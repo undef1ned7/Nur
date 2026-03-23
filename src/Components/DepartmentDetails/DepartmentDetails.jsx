@@ -318,7 +318,14 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
       basicAccess,
     );
 
-    // Для тарифа "Старт" не показываем секторные permissions
+    // Кафе в «Старт»: секторные права без кухни (повар/KDS)
+    if (sectorName === "Кафе") {
+      const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
+        (a) => a.backendKey !== "can_view_cafe_cook",
+      );
+      return [...basicAccess, ...cafeNoCook];
+    }
+
     return basicAccess;
   }
 

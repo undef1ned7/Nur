@@ -29,6 +29,7 @@ import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan as checkStartPlan } from "../../../../utils/subscriptionPlan";
 import Pagination from "../../Market/Counterparties/components/Pagination";
 import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
@@ -255,7 +256,11 @@ const statusFilterOptions =
    ========================================================= */
 const Orders = () => {
   const alert = useAlert();
-  const { profile } = useUser();
+  const { profile, company, tariff } = useUser();
+  const startPlan = useMemo(
+    () => checkStartPlan(tariff || company?.subscription_plan?.name),
+    [tariff, company?.subscription_plan?.name],
+  );
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -620,11 +625,11 @@ const Orders = () => {
   }, [orders]);
 
   const roleFiltered = useMemo(() => {
-    if (userRole === "официант") {
+    if (userRole === "официант" && !startPlan) {
       return orders.filter((item) => String(item.waiter) === String(userId));
     }
     return orders;
-  }, [orders, userRole, userId]);
+  }, [orders, userRole, userId, startPlan]);
 
   const visibleOrders = useMemo(() => {
     return roleFiltered;
@@ -982,7 +987,7 @@ const Orders = () => {
     setForm({
       table: String(order.table ?? ""),
       guests: Number(order.guests) || 0,
-      waiter: order.waiter ? String(order.waiter) : "",
+      waiter: startPlan ? "" : order.waiter ? String(order.waiter) : "",
       client: order.client ? String(order.client) : "",
       items: itemsNormalized,
     });
@@ -1079,7 +1084,8 @@ const Orders = () => {
     try {
       if (!isEditing) {
         const basePayload = normalizeOrderPayload(form, true);
-        if (isStaff) basePayload['waiter'] = userId;
+        if (startPlan) delete basePayload.waiter;
+        else if (isStaff) basePayload.waiter = userId;
         const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
 
         try {
@@ -1097,6 +1103,7 @@ const Orders = () => {
         await autoPrintKitchenTickets(res?.data?.id);
       } else {
         const payload = normalizeOrderPayload(form);
+        if (startPlan) delete payload.waiter;
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
       }
 
@@ -1258,8 +1265,7 @@ const Orders = () => {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          {
-            userRole == 'owner' && (
+          {userRole == "owner" && !startPlan && (
               <div className="cafeOrders__filter">
                 <SearchableCombobox
                   value={waiterFilter}
@@ -1461,8 +1467,8 @@ const Orders = () => {
                       disabled={saving}
                     />
                   </div>
-                  {
-                    !isStaff && <div className="cafeOrders__field" style={{ gridColumn: "1 / -1" }}>
+                  {!isStaff && !startPlan && (
+                    <div className="cafeOrders__field" style={{ gridColumn: "1 / -1" }}>
                       <SearchSelect
                         id="waiter"
                         openId={openSelectId}
@@ -1475,7 +1481,7 @@ const Orders = () => {
                         disabled={saving}
                       />
                     </div>
-                  }
+                  )}
                 </div>
 
                 {/* Клиент */}

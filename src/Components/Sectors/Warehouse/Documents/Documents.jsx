@@ -18,6 +18,7 @@ import {
   Undo2,
   LayoutGrid,
   List,
+  Download,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
@@ -600,157 +601,187 @@ const Documents = () => {
     );
   };
 
-  const handlePrint = async (item) => {
+  const buildInvoiceDataFromDocument = (doc) => {
+    const seller = {
+      id: company?.id || "",
+      name: company?.name || "",
+      inn: company?.inn || "",
+      okpo: company?.okpo || "",
+      score: company?.score || "",
+      bik: company?.bik || "",
+      address: company?.address || "",
+      phone: company?.phone || null,
+      email: company?.email || null,
+    };
+    const buyer =
+      doc.counterparty && typeof doc.counterparty === "object"
+        ? {
+            id: doc.counterparty.id,
+            name: doc.counterparty.name || "",
+            inn: doc.counterparty.inn || "",
+            okpo: doc.counterparty.okpo || "",
+            score: doc.counterparty.score || "",
+            bik: doc.counterparty.bik || "",
+            address: doc.counterparty.address || "",
+            phone: doc.counterparty.phone || null,
+            email: doc.counterparty.email || null,
+          }
+        : doc.counterparty_display_name
+          ? {
+              id: String(doc.counterparty || ""),
+              name: doc.counterparty_display_name || "",
+              inn: "",
+              okpo: "",
+              score: "",
+              bik: "",
+              address: "",
+              phone: null,
+              email: null,
+            }
+          : null;
+    const docDiscountPercent = Number(doc.discount_percent || 0);
+    const docDiscountAmount = Number(doc.discount_amount || 0);
+    const items = Array.isArray(doc.items)
+      ? doc.items.map((item) => {
+          const price = Number(item.price || 0);
+          const qty = Number(item.qty || 0);
+          const lineTotal = price * qty;
+          return {
+            id: item.id,
+            name:
+              item.product_name ??
+              item.product?.name ??
+              item.name ??
+              item.product?.title ??
+              "Товар",
+            qty: String(qty),
+            unit_price: String(price.toFixed(2)),
+            total: String(lineTotal.toFixed(2)),
+            unit: item.product?.unit ?? item.unit ?? "ШТ",
+            article:
+              String(
+                item.product?.article ??
+                  item.article ??
+                  item.product_article ??
+                  "",
+              ).trim() || "",
+            discount_percent: Number(item.discount_percent || 0),
+            discount_amount: Number(item.discount_amount || 0),
+            price_before_discount: String(price.toFixed(2)),
+          };
+        })
+      : [];
+    const subtotal = items.reduce(
+      (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
+      0,
+    );
+    const itemsDiscountTotal = items.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item.unit_price) *
+          Number(item.qty) *
+          Number(item.discount_percent || 0)) /
+          100,
+      0,
+    );
+    const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+    const total = Number(doc.total) || subtotal - totalDiscount;
+    const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
+    const warehouseToName = doc.warehouse_to?.name || "";
+
+    return {
+      doc_type: doc.doc_type || "SALE",
+      document: {
+        type: doc.doc_type?.toLowerCase() || "sale_invoice",
+        doc_type: doc.doc_type || "SALE",
+        title: "Накладная",
+        id: doc.id,
+        number: doc.number || "",
+        date: doc.date || doc.created_at?.split("T")[0] || "",
+        datetime: doc.created_at || doc.date || "",
+        created_at: doc.created_at || "",
+        discount_percent: docDiscountPercent,
+        discount_amount: docDiscountAmount,
+        discount_total: docDiscountAmount,
+      },
+      seller,
+      buyer,
+      items,
+      totals: {
+        subtotal: String(subtotal.toFixed(2)),
+        discount_total: String(totalDiscount.toFixed(2)),
+        tax_total: "0.00",
+        total: String(total.toFixed(2)),
+      },
+      warehouse: warehouseName,
+      warehouse_to: warehouseToName,
+    };
+  };
+
+  const printInvoicePdfBlob = (blob) => {
+    if (typeof window === "undefined" || !window.URL || !window.document) {
+      throw new Error("Печать доступна только в браузере");
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const iframe = window.document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = url;
+    window.document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            iframe.remove();
+          }, 2000);
+        }
+      }, 200);
+    };
+  };
+
+  const handlePrint = async (item, options = {}) => {
     if (!item?.id) return;
 
     try {
       if (activeTab === "invoices") {
-        // Для накладной используем новый warehouse API
+        // Для накладной используем warehouse API
         const result = await dispatch(getWarehouseDocumentById(item.id));
         if (getWarehouseDocumentById.fulfilled.match(result)) {
           const doc = result.payload;
-
-          // Преобразуем данные в формат для PDF
-          const seller = {
-            id: company?.id || "",
-            name: company?.name || "",
-            inn: company?.inn || "",
-            okpo: company?.okpo || "",
-            score: company?.score || "",
-            bik: company?.bik || "",
-            address: company?.address || "",
-            phone: company?.phone || null,
-            email: company?.email || null,
-          };
-          const buyer =
-            doc.counterparty && typeof doc.counterparty === "object"
-              ? {
-                  id: doc.counterparty.id,
-                  name: doc.counterparty.name || "",
-                  inn: doc.counterparty.inn || "",
-                  okpo: doc.counterparty.okpo || "",
-                  score: doc.counterparty.score || "",
-                  bik: doc.counterparty.bik || "",
-                  address: doc.counterparty.address || "",
-                  phone: doc.counterparty.phone || null,
-                  email: doc.counterparty.email || null,
-                }
-              : doc.counterparty_display_name
-                ? {
-                    id: String(doc.counterparty || ""),
-                    name: doc.counterparty_display_name || "",
-                    inn: "",
-                    okpo: "",
-                    score: "",
-                    bik: "",
-                    address: "",
-                    phone: null,
-                    email: null,
-                  }
-                : null;
-          const docDiscountPercent = Number(doc.discount_percent || 0);
-          const docDiscountAmount = Number(doc.discount_amount || 0);
-
-          const items = Array.isArray(doc.items)
-            ? doc.items.map((item) => {
-                const price = Number(item.price || 0);
-                const qty = Number(item.qty || 0);
-                // Сумма по строке = цена × кол-во (как на накладной из CreateSaleDocument), не используем line_total с бэка
-                const lineTotal = price * qty;
-                return {
-                  id: item.id,
-                  name:
-                    item.product_name ??
-                    item.product?.name ??
-                    item.name ??
-                    item.product?.title ??
-                    "Товар",
-                  qty: String(qty),
-                  unit_price: String(price.toFixed(2)),
-                  total: String(lineTotal.toFixed(2)),
-                  unit: item.product?.unit ?? item.unit ?? "ШТ",
-                  article:
-                    String(
-                      item.product?.article ??
-                        item.article ??
-                        item.product_article ??
-                        "",
-                    ).trim() || "",
-                  discount_percent: Number(item.discount_percent || 0),
-                  discount_amount: Number(item.discount_amount || 0),
-                  price_before_discount: String(price.toFixed(2)),
-                };
-              })
-            : [];
-          const subtotal = items.reduce(
-            (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
-            0,
-          );
-          const itemsDiscountTotal = items.reduce(
-            (sum, item) =>
-              sum +
-              (Number(item.unit_price) *
-                Number(item.qty) *
-                Number(item.discount_percent || 0)) /
-                100,
-            0,
-          );
-          const totalDiscount = itemsDiscountTotal + docDiscountAmount;
-          const total = Number(doc.total) || subtotal - totalDiscount;
-          const warehouseName =
-            doc.warehouse_from?.name || doc.warehouse?.name || "";
-          const warehouseToName = doc.warehouse_to?.name || "";
-
-          const invoiceData = {
-            doc_type: doc.doc_type || "SALE",
-            document: {
-              type: doc.doc_type?.toLowerCase() || "sale_invoice",
-              doc_type: doc.doc_type || "SALE",
-              title: "Накладная",
-              id: doc.id,
-              number: doc.number || "",
-              date: doc.date || doc.created_at?.split("T")[0] || "",
-              datetime: doc.created_at || doc.date || "",
-              created_at: doc.created_at || "",
-              discount_percent: docDiscountPercent,
-              discount_amount: docDiscountAmount,
-              discount_total: docDiscountAmount,
-            },
-            seller,
-            buyer,
-            items,
-            totals: {
-              subtotal: String(subtotal.toFixed(2)),
-              discount_total: String(totalDiscount.toFixed(2)),
-              tax_total: "0.00",
-              total: String(total.toFixed(2)),
-            },
-            warehouse: warehouseName,
-            warehouse_to: warehouseToName,
-          };
+          const invoiceData = buildInvoiceDataFromDocument(doc);
 
           if (!invoiceData) {
             throw new Error("Нет данных для генерации PDF");
           }
 
-          // Генерируем PDF из JSON используя InvoicePdfDocument
           const blob = await pdf(
             <InvoicePdfDocument data={invoiceData} />,
           ).toBlob();
-
-          const fileName = `invoice_${
-            invoiceData?.document?.number || item.id
-          }.pdf`;
-
-          // Скачиваем файл
-          const url = window.URL.createObjectURL(blob);
-          const a = window.document.createElement("a");
-          a.href = url;
-          a.download = fileName;
-          window.document.body.appendChild(a);
-          a.click();
-          window.document.body.removeChild(a);
-          setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+          if (options.directPrint) {
+            printInvoicePdfBlob(blob);
+          } else {
+            const fileName = `invoice_${
+              invoiceData?.document?.number || item.id
+            }.pdf`;
+            const url = window.URL.createObjectURL(blob);
+            const a = window.document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            window.document.body.appendChild(a);
+            a.click();
+            window.document.body.removeChild(a);
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+          }
         } else {
           throw new Error("Не удалось загрузить данные накладной");
         }
@@ -802,6 +833,10 @@ const Documents = () => {
           (printError.message || "Неизвестная ошибка", true),
       );
     }
+  };
+
+  const handleDirectInvoicePrint = async (item) => {
+    await handlePrint(item, { directPrint: true });
   };
 
   const formatAmount = (amount) => {
@@ -1139,10 +1174,17 @@ const Documents = () => {
                               )}
                               <button
                                 className="documents__action-btn"
+                                onClick={() => handleDirectInvoicePrint(item)}
+                                title="Сразу на печать"
+                              >
+                                <Printer size={18} />
+                              </button>
+                              <button
+                                className="documents__action-btn"
                                 onClick={() => handlePrint(item)}
                                 title="Печать"
                               >
-                                <Printer size={18} />
+                                <Download size={18} />
                               </button>
                               {item.rawStatus === "DRAFT" && (
                                 <button
@@ -1511,6 +1553,15 @@ const Documents = () => {
                     >
                       <Printer size={18} />
                     </button>
+                    {activeTab === "invoices" && (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() => handleDirectInvoicePrint(item)}
+                        title="Сразу на печать"
+                      >
+                        <Download size={18} />
+                      </button>
+                    )}
                     {item.rawStatus === "DRAFT" && (
                       <button
                         className="documents__action-btn"

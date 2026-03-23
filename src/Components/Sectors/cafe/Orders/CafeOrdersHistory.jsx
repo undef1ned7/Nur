@@ -1,5 +1,7 @@
 // src/.../Orders.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import {
   FaSearch,
   FaTimes,
@@ -65,6 +67,11 @@ const statusFilterOptions =
    ========================================================= */
 const CafeOrderHistory = () => {
   const alert = useAlert();
+  const { company, tariff } = useUser();
+  const startPlan = useMemo(
+    () => isStartPlan(tariff || company?.subscription_plan?.name),
+    [tariff, company?.subscription_plan?.name],
+  );
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
@@ -197,15 +204,21 @@ const CafeOrderHistory = () => {
   }, [fetchOrders]);
 
   useEffect(() => {
+    if (startPlan) setWaiterFilter(null);
+  }, [startPlan]);
+
+  useEffect(() => {
     setLoading(true);
     (async () => {
       try {
         const params = {
           search: debouncedOrderSearchQuery,
           status__in: ['closed', 'cancelled'].toString(),
-          waiter: waiterFilter,
           page: ordersPagination.currentPage
         };
+        if (!startPlan) {
+          params.waiter = waiterFilter;
+        }
         if (statusFilter) {
           params['status'] = statusFilter;
           delete params['status__in'];
@@ -218,7 +231,7 @@ const CafeOrderHistory = () => {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders, ordersPagination?.currentPage])
+  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders, ordersPagination?.currentPage, startPlan])
   useEffect(() => {
     const handler = () => fetchOrders();
     window.addEventListener("orders:refresh", handler);
@@ -241,11 +254,11 @@ const CafeOrderHistory = () => {
   }, [menuItems]);
 
   const roleFiltered = useMemo(() => {
-    if (userRole === "официант") {
+    if (userRole === "официант" && !startPlan) {
       return orders.filter((item) => String(item.waiter) === String(userId));
     }
     return orders;
-  }, [orders, userRole, userId]);
+  }, [orders, userRole, userId, startPlan]);
 
   const visibleOrders = useMemo(() => {
     return roleFiltered;
@@ -380,15 +393,17 @@ const CafeOrderHistory = () => {
               classNamePrefix="cafeOrders__combo"
             />
           </div>
-          <div className="cafeOrders__filter">
-            <SearchableCombobox
-              value={waiterFilter}
-              onChange={setWaiterFilter}
-              options={waiterOptions}
-              placeholder="Сотрудники"
-              classNamePrefix="cafeOrders__combo"
-            />
-          </div>
+          {!startPlan && (
+            <div className="cafeOrders__filter">
+              <SearchableCombobox
+                value={waiterFilter}
+                onChange={setWaiterFilter}
+                options={waiterOptions}
+                placeholder="Сотрудники"
+                classNamePrefix="cafeOrders__combo"
+              />
+            </div>
+          )}
         </div>
       </div>
       <DataContainer>
