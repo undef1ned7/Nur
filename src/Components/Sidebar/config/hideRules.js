@@ -46,6 +46,7 @@ export const HIDE_RULES = [
         "/crm/sklad",
         "/crm/analytics",
         "/crm/kassa",
+        "/crm/sell",
       ],
     },
   },

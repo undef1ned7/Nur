@@ -148,6 +148,22 @@ const Menu = () => {
     setKitchens(getListFromResponse(res));
   }, []);
 
+  const handleKitchenCreated = useCallback(
+    async (created) => {
+      await fetchKitchens();
+      const id = created?.id ?? created?.uuid;
+      if (id != null && id !== "") {
+        setForm((prev) => ({ ...prev, kitchen: String(id) }));
+      }
+      try {
+        window.dispatchEvent(new CustomEvent("orders:refresh"));
+      } catch {
+        /* ignore */
+      }
+    },
+    [fetchKitchens],
+  );
+
   const fetchWarehouse = useCallback(async () => {
     const res = await api.get("/cafe/warehouse/");
     setWarehouse(getListFromResponse(res));
@@ -703,6 +719,7 @@ const Menu = () => {
         addIngredientRow={addIngredientRow}
         changeIngredientRow={updateIngredientRow}
         removeIngredientRow={removeIngredientRow}
+        onKitchenCreated={handleKitchenCreated}
       />
 
       {/* Модал для создания/редактирования категории */}

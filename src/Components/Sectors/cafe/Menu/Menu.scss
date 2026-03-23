@@ -1539,6 +1539,21 @@
     min-width: 0;
   }
 
+  &__kitchenHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  &__kitchenCreate {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
   @media (max-width: 860px) {
     &__grid {
       grid-template-columns: 1fr;
