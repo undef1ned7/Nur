@@ -701,6 +701,31 @@
   &__staffBtn {
     margin-left: auto;
   }
+
+  &__exportForm {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fafafa;
+  }
+
+  &__exportActions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  &__exportError {
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: rgba(239, 68, 68, 0.08);
+    color: #991b1b;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+  }
 }
 
 /* ===== Adaptive ===== */
@@ -720,6 +745,9 @@
     }
     &__staffBtn {
       margin-left: 0;
+    }
+    &__exportForm {
+      grid-template-columns: 1fr;
     }
   }
 }

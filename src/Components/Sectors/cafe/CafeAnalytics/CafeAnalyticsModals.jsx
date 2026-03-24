@@ -73,6 +73,18 @@ const CafeAnalyticsModalContent = ({
   fmtInt,
   fmtMoney,
   toNum,
+
+  exportReport,
+  setExportReport,
+  exportFormat,
+  setExportFormat,
+  exportDateFrom,
+  setExportDateFrom,
+  exportDateTo,
+  setExportDateTo,
+  exportLoading,
+  exportError,
+  onExport,
 }) => {
   if (!modalKey) return null;
 
@@ -298,6 +310,66 @@ const CafeAnalyticsModalContent = ({
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "export") {
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__exportForm">
+          <label className="cafeAnalytics__staffField">
+            <span>Тип отчета</span>
+            <select
+              className="cafeAnalytics__staffSelect"
+              value={exportReport}
+              onChange={(e) => setExportReport(e.target.value)}
+            >
+              <option value="analytics">Аналитика</option>
+              <option value="cash">Касса</option>
+            </select>
+          </label>
+
+          <label className="cafeAnalytics__staffField">
+            <span>Формат</span>
+            <select
+              className="cafeAnalytics__staffSelect"
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+            >
+              <option value="excel">Excel (.xlsx)</option>
+              <option value="word">Word (.doc)</option>
+            </select>
+          </label>
+
+          <label className="cafeAnalytics__staffField">
+            <span>Дата от (опционально)</span>
+            <input
+              type="date"
+              className="cafeAnalytics__input"
+              value={exportDateFrom}
+              onChange={(e) => setExportDateFrom(e.target.value)}
+            />
+          </label>
+
+          <label className="cafeAnalytics__staffField">
+            <span>Дата до (опционально)</span>
+            <input
+              type="date"
+              className="cafeAnalytics__input"
+              value={exportDateTo}
+              onChange={(e) => setExportDateTo(e.target.value)}
+            />
+          </label>
+        </div>
+
+        {exportError ? <div className="cafeAnalytics__exportError">{exportError}</div> : null}
+
+        <div className="cafeAnalytics__exportActions">
+          <button className="cafeAnalytics__btn" type="button" onClick={onExport} disabled={exportLoading}>
+            {exportLoading ? "Экспорт..." : "Скачать файл"}
+          </button>
         </div>
       </div>
     );
