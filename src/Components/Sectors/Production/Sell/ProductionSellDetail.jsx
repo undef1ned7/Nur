@@ -6,7 +6,9 @@ import {
   getAgentSaleDetail,
   getAllProductionSaleDetail,
   agentSaleReturn,
+  getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
+import { useConfirm } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
 import ProductionInvoicePdfDocument from "./ProductionInvoicePdfDocument";
 
@@ -24,6 +26,7 @@ const ProductionSellDetail = ({
   useGlobalAccess = false,
 }) => {
   const { company, profile } = useUser();
+  const confirm = useConfirm();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(false);
@@ -89,22 +92,28 @@ const ProductionSellDetail = ({
       setError("Возврат возможен только для оплаченных или долговых продаж.");
       return;
     }
-    if (!window.confirm("Выполнить возврат? Статус продажи станет «Возвращена».")) return;
-    setError("");
-    setReturning(true);
-    try {
-      await agentSaleReturn(id);
-      onReturnSuccess?.();
-      onClose();
-    } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Не удалось выполнить возврат";
-      setError(msg);
-    } finally {
-      setReturning(false);
-    }
+    confirm("Выполнить возврат? Статус продажи станет «Возвращена».", async (ok) => {
+      if (!ok) return;
+      setError("");
+      setReturning(true);
+      try {
+        if (useGlobalAccess) {
+          await getAllProductionSaleReturn(id);
+        } else {
+          await agentSaleReturn(id);
+        }
+        onReturnSuccess?.();
+        onClose();
+      } catch (err) {
+        const msg =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Не удалось выполнить возврат";
+        setError(msg);
+      } finally {
+        setReturning(false);
+      }
+    });
   };
 
   const handleDownloadInvoice = async () => {

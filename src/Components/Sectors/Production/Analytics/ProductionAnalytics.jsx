@@ -983,7 +983,6 @@ const ProductionAnalytics = () => {
             </span>
           </div>
         </div>
-
         <div className="agent-analytics__metric-card">
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
             <Warehouse size={24} />
@@ -996,7 +995,7 @@ const ProductionAnalytics = () => {
             </span>
           </div>
         </div>
-
+      
         <div className="agent-analytics__metric-card">
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
             <Receipt size={24} />

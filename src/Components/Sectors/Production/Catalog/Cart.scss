@@ -1025,6 +1025,68 @@
     .cart-items-section {
       max-height: none;
       overflow-y: visible;
+
+      .cart-item {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+
+        .item-image {
+          width: 100%;
+          height: 160px;
+          align-self: stretch;
+          margin-bottom: 8px;
+
+          img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+        }
+
+        .item-details {
+          min-width: 0;
+
+          .item-name,
+          .item-price {
+            word-break: break-word;
+          }
+
+          .item-actions {
+            min-width: 0;
+
+            .item-actions-main {
+              min-width: 0;
+              width: 100%;
+              flex-wrap: wrap;
+              align-items: stretch;
+            }
+
+            .quantity-controls {
+              min-width: 0;
+              width: fit-content;
+              max-width: 100%;
+            }
+
+            .item-discount {
+              min-width: 0;
+              max-width: 100%;
+              flex-wrap: wrap;
+
+              &-input {
+                width: 100%;
+                min-width: 110px;
+                text-align: left;
+              }
+            }
+          }
+        }
+      }
     }
 
     // Стили для секции заказа в мобильной версии

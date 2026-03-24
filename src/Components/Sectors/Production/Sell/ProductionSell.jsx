@@ -2,10 +2,12 @@ import { Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
+import { useConfirm } from "../../../../hooks/useDialog";
 import {
   getAgentSalesList,
   getAllProductionSalesList,
   agentSaleReturn,
+  getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
@@ -46,6 +48,7 @@ const paymentMethodTranslate = {
 const ProductionSell = () => {
   const navigate = useNavigate();
   const { profile } = useUser();
+  const confirm = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,28 +107,32 @@ const ProductionSell = () => {
   const handleReturn = useCallback(
     async (item) => {
       if (!item?.id || !canReturnSale(item)) return;
-      if (
-        !window.confirm(
-          "Выполнить возврат? Статус продажи станет «Возвращена», товар вернётся на склад или агенту.",
-        )
-      )
-        return;
-      setReturningId(item.id);
-      setError("");
-      try {
-        await agentSaleReturn(item.id);
-        fetchList();
-      } catch (err) {
-        const msg =
-          err?.response?.data?.detail ||
-          err?.message ||
-          "Не удалось выполнить возврат";
-        setError(msg);
-      } finally {
-        setReturningId(null);
-      }
+      confirm(
+        "Выполнить возврат? Статус продажи станет «Возвращена», товар вернётся на склад или агенту.",
+        async (ok) => {
+          if (!ok) return;
+          setReturningId(item.id);
+          setError("");
+          try {
+            if (isOwnerOrAdmin) {
+              await getAllProductionSaleReturn(item.id);
+            } else {
+              await agentSaleReturn(item.id);
+            }
+            fetchList();
+          } catch (err) {
+            const msg =
+              err?.response?.data?.detail ||
+              err?.message ||
+              "Не удалось выполнить возврат";
+            setError(msg);
+          } finally {
+            setReturningId(null);
+          }
+        },
+      );
     },
-    [fetchList],
+    [confirm, fetchList, isOwnerOrAdmin],
   );
 
   useEffect(() => {
@@ -200,6 +207,7 @@ const ProductionSell = () => {
             </span>
           </div>
         </div>
+        
         {isOwner && (
           <button
             type="button"
