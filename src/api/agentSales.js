@@ -32,6 +32,11 @@ export const getAllProductionSaleDetail = async (saleId) => {
   return data;
 };
 
+export const getAllProductionSaleReturn = async (saleId) => {
+  const { data } = await api.post(`/main/pos/sales/${saleId}/return/`);
+  return data;
+};
+
 /**
  * Возврат продажи (только paid или debt). Статус → canceled.
  * @param {string} saleId - UUID продажи
