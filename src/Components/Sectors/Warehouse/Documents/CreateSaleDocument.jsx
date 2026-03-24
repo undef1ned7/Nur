@@ -245,7 +245,7 @@ const CreateSaleDocument = () => {
   const [docType, setDocType] = useState(initialDocType);
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
-  const [isDocumentPosted, setIsDocumentPosted] = useState(false);
+  const [isDocumentPosted, setIsDocumentPosted] = useState(true);
   const [isOrder, setIsOrder] = useState(false);
   const [documentDateValue, setDocumentDateValue] = useState(
     new Date().toISOString().split("T")[0],
@@ -259,13 +259,15 @@ const CreateSaleDocument = () => {
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
   const [showProductSelectModal, setShowProductSelectModal] = useState(false);
-  const [productSelectModalProduct, setProductSelectModalProduct] = useState(null);
+  const [productSelectModalProduct, setProductSelectModalProduct] =
+    useState(null);
   const [productSelectModalQty, setProductSelectModalQty] = useState("1");
   const productSelectQtyInputRef = useRef(null);
   const productListRefs = useRef({});
   const [showExitModal, setShowExitModal] = useState(false);
   const [cartItems, setCartItems] = useState([]);
-  const [activeGroupKeyForKeyboard, setActiveGroupKeyForKeyboard] = useState("");
+  const [activeGroupKeyForKeyboard, setActiveGroupKeyForKeyboard] =
+    useState("");
   const [groupKeyboardIndexMap, setGroupKeyboardIndexMap] = useState({});
   const [documentId] = useState(
     () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -331,7 +333,8 @@ const CreateSaleDocument = () => {
       ) {
         return;
       }
-      if (showProductSelectModal || showPrepaymentModal || showExitModal) return;
+      if (showProductSelectModal || showPrepaymentModal || showExitModal)
+        return;
       if (isTypingElement(document.activeElement)) return;
 
       const groupsByParentMap = new Map();
@@ -348,7 +351,8 @@ const CreateSaleDocument = () => {
         }
         const parent = g?.parent ?? null;
         const parentKey = parent === null ? "root" : String(parent);
-        if (!groupsByParentMap.has(parentKey)) groupsByParentMap.set(parentKey, []);
+        if (!groupsByParentMap.has(parentKey))
+          groupsByParentMap.set(parentKey, []);
         groupsByParentMap.get(parentKey).push(g);
       });
       for (const [k, arr] of groupsByParentMap.entries()) {
@@ -388,7 +392,9 @@ const CreateSaleDocument = () => {
         }
         return chain;
       };
-      const expandedOnlyKeys = allGroupKeys.filter((k) => expandedGroupIds.has(k));
+      const expandedOnlyKeys = allGroupKeys.filter((k) =>
+        expandedGroupIds.has(k),
+      );
 
       if (key === "ArrowLeft" || key === "ArrowRight") {
         if (!expandedOnlyKeys.length) return;
@@ -414,7 +420,9 @@ const CreateSaleDocument = () => {
       }
 
       const preferredKey = String(activeGroupKeyForKeyboard || "");
-      const preferredEntry = preferredKey ? groupProducts?.[preferredKey] : null;
+      const preferredEntry = preferredKey
+        ? groupProducts?.[preferredKey]
+        : null;
       const preferredItems = Array.isArray(preferredEntry?.items)
         ? preferredKey === "all"
           ? sortProductsByDate(getUngroupedProducts(preferredEntry.items))
@@ -489,7 +497,9 @@ const CreateSaleDocument = () => {
             (k) => String(k) === String(targetGroupKey),
           );
           const prevGroupKey =
-            currentGroupFlatIndex > 0 ? allGroupKeys[currentGroupFlatIndex - 1] : null;
+            currentGroupFlatIndex > 0
+              ? allGroupKeys[currentGroupFlatIndex - 1]
+              : null;
 
           if (prevGroupKey) {
             const prevKey = String(prevGroupKey);
@@ -511,7 +521,9 @@ const CreateSaleDocument = () => {
                 [prevKey]: 0,
               }));
             } else {
-              const prevItems = Array.isArray(prevEntry?.items) ? prevEntry.items : [];
+              const prevItems = Array.isArray(prevEntry?.items)
+                ? prevEntry.items
+                : [];
               const prevVisibleCount =
                 prevKey === "all"
                   ? getUngroupedProducts(prevItems).length
@@ -873,7 +885,9 @@ const CreateSaleDocument = () => {
                   </div>
                 ) : (
                   (() => {
-                    const visibleProducts = sortProductsByDate(cached?.items || []);
+                    const visibleProducts = sortProductsByDate(
+                      cached?.items || [],
+                    );
                     const currentIndex =
                       typeof groupKeyboardIndexMap[gKey] === "number"
                         ? groupKeyboardIndexMap[gKey]
@@ -923,7 +937,8 @@ const CreateSaleDocument = () => {
                           } else if (e.key === "Enter") {
                             e.preventDefault();
                             const selectedByKeyboard =
-                              visibleProducts[currentIndex] || visibleProducts[0];
+                              visibleProducts[currentIndex] ||
+                              visibleProducts[0];
                             if (selectedByKeyboard) {
                               openProductSelectModal(selectedByKeyboard);
                             }
@@ -935,7 +950,8 @@ const CreateSaleDocument = () => {
                             String(product.id),
                           );
                           const isInCart = cartItems.some(
-                            (item) => String(item.productId) === String(product.id),
+                            (item) =>
+                              String(item.productId) === String(product.id),
                           );
                           const isKeyboardActive =
                             activeGroupKeyForKeyboard === gKey &&
@@ -953,7 +969,7 @@ const CreateSaleDocument = () => {
                                   [gKey]: index,
                                 }));
                               }}
-                              onClick={(e) => {
+                              onDoubleClick={(e) => {
                                 e.stopPropagation();
                                 handleAddProduct(product);
                               }}
@@ -967,7 +983,9 @@ const CreateSaleDocument = () => {
                                 </FullNamePopover>
                                 <div className="create-sale-document__group-product-meta">
                                   <span className="create-sale-document__group-product-price">
-                                    {formatPrice(getProductPriceForDocument(product))}{" "}
+                                    {formatPrice(
+                                      getProductPriceForDocument(product),
+                                    )}{" "}
                                     сом
                                   </span>
                                   <span className="create-sale-document__group-product-stock">
@@ -1522,7 +1540,9 @@ const CreateSaleDocument = () => {
 
       const unit = String(product.unit || "шт").toLowerCase();
       const isPiece = unit === "шт" || unit === "штук";
-      const qtyToAdd = isPiece ? Math.floor(requestedQtyNumber) : requestedQtyNumber;
+      const qtyToAdd = isPiece
+        ? Math.floor(requestedQtyNumber)
+        : requestedQtyNumber;
       if (qtyToAdd <= 0) {
         alert("Количество должно быть больше 0");
         return false;
@@ -1539,7 +1559,11 @@ const CreateSaleDocument = () => {
         const existing = cartItems[existingItemIndex];
         const currentQty = Number(existing.quantity || 0);
         const maxQty = Number(existing.stock ?? stock);
-        if (isStockLimitRequired && maxQty > 0 && currentQty + qtyToAdd > maxQty) {
+        if (
+          isStockLimitRequired &&
+          maxQty > 0 &&
+          currentQty + qtyToAdd > maxQty
+        ) {
           const available = Math.max(0, maxQty - currentQty);
           alert(
             available > 0
@@ -1615,7 +1639,10 @@ const CreateSaleDocument = () => {
       alert("Введите корректное количество");
       return;
     }
-    const success = await handleAddProduct(productSelectModalProduct, qtyNumber);
+    const success = await handleAddProduct(
+      productSelectModalProduct,
+      qtyNumber,
+    );
     if (success) {
       closeProductSelectModal();
       // Гарантируем, что текущая "папка" (группа) останется раскрытой после добавления
@@ -2497,7 +2524,9 @@ const CreateSaleDocument = () => {
                                         visibleProducts[currentIndex] ||
                                         visibleProducts[0];
                                       if (selectedByKeyboard) {
-                                        openProductSelectModal(selectedByKeyboard);
+                                        openProductSelectModal(
+                                          selectedByKeyboard,
+                                        );
                                       }
                                     }
                                   }}
@@ -2542,7 +2571,9 @@ const CreateSaleDocument = () => {
                                           <div className="create-sale-document__group-product-meta">
                                             <span className="create-sale-document__group-product-price">
                                               {formatPrice(
-                                                getProductPriceForDocument(product),
+                                                getProductPriceForDocument(
+                                                  product,
+                                                ),
                                               )}{" "}
                                               сом
                                             </span>

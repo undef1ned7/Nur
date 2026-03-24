@@ -26,8 +26,8 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
   const { profile, loading } = useUser();
 
   const getProfileFunc = useCallback(async () => {
-    dispatch(getProfile())
-  }, [])
+    await dispatch(getProfile()).unwrap();
+  }, [dispatch]);
   useEffect(() => {
     if (loading) return;
     if (onProfileLoaded) {

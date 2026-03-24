@@ -43,7 +43,19 @@ api.interceptors.response.use(
     const accessToken = localStorage.getItem("accessToken");
     const refreshToken = localStorage.getItem("refreshToken");
 
-    if (err.response?.status === 401 && !originalRequest._retry && accessToken) {
+    if (
+      err.response?.status === 401 &&
+      !originalRequest._retry &&
+      accessToken &&
+      !originalRequest?.url?.includes("/users/auth/refresh/")
+    ) {
+      if (!refreshToken) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/login";
+        return Promise.reject(err);
+      }
+
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -61,14 +73,14 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await axios.post("/users/auth/refresh/", {
+        const response = await api.post("/users/auth/refresh/", {
           refresh: refreshToken,
         });
 
         const newAccessToken = response.data.access;
         localStorage.setItem("accessToken", newAccessToken);
 
-        api.defaults.headers["Authorization"] = "Bearer " + newAccessToken;
+        api.defaults.headers.common["Authorization"] = "Bearer " + newAccessToken;
         originalRequest.headers["Authorization"] = "Bearer " + newAccessToken;
 
         processQueue(null, newAccessToken);

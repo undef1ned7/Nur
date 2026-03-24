@@ -35,7 +35,12 @@ export const loginUserAsync = createAsyncThunk(
       localStorage.setItem("userData", JSON.stringify(response));
       if (response.access) {
         localStorage.setItem("accessToken", response.access);
+      }
+      if (response.refresh) {
+        localStorage.setItem("refreshToken", response.refresh);
+      }
 
+      if (response.access) {
         // Миграция permissions — не блокируем логин при её падении
         try {
           await migrateUserPermissions();
