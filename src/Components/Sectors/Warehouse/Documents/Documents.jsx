@@ -261,7 +261,7 @@ const Documents = () => {
     return Math.max(0, subtotal - totalDiscount);
   };
 
-  // Маппинг статусов по API (9): DRAFT | CASH_PENDING | POSTED | REJECTED
+  // Маппинг статусов: DRAFT | SALE_REQUEST | CASH_PENDING | POSTED | REJECTED
   const getStatusLabel = (status) => {
     switch (status) {
       case "POSTED":
@@ -270,6 +270,8 @@ const Documents = () => {
         return "Ожидает кассы";
       case "REJECTED":
         return "Отклонён";
+      case "SALE_REQUEST":
+        return "Заявка на продажу";
       default:
         return "Черновик";
     }
@@ -282,10 +284,16 @@ const Documents = () => {
         return "cash_pending";
       case "REJECTED":
         return "rejected";
+      case "SALE_REQUEST":
+        return "sale_request";
       default:
         return "draft";
     }
   };
+
+  /** Черновик и заявка на продажу — одни и те же действия (редактирование, проведение). */
+  const isSaleDraftLikeStatus = (status) =>
+    status === "DRAFT" || status === "SALE_REQUEST";
 
   // Фильтрация по агенту (для продаж)
   const filteredDocuments = useMemo(() => {
@@ -1059,7 +1067,7 @@ const Documents = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {item.rawStatus === "DRAFT" && (
+                              {isSaleDraftLikeStatus(item.rawStatus) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handleEditDraft(item)}
@@ -1075,7 +1083,7 @@ const Documents = () => {
                               >
                                 <Printer size={18} />
                               </button>
-                              {item.rawStatus === "DRAFT" && (
+                              {isSaleDraftLikeStatus(item.rawStatus) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -1163,7 +1171,7 @@ const Documents = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {item.rawStatus === "DRAFT" && (
+                              {isSaleDraftLikeStatus(item.rawStatus) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handleEditDraft(item)}
@@ -1186,7 +1194,7 @@ const Documents = () => {
                               >
                                 <Download size={18} />
                               </button>
-                              {item.rawStatus === "DRAFT" && (
+                              {isSaleDraftLikeStatus(item.rawStatus) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -1360,7 +1368,7 @@ const Documents = () => {
                                 >
                                   <Eye size={18} />
                                 </button>
-                                {agentItem?.rawStatus === "DRAFT" && (
+                                {isSaleDraftLikeStatus(agentItem?.rawStatus) && (
                                   <button
                                     type="button"
                                     className="documents__action-btn"
@@ -1537,7 +1545,7 @@ const Documents = () => {
                     >
                       <Eye size={18} />
                     </button>
-                    {item.rawStatus === "DRAFT" && (
+                    {isSaleDraftLikeStatus(item.rawStatus) && (
                       <button
                         className="documents__action-btn"
                         onClick={() => handleEditDraft(item)}
@@ -1562,7 +1570,7 @@ const Documents = () => {
                         <Download size={18} />
                       </button>
                     )}
-                    {item.rawStatus === "DRAFT" && (
+                    {isSaleDraftLikeStatus(item.rawStatus) && (
                       <button
                         className="documents__action-btn"
                         onClick={() => handlePost(item)}
@@ -1722,7 +1730,7 @@ const Documents = () => {
                           >
                             <Eye size={18} />
                           </button>
-                          {agentItem?.rawStatus === "DRAFT" && (
+                          {isSaleDraftLikeStatus(agentItem?.rawStatus) && (
                             <button
                               className="documents__action-btn"
                               onClick={() =>
