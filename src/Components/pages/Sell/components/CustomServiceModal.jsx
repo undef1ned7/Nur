@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from "react";
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
 
 const CustomServiceModal = ({
@@ -7,14 +8,35 @@ const CustomServiceModal = ({
   setCustomService,
   onAdd,
 }) => {
+  const handleClose = useCallback(() => {
+    onClose();
+    setCustomService({ name: "", price: "", quantity: "1" });
+  }, [onClose, setCustomService]);
+
+  const handleAdd = useCallback(() => {
+    onAdd();
+  }, [onAdd]);
+
+  useEffect(() => {
+    if (!show) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        handleAdd();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [show, handleClose, handleAdd]);
+
   if (!show) return null;
 
   return (
     <UniversalModal
-      onClose={() => {
-        onClose();
-        setCustomService({ name: "", price: "", quantity: "1" });
-      }}
+      onClose={handleClose}
       title={"Дополнительная услуга"}
     >
       <div className="start__custom-service">
@@ -76,10 +98,7 @@ const CustomServiceModal = ({
           <button
             className="sell__reset"
             type="button"
-            onClick={() => {
-              onClose();
-              setCustomService({ name: "", price: "", quantity: "1" });
-            }}
+            onClick={handleClose}
           >
             Отменить
           </button>
@@ -87,7 +106,7 @@ const CustomServiceModal = ({
             className="start__total-pay"
             style={{ width: "auto" }}
             type="button"
-            onClick={onAdd}
+            onClick={handleAdd}
           >
             Добавить
           </button>

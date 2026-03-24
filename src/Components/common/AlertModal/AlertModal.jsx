@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import ReactPortal from "../Portal/ReactPortal";
 
 // Simple, reusable alert modal with types: success | error | warning | info
@@ -44,10 +44,23 @@ const AlertModal = ({
   onClose,
   onConfirm,
 }) => {
-  if (!open) return null;
   const styles = TYPE_STYLES[type] || TYPE_STYLES.info;
   const handle = onConfirm || onClose;
   const ALERT_Z_INDEX = 100000;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" || e.key === "Enter") {
+        e.preventDefault();
+        handle?.();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, handle]);
+
+  if (!open) return null;
 
   return (
     <ReactPortal wrapperId="alert_modal">

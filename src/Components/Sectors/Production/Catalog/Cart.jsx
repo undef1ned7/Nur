@@ -40,6 +40,7 @@ import {
 } from "../../../../store/creators/shiftThunk";
 import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
+import api from "../../../../api";
 // Alert is handled by parent (ProductionCatalog) via onNotify
 import "./Cart.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
@@ -1372,6 +1373,27 @@ const Cart = ({
         }
 
         await dispatch(createDeal(dealPayload)).unwrap();
+      }
+
+      const cashboxId = String(cashBoxes?.[0]?.id ?? cashBoxes?.[0]?.uuid ?? "");
+      if (!cashboxId) {
+        throw new Error("Нет доступной кассы для отправки запроса");
+      }
+
+      const requestedAmount =
+        paymentType === "Предоплата"
+          ? Number(prepaymentAmount || 0)
+          : paymentType === "Долги"
+            ? 0
+            : Number(totalAmount || 0);
+
+      if (requestedAmount > 0) {
+        await api.post("/construction/cashflows/", {
+          cashbox: cashboxId,
+          type: "income",
+          name: `Продажа`,
+          amount: requestedAmount,
+        });
       }
 
       // Используем checkoutAgentCart для чекаута корзины

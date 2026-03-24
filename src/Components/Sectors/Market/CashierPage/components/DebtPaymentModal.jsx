@@ -337,20 +337,16 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
     }
   };
 
-  // Обработка нажатия ESC
+  // Обработка нажатия ESC: всегда закрываем модалку
   React.useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === "Escape") {
-        if (selectedClient) {
-          handleBackToList();
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [onClose, selectedClient]);
+  }, [onClose]);
 
   // Если выбран клиент, показываем его deals
   if (selectedClient) {

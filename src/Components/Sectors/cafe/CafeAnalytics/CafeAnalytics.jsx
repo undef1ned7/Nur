@@ -47,6 +47,14 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const pickCategoryName = (x) =>
+  x?.category_name ||
+  x?.category?.name ||
+  x?.category ||
+  x?.name ||
+  x?.title ||
+  "—";
+
 const fmtInt = (n) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(
     Math.round(Number(n) || 0)
@@ -218,6 +226,7 @@ const CafeAnalytics = () => {
     revenue: "0.00",
   });
   const [salesItems, setSalesItems] = useState([]);
+  const [salesCategories, setSalesCategories] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
   // гости
@@ -277,16 +286,20 @@ const CafeAnalytics = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rSalesSummary, rSalesItems, rLowStock] = await Promise.all([
+      const [rSalesSummary, rSalesItems, rSalesCategories, rLowStock] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
           .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 10 } })
           .catch(() => ({ data: [] })),
+        api.get("/cafe/analytics/sales/categories/", { params }).catch(() => ({ data: [] })),
         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
       ]);
 
       setSalesSummary(rSalesSummary?.data || { orders_count: 0, items_qty: 0, revenue: "0.00" });
       setSalesItems(Array.isArray(listFrom(rSalesItems)) ? listFrom(rSalesItems) : []);
+      setSalesCategories(
+        Array.isArray(listFrom(rSalesCategories)) ? listFrom(rSalesCategories) : []
+      );
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
 
       fetchGuestsCount().catch(() => {});
@@ -300,6 +313,7 @@ const CafeAnalytics = () => {
       console.error("CafeAnalytics fetchAll error:", e);
       setSalesSummary({ orders_count: 0, items_qty: 0, revenue: "0.00" });
       setSalesItems([]);
+      setSalesCategories([]);
       setLowStock([]);
     } finally {
       setLoading(false);
@@ -643,6 +657,44 @@ const CafeAnalytics = () => {
                     </tr>
                   ))}
                   {!salesItems.length && (
+                    <tr>
+                      <td colSpan={3} className="cafeAnalytics__tdEmpty">
+                        Нет данных.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__card cafeAnalytics__card--full">
+          <div className="cafeAnalytics__cardHead cafeAnalytics__cardHead--tight">
+            <div className="cafeAnalytics__cardTitle">Продажи по категориям</div>
+          </div>
+
+          <div className="cafeAnalytics__cardBody cafeAnalytics__cardBody--tight">
+            <div className="cafeAnalytics__tableWrap">
+              <table className="cafeAnalytics__table">
+                <thead>
+                  <tr>
+                    <th>Категория</th>
+                    <th>Кол-во</th>
+                    <th>Выручка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesCategories.map((x, idx) => (
+                    <tr key={x?.category_id || x?.id || `${pickCategoryName(x)}_${idx}`}>
+                      <td className="cafeAnalytics__tdTitle" title={pickCategoryName(x)}>
+                        {pickCategoryName(x)}
+                      </td>
+                      <td>{fmtInt(toNum(x?.qty ?? x?.items_qty ?? x?.orders_count ?? 0))}</td>
+                      <td>{fmtMoney(toNum(x?.revenue ?? x?.total ?? x?.amount ?? 0))}</td>
+                    </tr>
+                  ))}
+                  {!salesCategories.length && (
                     <tr>
                       <td colSpan={3} className="cafeAnalytics__tdEmpty">
                         Нет данных.

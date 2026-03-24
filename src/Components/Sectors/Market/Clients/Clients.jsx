@@ -840,6 +840,13 @@ export default function MarketClients() {
   const [addPhone, setAddPhone] = useState("");
   const [addEmail, setAddEmail] = useState("");
   const [addDate, setAddDate] = useState(todayStr());
+  const [addStatus, setAddStatus] = useState("");
+  const [addLlc, setAddLlc] = useState("");
+  const [addInn, setAddInn] = useState("");
+  const [addOkpo, setAddOkpo] = useState("");
+  const [addScore, setAddScore] = useState("");
+  const [addBik, setAddBik] = useState("");
+  const [addAddress, setAddAddress] = useState("");
   const [addSaving, setAddSaving] = useState(false);
   const [addErr, setAddErr] = useState("");
 
@@ -853,10 +860,29 @@ export default function MarketClients() {
     setAddPhone("");
     setAddEmail("");
     setAddDate(todayStr());
+    setAddStatus("");
+    setAddLlc("");
+    setAddInn("");
+    setAddOkpo("");
+    setAddScore("");
+    setAddBik("");
+    setAddAddress("");
     setAddErr("");
   };
 
-  const createRowApi = async ({ full_name, phone, email, date }) => {
+  const createRowApi = async ({
+    full_name,
+    phone,
+    email,
+    date,
+    status,
+    llc,
+    inn,
+    okpo,
+    score,
+    bik,
+    address,
+  }) => {
     const variants = TYPE_VARIANTS_BY_TAB[activeTab] || [];
     const preferredFirst = acceptedTypeByTab[activeTab]
       ? [
@@ -879,6 +905,13 @@ export default function MarketClients() {
       };
       if (email) payload.email = String(email).trim();
       if (date) payload.date = date;
+      if (status) payload.status = String(status).trim();
+      if (llc) payload.llc = String(llc).trim();
+      if (inn) payload.inn = String(inn).trim();
+      if (okpo) payload.okpo = String(okpo).trim();
+      if (score) payload.score = String(score).trim();
+      if (bik) payload.bik = String(bik).trim();
+      if (address) payload.address = String(address).trim();
 
       try {
         const res = await api.post("/main/clients/", payload);
@@ -902,6 +935,13 @@ export default function MarketClients() {
       phone: String(phone || "").trim(),
       ...(email ? { email: String(email).trim() } : {}),
       ...(date ? { date } : {}),
+      ...(status ? { status: String(status).trim() } : {}),
+      ...(llc ? { llc: String(llc).trim() } : {}),
+      ...(inn ? { inn: String(inn).trim() } : {}),
+      ...(okpo ? { okpo: String(okpo).trim() } : {}),
+      ...(score ? { score: String(score).trim() } : {}),
+      ...(bik ? { bik: String(bik).trim() } : {}),
+      ...(address ? { address: String(address).trim() } : {}),
     };
     const res = await api.post("/main/clients/", fallbackPayload);
     return res?.data || fallbackPayload;
@@ -917,6 +957,13 @@ export default function MarketClients() {
         phone: addPhone,
         email: addEmail,
         date: addDate,
+        status: addStatus,
+        llc: addLlc,
+        inn: addInn,
+        okpo: addOkpo,
+        score: addScore,
+        bik: addBik,
+        address: addAddress,
       });
       if (created?.id) navigate(`${CARD_BASE}${created.id}`); // абсолютный путь
       setRows((prev) => [created, ...(Array.isArray(prev) ? prev : [])]);
@@ -1265,6 +1312,76 @@ export default function MarketClients() {
                   type="date"
                   value={addDate}
                   onChange={(e) => setAddDate(e.target.value)}
+                />
+              </label>
+
+              <label className="field">
+                <span>Статус</span>
+                <input
+                  type="text"
+                  value={addStatus}
+                  onChange={(e) => setAddStatus(e.target.value)}
+                  placeholder="new"
+                />
+              </label>
+
+              <label className="field">
+                <span>ОсОО</span>
+                <input
+                  type="text"
+                  value={addLlc}
+                  onChange={(e) => setAddLlc(e.target.value)}
+                  placeholder="ОсОО"
+                />
+              </label>
+
+              <label className="field">
+                <span>ИНН</span>
+                <input
+                  type="text"
+                  value={addInn}
+                  onChange={(e) => setAddInn(e.target.value)}
+                  placeholder="ИНН"
+                />
+              </label>
+
+              <label className="field">
+                <span>ОКПО</span>
+                <input
+                  type="text"
+                  value={addOkpo}
+                  onChange={(e) => setAddOkpo(e.target.value)}
+                  placeholder="ОКПО"
+                />
+              </label>
+
+              <label className="field">
+                <span>Счет</span>
+                <input
+                  type="text"
+                  value={addScore}
+                  onChange={(e) => setAddScore(e.target.value)}
+                  placeholder="Расчетный счет"
+                />
+              </label>
+
+              <label className="field">
+                <span>БИК</span>
+                <input
+                  type="text"
+                  value={addBik}
+                  onChange={(e) => setAddBik(e.target.value)}
+                  placeholder="БИК"
+                />
+              </label>
+
+              <label className="field">
+                <span>Адрес</span>
+                <input
+                  type="text"
+                  value={addAddress}
+                  onChange={(e) => setAddAddress(e.target.value)}
+                  placeholder="Адрес"
                 />
               </label>
             </div>
