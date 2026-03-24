@@ -7,11 +7,8 @@ import React, {
 } from "react";
 import {
   Eye,
-  Heart,
   ShoppingCart,
-  Star,
   Search,
-  Filter,
   Grid,
   List,
   Plus,
@@ -49,7 +46,6 @@ import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import Cart from "./Cart";
 import "./ProductionCatalog.scss";
-import { display, margin } from "@mui/system";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert } from "../../../../hooks/useDialog";

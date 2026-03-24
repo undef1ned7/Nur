@@ -7,6 +7,7 @@ import {
   FaBoxOpen,
   FaShoppingCart,
   FaUsers,
+  FaDownload,
 } from "react-icons/fa";
 import {
   Chart,
@@ -46,6 +47,14 @@ const toNum = (v) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+
+const pickCategoryName = (x) =>
+  x?.category_name ||
+  x?.category?.name ||
+  x?.category ||
+  x?.name ||
+  x?.title ||
+  "—";
 
 const fmtInt = (n) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(
@@ -218,6 +227,7 @@ const CafeAnalytics = () => {
     revenue: "0.00",
   });
   const [salesItems, setSalesItems] = useState([]);
+  const [salesCategories, setSalesCategories] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
   // гости
@@ -235,6 +245,12 @@ const CafeAnalytics = () => {
   const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters
   const [staffQ, setStaffQ] = useState("");
   const [staffSort, setStaffSort] = useState("revenue_desc"); // revenue_desc | orders_desc | avg_desc | name_asc
+  const [exportReport, setExportReport] = useState("analytics");
+  const [exportFormat, setExportFormat] = useState("excel");
+  const [exportDateFrom, setExportDateFrom] = useState("");
+  const [exportDateTo, setExportDateTo] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   const params = useMemo(() => {
     const p = {};
@@ -277,16 +293,20 @@ const CafeAnalytics = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rSalesSummary, rSalesItems, rLowStock] = await Promise.all([
+      const [rSalesSummary, rSalesItems, rSalesCategories, rLowStock] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
           .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 10 } })
           .catch(() => ({ data: [] })),
+        api.get("/cafe/analytics/sales/categories/", { params }).catch(() => ({ data: [] })),
         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
       ]);
 
       setSalesSummary(rSalesSummary?.data || { orders_count: 0, items_qty: 0, revenue: "0.00" });
       setSalesItems(Array.isArray(listFrom(rSalesItems)) ? listFrom(rSalesItems) : []);
+      setSalesCategories(
+        Array.isArray(listFrom(rSalesCategories)) ? listFrom(rSalesCategories) : []
+      );
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
 
       fetchGuestsCount().catch(() => {});
@@ -300,6 +320,7 @@ const CafeAnalytics = () => {
       console.error("CafeAnalytics fetchAll error:", e);
       setSalesSummary({ orders_count: 0, items_qty: 0, revenue: "0.00" });
       setSalesItems([]);
+      setSalesCategories([]);
       setLowStock([]);
     } finally {
       setLoading(false);
@@ -432,6 +453,13 @@ const CafeAnalytics = () => {
     setModalKey(key);
     setStaffQ("");
     setStaffSort("revenue_desc");
+    if (key === "export") {
+      setExportReport("analytics");
+      setExportFormat("excel");
+      setExportDateFrom(dateFrom || "");
+      setExportDateTo(dateTo || "");
+      setExportError("");
+    }
   };
   const closeModal = () => setModalKey(null);
 
@@ -442,6 +470,7 @@ const CafeAnalytics = () => {
     if (modalKey === "stock") return "Склад";
     if (modalKey === "cooks") return "Аналитика по поварам";
     if (modalKey === "waiters") return "Аналитика по официантам";
+    if (modalKey === "export") return "Экспорт отчета";
     return "";
   }, [modalKey]);
 
@@ -476,6 +505,52 @@ const CafeAnalytics = () => {
       items: sumBy(rows, "items_qty"),
     };
   }, [activeStaffRows]);
+
+  const handleExport = useCallback(async () => {
+    setExportLoading(true);
+    setExportError("");
+    try {
+      const exportParams = {
+        report: exportReport,
+        format: exportFormat,
+      };
+      if (exportDateFrom) exportParams.date_from = exportDateFrom;
+      if (exportDateTo) exportParams.date_to = exportDateTo;
+
+      const response = await api.get("/cafe/analytics/export/", {
+        params: exportParams,
+        responseType: "blob",
+        // axios по умолчанию шлёт Accept: application/json — DRF отказывает для .xlsx/.doc
+        headers: { Accept: "*/*" },
+      });
+
+      const contentDisposition = response.headers?.["content-disposition"] || "";
+      const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+      const fallbackExt = exportFormat === "excel" ? "xlsx" : "doc";
+      const fallbackName = `${exportReport}_${exportDateFrom || "all"}_${exportDateTo || "all"}.${fallbackExt}`;
+      const rawFileName = decodeURIComponent(match?.[1] || match?.[2] || fallbackName);
+
+      const blob = new Blob([response.data], {
+        type:
+          exportFormat === "excel"
+            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            : "application/msword",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = rawFileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      closeModal();
+    } catch (e) {
+      setExportError("Не удалось выполнить экспорт. Проверьте параметры и попробуйте снова.");
+    } finally {
+      setExportLoading(false);
+    }
+  }, [exportReport, exportFormat, exportDateFrom, exportDateTo]);
 
   return (
     <section className="cafeAnalytics">
@@ -520,6 +595,14 @@ const CafeAnalytics = () => {
                 type="button"
               >
                 <FaSync /> Обновить
+              </button>
+              <button
+                className="cafeAnalytics__btn"
+                onClick={() => openModal("export")}
+                type="button"
+                disabled={exportLoading}
+              >
+                <FaDownload /> Экспорт
               </button>
             </div>
           </div>
@@ -655,6 +738,44 @@ const CafeAnalytics = () => {
           </div>
         </div>
 
+        <div className="cafeAnalytics__card cafeAnalytics__card--full">
+          <div className="cafeAnalytics__cardHead cafeAnalytics__cardHead--tight">
+            <div className="cafeAnalytics__cardTitle">Продажи по категориям</div>
+          </div>
+
+          <div className="cafeAnalytics__cardBody cafeAnalytics__cardBody--tight">
+            <div className="cafeAnalytics__tableWrap">
+              <table className="cafeAnalytics__table">
+                <thead>
+                  <tr>
+                    <th>Категория</th>
+                    <th>Кол-во</th>
+                    <th>Выручка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesCategories.map((x, idx) => (
+                    <tr key={x?.category_id || x?.id || `${pickCategoryName(x)}_${idx}`}>
+                      <td className="cafeAnalytics__tdTitle" title={pickCategoryName(x)}>
+                        {pickCategoryName(x)}
+                      </td>
+                      <td>{fmtInt(toNum(x?.qty ?? x?.items_qty ?? x?.orders_count ?? 0))}</td>
+                      <td>{fmtMoney(toNum(x?.revenue ?? x?.total ?? x?.amount ?? 0))}</td>
+                    </tr>
+                  ))}
+                  {!salesCategories.length && (
+                    <tr>
+                      <td colSpan={3} className="cafeAnalytics__tdEmpty">
+                        Нет данных.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <button className="cafeAnalytics__mini" type="button" onClick={() => openModal("stock")}>
           <div className="cafeAnalytics__miniTop">
             <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--red">
@@ -699,6 +820,17 @@ const CafeAnalytics = () => {
           fmtInt={fmtInt}
           fmtMoney={fmtMoney}
           toNum={toNum}
+          exportReport={exportReport}
+          setExportReport={setExportReport}
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          exportDateFrom={exportDateFrom}
+          setExportDateFrom={setExportDateFrom}
+          exportDateTo={exportDateTo}
+          setExportDateTo={setExportDateTo}
+          exportLoading={exportLoading}
+          exportError={exportError}
+          onExport={handleExport}
         />
       </CafeAnalyticsModal>
     </section>

@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from "react";
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
 
 const DiscountModal = ({
@@ -10,14 +11,38 @@ const DiscountModal = ({
   mode = "amount", // "amount" | "percent"
   setMode, // опционально, если нужно менять режим из модалки
 }) => {
+  const handleClose = useCallback(() => {
+    onClose();
+    setDiscountValue("");
+  }, [onClose, setDiscountValue]);
+
+  const handleApply = useCallback(() => {
+    const discount = String(discountValue || "").trim() === "" ? "0" : discountValue;
+    onApply(discount);
+    onClose();
+    setDiscountValue("");
+  }, [discountValue, onApply, onClose, setDiscountValue]);
+
+  useEffect(() => {
+    if (!show) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleClose();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        handleApply();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [show, handleClose, handleApply]);
+
   if (!show) return null;
 
   return (
     <UniversalModal
-      onClose={() => {
-        onClose();
-        setDiscountValue("");
-      }}
+      onClose={handleClose}
       title={"Общая скидка"}
     >
       <div className="start__discount min-w-75">
@@ -79,10 +104,7 @@ const DiscountModal = ({
           <button
             className="sell__reset"
             type="button"
-            onClick={() => {
-              onClose();
-              setDiscountValue("");
-            }}
+            onClick={handleClose}
           >
             Отмена
           </button>
@@ -90,13 +112,7 @@ const DiscountModal = ({
             className="start__total-pay"
             style={{ width: "auto" }}
             type="button"
-            onClick={() => {
-              const discount =
-                discountValue.trim() === "" ? "0" : discountValue;
-              onApply(discount);
-              onClose();
-              setDiscountValue("");
-            }}
+            onClick={handleApply}
           >
             Применить
           </button>
