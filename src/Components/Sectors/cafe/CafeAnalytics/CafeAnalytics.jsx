@@ -230,8 +230,9 @@ const CafeAnalytics = () => {
   const [salesCategories, setSalesCategories] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
-  // гости
+  // гости (список с /cafe/clients/ для модалки)
   const [guestsCount, setGuestsCount] = useState(0);
+  const [cafeClients, setCafeClients] = useState([]);
 
   // кухня аналитика
   const [cooksRows, setCooksRows] = useState([]);
@@ -262,9 +263,12 @@ const CafeAnalytics = () => {
   const fetchGuestsCount = useCallback(async () => {
     try {
       const clients = await fetchAllPages("/cafe/clients/");
-      setGuestsCount(Array.isArray(clients) ? clients.length : 0);
+      const list = Array.isArray(clients) ? clients : [];
+      setGuestsCount(list.length);
+      setCafeClients(list);
     } catch (e) {
       setGuestsCount(0);
+      setCafeClients([]);
     }
   }, []);
 
@@ -807,6 +811,7 @@ const CafeAnalytics = () => {
           trxCount={trxCount}
           avgCheck={avgCheck}
           guestsCount={guestsCount}
+          cafeClients={cafeClients}
           salesItems={salesItems}
           lowStock={lowStock}
           kitchenLoading={kitchenLoading}

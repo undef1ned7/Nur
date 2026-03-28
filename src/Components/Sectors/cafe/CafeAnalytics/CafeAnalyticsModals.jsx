@@ -1,6 +1,37 @@
 // src/.../CafeAnalyticsModals.jsx
-import React, { useEffect } from "react";
-import { FaSync, FaTimes } from "react-icons/fa";
+import React, { useEffect, useState } from "react";
+import { FaChevronDown, FaChevronRight, FaSync, FaTimes } from "react-icons/fa";
+
+const fmtDateTime = (iso) => {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return String(iso);
+  }
+};
+
+const PAYMENT_LABEL = {
+  cash: "Наличные",
+  card: "Карта",
+  transfer: "Перевод",
+  mixed: "Смешанная оплата",
+};
+
+const pickPaymentLabel = (code) =>
+  (code && PAYMENT_LABEL[String(code).toLowerCase()]) || code || "—";
+
+const pickStatusLabel = (s) => {
+  if (!s) return "—";
+  const v = String(s).toLowerCase().replace(/\s+/g, "_");
+  if (v === "closed") return "Закрыт";
+  if (v === "paid") return "Оплачен";
+  if (v === "open") return "Открыт";
+  if (v === "cancelled" || v === "canceled") return "Отменён";
+  return s;
+};
 
 /* ===== Modal shell ===== */
 const CafeAnalyticsModal = ({ open, title, subtitle, onClose, children }) => {
@@ -56,6 +87,7 @@ const CafeAnalyticsModalContent = ({
   trxCount,
   avgCheck,
   guestsCount,
+  cafeClients,
 
   salesItems,
   lowStock,
@@ -86,6 +118,12 @@ const CafeAnalyticsModalContent = ({
   exportError,
   onExport,
 }) => {
+  const [expandedGuestId, setExpandedGuestId] = useState(null);
+
+  useEffect(() => {
+    if (modalKey !== "clients") setExpandedGuestId(null);
+  }, [modalKey]);
+
   if (!modalKey) return null;
 
   if (modalKey === "revenue") {
@@ -139,13 +177,99 @@ const CafeAnalyticsModalContent = ({
   }
 
   if (modalKey === "clients") {
+    const clients = Array.isArray(cafeClients) ? cafeClients : [];
+
     return (
-      <div className="cafeAnalytics__modalContent">
+      <div className="cafeAnalytics__modalContent cafeAnalytics__modalContent--guests">
         <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--1">
           <div className="cafeAnalytics__modalKpi">
-            <div className="cafeAnalytics__modalKLabel">Гости</div>
+            <div className="cafeAnalytics__modalKLabel">Всего клиентов</div>
             <div className="cafeAnalytics__modalKVal">{fmtInt(guestsCount)}</div>
           </div>
+        </div>
+
+        <div className="cafeAnalytics__guestList">
+          {clients.map((c, idx) => {
+            const id = c?.id ?? `guest_${idx}`;
+            const name = c?.name || "Без имени";
+            const phone = c?.phone ? String(c.phone) : "";
+            const history = Array.isArray(c?.history) ? c.history : [];
+            const open = expandedGuestId === id;
+
+            return (
+              <div key={id} className="cafeAnalytics__guestCard">
+                <button
+                  type="button"
+                  className="cafeAnalytics__guestCardHead"
+                  onClick={() => setExpandedGuestId(open ? null : id)}
+                  aria-expanded={open}
+                >
+                  <span className="cafeAnalytics__guestCardChevron" aria-hidden>
+                    {open ? <FaChevronDown /> : <FaChevronRight />}
+                  </span>
+                  <span className="cafeAnalytics__guestCardName" title={name}>
+                    {name}
+                  </span>
+                  {phone ? (
+                    <span className="cafeAnalytics__guestCardPhone" title={phone}>
+                      {phone}
+                    </span>
+                  ) : null}
+                  <span className="cafeAnalytics__guestCardMeta">
+                    {fmtInt(history.length)} в истории
+                  </span>
+                </button>
+
+                {open && (
+                  <div className="cafeAnalytics__guestHistory">
+                    {!history.length ? (
+                      <div className="cafeAnalytics__guestHistoryEmpty">Нет записей в истории.</div>
+                    ) : (
+                      <div className="cafeAnalytics__modalTableWrap cafeAnalytics__guestHistoryTable">
+                        <table className="cafeAnalytics__modalTable cafeAnalytics__modalTable--guestArchive">
+                          <thead>
+                            <tr>
+                              <th>Архив</th>
+                              <th>Стол</th>
+                              <th>Гости</th>
+                              <th>Сумма</th>
+                              <th>Статус</th>
+                              <th>Оплата</th>
+                              <th>Оплачено</th>
+                              <th>Официант</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {history.map((h) => (
+                              <tr key={h?.id || `${h?.original_order_id}_${h?.archived_at}`}>
+                                <td>{fmtDateTime(h?.archived_at)}</td>
+                                <td>{h?.table_number != null ? fmtInt(h.table_number) : "—"}</td>
+                                <td>{fmtInt(h?.guests)}</td>
+                                <td>{fmtMoney(toNum(h?.total_amount))}</td>
+                                <td>{pickStatusLabel(h?.status)}</td>
+                                <td>
+                                  {pickPaymentLabel(h?.payment_method)}
+                                  {h?.is_paid ? " · да" : ""}
+                                </td>
+                                <td>{fmtDateTime(h?.paid_at)}</td>
+                                <td className="cafeAnalytics__guestArchiveWaiter" title={h?.waiter_label || ""}>
+                                  {h?.waiter_label || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {!clients.length && (
+            <div className="cafeAnalytics__guestHistoryEmpty">Нет клиентов в списке.</div>
+          )}
         </div>
       </div>
     );
