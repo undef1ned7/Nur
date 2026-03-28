@@ -1293,6 +1293,9 @@ const CreateSaleDocument = () => {
   }, [counterparties, docType]);
 
   const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
+  const isOwnerOrAdmin =
+    userProfile?.role === "owner" || userProfile?.role === "admin";
+  const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
 
   const getCounterpartyAgentId = (cp) => {
     const a = cp?.agent;
@@ -1306,32 +1309,25 @@ const CreateSaleDocument = () => {
 
   const agents = useMemo(() => {
     const list = Array.isArray(employees) ? employees : [];
-    const baseAgents = list.filter((e) => {
-      const role =
-        e?.role_display ??
-        e?.role_name ??
+    const visibleEmployees = list.filter((e) => {
+      const roleRaw =
         e?.role ??
+        e?.role_name ??
+        e?.role_display ??
         e?.position ??
         e?.post ??
         "";
-      return String(role).trim() === "Агент";
+      const role = String(roleRaw).trim().toLowerCase();
+      return role !== "admin" && role !== "owner";
     });
 
-    const filteredAgents = isAgentFilterRelevant
-      ? baseAgents.filter((e) =>
-          filteredCounterparties.some(
-            (c) => getCounterpartyAgentId(c) === String(e?.id ?? ""),
-          ),
-        )
-      : baseAgents;
-
-    return filteredAgents.sort((a, b) =>
+    return visibleEmployees.sort((a, b) =>
       String(a?.full_name || a?.name || a?.email || "").localeCompare(
         String(b?.full_name || b?.name || b?.email || ""),
         "ru",
       ),
     );
-  }, [employees, filteredCounterparties, isAgentFilterRelevant]);
+  }, [employees]);
 
   const counterpartyOptions = useMemo(() => {
     const list = Array.isArray(filteredCounterparties)
@@ -1366,6 +1362,25 @@ const CreateSaleDocument = () => {
       }`.trim(),
     }));
   }, [agents]);
+
+  const currentAgentLabel = useMemo(() => {
+    if (!currentUserAgentId) return "Сотрудник не определен";
+    const found = agentOptions.find(
+      (opt) => String(opt.value) === String(currentUserAgentId),
+    );
+    return (
+      found?.label ||
+      userProfile?.full_name ||
+      userProfile?.name ||
+      userProfile?.email ||
+      `#${currentUserAgentId}`
+    );
+  }, [agentOptions, currentUserAgentId, userProfile]);
+
+  useEffect(() => {
+    if (isOwnerOrAdmin || !currentUserAgentId) return;
+    setAgentId(currentUserAgentId);
+  }, [isOwnerOrAdmin, currentUserAgentId]);
 
   const warehouseOptions = useMemo(() => {
     return (Array.isArray(warehouses) ? warehouses : [])
@@ -2833,20 +2848,29 @@ const CreateSaleDocument = () => {
                     />
                     <div className="create-sale-document__field-inner">
                       <label>Агент</label>
-                      <SearchSelect
-                        value={agentId}
-                        onChange={(v) => setAgentId(String(v || ""))}
-                        options={[
-                          {
-                            value: "",
-                            label: "Все агенты",
-                            searchText: "Все агенты",
-                          },
-                          ...agentOptions,
-                        ]}
-                        placeholder="Выберите агента (необязательно)"
-                        emptyText="Агенты не найдены"
-                      />
+                      {isOwnerOrAdmin ? (
+                        <SearchSelect
+                          value={agentId}
+                          onChange={(v) => setAgentId(String(v || ""))}
+                          options={[
+                            {
+                              value: "",
+                              label: "Все агенты",
+                              searchText: "Все агенты",
+                            },
+                            ...agentOptions,
+                          ]}
+                          placeholder="Выберите агента (необязательно)"
+                          emptyText="Агенты не найдены"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={currentAgentLabel}
+                          readOnly
+                          disabled
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
