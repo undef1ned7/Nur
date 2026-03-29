@@ -253,6 +253,7 @@ const CreateSaleDocument = () => {
   const [showSavePrintMenu, setShowSavePrintMenu] = useState(false);
   const dateInputRef = useRef(null);
   const [documentDiscount, setDocumentDiscount] = useState("");
+  const [documentDiscountAmount, setDocumentDiscountAmount] = useState("");
   const [comment, setComment] = useState("");
   const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
   const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
@@ -1100,6 +1101,11 @@ const CreateSaleDocument = () => {
             ? String(doc.discount_percent)
             : "",
         );
+        setDocumentDiscountAmount(
+          doc.discount_amount != null && doc.discount_amount !== ""
+            ? String(doc.discount_amount)
+            : "",
+        );
         setPaymentKind(doc.payment_kind || "cash");
         setPrepaymentAmount(
           doc.prepayment_amount != null && doc.prepayment_amount !== ""
@@ -1156,6 +1162,11 @@ const CreateSaleDocument = () => {
                 unit: unit && String(unit).trim() ? String(unit) : "шт",
                 discount: discountPct,
                 discount_percent: discountPct,
+                effective_discount_percent:
+                  it.effective_discount_percent != null &&
+                  it.effective_discount_percent !== ""
+                    ? Number(it.effective_discount_percent)
+                    : undefined,
                 article: article ? String(article) : "",
                 addedAt: it.created_at || new Date().toISOString(),
                 created_at: it.created_at,
@@ -1293,6 +1304,9 @@ const CreateSaleDocument = () => {
   }, [counterparties, docType]);
 
   const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
+  const isOwnerOrAdmin =
+    userProfile?.role === "owner" || userProfile?.role === "admin";
+  const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
 
   const getCounterpartyAgentId = (cp) => {
     const a = cp?.agent;
@@ -1306,32 +1320,25 @@ const CreateSaleDocument = () => {
 
   const agents = useMemo(() => {
     const list = Array.isArray(employees) ? employees : [];
-    const baseAgents = list.filter((e) => {
-      const role =
-        e?.role_display ??
-        e?.role_name ??
+    const visibleEmployees = list.filter((e) => {
+      const roleRaw =
         e?.role ??
+        e?.role_name ??
+        e?.role_display ??
         e?.position ??
         e?.post ??
         "";
-      return String(role).trim() === "Агент";
+      const role = String(roleRaw).trim().toLowerCase();
+      return role !== "admin" && role !== "owner";
     });
 
-    const filteredAgents = isAgentFilterRelevant
-      ? baseAgents.filter((e) =>
-          filteredCounterparties.some(
-            (c) => getCounterpartyAgentId(c) === String(e?.id ?? ""),
-          ),
-        )
-      : baseAgents;
-
-    return filteredAgents.sort((a, b) =>
+    return visibleEmployees.sort((a, b) =>
       String(a?.full_name || a?.name || a?.email || "").localeCompare(
         String(b?.full_name || b?.name || b?.email || ""),
         "ru",
       ),
     );
-  }, [employees, filteredCounterparties, isAgentFilterRelevant]);
+  }, [employees]);
 
   const counterpartyOptions = useMemo(() => {
     const list = Array.isArray(filteredCounterparties)
@@ -1366,6 +1373,25 @@ const CreateSaleDocument = () => {
       }`.trim(),
     }));
   }, [agents]);
+
+  const currentAgentLabel = useMemo(() => {
+    if (!currentUserAgentId) return "Сотрудник не определен";
+    const found = agentOptions.find(
+      (opt) => String(opt.value) === String(currentUserAgentId),
+    );
+    return (
+      found?.label ||
+      userProfile?.full_name ||
+      userProfile?.name ||
+      userProfile?.email ||
+      `#${currentUserAgentId}`
+    );
+  }, [agentOptions, currentUserAgentId, userProfile]);
+
+  useEffect(() => {
+    if (isOwnerOrAdmin || !currentUserAgentId) return;
+    setAgentId(currentUserAgentId);
+  }, [isOwnerOrAdmin, currentUserAgentId]);
 
   const warehouseOptions = useMemo(() => {
     return (Array.isArray(warehouses) ? warehouses : [])
@@ -1472,16 +1498,24 @@ const CreateSaleDocument = () => {
     // Сумма после скидок по позициям
     const subtotalAfterItemsDiscount = subtotal - itemsDiscount;
 
-    // Скидка по документу (в процентах) применяется к сумме ПОСЛЕ скидок по позициям
+    // Скидка по документу: % и фиксированная сумма — независимы, суммируются (с ограничением по подытогу)
     const discountPercent = Number(documentDiscount) || 0;
-    const documentDiscountAmount =
+    const documentDiscountPercentPart =
       (subtotalAfterItemsDiscount * discountPercent) / 100;
+    const documentDiscountFixedPart = Math.max(
+      0,
+      Number(String(documentDiscountAmount).replace(",", ".")) || 0,
+    );
+    const documentDiscountCombined = Math.min(
+      documentDiscountPercentPart + documentDiscountFixedPart,
+      subtotalAfterItemsDiscount,
+    );
 
     // Общая скидка (скидка по позициям + скидка по документу)
-    const totalDiscount = itemsDiscount + documentDiscountAmount;
+    const totalDiscount = itemsDiscount + documentDiscountCombined;
 
     // Итоговая сумма с учетом всех скидок
-    const total = subtotalAfterItemsDiscount - documentDiscountAmount;
+    const total = subtotalAfterItemsDiscount - documentDiscountCombined;
 
     // Предоплата (только для продажи/покупки в долг)
     const prepaymentNum =
@@ -1501,7 +1535,7 @@ const CreateSaleDocument = () => {
     return {
       subtotal,
       itemsDiscount,
-      documentDiscount: documentDiscountAmount,
+      documentDiscount: documentDiscountCombined,
       totalDiscount,
       total,
       displayTotal,
@@ -1512,6 +1546,7 @@ const CreateSaleDocument = () => {
   }, [
     cartItems,
     documentDiscount,
+    documentDiscountAmount,
     isDocumentPosted,
     isPaymentKindRelevant,
     paymentKind,
@@ -1787,6 +1822,35 @@ const CreateSaleDocument = () => {
       }
     }
 
+    const subtotalCheck = cartItems.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item.price || item.unit_price) || 0) *
+          (Number(item.quantity) || 0),
+      0,
+    );
+    const itemsDiscCheck = cartItems.reduce((sum, item) => {
+      const itemPrice = Number(item.price || item.unit_price || 0);
+      const itemQty = Number(item.quantity || 0);
+      const itemDiscountPercent = Number(
+        item.discount_percent || item.discount || 0,
+      );
+      return sum + (itemPrice * itemQty * itemDiscountPercent) / 100;
+    }, 0);
+    const netAfterLines = subtotalCheck - itemsDiscCheck;
+    const pctOffCheck = (netAfterLines * (Number(documentDiscount) || 0)) / 100;
+    const fixedOffCheck = Math.max(
+      0,
+      Number(String(documentDiscountAmount).replace(",", ".")) || 0,
+    );
+    if (pctOffCheck + fixedOffCheck > netAfterLines + 0.005) {
+      return {
+        valid: false,
+        error:
+          "Скидка по документу (% и суммой) не может превышать подытог после скидок по позициям",
+      };
+    }
+
     // Проверка склада
     if (!warehouse) {
       return { valid: false, error: "Выберите склад" };
@@ -1870,24 +1934,12 @@ const CreateSaleDocument = () => {
     }
 
     try {
-      // Скидка по документу (API: discount_percent, discount_amount)
+      // Скидка по документу: на бэкенде discount_percent и discount_amount — независимые скидки
       const discountPercentNum = Number(documentDiscount) || 0;
-      const subtotalForDoc = cartItems.reduce(
-        (sum, item) =>
-          sum +
-          (Number(item.price || item.unit_price) || 0) *
-            (Number(item.quantity) || 0),
+      const discountAmountNum = Math.max(
         0,
+        Number(String(documentDiscountAmount).replace(",", ".")) || 0,
       );
-      const itemsDiscountSum = cartItems.reduce((sum, item) => {
-        const p = Number(item.price || item.unit_price) || 0;
-        const q = Number(item.quantity) || 0;
-        const d = Number(item.discount_percent || item.discount || 0);
-        return sum + (p * q * d) / 100;
-      }, 0);
-      const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
-      const documentDiscountAmount =
-        (subtotalAfterItems * discountPercentNum) / 100;
 
       // Предоплата по долгу (API: prepayment_amount, только при payment_kind=credit)
       const prepaymentNum = Number(prepaymentAmount) || 0;
@@ -1906,7 +1958,7 @@ const CreateSaleDocument = () => {
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
-        discount_amount: String(documentDiscountAmount.toFixed(2)),
+        discount_amount: String(discountAmountNum.toFixed(2)),
         items: cartItems.map((item) => {
           const unit = item.unit || "шт";
           const isPiece =
@@ -1987,6 +2039,7 @@ const CreateSaleDocument = () => {
       setClientId("");
       setWarehouseTo("");
       setDocumentDiscount("");
+      setDocumentDiscountAmount("");
       setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
@@ -2025,22 +2078,10 @@ const CreateSaleDocument = () => {
     try {
       // Сначала создаем документ через новый API
       const discountPercentNum = Number(documentDiscount) || 0;
-      const subtotalForDoc = cartItems.reduce(
-        (sum, item) =>
-          sum +
-          (Number(item.price || item.unit_price) || 0) *
-            (Number(item.quantity) || 0),
+      const discountAmountNum = Math.max(
         0,
+        Number(String(documentDiscountAmount).replace(",", ".")) || 0,
       );
-      const itemsDiscountSum = cartItems.reduce((sum, item) => {
-        const p = Number(item.price || item.unit_price) || 0;
-        const q = Number(item.quantity) || 0;
-        const d = Number(item.discount_percent || item.discount || 0);
-        return sum + (p * q * d) / 100;
-      }, 0);
-      const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
-      const documentDiscountAmount =
-        (subtotalAfterItems * discountPercentNum) / 100;
 
       const prepaymentNum = Number(prepaymentAmount) || 0;
       const hasPrepayment =
@@ -2057,7 +2098,7 @@ const CreateSaleDocument = () => {
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
-        discount_amount: String(documentDiscountAmount.toFixed(2)),
+        discount_amount: String(discountAmountNum.toFixed(2)),
         items: cartItems.map((item) => {
           const unit = item.unit || "шт";
           const isPiece =
@@ -2130,7 +2171,7 @@ const CreateSaleDocument = () => {
       // Формируем данные для печати из ответа сервера (createdDocument)
       const doc = createdDocument;
       const docDiscountPercent = Number(doc.discount_percent || 0);
-      const docDiscountAmount = Number(doc.discount_amount || 0);
+      const docDiscountAmountFixed = Number(doc.discount_amount || 0);
 
       const items = Array.isArray(doc.items)
         ? doc.items.map((item) => {
@@ -2178,7 +2219,12 @@ const CreateSaleDocument = () => {
             100,
         0,
       );
-      const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+      const netAfterLineDiscounts = subtotal - itemsDiscountTotal;
+      const docDiscountFromPercent =
+        (netAfterLineDiscounts * docDiscountPercent) / 100;
+      const docDiscountCombined =
+        docDiscountAmountFixed + docDiscountFromPercent;
+      const totalDiscount = itemsDiscountTotal + docDiscountCombined;
       const total = Number(doc.total) || subtotal - totalDiscount;
 
       const docNumber = doc.number || documentId.substring(0, 8) || "00001";
@@ -2214,8 +2260,8 @@ const CreateSaleDocument = () => {
             datetime: doc.date || currentDate.toISOString(),
             created_at: doc.created_at || currentDate.toISOString(),
             discount_percent: docDiscountPercent,
-            discount_amount: docDiscountAmount,
-            discount_total: docDiscountAmount,
+            discount_amount: docDiscountCombined,
+            discount_total: docDiscountCombined,
           },
           seller: {
             id: company?.id || "",
@@ -2329,6 +2375,7 @@ const CreateSaleDocument = () => {
       setSelectedProductIds(new Set());
       setClientId("");
       setDocumentDiscount("");
+      setDocumentDiscountAmount("");
       setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
@@ -2833,20 +2880,29 @@ const CreateSaleDocument = () => {
                     />
                     <div className="create-sale-document__field-inner">
                       <label>Агент</label>
-                      <SearchSelect
-                        value={agentId}
-                        onChange={(v) => setAgentId(String(v || ""))}
-                        options={[
-                          {
-                            value: "",
-                            label: "Все агенты",
-                            searchText: "Все агенты",
-                          },
-                          ...agentOptions,
-                        ]}
-                        placeholder="Выберите агента (необязательно)"
-                        emptyText="Агенты не найдены"
-                      />
+                      {isOwnerOrAdmin ? (
+                        <SearchSelect
+                          value={agentId}
+                          onChange={(v) => setAgentId(String(v || ""))}
+                          options={[
+                            {
+                              value: "",
+                              label: "Все агенты",
+                              searchText: "Все агенты",
+                            },
+                            ...agentOptions,
+                          ]}
+                          placeholder="Выберите агента (необязательно)"
+                          emptyText="Агенты не найдены"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={currentAgentLabel}
+                          readOnly
+                          disabled
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
@@ -2925,11 +2981,27 @@ const CreateSaleDocument = () => {
                         item.price || item.unit_price || 0,
                       );
                       const itemQuantity = Number(item.quantity);
-                      const itemDiscount = Number(
+                      const docDiscNum = Number(
+                        String(documentDiscount).replace(",", "."),
+                      ) || 0;
+                      const rawLineDiscount = Number(
                         item.discount_percent ?? item.discount ?? 0,
                       );
+                      const effectiveDiscount =
+                        item.effective_discount_percent != null &&
+                        item.effective_discount_percent !== ""
+                          ? Number(item.effective_discount_percent)
+                          : rawLineDiscount > 0
+                            ? rawLineDiscount
+                            : docDiscNum;
+                      const discountDisplay =
+                        effectiveDiscount > 0
+                          ? `${effectiveDiscount}%`
+                          : "–";
                       const itemTotal =
-                        itemPrice * itemQuantity * (1 - itemDiscount / 100);
+                        itemPrice *
+                        itemQuantity *
+                        (1 - effectiveDiscount / 100);
 
                       return (
                         <tr key={item.id || index}>
@@ -2972,9 +3044,22 @@ const CreateSaleDocument = () => {
                             />
                           </td>
                           <td>
+                            <span className="create-sale-document__discount-effective">
+                              {discountDisplay}
+                            </span>
                             <input
                               type="text"
-                              value={itemDiscount}
+                              value={
+                                rawLineDiscount > 0
+                                  ? String(rawLineDiscount)
+                                  : ""
+                              }
+                              placeholder={
+                                docDiscNum > 0
+                                  ? `стр. (док. ${docDiscNum}%)`
+                                  : "стр. %"
+                              }
+                              title="Индивидуальная скидка строки, % (пусто — действует скидка документа)"
                               onChange={(e) =>
                                 handleDiscountChange(item.id, e.target.value)
                               }
@@ -3075,6 +3160,43 @@ const CreateSaleDocument = () => {
                       className="create-sale-document__discount-input"
                     />
                     <span>%</span>
+                  </div>
+                </div>
+                <div className="create-sale-document__summary-row create-sale-document__summary-row--discount">
+                  <span>Скидка суммой:</span>
+                  <div className="create-sale-document__discount-input-wrapper">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={documentDiscountAmount}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "") {
+                          setDocumentDiscountAmount("");
+                        } else {
+                          const num = Number(v.replace(",", "."));
+                          if (!isNaN(num) && num >= 0) {
+                            setDocumentDiscountAmount(v);
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const raw = String(e.target.value).replace(",", ".");
+                        if (raw === "" || raw === null) {
+                          setDocumentDiscountAmount("");
+                          return;
+                        }
+                        const num = Number(raw);
+                        if (isNaN(num) || num < 0) {
+                          setDocumentDiscountAmount("0");
+                        } else {
+                          setDocumentDiscountAmount(num.toFixed(2));
+                        }
+                      }}
+                      className="create-sale-document__discount-input"
+                      placeholder="0"
+                    />
+                    <span>сом</span>
                   </div>
                 </div>
                 <div className="create-sale-document__summary-row create-sale-document__summary-row--total">

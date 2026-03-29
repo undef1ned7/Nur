@@ -294,6 +294,17 @@ const Documents = () => {
   /** Черновик и заявка на продажу — одни и те же действия (редактирование, проведение). */
   const isSaleDraftLikeStatus = (status) =>
     status === "DRAFT" || status === "SALE_REQUEST";
+  const isSaleRequestStatus = (status) => status === "SALE_REQUEST";
+
+  // Нормализация статуса согласно бизнес-правилу:
+  // SALE + is_sale_request=true -> SALE_REQUEST.
+  const resolveDocumentStatus = (doc) => {
+    if (!doc) return "";
+    if (doc.doc_type === "SALE" && doc.is_sale_request === true) {
+      return "SALE_REQUEST";
+    }
+    return doc.status;
+  };
 
   // Фильтрация по агенту (для продаж)
   const filteredDocuments = useMemo(() => {
@@ -304,73 +315,94 @@ const Documents = () => {
     );
   }, [documents, docType, agentFilterId]);
 
+  // В табе "Продажи по заявкам" источник — /warehouse/documents?doc_type=SALE,
+  // и показываем только SALE_REQUEST.
+  const agentSalesRequestDocuments = useMemo(() => {
+    return (documents || []).filter((doc) => {
+      const resolvedStatus = resolveDocumentStatus(doc);
+      const byAgent =
+        !agentFilterId || String(doc.agent || "") === String(agentFilterId);
+      return (
+        doc.doc_type === "SALE" &&
+        isSaleRequestStatus(resolvedStatus) &&
+        byAgent
+      );
+    });
+  }, [documents, agentFilterId]);
+
   // Маппинг данных из Redux в формат для отображения
   const receiptsData = useMemo(() => {
     if (activeTab !== "receipts") return [];
-    return (filteredDocuments || []).map((doc, index) => ({
-      id: doc.id,
-      number: doc.number || getDocumentNumber(index, "ЧЕК"),
-      date:
-        doc.date || doc.created_at
-          ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—",
-      client:
-        doc.counterparty?.name ||
-        doc.counterparty_display_name ||
-        doc.counterparty ||
-        "Без клиента",
-      products: doc.items?.length || 0,
-      amount: getDocumentAmount(doc),
-      discount_percent: doc.discount_percent ?? null,
-      discount_amount: doc.discount_amount ?? null,
-      status: getStatusLabel(doc.status),
-      statusType: getStatusType(doc.status),
-      rawStatus: doc.status,
-      payment_kind: doc.payment_kind,
-      document: doc,
-      agentDisplay:
-        doc.agent_display?.trim?.() ||
-        (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
-    }));
+    return (filteredDocuments || []).map((doc, index) => {
+      const resolvedStatus = resolveDocumentStatus(doc);
+      return {
+        id: doc.id,
+        number: doc.number || getDocumentNumber(index, "ЧЕК"),
+        date:
+          doc.date || doc.created_at
+            ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "—",
+        client:
+          doc.counterparty?.name ||
+          doc.counterparty_display_name ||
+          doc.counterparty ||
+          "Без клиента",
+        products: doc.items?.length || 0,
+        amount: getDocumentAmount(doc),
+        discount_percent: doc.discount_percent ?? null,
+        discount_amount: doc.discount_amount ?? null,
+        status: getStatusLabel(resolvedStatus),
+        statusType: getStatusType(resolvedStatus),
+        rawStatus: resolvedStatus,
+        payment_kind: doc.payment_kind,
+        document: doc,
+        agentDisplay:
+          doc.agent_display?.trim?.() ||
+          (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
+      };
+    });
   }, [filteredDocuments, activeTab, currentPage]);
 
   const invoicesData = useMemo(() => {
     if (activeTab !== "invoices") return [];
-    return (filteredDocuments || []).map((doc, index) => ({
-      id: doc.id,
-      number: doc.number || getDocumentNumber(index, "НАКЛ"),
-      date:
-        doc.date || doc.created_at
-          ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })
-          : "—",
-      counterparty:
-        doc.counterparty?.name ||
-        doc.counterparty_display_name ||
-        doc.counterparty ||
-        "Без контрагента",
-      positions: doc.items?.length || 0,
-      amount: getDocumentAmount(doc),
-      discount_percent: doc.discount_percent ?? null,
-      discount_amount: doc.discount_amount ?? null,
-      status: getStatusLabel(doc.status),
-      statusType: getStatusType(doc.status),
-      rawStatus: doc.status,
-      payment_kind: doc.payment_kind,
-      document: doc,
-      agentDisplay:
-        doc.agent_display?.trim?.() ||
-        (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
-    }));
+    return (filteredDocuments || []).map((doc, index) => {
+      const resolvedStatus = resolveDocumentStatus(doc);
+      return {
+        id: doc.id,
+        number: doc.number || getDocumentNumber(index, "НАКЛ"),
+        date:
+          doc.date || doc.created_at
+            ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })
+            : "—",
+        counterparty:
+          doc.counterparty?.name ||
+          doc.counterparty_display_name ||
+          doc.counterparty ||
+          "Без контрагента",
+        positions: doc.items?.length || 0,
+        amount: getDocumentAmount(doc),
+        discount_percent: doc.discount_percent ?? null,
+        discount_amount: doc.discount_amount ?? null,
+        status: getStatusLabel(resolvedStatus),
+        statusType: getStatusType(resolvedStatus),
+        rawStatus: resolvedStatus,
+        payment_kind: doc.payment_kind,
+        document: doc,
+        agentDisplay:
+          doc.agent_display?.trim?.() ||
+          (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
+      };
+    });
   }, [filteredDocuments, activeTab, currentPage]);
 
   // Обновление URL только при изменении страницы (без поиска)
@@ -396,12 +428,17 @@ const Documents = () => {
 
   // Загрузка данных через Redux при изменении таба, страницы, типа документа или поиска
   useEffect(() => {
-    if (activeTab === "receipts" || activeTab === "invoices") {
+    if (
+      activeTab === "receipts" ||
+      activeTab === "invoices" ||
+      activeTab === "agent_sales"
+    ) {
+      const requestDocType = activeTab === "agent_sales" ? "SALE" : docType;
       // Используем новый warehouse API
       const params = {
         page: currentPage,
         page_size: 100, // По умолчанию 100 согласно документации
-        ...(docType && { doc_type: docType }), // Добавляем doc_type только если выбран
+        ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         // Дополнительные фильтры из документации:
         // status, warehouse_from, warehouse_to, counterparty - можно добавить позже через UI
@@ -471,15 +508,56 @@ const Documents = () => {
 
   const handleSaved = () => {
     // Перезагружаем документы после сохранения
-    if (activeTab === "receipts" || activeTab === "invoices") {
+    if (
+      activeTab === "receipts" ||
+      activeTab === "invoices" ||
+      activeTab === "agent_sales"
+    ) {
+      const requestDocType = activeTab === "agent_sales" ? "SALE" : docType;
       const params = {
         page: currentPage,
         page_size: 100,
-        ...(docType && { doc_type: docType }),
+        ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
       };
       dispatch(fetchWarehouseDocuments(params));
     }
+  };
+
+  // Для SALE_REQUEST из списка документов открываем модалку создания продажи
+  // по связанной заявке агента (cart.sale_document === document.id).
+  const handleOpenCreateSaleFromRequest = async (doc) => {
+    if (!doc?.id) return;
+    let linkedCart = (agentSalesCarts || []).find(
+      (cart) => String(cart.sale_document || "") === String(doc.id),
+    );
+    // Fallback: локальный список заявок может быть неполным (например, из-за фильтров по статусу).
+    if (!linkedCart) {
+      try {
+        const data = await warehouseAPI.listAgentCarts({ page_size: 500 });
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        linkedCart = list.find(
+          (cart) => String(cart.sale_document || "") === String(doc.id),
+        );
+        if (linkedCart) {
+          setAgentSalesCarts(list);
+        }
+      } catch (e) {
+        console.error("Ошибка поиска связанной заявки:", e);
+      }
+    }
+    if (!linkedCart) {
+      alert(
+        "Не найдена связанная заявка агента для этого документа. Возможно, заявка недоступна в текущем списке.",
+        true,
+      );
+      return;
+    }
+    setCreateSaleModalCart(linkedCart);
   };
 
   // Обновить документ в локальном кэше (для продаж по заявкам)
@@ -854,6 +932,40 @@ const Documents = () => {
     });
   };
 
+  /** Скидка по документу: бэкенд может отдать только % (discount_amount = 0) — тогда показываем сумму от подытога или хотя бы %. */
+  const formatDocumentDiscountCell = (item) => {
+    const pct = Number(item.discount_percent ?? 0);
+    const amt = Number(item.discount_amount ?? 0);
+    if (amt !== 0) {
+      return `${formatAmount(amt)} сом${
+        pct !== 0 ? ` (${item.discount_percent}%)` : ""
+      }`;
+    }
+    if (pct !== 0) {
+      const doc = item.document;
+      if (doc && Array.isArray(doc.items) && doc.items.length > 0) {
+        const subtotal = doc.items.reduce(
+          (s, it) =>
+            s +
+            (Number(it.price ?? it.unit_price ?? 0) || 0) *
+              (Number(it.qty ?? it.quantity ?? 0) || 0),
+          0,
+        );
+        const itemsDisc = doc.items.reduce((sum, it) => {
+          const p = Number(it.price ?? it.unit_price ?? 0) || 0;
+          const q = Number(it.qty ?? it.quantity ?? 0) || 0;
+          const d = Number(it.discount_percent ?? 0) || 0;
+          return sum + (p * q * d) / 100;
+        }, 0);
+        const net = subtotal - itemsDisc;
+        const fromPct = (net * pct) / 100;
+        return `${formatAmount(fromPct)} сом (${item.discount_percent}%)`;
+      }
+      return `${item.discount_percent}%`;
+    }
+    return "—";
+  };
+
   return (
     <div className="documents">
       {/* Header with search and filters */}
@@ -1040,17 +1152,7 @@ const Documents = () => {
                           )}
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
-                          <td>
-                            {item.discount_amount != null &&
-                            Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${
-                                  item.discount_percent != null &&
-                                  Number(item.discount_percent) !== 0
-                                    ? ` (${item.discount_percent}%)`
-                                    : ""
-                                }`
-                              : "—"}
-                          </td>
+                          <td>{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1144,17 +1246,7 @@ const Documents = () => {
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
-                          <td>
-                            {item.discount_amount != null &&
-                            Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${
-                                  item.discount_percent != null &&
-                                  Number(item.discount_percent) !== 0
-                                    ? ` (${item.discount_percent}%)`
-                                    : ""
-                                }`
-                              : "—"}
-                          </td>
+                          <td>{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1266,193 +1358,86 @@ const Documents = () => {
                   <th>Номер продажи</th>
                   <th>Статус заявки</th>
                   <th>Статус документа</th>
-                  <th>Действия</th>
+                  {/* <th>Действия</th> */}
                 </tr>
               </thead>
               <tbody>
-                {agentSalesLoading ? (
+                {documentsLoading ? (
                   <tr>
                     <td colSpan={8} className="documents__empty">
                       Загрузка...
                     </td>
                   </tr>
-                ) : agentSalesError ? (
+                ) : agentSalesRequestDocuments.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="documents__empty">
-                      {agentSalesError}
-                    </td>
-                  </tr>
-                ) : agentSalesCarts.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="documents__empty">
-                      Одобренных заявок нет
+                      Заявок на продажу нет
                     </td>
                   </tr>
                 ) : (
-                  agentSalesCarts.map((cart, index) => {
-                    const doc = cart.sale_document
-                      ? agentSaleDocumentById[cart.sale_document]
-                      : null;
-                    const docStatusLabel = doc
-                      ? getStatusLabel(doc.status)
-                      : cart.sale_document
-                        ? "…"
-                        : "—";
-                    const docStatusType = doc ? getStatusType(doc.status) : "";
-                    const agentItem =
-                      (doc && {
-                        id: doc.id,
-                        number: doc.number || "",
-                        rawStatus: doc.status,
-                        document: doc,
-                      }) ||
-                      null;
+                  agentSalesRequestDocuments.map((doc, index) => {
+                    const resolvedDocStatus = resolveDocumentStatus(doc);
+                    const docStatusLabel = getStatusLabel(resolvedDocStatus);
+                    const docStatusType = getStatusType(resolvedDocStatus);
+                    const agentItem = {
+                      id: doc.id,
+                      number: doc.number || "",
+                      rawStatus: resolvedDocStatus,
+                      document: doc,
+                    };
                     return (
-                      <tr key={cart.id}>
+                      <tr key={doc.id}>
                         <td>{index + 1}</td>
                         <td>
-                          {cart.agent_name ||
-                            cart.agent_display ||
-                            (cart.agent
-                              ? `${String(cart.agent).slice(0, 8)}…`
+                          {doc.agent_display?.trim?.() ||
+                            (doc.agent
+                              ? `${String(doc.agent).slice(0, 8)}…`
                               : "—")}
                         </td>
                         <td>
-                          {cart.warehouse_name ||
-                            (cart.warehouse
-                              ? `${String(cart.warehouse).slice(0, 8)}…`
-                              : "—")}
-                        </td>
-                        <td>
-                          {cart.items_count ??
-                            (Array.isArray(cart.items)
-                              ? cart.items.length
-                              : null) ??
+                          {doc.warehouse_from?.name ||
+                            doc.warehouse?.name ||
                             "—"}
                         </td>
-                        <td>{cart.sale_document_number || "—"}</td>
                         <td>
-                          {cart.status === "approved"
-                            ? "Одобрена"
-                            : cart.status === "draft"
-                              ? "Черновик"
-                              : cart.status === "submitted"
-                                ? "Отправлена"
-                                : cart.status === "rejected"
-                                  ? "Отклонена"
-                                  : cart.status || "—"}
+                          {Array.isArray(doc.items) ? doc.items.length : "—"}
                         </td>
+                        <td>{doc.number || "—"}</td>
+                        <td>Заявка на продажу</td>
                         <td>
-                          {docStatusLabel !== "—" && (
-                            <span
-                              className={`documents__status documents__status--${docStatusType}`}
-                            >
-                              {docStatusLabel}
-                            </span>
-                          )}
-                          {docStatusLabel === "—" && "—"}
+                          <span
+                            className={`documents__status documents__status--${docStatusType}`}
+                          >
+                            {docStatusLabel}
+                          </span>
                         </td>
                         <td>
                           <div className="documents__actions">
-                            {cart.sale_document ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="documents__action-btn"
-                                  onClick={() =>
-                                    navigate(
-                                      `/crm/warehouse/documents/edit/${cart.sale_document}`,
-                                    )
-                                  }
-                                  title="Открыть документ"
-                                >
-                                  <Eye size={18} />
-                                </button>
-                                {isSaleDraftLikeStatus(agentItem?.rawStatus) && (
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn"
-                                    onClick={() =>
-                                      handlePost(agentItem, {
-                                        onSuccess: () =>
-                                          refetchAgentSaleDoc(agentItem.id),
-                                      })
-                                    }
-                                    title="Провести"
-                                  >
-                                    <Check size={18} />
-                                  </button>
-                                )}
-                                {agentItem?.rawStatus === "CASH_PENDING" && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="documents__action-btn documents__action-btn--approve"
-                                      onClick={() =>
-                                        handleCashApprove(agentItem, {
-                                          onSuccess: () =>
-                                            refetchAgentSaleDoc(agentItem.id),
-                                        })
-                                      }
-                                      title="Подтвердить кассой"
-                                    >
-                                      <Check size={18} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="documents__action-btn documents__action-btn--reject"
-                                      onClick={() =>
-                                        handleCashReject(agentItem, {
-                                          onSuccess: () =>
-                                            refetchAgentSaleDoc(agentItem.id),
-                                        })
-                                      }
-                                      title="Отклонить"
-                                    >
-                                      <X size={18} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="documents__action-btn documents__action-btn--unpost"
-                                      onClick={() =>
-                                        handleUnpost(agentItem, {
-                                          onSuccess: () =>
-                                            refetchAgentSaleDoc(agentItem.id),
-                                        })
-                                      }
-                                      title="Отменить проведение"
-                                    >
-                                      <Undo2 size={18} />
-                                    </button>
-                                  </>
-                                )}
-                                {agentItem?.rawStatus === "POSTED" && (
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn documents__action-btn--unpost"
-                                    onClick={() =>
-                                      handleUnpost(agentItem, {
-                                        onSuccess: () =>
-                                          refetchAgentSaleDoc(agentItem.id),
-                                      })
-                                    }
-                                    title="Отменить проведение"
-                                  >
-                                    <Undo2 size={18} />
-                                  </button>
-                                )}
-                              </>
-                            ) : (
+                            {/* <button
+                              type="button"
+                              className="documents__action-btn"
+                              onClick={() =>
+                                navigate(
+                                  `/crm/warehouse/documents/edit/${doc.id}`,
+                                )
+                              }
+                              title="Открыть документ"
+                            >
+                              <Eye size={18} />
+                            </button> */}
+                            {/* {isSaleRequestStatus(agentItem.rawStatus) && (
                               <button
                                 type="button"
                                 className="documents__action-btn documents__action-btn--create-sale !w-auto !h-auto !py-1"
-                                onClick={() => setCreateSaleModalCart(cart)}
+                                onClick={() =>
+                                  handleOpenCreateSaleFromRequest(doc)
+                                }
                                 title="Создать продажу по заявке"
                               >
                                 <Plus size={18} />
                                 Создать продажу
                               </button>
-                            )}
+                            )} */}
                           </div>
                         </td>
                       </tr>
@@ -1523,19 +1508,15 @@ const Documents = () => {
                         {formatAmount(item.amount)} сом
                       </span>
                     </div>
-                    {item.discount_amount != null &&
-                      Number(item.discount_amount) !== 0 && (
-                        <div className="documents__card-row documents__card-row--discount">
-                          <span className="documents__card-label">Скидка</span>
-                          <span className="documents__card-value">
-                            {formatAmount(item.discount_amount)} сом
-                            {item.discount_percent != null &&
-                            Number(item.discount_percent) !== 0
-                              ? ` (${item.discount_percent}%)`
-                              : ""}
-                          </span>
-                        </div>
-                      )}
+                    {(Number(item.discount_amount ?? 0) !== 0 ||
+                      Number(item.discount_percent ?? 0) !== 0) && (
+                      <div className="documents__card-row documents__card-row--discount">
+                        <span className="documents__card-label">Скидка</span>
+                        <span className="documents__card-value">
+                          {formatDocumentDiscountCell(item)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="documents__card-actions">
                     <button
@@ -1626,35 +1607,25 @@ const Documents = () => {
 
         {viewMode === "cards" && activeTab === "agent_sales" && (
           <div className="documents__cards">
-            {agentSalesLoading ? (
+            {documentsLoading ? (
               <div className="documents__cards-empty">Загрузка...</div>
-            ) : agentSalesError ? (
-              <div className="documents__cards-empty">{agentSalesError}</div>
-            ) : agentSalesCarts.length === 0 ? (
+            ) : agentSalesRequestDocuments.length === 0 ? (
               <div className="documents__cards-empty">
-                Одобренных заявок нет
+                Заявок на продажу нет
               </div>
             ) : (
-              agentSalesCarts.map((cart, index) => {
-                const doc = cart.sale_document
-                  ? agentSaleDocumentById[cart.sale_document]
-                  : null;
-                const docStatusLabel = doc
-                  ? getStatusLabel(doc.status)
-                  : cart.sale_document
-                    ? "…"
-                    : "—";
-                const docStatusType = doc ? getStatusType(doc.status) : "";
-                const agentItem =
-                  (doc && {
-                    id: doc.id,
-                    number: doc.number || "",
-                    rawStatus: doc.status,
-                    document: doc,
-                  }) ||
-                  null;
+              agentSalesRequestDocuments.map((doc, index) => {
+                const resolvedDocStatus = resolveDocumentStatus(doc);
+                const docStatusLabel = getStatusLabel(resolvedDocStatus);
+                const docStatusType = getStatusType(resolvedDocStatus);
+                const agentItem = {
+                  id: doc.id,
+                  number: doc.number || "",
+                  rawStatus: resolvedDocStatus,
+                  document: doc,
+                };
                 return (
-                  <div key={cart.id} className="documents__card">
+                  <div key={doc.id} className="documents__card">
                     <div className="documents__card-header">
                       <span className="documents__card-number">
                         Заявка #{index + 1}
@@ -1666,37 +1637,31 @@ const Documents = () => {
                             : "documents__status"
                         }
                       >
-                        {cart.sale_document_number || "—"}
+                        {doc.number || "—"}
                       </span>
                     </div>
                     <div className="documents__card-body">
                       <div className="documents__card-row">
                         <span className="documents__card-label">Агент</span>
                         <span className="documents__card-value">
-                          {cart.agent_name ||
-                            cart.agent_display ||
-                            (cart.agent
-                              ? `${String(cart.agent).slice(0, 8)}…`
+                          {doc.agent_display?.trim?.() ||
+                            (doc.agent
+                              ? `${String(doc.agent).slice(0, 8)}…`
                               : "—")}
                         </span>
                       </div>
                       <div className="documents__card-row">
                         <span className="documents__card-label">Склад</span>
                         <span className="documents__card-value">
-                          {cart.warehouse_name ||
-                            (cart.warehouse
-                              ? `${String(cart.warehouse).slice(0, 8)}…`
-                              : "—")}
+                          {doc.warehouse_from?.name ||
+                            doc.warehouse?.name ||
+                            "—"}
                         </span>
                       </div>
                       <div className="documents__card-row">
                         <span className="documents__card-label">Позиций</span>
                         <span className="documents__card-value">
-                          {cart.items_count ??
-                            (Array.isArray(cart.items)
-                              ? cart.items.length
-                              : null) ??
-                            "—"}
+                          {Array.isArray(doc.items) ? doc.items.length : "—"}
                         </span>
                       </div>
                       <div className="documents__card-row">
@@ -1710,100 +1675,26 @@ const Documents = () => {
                       <div className="documents__card-row">
                         <span className="documents__card-label">Одобрена</span>
                         <span className="documents__card-value">
-                          {cart.approved_at
-                            ? new Date(cart.approved_at).toLocaleString("ru-RU")
+                          {doc.created_at
+                            ? new Date(doc.created_at).toLocaleString("ru-RU")
                             : "—"}
                         </span>
                       </div>
                     </div>
                     <div className="documents__card-actions">
-                      {cart.sale_document ? (
-                        <>
-                          <button
-                            className="documents__action-btn"
-                            onClick={() =>
-                              navigate(
-                                `/crm/warehouse/documents/edit/${cart.sale_document}`,
-                              )
-                            }
-                            title="Открыть документ"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {isSaleDraftLikeStatus(agentItem?.rawStatus) && (
-                            <button
-                              className="documents__action-btn"
-                              onClick={() =>
-                                handlePost(agentItem, {
-                                  onSuccess: () =>
-                                    refetchAgentSaleDoc(agentItem.id),
-                                })
-                              }
-                              title="Провести"
-                            >
-                              <Check size={18} />
-                            </button>
-                          )}
-                          {agentItem?.rawStatus === "CASH_PENDING" && (
-                            <>
-                              <button
-                                className="documents__action-btn documents__action-btn--approve"
-                                onClick={() =>
-                                  handleCashApprove(agentItem, {
-                                    onSuccess: () =>
-                                      refetchAgentSaleDoc(agentItem.id),
-                                  })
-                                }
-                                title="Подтвердить кассой"
-                              >
-                                <Check size={18} />
-                              </button>
-                              <button
-                                className="documents__action-btn documents__action-btn--reject"
-                                onClick={() =>
-                                  handleCashReject(agentItem, {
-                                    onSuccess: () =>
-                                      refetchAgentSaleDoc(agentItem.id),
-                                  })
-                                }
-                                title="Отклонить"
-                              >
-                                <X size={18} />
-                              </button>
-                              <button
-                                className="documents__action-btn documents__action-btn--unpost"
-                                onClick={() =>
-                                  handleUnpost(agentItem, {
-                                    onSuccess: () =>
-                                      refetchAgentSaleDoc(agentItem.id),
-                                  })
-                                }
-                                title="Отменить проведение"
-                              >
-                                <Undo2 size={18} />
-                              </button>
-                            </>
-                          )}
-                          {agentItem?.rawStatus === "POSTED" && (
-                            <button
-                              className="documents__action-btn documents__action-btn--unpost"
-                              onClick={() =>
-                                handleUnpost(agentItem, {
-                                  onSuccess: () =>
-                                    refetchAgentSaleDoc(agentItem.id),
-                                })
-                              }
-                              title="Отменить проведение"
-                            >
-                              <Undo2 size={18} />
-                            </button>
-                          )}
-                        </>
-                      ) : (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() =>
+                          navigate(`/crm/warehouse/documents/edit/${doc.id}`)
+                        }
+                        title="Открыть документ"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      {isSaleRequestStatus(agentItem.rawStatus) && (
                         <button
-                          type="button"
                           className="documents__action-btn documents__action-btn--create-sale !w-auto !h-auto !py-1"
-                          onClick={() => setCreateSaleModalCart(cart)}
+                          onClick={() => handleOpenCreateSaleFromRequest(doc)}
                           title="Создать продажу по заявке"
                         >
                           <Plus size={18} />

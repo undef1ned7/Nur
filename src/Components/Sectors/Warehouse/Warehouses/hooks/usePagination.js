@@ -26,11 +26,13 @@ export const usePagination = (count, next, previous) => {
   const hasNextPage = useMemo(() => !!next, [next]);
   const hasPrevPage = useMemo(() => !!previous, [previous]);
 
-  // Синхронизация URL с состоянием страницы
+  // Синхронизация URL с состоянием страницы (сохраняем прочие query, напр. product_group)
   useEffect(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
     if (currentPage > 1) {
       params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
     }
     const newSearchString = params.toString();
     const currentSearchString = searchParams.toString();

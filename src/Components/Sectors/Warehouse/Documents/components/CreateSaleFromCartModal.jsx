@@ -44,6 +44,7 @@ export default function CreateSaleFromCartModal({
     discount_percent: "0",
     discount_amount: "0",
     comment: "",
+    is_sale_request: true,
     post: false,
   });
 
@@ -58,6 +59,7 @@ export default function CreateSaleFromCartModal({
         discount_percent: "0",
         discount_amount: "0",
         comment: "",
+        is_sale_request: true,
         post: false,
       });
       loadCounterparties();
@@ -138,7 +140,7 @@ export default function CreateSaleFromCartModal({
       discount_percent: String(Number(form.discount_percent) || 0),
       discount_amount: String(Number(form.discount_amount) || 0),
       comment: form.comment || "",
-      is_sale_request: true,
+      is_sale_request: Boolean(form.is_sale_request),
     };
     if (form.payment_kind === "credit" && form.prepayment_amount) {
       payload.prepayment_amount = String(
@@ -415,6 +417,22 @@ export default function CreateSaleFromCartModal({
                 }
                 placeholder="Комментарий к документу"
               />
+            </div>
+
+            <div className="reconciliation-modal__form-group">
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_sale_request}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      is_sale_request: e.target.checked,
+                    }))
+                  }
+                />
+                Создать как заявку на продажу
+              </label>
             </div>
 
             <div className="reconciliation-modal__form-group">

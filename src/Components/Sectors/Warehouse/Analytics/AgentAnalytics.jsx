@@ -60,6 +60,15 @@ const formatNum = (v) => {
   }).format(n);
 };
 
+const formatMoney = (v) => `${formatNum(v)} сом`;
+
+const formatSignedMoney = (v) => {
+  const n = Number(v);
+  if (Number.isNaN(n) || n === 0) return "0 сом";
+  const sign = n > 0 ? "+" : "−";
+  return `${sign}${formatNum(Math.abs(n))} сом`;
+};
+
 const formatShortDate = (s) => {
   if (!s) return "—";
   try {
@@ -299,6 +308,14 @@ const AgentAnalytics = () => {
   const salesByWarehouse = Array.isArray(details.sales_by_warehouse)
     ? details.sales_by_warehouse
     : [];
+  const counterpartiesDebt = Array.isArray(details.counterparties_debt)
+    ? details.counterparties_debt
+    : [];
+  const counterpartiesDebtNotes =
+    details.counterparties_debt_notes &&
+    typeof details.counterparties_debt_notes === "object"
+      ? details.counterparties_debt_notes
+      : {};
 
   const requestsSubmitted = Number(summary.requests_submitted ?? 0);
   const requestsApproved = Number(summary.requests_approved ?? 0);
@@ -313,6 +330,13 @@ const AgentAnalytics = () => {
   const writeOffQty = Number(summary.write_off_qty ?? 0);
   const onHandQty = Number(summary.on_hand_qty ?? 0);
   const onHandAmount = Number(summary.on_hand_amount ?? 0);
+  const counterpartiesDebtTotal = Number(summary.counterparties_debt_total ?? 0);
+  const counterpartiesPayableTotal = Number(
+    summary.counterparties_payable_total ?? 0
+  );
+  const counterpartyDebtsCompanyName =
+    summary.counterparty_debts_company_name || "Компания";
+  const counterpartyDebtsBranchName = summary.counterparty_debts_branch_name;
 
   const salesChartData = salesByDate.map((d) => ({
     date: d.date ? formatShortDate(d.date) : d.label || "—",
@@ -428,8 +452,24 @@ const AgentAnalytics = () => {
             />
             <KpiCard
               label="Остатки на руках"
-              value={`${formatNum(onHandAmount)} сом`}
+              value={formatMoney(onHandAmount)}
               description={`${formatNum(onHandQty)} шт`}
+              icon={Package}
+            />
+            <KpiCard
+              label="Контрагенты должны компании"
+              value={formatMoney(counterpartiesDebtTotal)}
+              description={`${counterpartyDebtsCompanyName}${
+                counterpartyDebtsBranchName
+                  ? `, ${counterpartyDebtsBranchName}`
+                  : ""
+              }`}
+              icon={Package}
+            />
+            <KpiCard
+              label="Компания должна контрагентам"
+              value={formatMoney(counterpartiesPayableTotal)}
+              description="Текущее сальдо по всем проведённым документам"
               icon={Package}
             />
           </div>
@@ -626,6 +666,103 @@ const AgentAnalytics = () => {
                 ) : (
                   <div className="warehouse-analytics-table__empty">
                     Нет продаж по складам за период.
+                  </div>
+                )}
+              </div>
+            </AccordionItem>
+
+            <AccordionItem
+              id="wa-agent-counterparties-debt"
+              title="Долги по контрагентам агента"
+              icon={Package}
+              badge={counterpartiesDebt.length ? `${counterpartiesDebt.length}` : "0"}
+              defaultOpen={false}
+            >
+              <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                <div className="warehouse-analytics__kpis" style={{ marginBottom: 12 }}>
+                  <KpiCard
+                    label="Контрагенты должны компании"
+                    value={formatMoney(counterpartiesDebtTotal)}
+                    description="Сумма положительных сальдо"
+                    icon={Package}
+                  />
+                  <KpiCard
+                    label="Компания должна контрагентам"
+                    value={formatMoney(counterpartiesPayableTotal)}
+                    description="Сумма модулей отрицательных сальдо"
+                    icon={Package}
+                  />
+                </div>
+
+                {counterpartiesDebtNotes?.formula_ru ? (
+                  <div
+                    className="warehouse-analytics-table__empty"
+                    style={{ marginBottom: 10, textAlign: "left" }}
+                  >
+                    Формула: {counterpartiesDebtNotes.formula_ru}
+                  </div>
+                ) : null}
+
+                {counterpartiesDebt.length > 0 ? (
+                  <PaginatedTable
+                    head={[
+                      "Контрагент",
+                      "Направление",
+                      "Сальдо",
+                      "Модуль, сом",
+                      "Кратко",
+                      "Расшифровка",
+                    ]}
+                    rows={counterpartiesDebt.map((d) => {
+                      const breakdown = d?.breakdown || {};
+                      const labelsRu = breakdown?.labels_ru || {};
+                      const saleAndPurchaseReturn = Number(
+                        breakdown?.sale_and_purchase_return ?? 0
+                      );
+                      const purchaseAndSaleReturn = Number(
+                        breakdown?.purchase_and_sale_return ?? 0
+                      );
+                      const moneyExpense = Number(breakdown?.money_expense ?? 0);
+                      const moneyReceipt = Number(breakdown?.money_receipt ?? 0);
+
+                      const breakdownText = [
+                        `${labelsRu.sale_and_purchase_return || "Продажи + возврат поставщику"}: ${formatMoney(
+                          saleAndPurchaseReturn
+                        )}`,
+                        `${labelsRu.purchase_and_sale_return || "Покупки + возврат от покупателя"}: ${formatMoney(
+                          purchaseAndSaleReturn
+                        )}`,
+                        `${labelsRu.money_expense || "Расход кассы контрагенту"}: ${formatMoney(
+                          moneyExpense
+                        )}`,
+                        `${labelsRu.money_receipt || "Приход от контрагента"}: ${formatMoney(
+                          moneyReceipt
+                        )}`,
+                      ].join(" | ");
+
+                      return [
+                        d?.debtor?.role === "counterparty" || d?.creditor?.role === "counterparty"
+                          ? d?.debtor?.role === "counterparty"
+                            ? d?.debtor?.name || "—"
+                            : d?.creditor?.name || "—"
+                          : "—",
+                        d?.direction === "counterparty_owes_company"
+                          ? "Контрагент должен компании"
+                          : d?.direction === "company_owes_counterparty"
+                            ? "Компания должна контрагенту"
+                            : "—",
+                        formatSignedMoney(d?.balance ?? 0),
+                        formatNum(d?.abs_amount ?? 0),
+                        d?.summary_ru || "—",
+                        breakdownText,
+                      ];
+                    })}
+                    colTemplate="220px 220px 130px 120px 1fr 2fr"
+                    numeric={[2, 3]}
+                  />
+                ) : (
+                  <div className="warehouse-analytics-table__empty">
+                    Нет контрагентов с ненулевым сальдо.
                   </div>
                 )}
               </div>

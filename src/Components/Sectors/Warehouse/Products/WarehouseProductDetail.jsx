@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   X,
   Edit,
@@ -21,6 +21,7 @@ import WarehouseMoveProductModal from "./WarehouseMoveProductModal";
 const WarehouseProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,16 +72,22 @@ const WarehouseProductDetail = () => {
     );
   };
 
-  const handleEdit = () => {
+  const buildAddProductSearch = () => {
+    const params = new URLSearchParams();
     const warehouseId = product?.warehouse || product?.warehouse_id || "";
-    const qs = warehouseId ? `?warehouse_id=${warehouseId}` : "";
-    navigate(`/crm/warehouse/stocks/add-product/${id}${qs}`);
+    if (warehouseId) params.set("warehouse_id", warehouseId);
+    const pg = new URLSearchParams(location.search).get("product_group");
+    if (pg) params.set("product_group", pg);
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  };
+
+  const handleEdit = () => {
+    navigate(`/crm/warehouse/stocks/add-product/${id}${buildAddProductSearch()}`);
   };
 
   const handleDuplicate = () => {
-    const warehouseId = product?.warehouse || product?.warehouse_id || "";
-    const qs = warehouseId ? `?warehouse_id=${warehouseId}` : "";
-    navigate(`/crm/warehouse/stocks/add-product${qs}`, {
+    navigate(`/crm/warehouse/stocks/add-product${buildAddProductSearch()}`, {
       state: { duplicate: true, productData: product },
     });
   };
