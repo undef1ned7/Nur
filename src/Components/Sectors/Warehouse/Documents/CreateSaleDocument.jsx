@@ -1162,6 +1162,11 @@ const CreateSaleDocument = () => {
                 unit: unit && String(unit).trim() ? String(unit) : "шт",
                 discount: discountPct,
                 discount_percent: discountPct,
+                effective_discount_percent:
+                  it.effective_discount_percent != null &&
+                  it.effective_discount_percent !== ""
+                    ? Number(it.effective_discount_percent)
+                    : undefined,
                 article: article ? String(article) : "",
                 addedAt: it.created_at || new Date().toISOString(),
                 created_at: it.created_at,
@@ -2976,11 +2981,27 @@ const CreateSaleDocument = () => {
                         item.price || item.unit_price || 0,
                       );
                       const itemQuantity = Number(item.quantity);
-                      const itemDiscount = Number(
+                      const docDiscNum = Number(
+                        String(documentDiscount).replace(",", "."),
+                      ) || 0;
+                      const rawLineDiscount = Number(
                         item.discount_percent ?? item.discount ?? 0,
                       );
+                      const effectiveDiscount =
+                        item.effective_discount_percent != null &&
+                        item.effective_discount_percent !== ""
+                          ? Number(item.effective_discount_percent)
+                          : rawLineDiscount > 0
+                            ? rawLineDiscount
+                            : docDiscNum;
+                      const discountDisplay =
+                        effectiveDiscount > 0
+                          ? `${effectiveDiscount}%`
+                          : "–";
                       const itemTotal =
-                        itemPrice * itemQuantity * (1 - itemDiscount / 100);
+                        itemPrice *
+                        itemQuantity *
+                        (1 - effectiveDiscount / 100);
 
                       return (
                         <tr key={item.id || index}>
@@ -3023,9 +3044,22 @@ const CreateSaleDocument = () => {
                             />
                           </td>
                           <td>
+                            <span className="create-sale-document__discount-effective">
+                              {discountDisplay}
+                            </span>
                             <input
                               type="text"
-                              value={itemDiscount}
+                              value={
+                                rawLineDiscount > 0
+                                  ? String(rawLineDiscount)
+                                  : ""
+                              }
+                              placeholder={
+                                docDiscNum > 0
+                                  ? `стр. (док. ${docDiscNum}%)`
+                                  : "стр. %"
+                              }
+                              title="Индивидуальная скидка строки, % (пусто — действует скидка документа)"
                               onChange={(e) =>
                                 handleDiscountChange(item.id, e.target.value)
                               }

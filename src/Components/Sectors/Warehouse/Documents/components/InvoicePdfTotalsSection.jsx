@@ -9,9 +9,11 @@ export default function InvoicePdfTotalsSection({
   total,
   documentDiscountPercent,
   documentDiscountAmount,
+  showDocumentDiscountLine = true,
 }) {
   const showDiscountLine =
-    documentDiscountAmount > 0 || documentDiscountPercent > 0;
+    showDocumentDiscountLine &&
+    (documentDiscountAmount > 0 || documentDiscountPercent > 0);
 
   return (
     <>

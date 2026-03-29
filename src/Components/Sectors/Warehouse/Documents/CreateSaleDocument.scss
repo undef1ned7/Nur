@@ -1136,6 +1136,15 @@ $due-red: #dc2626;
     max-width: 56px;
   }
 
+  &__discount-effective {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+    text-align: right;
+    color: #0f172a;
+  }
+
   &__empty-table {
     text-align: center;
     padding: 48px 24px;

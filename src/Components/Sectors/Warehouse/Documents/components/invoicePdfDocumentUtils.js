@@ -66,8 +66,10 @@ export function needsDiscountColumns(docType) {
 
 /**
  * Отдельно сумма и процент скидки по документу: в сумму не подставляем discount_percent.
+ * Строка «Скидка документа» в итогах показывается только если по документу задан % и
+ * хотя бы одна позиция без индивидуальной скидки реально использовала общий %.
  */
-export function resolveDocumentDiscount(doc, data, subtotal) {
+export function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
   const rawPercent = Number(doc.discount_percent);
   const percentProvided =
     doc.discount_percent != null &&
@@ -101,7 +103,25 @@ export function resolveDocumentDiscount(doc, data, subtotal) {
     }
   }
 
-  return { documentDiscountPercent, documentDiscountAmount };
+  const docPctRaw = Number(doc.discount_percent);
+  const hasLinesWithDocDiscount =
+    docPctRaw > 0 &&
+    Array.isArray(rawItems) &&
+    rawItems.some((item) => {
+      const dp = item.discount_percent;
+      return dp == 0 || !dp;
+    });
+
+  const baseShow =
+    documentDiscountAmount > 0 || documentDiscountPercent > 0;
+  const showDocumentDiscountLine =
+    baseShow && (docPctRaw <= 0 || hasLinesWithDocDiscount);
+
+  return {
+    documentDiscountPercent,
+    documentDiscountAmount,
+    showDocumentDiscountLine,
+  };
 }
 
 /** Стабильный ключ строки PDF (список статичен; без id — составной). */

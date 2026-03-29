@@ -34,34 +34,44 @@ export default function InvoicePdfDocument({ data }) {
   const isInventory = docType === "INVENTORY";
   const isTransfer = docType === "TRANSFER";
 
-  const { documentDiscountPercent, documentDiscountAmount } =
-    resolveDocumentDiscount(doc, data, subtotal);
+  const { documentDiscountPercent, documentDiscountAmount, showDocumentDiscountLine } =
+    resolveDocumentDiscount(doc, data, subtotal, data?.items);
+
+  const docDiscountPctForLines = Number(doc.discount_percent ?? 0);
 
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
         const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const itemDiscountPercent = Number(it.discount_percent ?? it.discount ?? 0);
-        const subtotalRow = qty * unit;
-        const rowTotal = subtotalRow * (1 - itemDiscountPercent / 100);
+        const unitBase = Number(it.price ?? it.unit_price ?? 0);
+        const lineDisc = Number(it.discount_percent ?? it.discount ?? 0);
+        const discount =
+          it.effective_discount_percent != null && it.effective_discount_percent !== ""
+            ? Number(it.effective_discount_percent)
+            : lineDisc > 0
+              ? lineDisc
+              : docDiscountPctForLines;
 
         let priceNoDiscount = Number(
           it.original_price ??
             it.price_before_discount ??
             it.price_without_discount ??
-            unit
+            unitBase
         );
         if (!priceNoDiscount) {
-          priceNoDiscount = unit;
+          priceNoDiscount = unitBase;
         }
+
+        const priceAfterDiscount =
+          priceNoDiscount * (1 - Number(discount || 0) / 100);
+        const rowTotal = qty * priceAfterDiscount;
 
         return {
           id: it.id,
           name: it.name || it.product_name || "Товар",
           qty,
-          unit_price: unit,
+          unit_price: priceAfterDiscount,
           price_no_discount: priceNoDiscount,
-          discount: itemDiscountPercent,
+          discount,
           total: rowTotal,
           unit: it.unit || "ШТ",
           article: it.article || "",
@@ -155,6 +165,7 @@ export default function InvoicePdfDocument({ data }) {
             total={total}
             documentDiscountPercent={documentDiscountPercent}
             documentDiscountAmount={documentDiscountAmount}
+            showDocumentDiscountLine={showDocumentDiscountLine}
           />
         )}
 
