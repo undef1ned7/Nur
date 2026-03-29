@@ -34,7 +34,7 @@ const Stocks = () => {
   const confirm = useConfirm();
   const alert = useAlert();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { warehouse_id: warehouseIdFromParams } = useParams();
   const warehouseId = warehouseIdFromParams || searchParams.get("warehouse_id");
 
@@ -85,7 +85,22 @@ const Stocks = () => {
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
-  const [selectedGroupId, setSelectedGroupId] = useState("all"); // all | uuid
+  /** Выбранная группа хранится в URL (`product_group`), чтобы после создания/редактирования товара возвращаться в ту же группу */
+  const selectedGroupId = searchParams.get("product_group") || "all"; // all | uuid
+
+  const setProductGroupFilter = useCallback(
+    (groupId) => {
+      const next = new URLSearchParams(searchParams);
+      if (!groupId || groupId === "all") {
+        next.delete("product_group");
+      } else {
+        next.set("product_group", groupId);
+      }
+      next.set("page", "1");
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsError, setGroupsError] = useState(null);
@@ -212,9 +227,14 @@ const Stocks = () => {
   // Обработчики событий
   const handleProductClick = useCallback(
     (product) => {
-      navigate(`/crm/warehouse/products/${product.id}`);
+      const qs = new URLSearchParams();
+      if (selectedGroupId && selectedGroupId !== "all") {
+        qs.set("product_group", selectedGroupId);
+      }
+      const q = qs.toString();
+      navigate(`/crm/warehouse/products/${product.id}${q ? `?${q}` : ""}`);
     },
-    [navigate],
+    [navigate, selectedGroupId],
   );
 
   const handlePageChange = useCallback(
@@ -267,12 +287,16 @@ const Stocks = () => {
   }, []);
 
   const handleCreateProduct = useCallback(() => {
+    const qs = new URLSearchParams();
     if (warehouseId) {
-      navigate(`/crm/warehouse/stocks/add-product?warehouse_id=${warehouseId}`);
-    } else {
-      navigate("/crm/warehouse/stocks/add-product");
+      qs.set("warehouse_id", warehouseId);
     }
-  }, [navigate, warehouseId]);
+    if (selectedGroupId && selectedGroupId !== "all") {
+      qs.set("product_group", selectedGroupId);
+    }
+    const q = qs.toString();
+    navigate(`/crm/warehouse/stocks/add-product${q ? `?${q}` : ""}`);
+  }, [navigate, warehouseId, selectedGroupId]);
 
   const goBack = useCallback(() => {
     navigate("/crm/warehouse/warehouses");
@@ -497,12 +521,12 @@ const Stocks = () => {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setSelectedGroupId(gKey);
+                setProductGroupFilter(gKey);
                 resetToFirstPage();
               }}
               onKeyDown={(ev) => {
                 if (ev.key === "Enter") {
-                  setSelectedGroupId(gKey);
+                  setProductGroupFilter(gKey);
                   resetToFirstPage();
                 }
               }}
@@ -608,6 +632,7 @@ const Stocks = () => {
       selectedGroupId,
       dragOverGroupId,
       resetToFirstPage,
+      setProductGroupFilter,
       onGroupDrop,
       deleteGroup,
       toggleGroupExpand,
@@ -716,12 +741,12 @@ const Stocks = () => {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setSelectedGroupId("all");
+                setProductGroupFilter("all");
                 resetToFirstPage();
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  setSelectedGroupId("all");
+                  setProductGroupFilter("all");
                   resetToFirstPage();
                 }
               }}

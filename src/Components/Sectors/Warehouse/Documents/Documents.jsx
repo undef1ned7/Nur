@@ -932,6 +932,40 @@ const Documents = () => {
     });
   };
 
+  /** Скидка по документу: бэкенд может отдать только % (discount_amount = 0) — тогда показываем сумму от подытога или хотя бы %. */
+  const formatDocumentDiscountCell = (item) => {
+    const pct = Number(item.discount_percent ?? 0);
+    const amt = Number(item.discount_amount ?? 0);
+    if (amt !== 0) {
+      return `${formatAmount(amt)} сом${
+        pct !== 0 ? ` (${item.discount_percent}%)` : ""
+      }`;
+    }
+    if (pct !== 0) {
+      const doc = item.document;
+      if (doc && Array.isArray(doc.items) && doc.items.length > 0) {
+        const subtotal = doc.items.reduce(
+          (s, it) =>
+            s +
+            (Number(it.price ?? it.unit_price ?? 0) || 0) *
+              (Number(it.qty ?? it.quantity ?? 0) || 0),
+          0,
+        );
+        const itemsDisc = doc.items.reduce((sum, it) => {
+          const p = Number(it.price ?? it.unit_price ?? 0) || 0;
+          const q = Number(it.qty ?? it.quantity ?? 0) || 0;
+          const d = Number(it.discount_percent ?? 0) || 0;
+          return sum + (p * q * d) / 100;
+        }, 0);
+        const net = subtotal - itemsDisc;
+        const fromPct = (net * pct) / 100;
+        return `${formatAmount(fromPct)} сом (${item.discount_percent}%)`;
+      }
+      return `${item.discount_percent}%`;
+    }
+    return "—";
+  };
+
   return (
     <div className="documents">
       {/* Header with search and filters */}
@@ -1118,17 +1152,7 @@ const Documents = () => {
                           )}
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
-                          <td>
-                            {item.discount_amount != null &&
-                            Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${
-                                  item.discount_percent != null &&
-                                  Number(item.discount_percent) !== 0
-                                    ? ` (${item.discount_percent}%)`
-                                    : ""
-                                }`
-                              : "—"}
-                          </td>
+                          <td>{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1222,17 +1246,7 @@ const Documents = () => {
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
-                          <td>
-                            {item.discount_amount != null &&
-                            Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${
-                                  item.discount_percent != null &&
-                                  Number(item.discount_percent) !== 0
-                                    ? ` (${item.discount_percent}%)`
-                                    : ""
-                                }`
-                              : "—"}
-                          </td>
+                          <td>{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1494,19 +1508,15 @@ const Documents = () => {
                         {formatAmount(item.amount)} сом
                       </span>
                     </div>
-                    {item.discount_amount != null &&
-                      Number(item.discount_amount) !== 0 && (
-                        <div className="documents__card-row documents__card-row--discount">
-                          <span className="documents__card-label">Скидка</span>
-                          <span className="documents__card-value">
-                            {formatAmount(item.discount_amount)} сом
-                            {item.discount_percent != null &&
-                            Number(item.discount_percent) !== 0
-                              ? ` (${item.discount_percent}%)`
-                              : ""}
-                          </span>
-                        </div>
-                      )}
+                    {(Number(item.discount_amount ?? 0) !== 0 ||
+                      Number(item.discount_percent ?? 0) !== 0) && (
+                      <div className="documents__card-row documents__card-row--discount">
+                        <span className="documents__card-label">Скидка</span>
+                        <span className="documents__card-value">
+                          {formatDocumentDiscountCell(item)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="documents__card-actions">
                     <button
