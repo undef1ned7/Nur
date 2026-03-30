@@ -32,6 +32,7 @@
     "i18next": "^23.16.8",
     "i18next-browser-languagedetector": "^8.2.0",
     "i18next-http-backend": "^3.0.2",
+    "insta-fetcher": "^1.4.0",
     "jsbarcode": "^3.12.1",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.553.0",
