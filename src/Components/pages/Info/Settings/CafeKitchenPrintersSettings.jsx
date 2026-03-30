@@ -298,7 +298,7 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
           <span>Автопечать на кухни при создании заказа (WebSocket)</span>
         </label>
         <p className="settings__mutedText settings__mutedText--indent">
-          Включайте на компьютере/планшете, который физически печатает (где запущен printer‑bridge для Wi‑Fi).
+          Включайте на устройстве, с которого идёт печать (агент печати или printer‑bridge; тот же bridge URL, что и для кассы).
         </p>
       </div>
 

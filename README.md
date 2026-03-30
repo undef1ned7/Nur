@@ -81,7 +81,7 @@ yarn start
   1. **printer-bridge** (Node-скрипт в этом репо) — отдельный процесс, один файл, без зависимостей.
   2. **Ваш бэкенд** — добавить endpoint, который принимает `{ ip, port, data }` (data — base64 ESC/POS) и шлёт их в принтер по TCP (как в `tools/printer-bridge.mjs`, логика `sendRawToPrinter`). В настройках печати указать URL этого endpoint вместо bridge. **Спека для бэкенд-разработчика:** [docs/PRINT_BACKEND_API.md](docs/PRINT_BACKEND_API.md).
 
-В проекте есть готовый **printer-bridge** (`tools/printer-bridge.mjs`). Его можно не использовать, если тот же функционал реализован на вашем сервере.
+В проекте есть **printer-bridge** на Node (`tools/printer-bridge.mjs`) и **агент печати** на Python/Flet в каталоге **`tools/printer-agent`** — оба решают одну задачу (HTTP → сырой TCP на принтер). Можно использовать любой из них или свой сервер с тем же API.
 
 ### Запуск printer‑bridge
 
@@ -92,6 +92,18 @@ npm run printer-bridge
 ```
 
 По умолчанию он слушает `http://127.0.0.1:5179/print`.
+
+### Агент печати (Flet) — `tools/printer-agent`
+
+Это **отдельная папка** в репозитории: не корень `tools`, а именно `tools/printer-agent`. Десктопное приложение с окном и логом; тот же протокол, что у bridge (POST `/print`, порт по умолчанию 5179). Запуск:
+
+```bash
+cd tools/printer-agent
+pip install -r requirements.txt
+python main.py
+```
+
+Детали и сборка exe: [tools/printer-agent/README.md](tools/printer-agent/README.md).
 
 ### Настройка (опционально)
 

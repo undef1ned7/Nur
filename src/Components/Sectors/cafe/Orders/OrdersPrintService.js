@@ -524,7 +524,7 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
       });
     } catch (bridgeErr) {
       throw new Error(
-        `Printer-bridge недоступен. Запустите на ПК с принтером: npm run printer-bridge. Печать по Wi‑Fi только через bridge — иначе на чек печатаются HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
+        `Печать недоступна: не отвечает bridge/агент (npm run printer-bridge из корня репо или python main.py в tools/printer-agent). Без них на чек попадут HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
       );
     }
     if (r.ok) return true;

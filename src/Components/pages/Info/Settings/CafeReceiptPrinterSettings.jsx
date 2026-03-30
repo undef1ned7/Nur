@@ -258,7 +258,10 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
               />
             </div>
             <div className="settings__warnBox" style={{ marginTop: 10 }}>
-              Для Wi‑Fi печати нужен локальный bridge: запустите <code>npm run printer-bridge</code>.
+              Нужен агент или bridge на ПК в той же сети, что и браузер кассы (например{" "}
+              <code>tools/printer-agent</code> или <code>npm run printer-bridge</code>). В поле URL укажите IP
+              этого ПК <b>в той подсети, откуда открыт NurCRM</b> (при одновременном LAN и Wi‑Fi у агента —
+              разные строки в окне агента).
             </div>
           </div>
         </>
