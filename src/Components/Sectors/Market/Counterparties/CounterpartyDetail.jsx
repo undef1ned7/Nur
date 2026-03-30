@@ -307,6 +307,14 @@ const CounterpartyDetail = () => {
       ),
     [debtOperationsList],
   );
+  const sortedSaleRows = useMemo(
+    () =>
+      sortedAllRows.filter((row) => {
+        const number = String(row?.number ?? row?.document?.number ?? "").toUpperCase();
+        return number.includes("SALE");
+      }),
+    [sortedAllRows],
+  );
 
   const hasUnifiedOperations = sortedAllRows.some(
     (r) => r.source != null || r.debt_delta != null,
@@ -932,6 +940,16 @@ const CounterpartyDetail = () => {
                   {renderRowsContent(sortedAllRows, {
                     showSource: hasUnifiedOperations,
                     showDebtDelta: hasUnifiedOperations,
+                  })}
+                </AccordionSection>
+
+                <AccordionSection
+                  title="Продажи"
+                  subtitle={`${sortedSaleRows.length} шт.`}
+                >
+                  {renderRowsContent(sortedSaleRows, {
+                    showSource: true,
+                    showDebtDelta: true,
                   })}
                 </AccordionSection>
 

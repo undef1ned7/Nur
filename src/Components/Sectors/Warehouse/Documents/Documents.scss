@@ -220,7 +220,10 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable both-edges;
     position: relative;
 
     @media (max-width: 900px) {
@@ -232,6 +235,7 @@
 
   &__table {
     width: 100%;
+    min-width: 900px;
     border-collapse: collapse;
 
     thead {

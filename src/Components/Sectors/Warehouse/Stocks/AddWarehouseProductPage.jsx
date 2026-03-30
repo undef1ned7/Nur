@@ -318,9 +318,20 @@ const AddWarehouseProductPage = () => {
         state: { docType },
       };
     }
+    const sp = new URLSearchParams(location.search);
+    const productGroup = sp.get("product_group");
+    const groupQs = productGroup
+      ? `?product_group=${encodeURIComponent(productGroup)}`
+      : "";
     if (selectedWarehouse) {
       return {
-        path: `/crm/warehouse/stocks/${selectedWarehouse}`,
+        path: `/crm/warehouse/stocks/${selectedWarehouse}${groupQs}`,
+        state: {},
+      };
+    }
+    if (productGroup) {
+      return {
+        path: `/crm/warehouse/stocks${groupQs}`,
         state: {},
       };
     }
