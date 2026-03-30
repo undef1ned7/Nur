@@ -3,8 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Routes, Route, useNavigate, useParams, Link } from "react-router-dom";
 import api from "../../../../api";
 import "./kassa.scss";
-import { AddOperationModal } from "./components/KassaModals";
+import { AddOperationModal, EditCashboxNameModal } from "./components/KassaModals";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useUser } from "../../../../store/slices/userSlice";
 
 /* helpers */
 const asArray = (d) => (Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : []);
@@ -30,8 +31,16 @@ const CashboxList = () => {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [editRow, setEditRow] = useState(null);
 
   const navigate = useNavigate();
+  const { profile } = useUser();
+  const canEditCashboxes =
+    profile?.role === "owner" || profile?.role === "admin";
+
+  useEffect(() => {
+    if (!canEditCashboxes) setEditRow(null);
+  }, [canEditCashboxes]);
 
   const boxKey = (r) => String(r?.id || r?.uuid || "");
 
@@ -126,6 +135,8 @@ const CashboxList = () => {
     );
   }, [rows, q]);
 
+  const cashboxTitleForEdit = (r) => String(r?.department_name || r?.name || "").trim();
+
   const summary = useMemo(() => {
     let income = 0;
     let expense = 0;
@@ -174,13 +185,13 @@ const CashboxList = () => {
                 <th>Касса</th>
                 <th>Приход</th>
                 <th>Расход</th>
-                <th>Действия</th>
+                {canEditCashboxes ? <th>Действия</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4}>Загрузка…</td>
+                  <td colSpan={canEditCashboxes ? 4 : 3}>Загрузка…</td>
                 </tr>
               ) : filtered.length ? (
                 filtered.map((r) => {
@@ -194,24 +205,23 @@ const CashboxList = () => {
                       </td>
                       <td>{money(t.income)}</td>
                       <td>{money(t.expense)}</td>
-                      <td>
-                        <button
-                          className="cafeKassa__btn cafeKassa__btn--secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/crm/cafe/kassa/${key}`);
-                          }}
-                          type="button"
-                        >
-                          Открыть
-                        </button>
-                      </td>
+                      {canEditCashboxes ? (
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="cafeKassa__btn cafeKassa__btn--secondary"
+                            onClick={() => setEditRow(r)}
+                            type="button"
+                          >
+                            Редактировать
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={4} className="cafeKassa__center">
+                  <td colSpan={canEditCashboxes ? 4 : 3} className="cafeKassa__center">
                     Нет данных
                   </td>
                 </tr>
@@ -220,6 +230,31 @@ const CashboxList = () => {
           </table>
         </div>
       </DataContainer>
+
+      {canEditCashboxes ? (
+        <EditCashboxNameModal
+          open={!!editRow}
+          cashboxId={editRow ? boxKey(editRow) : ""}
+          initialName={editRow ? cashboxTitleForEdit(editRow) : ""}
+          onClose={() => setEditRow(null)}
+          onSaved={(data, submittedName) => {
+            const id = editRow ? boxKey(editRow) : "";
+            if (!id) return;
+            const label = String(submittedName || "").trim();
+            setRows((prev) =>
+              prev.map((r) => {
+                if (boxKey(r) !== id) return r;
+                const merged = { ...r, ...data };
+                return {
+                  ...merged,
+                  name: merged.name ?? label,
+                  department_name: merged.department_name ?? label,
+                };
+              })
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 };

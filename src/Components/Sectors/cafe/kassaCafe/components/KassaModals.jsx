@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import api from "../../../../../api";
 
@@ -274,6 +274,109 @@ export const AddOperationModal = ({
               disabled={loading}
             >
               {loading ? "Добавление..." : "Добавить"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ───────────────────────────────────────────────── */
+/* Модалка: название кассы */
+export const EditCashboxNameModal = ({ open, cashboxId, initialName, onClose, onSaved }) => {
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setName(String(initialName ?? "").trim());
+      setError("");
+    }
+  }, [open, initialName]);
+
+  if (!open) return null;
+
+  const handleClose = () => {
+    if (!loading) {
+      setError("");
+      onClose();
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = String(name || "").trim();
+    if (!trimmed) {
+      setError("Введите название");
+      return;
+    }
+    if (!cashboxId) {
+      setError("Не указана касса");
+      return;
+    }
+
+    try {
+      setError("");
+      setLoading(true);
+      const { data } = await api.patch(`/construction/cashboxes/${cashboxId}/`, { name: trimmed });
+      onSaved?.(data, trimmed);
+      handleClose();
+    } catch (err) {
+      console.error(err);
+      const d = err?.response?.data;
+      const msg =
+        (typeof d?.detail === "string" && d.detail) ||
+        (Array.isArray(d?.name) && d.name[0]) ||
+        (Array.isArray(d?.non_field_errors) && d.non_field_errors[0]) ||
+        "Не удалось сохранить. Попробуйте ещё раз.";
+      setError(String(msg));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="cafeKassa__modalOverlay" onClick={handleClose}>
+      <div className="cafeKassa__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cafeKassa__modalHeader">
+          <h3 className="cafeKassa__modalTitle">Редактировать кассу</h3>
+          <button
+            className="cafeKassa__iconBtn"
+            onClick={handleClose}
+            aria-label="Закрыть"
+            type="button"
+            disabled={loading}
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <form className="cafeKassa__form" onSubmit={handleSubmit}>
+          {error && <div className="cafeKassa__alert cafeKassa__alert--error">{error}</div>}
+
+          <div className="cafeKassa__field">
+            <label className="cafeKassa__label" htmlFor="cafeKassaEditCashboxName">
+              Название *
+            </label>
+            <input
+              id="cafeKassaEditCashboxName"
+              className="cafeKassa__input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="cafeKassa__formActions">
+            <button type="button" className="cafeKassa__btn" onClick={handleClose} disabled={loading}>
+              Отмена
+            </button>
+            <button type="submit" className="cafeKassa__btn cafeKassa__btn--primary" disabled={loading}>
+              {loading ? "Сохранение..." : "Сохранить"}
             </button>
           </div>
         </form>

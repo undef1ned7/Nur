@@ -5,11 +5,21 @@ const StockItemModal = ({
   editingId,
   form,
   setForm,
+  supplierSuggestions = [],
+  supplierOptionFallback = null,
   onClose,
   onSubmit,
   sanitizeDecimalInput,
 }) => {
   const isCreate = editingId == null;
+  const supplierOptions = (() => {
+    const list = [...(supplierSuggestions || [])];
+    const fb = supplierOptionFallback;
+    if (fb?.id && !list.some((o) => String(o.id) === String(fb.id))) {
+      list.unshift({ id: fb.id, label: fb.label || String(fb.id) });
+    }
+    return list;
+  })();
 
   return (
     <div className="cafeStock__modalOverlay" onClick={onClose}>
@@ -100,6 +110,28 @@ const StockItemModal = ({
                 }
                 placeholder="Цена за единицу"
               />
+            </div>
+
+            <div className="cafeStock__field cafeStock__field--full">
+              <label className="cafeStock__label" htmlFor="cafeStockSupplierSelect">
+                Поставщик
+              </label>
+              <select
+                id="cafeStockSupplierSelect"
+                className="cafeStock__select"
+                value={form.supplier ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, supplier: e.target.value }))}
+              >
+                <option value="">Не выбран</option>
+                {supplierOptions.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <div className="cafeStock__hint">
+                Необязательно. В запрос уходит id поставщика из справочника.
+              </div>
             </div>
           </div>
 
