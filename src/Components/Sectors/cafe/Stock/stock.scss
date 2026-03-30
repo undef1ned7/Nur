@@ -571,7 +571,8 @@
   }
 
   &__input,
-  &__textarea {
+  &__textarea,
+  &__select {
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -590,6 +591,12 @@
     &::placeholder {
       color: var(--muted);
     }
+  }
+
+  &__select {
+    cursor: pointer;
+    appearance: auto;
+    color: var(--text);
   }
 
   &__textarea {

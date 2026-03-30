@@ -1,5 +1,5 @@
 // src/Components/Sectors/cafe/Stock/Stock.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import "./stock.scss";
@@ -30,6 +30,17 @@ const sanitizeDecimalInput = (value) => {
   return `${parts[0]}.${parts.slice(1).join("")}`; // одна точка
 };
 
+const pickSupplierLabel = (c) =>
+  String(c?.full_name || c?.name || c?.title || c?.company_name || "").trim();
+
+/** UUID / id из поля склада (строка или вложенный объект клиента) */
+const normalizeSupplierId = (row) => {
+  const v = row?.supplier_id ?? row?.supplier;
+  if (v == null || v === "") return "";
+  if (typeof v === "object") return String(v.id ?? v.uuid ?? "").trim();
+  return String(v).trim();
+};
+
 const Stock = () => {
   const alert = useAlert();
   const [items, setItems] = useState([]);
@@ -47,7 +58,12 @@ const Stock = () => {
     remainder: "",
     minimum: "",
     unit_price: "",
+    supplier: "",
   });
+
+  const [supplierSuggestions, setSupplierSuggestions] = useState([]);
+  /** Поставщик с id, которого нет в загруженном списке — показать в select при редактировании */
+  const [supplierOptionFallback, setSupplierOptionFallback] = useState(null);
 
   // модалка движения (приход)
   const [moveOpen, setMoveOpen] = useState(false);
@@ -75,6 +91,60 @@ const Stock = () => {
   }, []);
 
   useEffect(() => {
+    const loadSuppliersFromMain = async () => {
+      const byId = new Map();
+      try {
+        let url = "/main/clients/";
+        let requestConfig = { params: { type: "suppliers" } };
+        let guard = 0;
+
+        while (url && guard < 80) {
+          // eslint-disable-next-line no-await-in-loop
+          const { data } = await api.get(url, requestConfig);
+          requestConfig = {};
+          const batch = listFrom({ data });
+          (Array.isArray(batch) ? batch : []).forEach((c) => {
+            const id = c?.id != null ? String(c.id).trim() : "";
+            const label = pickSupplierLabel(c);
+            if (id && label) byId.set(id, { id, label });
+          });
+          url = data?.next || null;
+          guard += 1;
+        }
+      } catch {
+        /* ignore */
+      }
+      setSupplierSuggestions(
+        [...byId.values()].sort((a, b) => a.label.localeCompare(b.label, "ru"))
+      );
+    };
+    loadSuppliersFromMain();
+  }, []);
+
+  const supplierLabelById = useMemo(() => {
+    const m = new Map();
+    supplierSuggestions.forEach(({ id, label }) => {
+      if (id) m.set(String(id), label);
+    });
+    return m;
+  }, [supplierSuggestions]);
+
+  const rowSupplierCaption = useCallback(
+    (s) => {
+      const nested = s?.supplier;
+      if (nested && typeof nested === "object") {
+        const t = pickSupplierLabel(nested);
+        if (t) return t;
+      }
+      if (s?.supplier_name) return String(s.supplier_name).trim();
+      const sid = normalizeSupplierId(s);
+      if (sid && supplierLabelById.has(sid)) return supplierLabelById.get(sid);
+      return "";
+    },
+    [supplierLabelById]
+  );
+
+  useEffect(() => {
     const fetchCashboxes = async () => {
       try {
         const r = await api.get("/construction/cashboxes/");
@@ -95,35 +165,52 @@ const Stock = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter(
-      (s) =>
+    return items.filter((s) => {
+      const supCap = rowSupplierCaption(s).toLowerCase();
+      return (
         String(s.title || "").toLowerCase().includes(q) ||
-        String(s.unit || "").toLowerCase().includes(q)
-    );
-  }, [items, query]);
+        String(s.unit || "").toLowerCase().includes(q) ||
+        (supCap && supCap.includes(q))
+      );
+    });
+  }, [items, query, rowSupplierCaption]);
 
   const isLow = (s) => toNum(s.remainder) <= toNum(s.minimum);
 
   const openCreate = () => {
     setEditingId(null);
+    setSupplierOptionFallback(null);
     setForm({
       title: "",
       unit: "",
       remainder: "",
       minimum: "",
       unit_price: "",
+      supplier: "",
     });
     setModalOpen(true);
   };
 
   const openEdit = (row) => {
     setEditingId(row.id);
+    const sid = normalizeSupplierId(row);
+    const sidStr = sid ? String(sid) : "";
+    if (sidStr && !supplierLabelById.has(sidStr)) {
+      const cap = rowSupplierCaption(row);
+      setSupplierOptionFallback({
+        id: sidStr,
+        label: cap || sidStr,
+      });
+    } else {
+      setSupplierOptionFallback(null);
+    }
     setForm({
       title: row.title || "",
       unit: row.unit || "",
       remainder: String(row.remainder ?? ""),
       minimum: String(row.minimum ?? ""),
       unit_price: String(row.unit_price ?? ""),
+      supplier: sidStr,
     });
     setModalOpen(true);
   };
@@ -170,6 +257,13 @@ const Stock = () => {
       minimum: numStr(Math.max(0, minimumNum)),
       unit_price: numStr(Math.max(0, unitPriceNum)),
     };
+
+    const supplierIdTrim = String(form.supplier || "").trim();
+    if (editingId == null) {
+      if (supplierIdTrim) payload.supplier = supplierIdTrim;
+    } else {
+      payload.supplier = supplierIdTrim || null;
+    }
 
     try {
       if (editingId == null) {
@@ -265,6 +359,8 @@ const Stock = () => {
       minimum: numStr(toNum(moveItem.minimum)),
       unit_price: numStr(unitPriceNum >= 0 ? unitPriceNum : toNum(moveItem.unit_price)),
     };
+    const moveSupId = normalizeSupplierId(moveItem);
+    if (moveSupId) payload.supplier = moveSupId;
 
     try {
       const res = await api.put(`/cafe/warehouse/${moveItem.id}/`, payload);
@@ -324,7 +420,9 @@ const Stock = () => {
           {loading && <div className="cafeStock__alert">Загрузка…</div>}
 
           {!loading &&
-            filtered.map((s) => (
+            filtered.map((s) => {
+              const supplierCap = rowSupplierCaption(s);
+              return (
               <article key={s.id} className="cafeStock__card">
                 <div className="cafeStock__cardLeft">
                   <div className="cafeStock__avatar">
@@ -333,6 +431,9 @@ const Stock = () => {
                   <div>
                     <h3 className="cafeStock__name">{s.title}</h3>
                     <div className="cafeStock__meta">
+                      {supplierCap ? (
+                        <span className="cafeStock__muted">Поставщик: {supplierCap}</span>
+                      ) : null}
                       <span className="cafeStock__muted">
                         Остаток: {toNum(s.remainder)} {s.unit}
                       </span>
@@ -370,7 +471,8 @@ const Stock = () => {
                   </button>
                 </div>
               </article>
-            ))}
+            );
+            })}
 
           {!loading && !filtered.length && (
             <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
@@ -384,7 +486,12 @@ const Stock = () => {
           editingId={editingId}
           form={form}
           setForm={setForm}
-          onClose={() => setModalOpen(false)}
+          supplierSuggestions={supplierSuggestions}
+          supplierOptionFallback={supplierOptionFallback}
+          onClose={() => {
+            setModalOpen(false);
+            setSupplierOptionFallback(null);
+          }}
           onSubmit={saveItem}
           sanitizeDecimalInput={sanitizeDecimalInput}
         />
