@@ -38,6 +38,12 @@ const fmtDateTime = (v) => {
 };
 
 const emptyPage = { count: 0, next: null, previous: null, results: [] };
+const toNumber = (v) => Number(v) || 0;
+const fmtRu2 = (v) =>
+  toNumber(v).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 /**
  * Страница контрагента: только денежные операции по контрагенту (API 5.3).
@@ -100,6 +106,7 @@ const CounterpartyDetail = () => {
     results: [],
     debt_operations: [],
     money: emptyPage,
+    analytics: null,
   }));
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
@@ -208,6 +215,10 @@ const CounterpartyDetail = () => {
           results: data.operations,
           debt_operations: data.debt_operations ?? [],
           money: moneyPage,
+          analytics:
+            data?.analytics && typeof data.analytics === "object"
+              ? data.analytics
+              : null,
         });
       } else {
         const list = data?.results ?? (Array.isArray(data) ? data : []);
@@ -215,11 +226,17 @@ const CounterpartyDetail = () => {
           results: list,
           debt_operations: [],
           money: { ...emptyPage, results: list, count: list.length },
+          analytics: null,
         });
       }
     } catch (e) {
       setErrorOperations("Не удалось загрузить приход/расход");
-      setOperations({ results: [], debt_operations: [], money: emptyPage });
+      setOperations({
+        results: [],
+        debt_operations: [],
+        money: emptyPage,
+        analytics: null,
+      });
     } finally {
       setLoadingOperations(false);
     }
@@ -320,23 +337,39 @@ const CounterpartyDetail = () => {
     (r) => r.source != null || r.debt_delta != null,
   );
 
-  // Сводка по операциям: сальдо (приходы − расходы), переводы (оборот), долговые операции (API 5.3)
-  // В Сальдо и Переводы включаем только реальные денежные приходы/расходы (source === "money"),
-  // чтобы покупки в долг (складские документы) не дублировались в сальдо.
-  // Общие долги = остаток: сумма по debt_operations + сумма debt_delta по operations (оплаты дают отрицательный debt_delta).
+  // Сводка для карточек: первично берем analytics с бэка.
+  // Фолбэк оставляем на старый клиентский расчет для обратной совместимости.
   const summary = useMemo(() => {
+    const analytics = operations?.analytics;
+    if (analytics && typeof analytics === "object") {
+      const cashReceived = toNumber(analytics?.cash?.received);
+      const cashPaid = toNumber(analytics?.cash?.paid);
+      const cashNet = toNumber(analytics?.cash?.net);
+      const counterpartyOwes = toNumber(
+        analytics?.debts?.counterparty_owes_company,
+      );
+      const companyOwes = toNumber(analytics?.debts?.company_owes_counterparty);
+      const debtNet = counterpartyOwes - companyOwes;
+      return {
+        balance: cashNet,
+        transfers: cashReceived + cashPaid,
+        debtOperationsCount: Number(analytics?.sales?.pending_cash?.count) || 0,
+        debtBalance: debtNet,
+      };
+    }
+
     const list = sortedAllRows;
     let sumReceipt = 0;
     let sumExpense = 0;
     list.forEach((row) => {
       if (row.source != null && row.source !== "money") return;
-      const amount = Number(row.amount) || 0;
+      const amount = toNumber(row.amount);
       if (row.doc_type === "MONEY_RECEIPT") sumReceipt += amount;
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
     // Остаток долга = сумма debt_delta по всем operations (продажи в долг дают +, оплаты −).
     const debtDeltaSum = list.reduce(
-      (acc, row) => acc + (Number(row.debt_delta) || 0),
+      (acc, row) => acc + toNumber(row.debt_delta),
       0,
     );
     return {
@@ -345,7 +378,12 @@ const CounterpartyDetail = () => {
       debtOperationsCount: debtOperationsList.length,
       debtBalance: debtDeltaSum,
     };
-  }, [sortedAllRows, debtOperationsList]);
+  }, [sortedAllRows, debtOperationsList, operations?.analytics]);
+
+  const counterpartyAnalytics =
+    operations?.analytics && typeof operations.analytics === "object"
+      ? operations.analytics
+      : null;
 
   const openPayDebtModal = useCallback(() => {
     const debtBalance = summary.debtBalance;
@@ -716,48 +754,80 @@ const CounterpartyDetail = () => {
                   Сальдо
                 </span>
                 <span className="counterparty-detail-page__summary-value">
-                  {summary.balance.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  COM
+                  {counterpartyAnalytics
+                    ? `${fmtRu2(counterpartyAnalytics.cash?.net)} COM`
+                    : loadingOperations
+                      ? "…"
+                      : "—"}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
-                  приходы − расходы по контрагенту
+                  {counterpartyAnalytics
+                    ? `Продажи: ${fmtRu2(counterpartyAnalytics.sales?.total)} COM · ${
+                        counterpartyAnalytics.sales?.count ?? 0
+                      } док. · наличные ${fmtRu2(
+                        counterpartyAnalytics.sales?.cash_total,
+                      )} · в долг ${fmtRu2(
+                        counterpartyAnalytics.sales?.credit_total,
+                      )}`
+                    : ""}
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
                 <span className="counterparty-detail-page__summary-label">
                   Переводы
                 </span>
-                <span className="counterparty-detail-page__summary-value">
-                  {summary.transfers.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  COM
-                </span>
+                <div className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--stack">
+                  {counterpartyAnalytics ? (
+                    <>
+                      <span>
+                        Приход: {fmtRu2(counterpartyAnalytics.cash?.received)}{" "}
+                        COM
+                      </span>
+                      <span>
+                        Расход: {fmtRu2(counterpartyAnalytics.cash?.paid)} COM
+                      </span>
+                    </>
+                  ) : loadingOperations ? (
+                    <span>…</span>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </div>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt-ops">
                 <span className="counterparty-detail-page__summary-label">
                   Общие долги
                 </span>
                 <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
-                  {Math.abs(summary.debtBalance).toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  с
+                  {counterpartyAnalytics
+                    ? `${fmtRu2(
+                        Math.abs(toNumber(counterpartyAnalytics.debts?.balance)),
+                      )} с`
+                    : loadingOperations
+                      ? "…"
+                      : "—"}
                 </span>
                 <span className="counterparty-detail-page__debt-who">
-                  {summary.debtBalance > 0
-                    ? "Контрагент должен вам"
-                    : summary.debtBalance < 0
-                      ? "Вы должны контрагенту"
-                      : "Долг закрыт"}
+                  {counterpartyAnalytics
+                    ? (() => {
+                        const cp = toNumber(
+                          counterpartyAnalytics.debts?.counterparty_owes_company,
+                        );
+                        const co = toNumber(
+                          counterpartyAnalytics.debts?.company_owes_counterparty,
+                        );
+                        if (cp > 0) return "Контрагент должен вам";
+                        if (co > 0) return "Вы должны контрагенту";
+                        return "Долг закрыт";
+                      })()
+                    : ""}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
-                  {summary.debtOperationsCount} кредитных документов
+                  {counterpartyAnalytics
+                    ? `${counterpartyAnalytics.sales?.pending_cash?.count ?? 0} кредитных документов · ожидается ${fmtRu2(
+                        counterpartyAnalytics.sales?.pending_cash?.total,
+                      )} с`
+                    : ""}
                 </span>
               </div>
             </div>
