@@ -41,6 +41,39 @@
     margin: 0;
   }
 
+  &__tabs {
+    display: inline-flex;
+    gap: 8px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: fit-content;
+    background: #fff;
+  }
+
+  &__tab {
+    height: 36px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 0 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #f3f4f6;
+      color: var(--text);
+    }
+
+    &--active {
+      background: var(--primary);
+      color: #111;
+    }
+  }
+
   &__subtitle {
     font-size: 13px;
     color: var(--muted);
