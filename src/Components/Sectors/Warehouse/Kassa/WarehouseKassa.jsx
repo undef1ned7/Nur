@@ -478,6 +478,10 @@ const CashRegisterDetail = () => {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentFilterId, setAgentFilterId] = useState("");
   const [counterpartyFilterId, setCounterpartyFilterId] = useState("");
+  const [docs, setDocs] = useState([]);
+  const [docsCount, setDocsCount] = useState(0);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState("");
   const PAGE_SIZE = 100;
   const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState({
@@ -513,15 +517,19 @@ const CashRegisterDetail = () => {
   useEffect(() => {
     (async () => {
       try {
+        const counterpartyParams = { page_size: 500 };
+        if (agentFilterId) {
+          counterpartyParams.agent = agentFilterId;
+        }
         const [cp, cat] = await Promise.all([
-          warehouseAPI.listCounterparties({ page_size: 500 }),
+          warehouseAPI.listCounterparties(counterpartyParams),
           warehouseAPI.listMoneyCategories({ page_size: 200 }),
         ]);
         setCounterparties(asArray(cp));
         setCategories(asArray(cat));
       } catch {}
     })();
-  }, []);
+  }, [agentFilterId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -560,66 +568,54 @@ const CashRegisterDetail = () => {
 
   const receipts = operations?.receipts ?? [];
   const expenses = operations?.expenses ?? [];
-  const allDocs = useMemo(
-    () =>
-      [...receipts, ...expenses].sort(
-        (a, b) =>
-          new Date(b.date || b.created_at) - new Date(a.date || a.created_at),
-      ),
-    [receipts, expenses],
-  );
 
-  const counterpartiesByAgent = useMemo(() => {
-    if (!agentFilterId) return counterparties;
-    const byAgent = counterparties.filter(
-      (c) => String(c.agent ?? c.agent_id ?? "") === String(agentFilterId),
-    );
-    return byAgent.length > 0 ? byAgent : counterparties;
-  }, [counterparties, agentFilterId]);
-
-  const filtered = useMemo(() => {
-    let list =
-      activeTab === "all"
-        ? allDocs
-        : activeTab === "receipt"
-          ? receipts
-          : expenses;
+  useEffect(() => {
+    if (!id) return;
+    const params = {
+      cash_register: id,
+      page_size: PAGE_SIZE,
+      page: currentPage,
+    };
+    if (activeTab === "receipt") {
+      params.doc_type = "MONEY_RECEIPT";
+    } else if (activeTab === "expense") {
+      params.doc_type = "MONEY_EXPENSE";
+    }
     if (agentFilterId) {
-      list = list.filter(
-        (row) =>
-          String(row.agent ?? row.agent_id ?? "") === String(agentFilterId),
-      );
+      params.agent = agentFilterId;
     }
     if (counterpartyFilterId) {
-      list = list.filter(
-        (row) =>
-          String(row.counterparty ?? row.counterparty_id ?? "") ===
-          String(counterpartyFilterId),
-      );
+      params.counterparty = counterpartyFilterId;
     }
-    return list;
-  }, [
-    activeTab,
-    allDocs,
-    receipts,
-    expenses,
-    agentFilterId,
-    counterpartyFilterId,
-  ]);
+    setDocsLoading(true);
+    setDocsError("");
+    warehouseAPI
+      .listMoneyDocuments(params)
+      .then((data) => {
+        const items = asArray(data);
+        setDocs(items);
+        setDocsCount(
+          typeof data?.count === "number" ? data.count : items.length,
+        );
+      })
+      .catch(() => {
+        setDocs([]);
+        setDocsCount(0);
+        setDocsError("Не удалось загрузить операции");
+      })
+      .finally(() => {
+        setDocsLoading(false);
+      });
+  }, [id, activeTab, agentFilterId, counterpartyFilterId, currentPage]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginatedList = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
+  const totalPages = Math.max(1, Math.ceil(docsCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, agentFilterId, counterpartyFilterId]);
 
-  const fromItem =
-    filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const toItem = Math.min(currentPage * PAGE_SIZE, filtered.length);
+  const fromItem = docsCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const toItem = Math.min(currentPage * PAGE_SIZE, docsCount);
 
   const openReceiptModal = () => {
     setForm({
@@ -819,7 +815,7 @@ const CashRegisterDetail = () => {
                 title="Фильтр по контрагенту"
               >
                 <option value="">Все контрагенты</option>
-                {counterpartiesByAgent.map((c) => (
+                {counterparties.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name ?? c.full_name ?? c.id}
                   </option>
@@ -828,7 +824,7 @@ const CashRegisterDetail = () => {
             </div>
             <div className="warehouse-kassa__filters-count">
               <span className="warehouse-kassa__filters-count-value">
-                {filtered.length}
+                {docsCount}
               </span>
               <span className="warehouse-kassa__filters-count-label">
                 записей
@@ -839,11 +835,15 @@ const CashRegisterDetail = () => {
       </div>
 
       <div className="kassa-table-container">
-        {loading ? (
+        {docsLoading ? (
           <div className="kassa-table__loading" style={{ padding: 40 }}>
             Загрузка…
           </div>
-        ) : !filtered.length ? (
+        ) : docsError ? (
+          <div className="kassa__alert kassa__alert--error" style={{ padding: 40 }}>
+            {docsError}
+          </div>
+        ) : !docs.length ? (
           <div className="kassa-table__empty" style={{ padding: 40 }}>
             Нет операций
           </div>
@@ -863,7 +863,7 @@ const CashRegisterDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedList.map((row) => (
+                  {docs.map((row) => (
                     <tr key={row.id}>
                       <td>
                         {row.doc_type === "MONEY_RECEIPT" ? "Приход" : "Расход"}
@@ -879,10 +879,10 @@ const CashRegisterDetail = () => {
                 </tbody>
               </table>
             </div>
-            {filtered.length > PAGE_SIZE && (
+            {docsCount > PAGE_SIZE && (
               <div className="warehouse-kassa__pagination">
                 <span className="warehouse-kassa__pagination-info">
-                  Записи {fromItem}–{toItem} из {filtered.length}
+                  Записи {fromItem}–{toItem} из {docsCount}
                 </span>
                 <div className="warehouse-kassa__pagination-controls">
                   <button
