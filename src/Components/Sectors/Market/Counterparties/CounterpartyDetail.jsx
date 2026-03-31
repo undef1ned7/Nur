@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, LayoutGrid, List, X, Check, Save, Edit } from "lucide-react";
+import {
+  ArrowLeft,
+  LayoutGrid,
+  List,
+  X,
+  Check,
+  Save,
+  Edit,
+} from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
@@ -131,7 +139,7 @@ const CounterpartyDetail = () => {
     amount: "",
     comment: "",
   });
-  const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(false);
+  const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(true);
   const [payDebtSubmitting, setPayDebtSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -144,8 +152,7 @@ const CounterpartyDetail = () => {
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
 
   const name = current?.name ?? "—";
-  const canEdit =
-    profile?.role === "owner" || profile?.role === "admin";
+  const canEdit = profile?.role === "owner" || profile?.role === "admin";
 
   const getBranchParams = useCallback(() => {
     const params = {};
@@ -327,7 +334,9 @@ const CounterpartyDetail = () => {
   const sortedSaleRows = useMemo(
     () =>
       sortedAllRows.filter((row) => {
-        const number = String(row?.number ?? row?.document?.number ?? "").toUpperCase();
+        const number = String(
+          row?.number ?? row?.document?.number ?? "",
+        ).toUpperCase();
         return number.includes("SALE");
       }),
     [sortedAllRows],
@@ -397,7 +406,7 @@ const CounterpartyDetail = () => {
       amount: amount > 0 ? String(amount) : "",
       comment: "Погашение долга",
     });
-    setPayDebtCreateAsPosted(false);
+    setPayDebtCreateAsPosted(true);
     setPayDebtError("");
     setShowPayDebtModal(true);
   }, [summary.debtBalance, cashRegisters, paymentCategories]);
@@ -478,7 +487,10 @@ const CounterpartyDetail = () => {
       setPayDebtError("");
       const cash_register = payDebtForm.cash_register?.trim();
       const payment_category = payDebtForm.payment_category?.trim();
-      const amountStr = String(payDebtForm.amount ?? "").trim().replace(/\s/g, "").replace(",", ".");
+      const amountStr = String(payDebtForm.amount ?? "")
+        .trim()
+        .replace(/\s/g, "")
+        .replace(",", ".");
       if (!cash_register || !payment_category || !amountStr) {
         setPayDebtError("Заполните кассу, категорию и сумму");
         return;
@@ -801,7 +813,9 @@ const CounterpartyDetail = () => {
                 <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
                   {counterpartyAnalytics
                     ? `${fmtRu2(
-                        Math.abs(toNumber(counterpartyAnalytics.debts?.balance)),
+                        Math.abs(
+                          toNumber(counterpartyAnalytics.debts?.balance),
+                        ),
                       )} с`
                     : loadingOperations
                       ? "…"
@@ -811,10 +825,12 @@ const CounterpartyDetail = () => {
                   {counterpartyAnalytics
                     ? (() => {
                         const cp = toNumber(
-                          counterpartyAnalytics.debts?.counterparty_owes_company,
+                          counterpartyAnalytics.debts
+                            ?.counterparty_owes_company,
                         );
                         const co = toNumber(
-                          counterpartyAnalytics.debts?.company_owes_counterparty,
+                          counterpartyAnalytics.debts
+                            ?.company_owes_counterparty,
                         );
                         if (cp > 0) return "Контрагент должен вам";
                         if (co > 0) return "Вы должны контрагенту";
@@ -1063,7 +1079,9 @@ const CounterpartyDetail = () => {
                       id="pay-debt-modal-title"
                       className="money-documents-page__modal-title money-documents-page__modal-title--operation"
                     >
-                      {summary.debtBalance > 0 ? "Приход (оплата долга)" : "Расход (оплата долга)"}
+                      {summary.debtBalance > 0
+                        ? "Приход (оплата долга)"
+                        : "Расход (оплата долга)"}
                     </h2>
                     <button
                       type="button"
@@ -1080,7 +1098,11 @@ const CounterpartyDetail = () => {
                         type="button"
                         role="switch"
                         aria-checked={payDebtCreateAsPosted}
-                        aria-label={payDebtCreateAsPosted ? "Документ проведён" : "Черновик"}
+                        aria-label={
+                          payDebtCreateAsPosted
+                            ? "Документ проведён"
+                            : "Черновик"
+                        }
                         className={`money-documents-page__status-toggle ${
                           payDebtCreateAsPosted
                             ? "money-documents-page__status-toggle--on"
@@ -1089,11 +1111,15 @@ const CounterpartyDetail = () => {
                         onClick={() => setPayDebtCreateAsPosted((v) => !v)}
                       >
                         <span className="money-documents-page__status-toggle-slider">
-                          {payDebtCreateAsPosted && <Check size={14} strokeWidth={3} />}
+                          {payDebtCreateAsPosted && (
+                            <Check size={14} strokeWidth={3} />
+                          )}
                         </span>
                       </button>
                       <span className="money-documents-page__modal-status-text">
-                        {payDebtCreateAsPosted ? "Документ проведён" : "Черновик"}
+                        {payDebtCreateAsPosted
+                          ? "Документ проведён"
+                          : "Черновик"}
                       </span>
                     </div>
                     <span className="money-documents-page__modal-status-date">
@@ -1123,7 +1149,10 @@ const CounterpartyDetail = () => {
                         id="pay-debt-cash-register"
                         value={payDebtForm.cash_register}
                         onChange={(e) =>
-                          handlePayDebtFormChange("cash_register", e.target.value)
+                          handlePayDebtFormChange(
+                            "cash_register",
+                            e.target.value,
+                          )
                         }
                         required
                       >
@@ -1142,12 +1171,17 @@ const CounterpartyDetail = () => {
                       </div>
                     </div>
                     <div className="money-documents-page__field">
-                      <label htmlFor="pay-debt-category">Категория платежа *</label>
+                      <label htmlFor="pay-debt-category">
+                        Категория платежа *
+                      </label>
                       <select
                         id="pay-debt-category"
                         value={payDebtForm.payment_category}
                         onChange={(e) =>
-                          handlePayDebtFormChange("payment_category", e.target.value)
+                          handlePayDebtFormChange(
+                            "payment_category",
+                            e.target.value,
+                          )
                         }
                         required
                       >
