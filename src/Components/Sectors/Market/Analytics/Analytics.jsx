@@ -42,7 +42,7 @@ ChartJS.register(
   ArcElement,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 const Analytics = () => {
@@ -50,13 +50,15 @@ const Analytics = () => {
   const { company, currentUser } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: branches } = useSelector(
-    (state) => state.branches || { list: [] }
+    (state) => state.branches || { list: [] },
   );
   const [activeTab, setActiveTab] = useState("sales");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [openProductTable, setOpenProductTable] = useState("topByRevenue");
+  const [openFinanceTable, setOpenFinanceTable] = useState("expenseBreakdown");
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -105,10 +107,13 @@ const Analytics = () => {
     if (!Array.isArray(cashBoxes) || cashBoxes.length === 0) return null;
 
     const getName = (box) => box?.name || box?.department_name || "";
-    const norm = (v) => String(v || "").trim().toLowerCase();
+    const norm = (v) =>
+      String(v || "")
+        .trim()
+        .toLowerCase();
 
     const exact = cashBoxes.find(
-      (box) => norm(getName(box)) === norm(DEFAULT_CASHBOX_NAME)
+      (box) => norm(getName(box)) === norm(DEFAULT_CASHBOX_NAME),
     );
     if (exact) return exact;
 
@@ -157,9 +162,9 @@ const Analytics = () => {
       warehouse: "stock", // "warehouse" -> "stock" для API
       cashiers: "cashboxes", // "cashiers" -> "cashboxes" для API
       shifts: "shifts",
-       products: "products",
-       users: "users",
-       finance: "finance",
+      products: "products",
+      users: "users",
+      finance: "finance",
     };
     return tabMap[tab] || "sales";
   };
@@ -223,7 +228,7 @@ const Analytics = () => {
         setLoading(false);
       }
     },
-    [period.from, period.to, filters]
+    [period.from, period.to, filters],
   );
 
   useEffect(() => {
@@ -253,6 +258,12 @@ const Analytics = () => {
   // Функция для обновления фильтра
   const updateFilter = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+  const toggleProductTable = (key) => {
+    setOpenProductTable((prev) => (prev === key ? null : key));
+  };
+  const toggleFinanceTable = (key) => {
+    setOpenFinanceTable((prev) => (prev === key ? null : key));
   };
 
   // Форматирование числа с разделителями
@@ -426,11 +437,11 @@ const Analytics = () => {
       paymentMethods: {
         labels:
           charts.payment_methods?.map(
-            (item) => paymentMethodLabels[item.method] || item.method
+            (item) => paymentMethodLabels[item.method] || item.method,
           ) || [],
         data:
           charts.payment_methods?.map((item) =>
-            parseFloat(item.total || item.count || 0)
+            parseFloat(item.total || item.count || 0),
           ) || [],
       },
     };
@@ -536,11 +547,11 @@ const Analytics = () => {
       movementChart: {
         labels:
           (charts.movement_units || charts.movement || []).map((item) =>
-            formatDateForChart(item.date)
+            formatDateForChart(item.date),
           ) || [],
         data:
           (charts.movement_units || charts.movement || []).map(
-            (item) => item.units || 0
+            (item) => item.units || 0,
           ) || [],
       },
       lowStock:
@@ -667,7 +678,7 @@ const Analytics = () => {
       paymentMethods: {
         labels:
           charts.payment_methods?.map(
-            (item) => paymentMethodLabels[item.name] || item.name
+            (item) => paymentMethodLabels[item.name] || item.name,
           ) || [],
         data: charts.payment_methods?.map((item) => item.percent) || [],
         colors: ["#f7d617", "#f59e0b", "#10b981"],
@@ -677,7 +688,7 @@ const Analytics = () => {
         data: charts.transactions_by_weekday
           ? weekdayLabels.map((_, index) => {
               const weekday = charts.transactions_by_weekday.find(
-                (item) => item.weekday === index
+                (item) => item.weekday === index,
               );
               return weekday?.transactions || 0;
             })
@@ -797,7 +808,7 @@ const Analytics = () => {
         labels: charts.sales_by_shift_bucket?.map((item) => item.name) || [],
         data:
           charts.sales_by_shift_bucket?.map((item) =>
-            parseFloat(item.revenue || 0)
+            parseFloat(item.revenue || 0),
           ) || [],
       },
       activeShifts:
@@ -1012,7 +1023,7 @@ const Analytics = () => {
         {
           title: "Операций",
           value: formatNumber(
-            (cards.income_count || 0) + (cards.expense_count || 0)
+            (cards.income_count || 0) + (cards.expense_count || 0),
           ),
           icon: BarChart3,
           color: "#f7d617",
@@ -1033,6 +1044,56 @@ const Analytics = () => {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
+  };
+
+  const renderProductsAccordion = (key, title, tableContent) => {
+    const isOpen = openProductTable === key;
+    return (
+      <div className="analytics-page__table-card analytics-page__accordion">
+        <button
+          type="button"
+          className="analytics-page__accordion-header"
+          onClick={() => toggleProductTable(key)}
+        >
+          <h3 className="analytics-page__table-title analytics-page__accordion-title">
+            {title}
+          </h3>
+          <span
+            className={`analytics-page__accordion-icon ${
+              isOpen ? "analytics-page__accordion-icon--open" : ""
+            }`}
+          >
+            ▾
+          </span>
+        </button>
+        {isOpen && tableContent}
+      </div>
+    );
+  };
+
+  const renderFinanceAccordion = (key, title, tableContent) => {
+    const isOpen = openFinanceTable === key;
+    return (
+      <div className="analytics-page__table-card analytics-page__accordion">
+        <button
+          type="button"
+          className="analytics-page__accordion-header"
+          onClick={() => toggleFinanceTable(key)}
+        >
+          <h3 className="analytics-page__table-title analytics-page__accordion-title">
+            {title}
+          </h3>
+          <span
+            className={`analytics-page__accordion-icon ${
+              isOpen ? "analytics-page__accordion-icon--open" : ""
+            }`}
+          >
+            ▾
+          </span>
+        </button>
+        {isOpen && tableContent}
+      </div>
+    );
   };
 
   return (
@@ -1098,8 +1159,6 @@ const Analytics = () => {
             {/* Фильтры для Sales и Cashiers */}
             {(activeTab === "sales" || activeTab === "cashiers") && (
               <>
-            
-
                 <div className="analytics-page__filter-group">
                   <label>Способ оплаты</label>
                   <select
@@ -2009,10 +2068,9 @@ const Analytics = () => {
           </div>
 
           <div className="analytics-page__grid">
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">
-                Топ по выручке
-              </h3>
+            {renderProductsAccordion(
+              "topByRevenue",
+              "Топ по выручке",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2047,13 +2105,12 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
 
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">
-                Топ по количеству
-              </h3>
+            {renderProductsAccordion(
+              "topByQuantity",
+              "Топ по количеству",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2080,13 +2137,14 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
           </div>
 
           <div className="analytics-page__grid">
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Категории</h3>
+            {renderProductsAccordion(
+              "categories",
+              "Категории",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2119,11 +2177,12 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
 
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Бренды</h3>
+            {renderProductsAccordion(
+              "brands",
+              "Бренды",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2152,14 +2211,13 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
           </div>
 
-          <div className="analytics-page__table-card">
-            <h3 className="analytics-page__table-title">
-              Товары с низким остатком
-            </h3>
+          {renderProductsAccordion(
+            "lowStockProducts",
+            "Товары с низким остатком",
             <table className="analytics-page__table">
               <thead>
                 <tr>
@@ -2194,8 +2252,8 @@ const Analytics = () => {
                   </tr>
                 )}
               </tbody>
-            </table>
-          </div>
+            </table>,
+          )}
         </div>
       )}
 
@@ -2344,8 +2402,9 @@ const Analytics = () => {
           </div>
 
           <div className="analytics-page__grid">
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Статьи расходов</h3>
+            {renderFinanceAccordion(
+              "expenseBreakdown",
+              "Статьи расходов",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2374,11 +2433,12 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
 
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Источники дохода</h3>
+            {renderFinanceAccordion(
+              "incomeBreakdown",
+              "Источники дохода",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2407,13 +2467,14 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
           </div>
 
           <div className="analytics-page__grid">
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Расходы</h3>
+            {renderFinanceAccordion(
+              "expenseItems",
+              "Расходы",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2448,11 +2509,12 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
 
-            <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">Доходы</h3>
+            {renderFinanceAccordion(
+              "incomeItems",
+              "Доходы",
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2481,8 +2543,8 @@ const Analytics = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
-            </div>
+              </table>,
+            )}
           </div>
         </div>
       )}

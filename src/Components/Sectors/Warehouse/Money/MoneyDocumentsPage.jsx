@@ -63,7 +63,7 @@ const MoneyDocumentsPage = () => {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const [postingId, setPostingId] = useState(null); // id документа, для которого идёт проведение/отмена
-  const [createAsPosted, setCreateAsPosted] = useState(false); // при создании: провести сразу или черновик
+  const [createAsPosted, setCreateAsPosted] = useState(true); // при создании: провести сразу или черновик
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
     const saved = localStorage.getItem(`${STORAGE_KEY}_money_docs`);
@@ -235,7 +235,7 @@ const MoneyDocumentsPage = () => {
   const openCreateModal = () => {
     setForm(initialForm);
     setCreateError("");
-    setCreateAsPosted(false);
+    setCreateAsPosted(true);
     setShowCreateModal(true);
   };
 

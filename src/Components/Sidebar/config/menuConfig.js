@@ -617,7 +617,7 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Агенты",
+        label: "Заявки агентов",
         to: "/crm/warehouse/agents",
         icon: menuIcons.user,
         permission: "can_view_agent",

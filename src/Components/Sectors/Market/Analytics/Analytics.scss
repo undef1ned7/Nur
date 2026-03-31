@@ -17,7 +17,7 @@
     gap: 8px;
     padding: 8px 16px;
     background: #f7d617;
-    border: none; 
+    border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
@@ -381,6 +381,42 @@
     font-weight: 700;
     color: #111827;
     margin: 0 0 16px 0;
+  }
+
+  &__accordion {
+    padding: 16px 20px;
+  }
+
+  &__accordion-header {
+    width: 100%;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 12px;
+  }
+
+  &__accordion-title {
+    margin: 0;
+    text-align: left;
+  }
+
+  &__accordion-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #6b7280;
+    transition: transform 0.2s ease;
+    transform: rotate(-90deg);
+  }
+
+  &__accordion-icon--open {
+    transform: rotate(0deg);
   }
 
   &__date-filter {
