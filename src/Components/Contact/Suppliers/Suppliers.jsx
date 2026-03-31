@@ -214,7 +214,7 @@ const AddModal = ({ onClose }) => {
   );
 };
 
-const Suppliers = () => {
+const Suppliers = ({ hideStatus = false }) => {
   const dispatch = useDispatch();
   const {
     list: clients,
@@ -288,16 +288,18 @@ const Suppliers = () => {
               />
             )}
           </div>
-          <select
-            className="employee__search-wrapper"
-            onChange={(e) => setSelectValue(e.target.value)}
-          >
-            {statusOptions.map((status, index) => (
-              <option key={index} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
+          {!hideStatus && (
+            <select
+              className="employee__search-wrapper"
+              onChange={(e) => setSelectValue(e.target.value)}
+            >
+              {statusOptions.map((status, index) => (
+                <option key={index} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="employee__top-buttons">
@@ -322,7 +324,7 @@ const Suppliers = () => {
                 <th>№</th>
                 <th>ФИО</th>
                 <th>Телефон</th>
-                <th>Статус</th>
+                {!hideStatus && <th>Статус</th>}
                 {/* <th></th> */}
               </tr>
             </thead>
@@ -336,10 +338,12 @@ const Suppliers = () => {
                   <td>{(page - 1) * perPage + idx + 1}</td>
                   <td className="employee__name">{c.full_name}</td>
                   <td>{c.phone}</td>
-                  <td>
-                    {statusOptions.find((i) => i.value === c.status)?.label ||
-                      ""}
-                  </td>
+                  {!hideStatus && (
+                    <td>
+                      {statusOptions.find((i) => i.value === c.status)?.label ||
+                        ""}
+                    </td>
+                  )}
                   {/* <td>
                     <MoreVertical
                       size={18}

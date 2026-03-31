@@ -53,7 +53,7 @@ export const HIDE_RULES = [
   {
     when: { sector: "Кафе" },
     hide: {
-      toIncludes: ["/crm/brand-category"],
+      toIncludes: ["/crm/brand-category", "/crm/clients"],
     },
   },
 
