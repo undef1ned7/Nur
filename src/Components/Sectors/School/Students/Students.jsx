@@ -971,9 +971,6 @@
 //   );
 // }
 
-
-
-
 import React, {
   useCallback,
   useEffect,
@@ -995,8 +992,8 @@ import "./Students.scss";
 import api from "../../../../api";
 
 /* ==== ленивый импорт вкладки «Клиенты» ==== */
-const ExternalClients = lazy(() =>
-  import("../../../Sectors/Market/Clients/Clients")
+const ExternalClients = lazy(
+  () => import("../../../Sectors/Market/Clients/Clients"),
 );
 
 /* ==== endpoints ==== */
@@ -1006,7 +1003,7 @@ const ENDPOINT_GROUPS = "/education/groups/";
 const STUDENT_ATT = (id) => `/education/students/${id}/attendance/`;
 
 /* ==== константы ==== */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* ==== helpers ==== */
 const asArray = (d) =>
@@ -1116,9 +1113,9 @@ const SchoolStudents = () => {
     const t = q.toLowerCase().trim();
     if (!t) return list;
     return list.filter((s) =>
-      [s.name, s.phone, s.group_name].filter(Boolean).some((v) =>
-        String(v).toLowerCase().includes(t)
-      )
+      [s.name, s.phone, s.group_name]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(t)),
     );
   }, [items, q, statusFilter]);
 
@@ -1242,7 +1239,7 @@ const SchoolStudents = () => {
               (x) =>
                 digits(x.phone) === digits(created.phone) ||
                 (lc(x.name) === lc(created.name) &&
-                  String(x.group || "") === String(created.group || ""))
+                  String(x.group || "") === String(created.group || "")),
             );
             return dup ? prev : [created, ...prev];
           });
@@ -1252,13 +1249,13 @@ const SchoolStudents = () => {
       } else {
         const res = await api.put(
           `${ENDPOINT_STUDENTS}${form.id}/`,
-          buildPayload(form)
+          buildPayload(form),
         );
         const updated = normalizeStudent(
-          res.data || { id: form.id, ...buildPayload(form) }
+          res.data || { id: form.id, ...buildPayload(form) },
         );
         setItems((prev) =>
-          prev.map((x) => (x.id === updated.id ? updated : x))
+          prev.map((x) => (x.id === updated.id ? updated : x)),
         );
       }
       setModal(false);
@@ -1268,7 +1265,7 @@ const SchoolStudents = () => {
       setModalErr(
         mode === "create"
           ? "Не удалось создать ученика."
-          : "Не удалось обновить ученика."
+          : "Не удалось обновить ученика.",
       );
     } finally {
       setSaving(false);
@@ -1283,8 +1280,7 @@ const SchoolStudents = () => {
   });
   const askRemove = (st) =>
     setConfirmDel({ open: true, id: st.id, name: st.name || "" });
-  const cancelRemove = () =>
-    setConfirmDel({ open: false, id: null, name: "" });
+  const cancelRemove = () => setConfirmDel({ open: false, id: null, name: "" });
 
   const removeStudent = async (id) => {
     setDeletingIds((p) => new Set(p).add(id));
@@ -1328,7 +1324,7 @@ const SchoolStudents = () => {
         (x) =>
           x.id !== st.id &&
           lc(x.name) === lc(st.name) &&
-          String(x.group || "") === String(move.groupId || "")
+          String(x.group || "") === String(move.groupId || ""),
       );
       if (exists) {
         setError("Дубликат: в целевой группе уже есть ученик с таким именем.");
@@ -1352,7 +1348,7 @@ const SchoolStudents = () => {
         setError("Не удалось перевести ученика.");
       }
     },
-    [items, move]
+    [items, move],
   );
 
   /* ─ клиенты из ученика ─ */
@@ -1454,7 +1450,7 @@ const SchoolStudents = () => {
         }));
       }
     },
-    []
+    [],
   );
   const onToggleStudentAtt = async (studentId, isOpen) => {
     if (isOpen && !att[studentId]?.items?.length)
@@ -1608,8 +1604,7 @@ const SchoolStudents = () => {
             <div className="Schoolstudents__pageInfo">
               Стр. {page}/{totalPages} • показано{" "}
               {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
-              {Math.min(page * PAGE_SIZE, filtered.length)} из{" "}
-              {filtered.length}
+              {Math.min(page * PAGE_SIZE, filtered.length)} из {filtered.length}
             </div>
           </div>
 
@@ -1952,7 +1947,7 @@ const SchoolStudents = () => {
                         <option value="">— выберите —</option>
                         {groups
                           .filter(
-                            (g) => String(g.courseId) === String(form.courseId)
+                            (g) => String(g.courseId) === String(form.courseId),
                           )
                           .map((g) => (
                             <option key={g.id} value={g.id}>
@@ -2031,8 +2026,8 @@ const SchoolStudents = () => {
                             ? "Сохранение…"
                             : "Обновление…"
                           : mode === "create"
-                          ? "Сохранить"
-                          : "Сохранить изменения"}
+                            ? "Сохранить"
+                            : "Сохранить изменения"}
                       </button>
                     </div>
                   </div>
@@ -2129,8 +2124,7 @@ const SchoolStudents = () => {
               >
                 <div className="Schoolconfirm__title">Подтверждение</div>
                 <div className="Schoolconfirm__text">
-                  Удалить «{confirmDel.name || "ученика"}»? Действие
-                  необратимо.
+                  Удалить «{confirmDel.name || "ученика"}»? Действие необратимо.
                 </div>
                 <div className="Schoolconfirm__actions">
                   <button

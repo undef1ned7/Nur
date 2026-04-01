@@ -242,7 +242,11 @@ const CashierPage = () => {
     // Некоторые сканеры отправляют завершающий Enter/клик, из-за чего
     // товар под курсором может случайно добавиться в корзину.
     // Игнорируем такие клики во время сканирования и сразу после него.
-    if (barcodeProcessingRef.current || isScanningRef.current || timeSinceLastScan < 700) {
+    if (
+      barcodeProcessingRef.current ||
+      isScanningRef.current ||
+      timeSinceLastScan < 700
+    ) {
       event?.preventDefault?.();
       event?.stopPropagation?.();
       return;
@@ -879,7 +883,7 @@ const CashierPage = () => {
   // Расчет пагинации
   // Используем фиксированный размер страницы
   // Если есть next или previous, значит есть еще страницы
-  const PAGE_SIZE = 50; // Размер страницы для API
+  const PAGE_SIZE = 100; // Размер страницы для API
   const hasNextPage = !!next;
   const hasPrevPage = !!previous;
 
@@ -1391,9 +1395,7 @@ const CashierPage = () => {
     const hasDiscount = parseFloat(item.discountTotal ?? 0) > 0;
     if (!item.isCustom && item.productId && !hasDiscount) {
       const product = products.find((p) => p.id === item.productId);
-      const purchasePrice = product
-        ? parseFloat(product.purchase_price)
-        : NaN;
+      const purchasePrice = product ? parseFloat(product.purchase_price) : NaN;
       if (!isNaN(purchasePrice) && num < purchasePrice) {
         showAlert(
           "warning",
@@ -1934,14 +1936,8 @@ const CashierPage = () => {
                                 ...prev,
                                 [item.id]: formatPrice(discountToShow),
                               }));
-                              if (
-                                lineTotal > 0 &&
-                                lineDiscount > lineTotal
-                              ) {
-                                patchCartItemDiscount(
-                                  item,
-                                  lineTotal,
-                                );
+                              if (lineTotal > 0 && lineDiscount > lineTotal) {
+                                patchCartItemDiscount(item, lineTotal);
                               }
                             }}
                           >
@@ -1970,10 +1966,17 @@ const CashierPage = () => {
                                 [item.id]: "percent",
                               }));
 
-                              if (wasAmount && !isNaN(num) && num >= 0 && lineTotal > 0) {
+                              if (
+                                wasAmount &&
+                                !isNaN(num) &&
+                                num >= 0 &&
+                                lineTotal > 0
+                              ) {
                                 const pct = Math.min(100, num);
                                 const displayPct =
-                                  pct === 100 ? "100" : String(pct).replace(/\.?0+$/, "") || "0";
+                                  pct === 100
+                                    ? "100"
+                                    : String(pct).replace(/\.?0+$/, "") || "0";
                                 const discountSom = (lineTotal * pct) / 100;
                                 setCartDiscounts((prev) => ({
                                   ...prev,
@@ -1991,9 +1994,10 @@ const CashierPage = () => {
                                   lineTotal > 0 && discountSom > 0
                                     ? String(
                                         Number(
-                                          ((discountSom / lineTotal) * 100).toFixed(
-                                            2,
-                                          ),
+                                          (
+                                            (discountSom / lineTotal) *
+                                            100
+                                          ).toFixed(2),
                                         ).replace(/\.?0+$/, ""),
                                       )
                                     : "";

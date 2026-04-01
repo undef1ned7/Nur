@@ -697,8 +697,6 @@
 
 // export default SchoolLeads;
 
-
-
 // src/components/Education/Leads.jsx
 // ВАЖНО: проверьте путь импорта api!
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -726,7 +724,7 @@ const SOURCE_OPTIONS = [
   { value: "telegram", label: "Telegram" },
 ];
 const LS = { INVOICES: "invoices" };
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* ===== utils ===== */
 const asArray = (data) =>
@@ -760,7 +758,10 @@ const normalizeStudent = (s = {}) => ({
   group: s.group ?? null,
 });
 
-const lc = (s) => String(s || "").trim().toLowerCase();
+const lc = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
 const digits = (s) => String(s || "").replace(/\D/g, "");
 const isPhoneLike = (s) => {
   const d = digits(s);
@@ -769,7 +770,10 @@ const isPhoneLike = (s) => {
 const allowedSource = (s) =>
   SOURCE_OPTIONS.some((o) => o.value === lc(s)) ? lc(s) : "instagram";
 
-const cleanSpaces = (s) => String(s || "").replace(/\s+/g, " ").trim();
+const cleanSpaces = (s) =>
+  String(s || "")
+    .replace(/\s+/g, " ")
+    .trim();
 const isNameValid = (s) => {
   const v = cleanSpaces(s);
   if (v.length < 2 || v.length > 80) return false;
@@ -800,9 +804,9 @@ const SchoolLeads = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [convertSaving, setConvertSaving] = useState(false);
-  const [error, setError] = useState("");             // страничные ошибки
-  const [modalError, setModalError] = useState("");   // ошибки в модалке заявки
-  const [convertError, setConvertError] = useState("");// ошибки в модалке зачисления
+  const [error, setError] = useState(""); // страничные ошибки
+  const [modalError, setModalError] = useState(""); // ошибки в модалке заявки
+  const [convertError, setConvertError] = useState(""); // ошибки в модалке зачисления
   const [query, setQuery] = useState("");
   const [deletingIds, setDeletingIds] = useState(new Set());
 
@@ -816,14 +820,25 @@ const SchoolLeads = () => {
   const closeConfirm = () => setConfirm({ open: false, id: null, name: "" });
 
   /* modal: lead */
-  const emptyForm = { id: null, name: "", phone: "", source: "instagram", note: "" };
+  const emptyForm = {
+    id: null,
+    name: "",
+    phone: "",
+    source: "instagram",
+    note: "",
+  };
   const [isModalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState("create");
   const [form, setForm] = useState(emptyForm);
 
   /* modal: convert */
   const [isConvertOpen, setConvertOpen] = useState(false);
-  const [convert, setConvert] = useState({ leadId: null, courseId: "", groupId: "", discount: 0 });
+  const [convert, setConvert] = useState({
+    leadId: null,
+    courseId: "",
+    groupId: "",
+    discount: 0,
+  });
 
   /* load */
   const fetchAll = useCallback(async () => {
@@ -848,20 +863,30 @@ const SchoolLeads = () => {
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   /* search + pagination */
   const filtered = useMemo(() => {
     const t = query.toLowerCase().trim();
     if (!t) return leads;
     return leads.filter((x) =>
-      [x.name, x.phone, x.source, x.note].some((v) => String(v || "").toLowerCase().includes(t))
+      [x.name, x.phone, x.source, x.note].some((v) =>
+        String(v || "")
+          .toLowerCase()
+          .includes(t),
+      ),
     );
   }, [leads, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  useEffect(() => { setPage(1); }, [query, filtered.length]);
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+  useEffect(() => {
+    setPage(1);
+  }, [query, filtered.length]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const pageItems = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
@@ -880,14 +905,25 @@ const SchoolLeads = () => {
     const phoneD = digits(phone);
     const nameLc = lc(name);
     if (phoneD && leads.some((l) => digits(l.phone) === phoneD)) return true;
-    if (!phoneD && leads.some((l) => lc(l.name) === nameLc && lc(l.source) === source)) return true;
+    if (
+      !phoneD &&
+      leads.some((l) => lc(l.name) === nameLc && lc(l.source) === source)
+    )
+      return true;
     return false;
   };
   const hasDuplicateEdit = (id, name, phone, source) => {
     const phoneD = digits(phone);
     const nameLc = lc(name);
-    if (phoneD && leads.some((l) => l.id !== id && digits(l.phone) === phoneD)) return true;
-    if (!phoneD && leads.some((l) => l.id !== id && lc(l.name) === nameLc && lc(l.source) === source)) return true;
+    if (phoneD && leads.some((l) => l.id !== id && digits(l.phone) === phoneD))
+      return true;
+    if (
+      !phoneD &&
+      leads.some(
+        (l) => l.id !== id && lc(l.name) === nameLc && lc(l.source) === source,
+      )
+    )
+      return true;
     return false;
   };
 
@@ -898,7 +934,13 @@ const SchoolLeads = () => {
     if (phoneD) {
       if (students.some((s) => digits(s.phone) === phoneD)) return true;
     } else {
-      if (students.some((s) => lc(s.name) === nameLc && String(s.group || "") === String(targetGroupId || "")))
+      if (
+        students.some(
+          (s) =>
+            lc(s.name) === nameLc &&
+            String(s.group || "") === String(targetGroupId || ""),
+        )
+      )
         return true;
     }
     return false;
@@ -939,7 +981,9 @@ const SchoolLeads = () => {
     const note = sanitizeNote(form.note);
 
     if (!isNameValid(name)) {
-      setModalError("Имя должно быть 2–80 символов и не состоять только из цифр/знаков.");
+      setModalError(
+        "Имя должно быть 2–80 символов и не состоять только из цифр/знаков.",
+      );
       return;
     }
     if (!isPhoneLike(phone)) {
@@ -948,11 +992,15 @@ const SchoolLeads = () => {
     }
 
     if (mode === "create" && hasDuplicateCreate(name, phone, src)) {
-      setModalError("Дубликат: заявка с таким телефоном или (имя+источник) уже есть.");
+      setModalError(
+        "Дубликат: заявка с таким телефоном или (имя+источник) уже есть.",
+      );
       return;
     }
     if (mode === "edit" && hasDuplicateEdit(form.id, name, phone, src)) {
-      setModalError("Дубликат: другая заявка использует этот телефон или (имя+источник).");
+      setModalError(
+        "Дубликат: другая заявка использует этот телефон или (имя+источник).",
+      );
       return;
     }
 
@@ -970,12 +1018,18 @@ const SchoolLeads = () => {
         const payload = { ...payloadBase, phone: phone || "" };
         const { data } = await api.put(`${LEADS_EP}${form.id}/`, payload);
         const updated = normalizeLead(data || { id: form.id, ...payload });
-        setLeads((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        setLeads((prev) =>
+          prev.map((x) => (x.id === updated.id ? updated : x)),
+        );
       }
       closeModal();
     } catch (e2) {
       console.error(e2);
-      setModalError(mode === "create" ? "Не удалось создать заявку." : "Не удалось обновить заявку.");
+      setModalError(
+        mode === "create"
+          ? "Не удалось создать заявку."
+          : "Не удалось обновить заявку.",
+      );
     } finally {
       setSaving(false);
     }
@@ -1035,18 +1089,26 @@ const SchoolLeads = () => {
     }
 
     if (studentDuplicateExists(lead.name, lead.phone, convert.groupId)) {
-      setConvertError("Дубликат: такой ученик уже есть (по телефону или по связке «имя+группа»).");
+      setConvertError(
+        "Дубликат: такой ученик уже есть (по телефону или по связке «имя+группа»).",
+      );
       return;
     }
 
-    const course = courses.find((c) => String(c.id) === String(convert.courseId));
+    const course = courses.find(
+      (c) => String(c.id) === String(convert.courseId),
+    );
     const decStr = String(convert.discount ?? 0).replace(",", ".");
     const discountNum = Number(decStr);
     if (!Number.isFinite(discountNum) || discountNum < 0) {
       setConvertError("Скидка должна быть числом ≥ 0.");
       return;
     }
-    if (course && Number.isFinite(course.price) && discountNum > Number(course.price)) {
+    if (
+      course &&
+      Number.isFinite(course.price) &&
+      discountNum > Number(course.price)
+    ) {
       setConvertError("Скидка не может быть больше стоимости программы.");
       return;
     }
@@ -1070,7 +1132,7 @@ const SchoolLeads = () => {
       if (studentId && course && course.price) {
         const invoices = JSON.parse(localStorage.getItem(LS.INVOICES) || "[]");
         const already = invoices.some(
-          (inv) => inv.studentId === studentId && inv.period === ym(todayISO())
+          (inv) => inv.studentId === studentId && inv.period === ym(todayISO()),
         );
         if (!already) {
           const price = Number(course.price || 0);
@@ -1100,13 +1162,22 @@ const SchoolLeads = () => {
         }
       }
 
-      try { await api.delete(`${LEADS_EP}${lead.id}/`); } catch (eDel) { /* no-op */ }
+      try {
+        await api.delete(`${LEADS_EP}${lead.id}/`);
+      } catch (eDel) {
+        /* no-op */
+      }
       setLeads((prev) => prev.filter((x) => x.id !== lead.id));
 
       // обновим список учеников для дальнейших проверок дублей
       setStudents((prev) => [
         ...prev,
-        normalizeStudent({ id: stData?.id, name: payload.name, phone: payload.phone, group: payload.group }),
+        normalizeStudent({
+          id: stData?.id,
+          name: payload.name,
+          phone: payload.phone,
+          group: payload.group,
+        }),
       ]);
 
       closeConvert();
@@ -1123,7 +1194,9 @@ const SchoolLeads = () => {
       <header className="school-leads__header">
         <div className="school-leads__head">
           <h2 className="school-leads__title">Заявки</h2>
-          <p className="school-leads__subtitle">Список заявок. Зачисляйте учеников.</p>
+          <p className="school-leads__subtitle">
+            Список заявок. Зачисляйте учеников.
+          </p>
         </div>
 
         <div className="school-leads__toolbar">
@@ -1149,29 +1222,43 @@ const SchoolLeads = () => {
       </header>
 
       {loading && <div className="school-leads__alert">Загрузка…</div>}
-      {!!error && !loading && <div className="school-leads__alert" role="alert">{error}</div>}
+      {!!error && !loading && (
+        <div className="school-leads__alert" role="alert">
+          {error}
+        </div>
+      )}
 
       {!loading && !error && (
         <>
           <div className="school-leads__list">
             {pageItems.map((l) => {
               const initial = (l.name || "•").charAt(0).toUpperCase();
-              const srcLabel = SOURCE_OPTIONS.find((o) => o.value === l.source)?.label || l.source;
+              const srcLabel =
+                SOURCE_OPTIONS.find((o) => o.value === l.source)?.label ||
+                l.source;
               const deleting = deletingIds.has(l.id);
 
               return (
                 <article key={l.id} className="school-leads__card">
                   <div className="school-leads__card-main">
-                    <div className="school-leads__avatar" aria-hidden>{initial}</div>
+                    <div className="school-leads__avatar" aria-hidden>
+                      {initial}
+                    </div>
 
                     <div className="school-leads__info">
                       <div className="school-leads__row">
                         <h3 className="school-leads__name">{l.name}</h3>
-                        <span className="school-leads__phone">{l.phone || "—"}</span>
+                        <span className="school-leads__phone">
+                          {l.phone || "—"}
+                        </span>
                       </div>
                       <div className="school-leads__meta">
                         <span>Источник: {srcLabel}</span>
-                        {l.note && <span className="school-leads__note">Заметка: {l.note}</span>}
+                        {l.note && (
+                          <span className="school-leads__note">
+                            Заметка: {l.note}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1216,7 +1303,11 @@ const SchoolLeads = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="school-leads__pagination" role="navigation" aria-label="Пагинация заявок">
+            <div
+              className="school-leads__pagination"
+              role="navigation"
+              aria-label="Пагинация заявок"
+            >
               <button
                 type="button"
                 className="school-leads__page-btn"
@@ -1229,7 +1320,13 @@ const SchoolLeads = () => {
 
               {pagesWindow[0] > 1 && (
                 <>
-                  <button type="button" className="school-leads__page-btn" onClick={() => setPage(1)}>1</button>
+                  <button
+                    type="button"
+                    className="school-leads__page-btn"
+                    onClick={() => setPage(1)}
+                  >
+                    1
+                  </button>
                   <span className="school-leads__dots">…</span>
                 </>
               )}
@@ -1269,7 +1366,8 @@ const SchoolLeads = () => {
               </button>
 
               <div className="school-leads__page-info">
-                Стр. {page}/{totalPages} • Показано {pageItems.length} из {filtered.length}
+                Стр. {page}/{totalPages} • Показано {pageItems.length} из{" "}
+                {filtered.length}
               </div>
             </div>
           )}
@@ -1278,24 +1376,41 @@ const SchoolLeads = () => {
 
       {/* Lead modal */}
       {isModalOpen && (
-        <div className="school-leads__modal-overlay" role="dialog" aria-modal="true">
+        <div
+          className="school-leads__modal-overlay"
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="school-leads__modal">
             <div className="school-leads__modal-header">
               <h3 className="school-leads__modal-title">
                 {mode === "create" ? "Новая заявка" : "Изменить заявку"}
               </h3>
-              <button className="school-leads__icon-btn" onClick={closeModal} type="button" aria-label="Закрыть">
+              <button
+                className="school-leads__icon-btn"
+                onClick={closeModal}
+                type="button"
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
 
             {!!modalError && (
-              <div className="school-leads__alert" role="alert" style={{margin:"0 16px"}}>
+              <div
+                className="school-leads__alert"
+                role="alert"
+                style={{ margin: "0 16px" }}
+              >
                 {modalError}
               </div>
             )}
 
-            <form className="school-leads__form" onSubmit={submitLead} noValidate>
+            <form
+              className="school-leads__form"
+              onSubmit={submitLead}
+              noValidate
+            >
               <div className="school-leads__form-grid">
                 <div className="school-leads__field">
                   <label className="school-leads__label">
@@ -1315,7 +1430,9 @@ const SchoolLeads = () => {
                   <input
                     className="school-leads__input"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, phone: e.target.value })
+                    }
                     inputMode="tel"
                     placeholder="+996..."
                     pattern="^(\+?\d{9,15})?$"
@@ -1328,10 +1445,14 @@ const SchoolLeads = () => {
                   <select
                     className="school-leads__input"
                     value={form.source}
-                    onChange={(e) => setForm({ ...form, source: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, source: e.target.value })
+                    }
                   >
                     {SOURCE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1358,14 +1479,18 @@ const SchoolLeads = () => {
                   >
                     Отмена
                   </button>
-                  <button type="submit" className="school-leads__btn school-leads__btn--primary" disabled={saving}>
+                  <button
+                    type="submit"
+                    className="school-leads__btn school-leads__btn--primary"
+                    disabled={saving}
+                  >
                     {saving
                       ? mode === "create"
                         ? "Сохранение…"
                         : "Обновление…"
                       : mode === "create"
-                      ? "Сохранить"
-                      : "Сохранить изменения"}
+                        ? "Сохранить"
+                        : "Сохранить изменения"}
                   </button>
                 </div>
               </div>
@@ -1376,7 +1501,11 @@ const SchoolLeads = () => {
 
       {/* Convert modal */}
       {isConvertOpen && (
-        <div className="school-leads__modal-overlay" role="dialog" aria-modal="true">
+        <div
+          className="school-leads__modal-overlay"
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="school-leads__modal">
             <div className="school-leads__modal-header">
               <h3 className="school-leads__modal-title">Зачисление ученика</h3>
@@ -1392,12 +1521,20 @@ const SchoolLeads = () => {
             </div>
 
             {!!convertError && (
-              <div className="school-leads__alert" role="alert" style={{margin:"0 16px"}}>
+              <div
+                className="school-leads__alert"
+                role="alert"
+                style={{ margin: "0 16px" }}
+              >
                 {convertError}
               </div>
             )}
 
-            <form className="school-leads__form" onSubmit={submitConvert} noValidate>
+            <form
+              className="school-leads__form"
+              onSubmit={submitConvert}
+              noValidate
+            >
               <div className="school-leads__form-grid">
                 <div className="school-leads__field">
                   <label className="school-leads__label">
@@ -1407,13 +1544,19 @@ const SchoolLeads = () => {
                     className="school-leads__input"
                     value={convert.courseId}
                     onChange={(e) =>
-                      setConvert({ ...convert, courseId: e.target.value, groupId: "" })
+                      setConvert({
+                        ...convert,
+                        courseId: e.target.value,
+                        groupId: "",
+                      })
                     }
                     required
                   >
                     <option value="">— выберите —</option>
                     {courses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1425,14 +1568,20 @@ const SchoolLeads = () => {
                   <select
                     className="school-leads__input"
                     value={convert.groupId}
-                    onChange={(e) => setConvert({ ...convert, groupId: e.target.value })}
+                    onChange={(e) =>
+                      setConvert({ ...convert, groupId: e.target.value })
+                    }
                     required
                   >
                     <option value="">— выберите —</option>
                     {groups
-                      .filter((g) => String(g.courseId) === String(convert.courseId))
+                      .filter(
+                        (g) => String(g.courseId) === String(convert.courseId),
+                      )
                       .map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
                       ))}
                   </select>
                 </div>
@@ -1445,7 +1594,9 @@ const SchoolLeads = () => {
                     min="0"
                     step="1"
                     value={convert.discount}
-                    onChange={(e) => setConvert({ ...convert, discount: e.target.value })}
+                    onChange={(e) =>
+                      setConvert({ ...convert, discount: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -1477,17 +1628,34 @@ const SchoolLeads = () => {
 
       {/* Confirm modal (удаление заявки) */}
       {confirm.open && (
-        <div className="school-leads__modal-overlay" role="dialog" aria-modal="true" onClick={closeConfirm}>
-          <div className="school-leads__confirm" role="document" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="school-leads__modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeConfirm}
+        >
+          <div
+            className="school-leads__confirm"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="school-leads__confirm-title">Подтверждение</div>
             <div className="school-leads__confirm-text">
               Удалить заявку «{confirm.name}»? Действие необратимо.
             </div>
             <div className="school-leads__confirm-actions">
-              <button type="button" className="school-leads__btn school-leads__btn--secondary" onClick={closeConfirm}>
+              <button
+                type="button"
+                className="school-leads__btn school-leads__btn--secondary"
+                onClick={closeConfirm}
+              >
                 Нет
               </button>
-              <button type="button" className="school-leads__btn school-leads__btn--danger" onClick={confirmYes}>
+              <button
+                type="button"
+                className="school-leads__btn school-leads__btn--danger"
+                onClick={confirmYes}
+              >
                 Да
               </button>
             </div>

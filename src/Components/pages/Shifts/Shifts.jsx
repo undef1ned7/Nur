@@ -14,19 +14,14 @@ import { fetchShiftsAsync } from "../../../store/creators/shiftThunk";
 import "./Shifts.scss";
 import DataContainer from "../../common/DataContainer/DataContainer";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 const Shifts = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const {
-    shifts,
-    loading,
-    shiftsCount,
-    shiftsNext,
-    shiftsPrevious
-  } = useSelector((state) => state.shifts);
+  const { shifts, loading, shiftsCount, shiftsNext, shiftsPrevious } =
+    useSelector((state) => state.shifts);
   const [activeTab, setActiveTab] = useState("open"); // "open" или "closed"
 
   // Refs для отслеживания изменений данных
@@ -36,13 +31,13 @@ const Shifts = () => {
   // Получаем текущую страницу из URL
   const currentPage = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   // Расчет общего количества страниц
   const totalPages = useMemo(
     () => (shiftsCount && PAGE_SIZE ? Math.ceil(shiftsCount / PAGE_SIZE) : 1),
-    [shiftsCount]
+    [shiftsCount],
   );
 
   const hasNextPage = !!shiftsNext;
@@ -75,7 +70,6 @@ const Shifts = () => {
     setSearchParams(params, { replace: true });
   };
 
-
   useEffect(() => {
     // Загружаем смены с фильтром по статусу в зависимости от активного таба
     const params = {
@@ -106,15 +100,15 @@ const Shifts = () => {
       prevShifts[0]?.id !== currentShifts[0]?.id;
 
     if (isNewData) {
-      const rootElement = document.getElementById('root');
+      const rootElement = document.getElementById("root");
       if (rootElement) {
         rootElement.scrollTo({
           top: 0,
-          behavior: 'smooth'
+          behavior: "smooth",
         });
       } else {
         // Fallback на window, если root не найден
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     }
     prevShiftsRef.current = currentShifts;
@@ -159,8 +153,9 @@ const Shifts = () => {
       {/* Табы */}
       <div className="shifts-page__tabs">
         <button
-          className={`shifts-page__tab ${activeTab === "open" ? "shifts-page__tab--active" : ""
-            }`}
+          className={`shifts-page__tab ${
+            activeTab === "open" ? "shifts-page__tab--active" : ""
+          }`}
           onClick={() => {
             setActiveTab("open");
             // Сбрасываем на первую страницу при переключении таба
@@ -172,12 +167,15 @@ const Shifts = () => {
           <CheckCircle size={18} />
           <span>Открытые</span>
           {activeTab === "open" && displayedShifts.length > 0 && (
-            <span className="shifts-page__tab-badge">{displayedShifts.length}</span>
+            <span className="shifts-page__tab-badge">
+              {displayedShifts.length}
+            </span>
           )}
         </button>
         <button
-          className={`shifts-page__tab ${activeTab === "closed" ? "shifts-page__tab--active" : ""
-            }`}
+          className={`shifts-page__tab ${
+            activeTab === "closed" ? "shifts-page__tab--active" : ""
+          }`}
           onClick={() => {
             setActiveTab("closed");
             // Сбрасываем на первую страницу при переключении таба
@@ -343,7 +341,11 @@ const Shifts = () => {
             type="button"
             className="shifts-page__pagination-btn"
             onClick={() => handlePageChange(currentPage + 1)}
-            disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+            disabled={
+              loading ||
+              !hasNextPage ||
+              (totalPages && currentPage >= totalPages)
+            }
           >
             Вперед
           </button>
