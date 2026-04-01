@@ -13,7 +13,7 @@ import { updateProductAsync } from "../../../../store/creators/productCreators";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import "./AddProductModal.scss";
-import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { validateResErrors } from '../../../../../tools/validateResErrors'
 import api from "../../../../api";
 
 const toNum = (v) => {
