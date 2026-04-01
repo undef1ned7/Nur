@@ -62,6 +62,7 @@ const TablesHall = ({
   const alert = useAlert();
   // ✅ раскрытие блюд по столам: key = tableId (string)
   const [expandedByTable, setExpandedByTable] = useState(() => ({}));
+  const [activeHallTableId, setActiveHallTableId] = useState(null);
 
   const toggleExpanded = useCallback((tableId) => {
     const key = asKey(tableId);
@@ -285,9 +286,19 @@ const TablesHall = ({
         const hasMore = dishes.length > COLLAPSED_LIMIT;
         const visibleDishes = isExpanded ? dishes : dishes.slice(0, COLLAPSED_LIMIT);
         const moreCount = Math.max(0, dishes.length - COLLAPSED_LIMIT);
+        const isActionsOpen = String(activeHallTableId) === String(t.id);
 
         return (
-          <article key={t.id} className="cafeTables__hallCard">
+          <article
+            key={t.id}
+            className="cafeTables__hallCard"
+            onClick={() =>
+              setActiveHallTableId((prev) =>
+                String(prev) === String(t.id) ? null : t.id
+              )
+            }
+            style={{ cursor: "pointer" }}
+          >
             <div className="cafeTables__hallHead">
               <div className="cafeTables__hallTitle">СТОЛ {t.number}</div>
               {date ? <div className="cafeTables__hallDate">{date}</div> : null}
@@ -334,6 +345,31 @@ const TablesHall = ({
             <div className={`cafeTables__hallStatus ${isBusy ? "cafeTables__hallStatus--busy" : "cafeTables__hallStatus--free"}`}>
               {isBusy ? "ЗАНЯТ" : "СВОБОДЕН"}
             </div>
+
+            {isActionsOpen && (
+              <div className="cafeTables__rowActions cafeTables__hallActions">
+                <button
+                  className="cafeTables__btn cafeTables__btn--secondary"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(t);
+                  }}
+                >
+                  <FaEdit /> Изменить
+                </button>
+                <button
+                  className="cafeTables__btn cafeTables__btn--danger"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openConfirm("table", t.id);
+                  }}
+                >
+                  <FaTrash /> Удалить
+                </button>
+              </div>
+            )}
           </article>
         );
       })}
