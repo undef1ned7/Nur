@@ -1,12 +1,14 @@
 // src/Components/Sectors/cafe/Stock/Stock.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import "./stock.scss";
 import { StockItemModal, StockMoveModal, StockDeleteModal } from "./components/StockModals";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import Suppliers from "../../../Contact/Suppliers/Suppliers";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -43,6 +45,7 @@ const normalizeSupplierId = (row) => {
 
 const Stock = () => {
   const alert = useAlert();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -64,6 +67,7 @@ const Stock = () => {
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   /** Поставщик с id, которого нет в загруженном списке — показать в select при редактировании */
   const [supplierOptionFallback, setSupplierOptionFallback] = useState(null);
+  const activeTab = searchParams.get("tab") === "suppliers" ? "suppliers" : "stock";
 
   // модалка движения (приход)
   const [moveOpen, setMoveOpen] = useState(false);
@@ -385,139 +389,175 @@ const Stock = () => {
     }
   };
 
+  const handleTabChange = (nextTab) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === "stock") next.delete("tab");
+        else next.set("tab", "suppliers");
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
   return (
     <section className="cafeStock">
-      <div className="cafeStock__header">
-        <div>
-          <h2 className="cafeStock__title">Склад</h2>
-        </div>
-
-        <div className="cafeStock__actions">
-          <div className="cafeStock__search">
-            <FaSearch className="cafeStock__searchIcon" />
-            <input
-              className="cafeStock__searchInput"
-              placeholder="Поиск ингредиента…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              type="text"
-              autoComplete="off"
-            />
-          </div>
-
-          <button
-            className="cafeStock__btn cafeStock__btn--primary"
-            onClick={openCreate}
-            type="button"
-          >
-            <FaPlus /> Новый товар
-          </button>
-        </div>
+      <div className="cafeStock__tabs">
+        <button
+          type="button"
+          className={`cafeStock__tab ${activeTab === "stock" ? "cafeStock__tab--active" : ""}`}
+          onClick={() => handleTabChange("stock")}
+        >
+          Склад
+        </button>
+        <button
+          type="button"
+          className={`cafeStock__tab ${activeTab === "suppliers" ? "cafeStock__tab--active" : ""}`}
+          onClick={() => handleTabChange("suppliers")}
+        >
+          Поставщики
+        </button>
       </div>
-      <DataContainer>
 
-        <div className="cafeStock__list">
-          {loading && <div className="cafeStock__alert">Загрузка…</div>}
+      {activeTab === "stock" ? (
+        <>
+          <div className="cafeStock__header">
+            <div>
+              <h2 className="cafeStock__title">Склад</h2>
+            </div>
 
-          {!loading &&
-            filtered.map((s) => {
-              const supplierCap = rowSupplierCaption(s);
-              return (
-              <article key={s.id} className="cafeStock__card">
-                <div className="cafeStock__cardLeft">
-                  <div className="cafeStock__avatar">
-                    <FaBoxes />
-                  </div>
-                  <div>
-                    <h3 className="cafeStock__name">{s.title}</h3>
-                    <div className="cafeStock__meta">
-                      {supplierCap ? (
-                        <span className="cafeStock__muted">Поставщик: {supplierCap}</span>
-                      ) : null}
-                      <span className="cafeStock__muted">
-                        Остаток: {toNum(s.remainder)} {s.unit}
-                      </span>
-                      <span
-                        className={`cafeStock__status ${isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"
-                          }`}
-                      >
-                        {isLow(s) ? "Мало" : "Ок"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+            <div className="cafeStock__actions">
+              <div className="cafeStock__search">
+                <FaSearch className="cafeStock__searchIcon" />
+                <input
+                  className="cafeStock__searchInput"
+                  placeholder="Поиск ингредиента…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  type="text"
+                  autoComplete="off"
+                />
+              </div>
 
-                <div className="cafeStock__rowActions">
-                  <button
-                    className="cafeStock__btn cafeStock__btn--success"
-                    onClick={() => openMove(s)}
-                    type="button"
-                  >
-                    Приход
-                  </button>
-                  <button
-                    className="cafeStock__btn cafeStock__btn--secondary"
-                    onClick={() => openEdit(s)}
-                    type="button"
-                  >
-                    <FaEdit /> Изменить
-                  </button>
-                  <button
-                    className="cafeStock__btn cafeStock__btn--danger"
-                    onClick={() => openDelete(s)}
-                    type="button"
-                  >
-                    <FaTrash /> Удалить
-                  </button>
-                </div>
-              </article>
-            );
-            })}
+              <button
+                className="cafeStock__btn cafeStock__btn--primary"
+                onClick={openCreate}
+                type="button"
+              >
+                <FaPlus /> Новый товар
+              </button>
+            </div>
+          </div>
+          <DataContainer>
+            <div className="cafeStock__list">
+              {loading && <div className="cafeStock__alert">Загрузка…</div>}
 
-          {!loading && !filtered.length && (
-            <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
+              {!loading &&
+                filtered.map((s) => {
+                  const supplierCap = rowSupplierCaption(s);
+                  return (
+                    <article key={s.id} className="cafeStock__card">
+                      <div className="cafeStock__cardLeft">
+                        <div className="cafeStock__avatar">
+                          <FaBoxes />
+                        </div>
+                        <div>
+                          <h3 className="cafeStock__name">{s.title}</h3>
+                          <div className="cafeStock__meta">
+                            {supplierCap ? (
+                              <span className="cafeStock__muted">Поставщик: {supplierCap}</span>
+                            ) : null}
+                            <span className="cafeStock__muted">
+                              Остаток: {toNum(s.remainder)} {s.unit}
+                            </span>
+                            <span
+                              className={`cafeStock__status ${isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"
+                                }`}
+                            >
+                              {isLow(s) ? "Мало" : "Ок"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="cafeStock__rowActions">
+                        <button
+                          className="cafeStock__btn cafeStock__btn--success"
+                          onClick={() => openMove(s)}
+                          type="button"
+                        >
+                          Приход
+                        </button>
+                        <button
+                          className="cafeStock__btn cafeStock__btn--secondary"
+                          onClick={() => openEdit(s)}
+                          type="button"
+                        >
+                          <FaEdit /> Изменить
+                        </button>
+                        <button
+                          className="cafeStock__btn cafeStock__btn--danger"
+                          onClick={() => openDelete(s)}
+                          type="button"
+                        >
+                          <FaTrash /> Удалить
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+
+              {!loading && !filtered.length && (
+                <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
+              )}
+            </div>
+          </DataContainer>
+
+          {/* Модалка товара */}
+          {modalOpen && (
+            <StockItemModal
+              editingId={editingId}
+              form={form}
+              setForm={setForm}
+              supplierSuggestions={supplierSuggestions}
+              supplierOptionFallback={supplierOptionFallback}
+              onClose={() => {
+                setModalOpen(false);
+                setSupplierOptionFallback(null);
+              }}
+              onSubmit={saveItem}
+              sanitizeDecimalInput={sanitizeDecimalInput}
+            />
           )}
-        </div>
-      </DataContainer>
 
-      {/* Модалка товара */}
-      {modalOpen && (
-        <StockItemModal
-          editingId={editingId}
-          form={form}
-          setForm={setForm}
-          supplierSuggestions={supplierSuggestions}
-          supplierOptionFallback={supplierOptionFallback}
-          onClose={() => {
-            setModalOpen(false);
-            setSupplierOptionFallback(null);
-          }}
-          onSubmit={saveItem}
-          sanitizeDecimalInput={sanitizeDecimalInput}
-        />
-      )}
+          {/* Модалка приход */}
+          {moveOpen && moveItem && (
+            <StockMoveModal
+              moveItem={moveItem}
+              moveQty={moveQty}
+              setMoveQty={setMoveQty}
+              moveUnitPrice={moveUnitPrice}
+              setMoveUnitPrice={setMoveUnitPrice}
+              onClose={() => setMoveOpen(false)}
+              onSubmit={applyMove}
+              sanitizeDecimalInput={sanitizeDecimalInput}
+            />
+          )}
 
-      {/* Модалка приход */}
-      {moveOpen && moveItem && (
-        <StockMoveModal
-          moveItem={moveItem}
-          moveQty={moveQty}
-          setMoveQty={setMoveQty}
-          moveUnitPrice={moveUnitPrice}
-          setMoveUnitPrice={setMoveUnitPrice}
-          onClose={() => setMoveOpen(false)}
-          onSubmit={applyMove}
-          sanitizeDecimalInput={sanitizeDecimalInput}
-        />
-      )}
-
-      {/* Модалка подтверждения удаления */}
-      {deleteOpen && deleteItem && (
-        <StockDeleteModal
-          deleteItem={deleteItem}
-          onClose={() => setDeleteOpen(false)}
-          onConfirm={confirmDelete}
-        />
+          {/* Модалка подтверждения удаления */}
+          {deleteOpen && deleteItem && (
+            <StockDeleteModal
+              deleteItem={deleteItem}
+              onClose={() => setDeleteOpen(false)}
+              onConfirm={confirmDelete}
+            />
+          )}
+        </>
+      ) : (
+        <DataContainer>
+          <Suppliers hideStatus />
+        </DataContainer>
       )}
     </section>
   );
