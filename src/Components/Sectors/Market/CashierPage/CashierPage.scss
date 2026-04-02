@@ -428,7 +428,9 @@
     cursor: pointer;
     background: transparent;
     color: #4b5563;
-    transition: background 0.15s, color 0.15s;
+    transition:
+      background 0.15s,
+      color 0.15s;
 
     &.active {
       background: #f7d617;
@@ -468,14 +470,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    // width: 30px;
+    // height: 30px;
     border: 1px solid #e2e8f0;
     background: #fff;
     border-radius: 8px;
     cursor: pointer;
     color: #475569;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      color 0.15s;
 
     &:hover {
       background: #f8fafc;
@@ -535,7 +540,9 @@
     color: #94a3b8;
     cursor: pointer;
     border-radius: 8px;
-    transition: color 0.15s, background 0.15s;
+    transition:
+      color 0.15s,
+      background 0.15s;
 
     &:hover {
       background: #fef2f2;

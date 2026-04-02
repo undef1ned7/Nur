@@ -65,6 +65,15 @@ const DOC_TYPE_FROM_PARAM = {
   transfer: "TRANSFER",
 };
 
+/** Дата/время в списке документов: 02.04.2026:00:35:20 */
+const formatDocumentDateTime = (value) => {
+  if (value == null || value === "") return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 const Documents = () => {
   const alert = useAlert();
   const confirm = useConfirm();
@@ -338,16 +347,7 @@ const Documents = () => {
       return {
         id: doc.id,
         number: doc.number || getDocumentNumber(index, "ЧЕК"),
-        date:
-          doc.date || doc.created_at
-            ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "—",
+        date: formatDocumentDateTime(doc.date || doc.created_at),
         client:
           doc.counterparty?.name ||
           doc.counterparty_display_name ||
@@ -376,14 +376,7 @@ const Documents = () => {
       return {
         id: doc.id,
         number: doc.number || getDocumentNumber(index, "НАКЛ"),
-        date:
-          doc.date || doc.created_at
-            ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
-            : "—",
+        date: formatDocumentDateTime(doc.date || doc.created_at),
         counterparty:
           doc.counterparty?.name ||
           doc.counterparty_display_name ||
@@ -1675,9 +1668,7 @@ const Documents = () => {
                       <div className="documents__card-row">
                         <span className="documents__card-label">Одобрена</span>
                         <span className="documents__card-value">
-                          {doc.created_at
-                            ? new Date(doc.created_at).toLocaleString("ru-RU")
-                            : "—"}
+                          {formatDocumentDateTime(doc.created_at)}
                         </span>
                       </div>
                     </div>

@@ -113,6 +113,11 @@ const CashierPage = () => {
     return String(num).replace(/\.?0+$/, "");
   };
 
+  const getDefaultPiecePackage = (product) => {
+    const packages = Array.isArray(product?.packages) ? product.packages : [];
+    return packages.find((pkg) => Number(pkg?.quantity_in_package) > 0) || null;
+  };
+
   // Функция для поиска открытой смены на всех страницах
   const findOpenShift = useCallback(async () => {
     try {
@@ -647,13 +652,18 @@ const CashierPage = () => {
           const productId = item.product || item.product_id;
           const cartItemId = item.id;
           const isCustom = !productId;
-          // Для доп. услуг productId = null/undefined, поэтому ключ делаем из cartItemId
-          const localId = isCustom ? `custom-${cartItemId}` : productId;
+          const salePackage = item.sale_package || null;
+          // Для обычных товаров ключ строим по itemId, чтобы не конфликтовали
+          // строки одного и того же товара с разными sale_package.
+          const localId = isCustom
+            ? `custom-${cartItemId}`
+            : `item-${cartItemId}`;
           return {
             id: localId, // ключ в UI (productId или custom-<cartItemId>)
             itemId: cartItemId, // ID элемента в корзине (для API: DELETE/PATCH /items/<itemId>/)
             productId: productId ?? null, // ID товара (если это товар)
             isCustom: isCustom,
+            salePackage,
             name: item.product_name || item.display_name || item.name || "—",
             price: price,
             quantity: qty,
@@ -1105,7 +1115,7 @@ const CashierPage = () => {
     dispatch(startSale({ discount_total: 0, shift: openShiftId }));
   }, [openShiftId]);
 
-  const addToCart = async (product) => {
+  const addToCartWithPackage = async (product, salePackageId = null) => {
     // Проверяем наличие товара
     // Для весовых товаров stock может быть false, но quantity > 0
     const availableQuantity = parseFloat(product.quantity || 0);
@@ -1154,9 +1164,14 @@ const CashierPage = () => {
       // Проверяем, есть ли товар уже в корзине
       // startSale возвращает items напрямую, а не cart.items
       const items = currentSale?.items || currentSale?.cart?.items || [];
-      const existingItem = items.find(
-        (item) => item.product === product.id || item.product_id === product.id,
-      );
+      const existingItem = items.find((item) => {
+        const itemProductId = item.product || item.product_id;
+        const itemSalePackage = item.sale_package || null;
+        return (
+          itemProductId === product.id &&
+          itemSalePackage === (salePackageId || null)
+        );
+      });
 
       if (existingItem) {
         // Проверяем, не превышает ли новое количество доступное
@@ -1166,7 +1181,7 @@ const CashierPage = () => {
         await dispatch(
           updateManualFilling({
             id: saleId,
-            productId: product.id,
+            productId: existingItem.id,
             quantity: newQuantity,
           }),
         );
@@ -1179,6 +1194,7 @@ const CashierPage = () => {
             id: saleId,
             productId: product.id,
             quantity: normalizeQuantity(1),
+            ...(salePackageId ? { salePackageId } : {}),
           }),
         );
         // Обновляем продажу после успешного добавления
@@ -1196,19 +1212,22 @@ const CashierPage = () => {
     }
   };
 
-  const updateQuantity = async (productId, delta) => {
+  const addToCart = async (product) => {
+    return addToCartWithPackage(product, null);
+  };
+
+  const updateQuantity = async (item, delta) => {
     if (!currentSale?.id) return;
 
     try {
+      if (!item?.itemId || !item?.productId) return;
       // Находим товар в списке продуктов для проверки наличия
-      const product = products.find((p) => p.id === productId);
+      const product = products.find((p) => p.id === item.productId);
       if (!product) return;
 
       // startSale возвращает items напрямую, а не cart.items
       const items = currentSale?.items || currentSale?.cart?.items || [];
-      const existingItem = items.find(
-        (item) => item.product === productId || item.product_id === productId,
-      );
+      const existingItem = items.find((el) => el.id === item.itemId);
 
       if (!existingItem) return;
 
@@ -1216,7 +1235,7 @@ const CashierPage = () => {
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
 
       // Проверяем наличие при увеличении количества
-      if (delta > 0) {
+      if (delta > 0 && !item.salePackage) {
         // Для весовых товаров stock может быть false, но quantity > 0
         const availableQuantity = parseFloat(product.quantity || 0);
         const isInStock = availableQuantity > 0;
@@ -1245,17 +1264,17 @@ const CashierPage = () => {
         await dispatch(
           deleteProductInCart({
             id: currentSale.id,
-            productId: productId,
+            productId: item.itemId,
           }),
         );
         // Удаляем товар из сохраненного порядка
         cartOrderRef.current = cartOrderRef.current.filter(
-          (id) => id !== productId,
+          (id) => id !== item.id,
         );
         // Удаляем из локальных значений количества
         setCartQuantities((prev) => {
           const newQuantities = { ...prev };
-          delete newQuantities[productId];
+          delete newQuantities[item.id];
           return newQuantities;
         });
         // Обновляем продажу после успешного удаления
@@ -1265,14 +1284,14 @@ const CashierPage = () => {
         await dispatch(
           updateManualFilling({
             id: currentSale.id,
-            productId: productId,
+            productId: item.itemId,
             quantity: newQuantity,
           }),
         );
         // Обновляем локальное значение количества
         setCartQuantities((prev) => ({
           ...prev,
-          [productId]: String(newQuantity),
+          [item.id]: String(newQuantity),
         }));
         // Обновляем продажу после успешного обновления
         // await refreshSale();
@@ -1289,12 +1308,13 @@ const CashierPage = () => {
   };
 
   // Функция для обновления количества напрямую (без дельты)
-  const updateQuantityDirect = async (productId, newQuantity) => {
+  const updateQuantityDirect = async (item, newQuantity) => {
     if (!currentSale?.id) return;
 
     try {
+      if (!item?.itemId || !item?.productId) return;
       // Находим товар в списке продуктов для проверки наличия
-      const product = products.find((p) => p.id === productId);
+      const product = products.find((p) => p.id === item.productId);
       if (!product) return;
 
       const qtyNum = normalizeQuantity(
@@ -1303,7 +1323,11 @@ const CashierPage = () => {
 
       // Проверяем наличие
       const availableQuantity = parseFloat(product.quantity || 0);
-      if (availableQuantity > 0 && qtyNum > availableQuantity) {
+      if (
+        !item.salePackage &&
+        availableQuantity > 0 &&
+        qtyNum > availableQuantity
+      ) {
         showAlert(
           "warning",
           "Недостаточно товара",
@@ -1313,20 +1337,20 @@ const CashierPage = () => {
       }
 
       if (qtyNum === 0) {
-        await removeFromCart(productId);
+        await removeFromCart(item);
       } else {
         // Обновляем количество
         await dispatch(
           updateManualFilling({
             id: currentSale.id,
-            productId: productId,
+            productId: item.itemId,
             quantity: qtyNum,
           }),
         );
         // Обновляем локальное значение количества
         setCartQuantities((prev) => ({
           ...prev,
-          [productId]: String(qtyNum),
+          [item.id]: String(qtyNum),
         }));
         // Обновляем продажу после успешного обновления
         await refreshSale();
@@ -1342,35 +1366,36 @@ const CashierPage = () => {
     }
   };
 
-  const removeFromCart = async (productId) => {
+  const removeFromCart = async (item) => {
     if (!currentSale?.id) return;
 
     try {
+      if (!item?.itemId) return;
       // Удаляем товар из корзины
       await dispatch(
         deleteProductInCart({
           id: currentSale.id,
-          productId: productId,
+          productId: item.itemId,
         }),
       );
       // Удаляем товар из сохраненного порядка
       cartOrderRef.current = cartOrderRef.current.filter(
-        (id) => id !== productId,
+        (id) => id !== item.id,
       );
       // Удаляем из локальных значений количества, цены и скидки
       setCartQuantities((prev) => {
         const newQuantities = { ...prev };
-        delete newQuantities[productId];
+        delete newQuantities[item.id];
         return newQuantities;
       });
       setCartPrices((prev) => {
         const next = { ...prev };
-        delete next[productId];
+        delete next[item.id];
         return next;
       });
       setCartDiscounts((prev) => {
         const next = { ...prev };
-        delete next[productId];
+        delete next[item.id];
         return next;
       });
       // Обновляем продажу после успешного удаления
@@ -1509,12 +1534,15 @@ const CashierPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    const cartItemsMap = new Map(
-      currentSale?.items?.map((el) => [
-        el.product,
-        { qty: parseFloat(el.quantity), item: el },
-      ]),
-    );
+    const cartItemsMap = new Map();
+    (currentSale?.items || []).forEach((el) => {
+      const productId = el.product || el.product_id;
+      if (!productId) return;
+      const prev = cartItemsMap.get(productId) || { qty: 0 };
+      cartItemsMap.set(productId, {
+        qty: prev.qty + (parseFloat(el.quantity) || 0),
+      });
+    });
     return products
       .map((el) => {
         const qty = parseFloat(el.quantity);
@@ -1523,16 +1551,16 @@ const CashierPage = () => {
         const primaryImg = el.images.find((el) => el.is_primary);
         return {
           ...el,
-          quantity: qty - cartQty,
+          quantity: qty,
           isCart: !!cartQty,
-          cartItem: cartItem?.item,
+          cartQty,
           img:
             primaryImg?.image_url ??
             el.images[0]?.image_url ??
             "/images/placeholder.avif",
         };
       })
-      .filter((el) => !!el.quantity);
+      .filter((el) => !!el.quantity || el.isCart);
   }, [products, currentSale]);
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
@@ -1799,7 +1827,7 @@ const CashierPage = () => {
                   >
                     {cartItem && (
                       <div className="cashier-page__product-badge">
-                        {cartItem.quantity}
+                        {formatQuantity(product.cartQty || 0)}
                       </div>
                     )}
                     <div className="cashier-page__product-name">
@@ -1808,8 +1836,26 @@ const CashierPage = () => {
                     <div className="cashier-page__product-price">
                       {formatPrice(product.price || 0)} сом
                     </div>
-                    <div className="cashier-page__product-stock">
+
+                    <div className="cashier-page__product-stock flex items-center gap-2">
                       {product.quantity || 0} {product.unit || "шт"}
+                      {getDefaultPiecePackage(product) && (
+                        <button
+                          type="button"
+                          className="cashier-page__cart-item-btn cursor-pointer"
+                          // style={{ marginTop: 8 }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const pkg = getDefaultPiecePackage(product);
+                            if (!pkg?.id) return;
+                            addToCartWithPackage(product, pkg.id);
+                          }}
+                          title="Добавить 1 шт (поштучно)"
+                        >
+                          +1 шт
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1907,6 +1953,7 @@ const CashierPage = () => {
                     <div className="cashier-page__cart-item-head">
                       <span className="cashier-page__cart-item-name">
                         {item.name}
+                        {item.salePackage ? " (поштучно)" : ""}
                       </span>
                       <div className="cashier-page__cart-item-head-right">
                         <div className="cashier-page__cart-item-discount-modes">
@@ -2170,7 +2217,7 @@ const CashierPage = () => {
                           onClick={() => {
                             if (item.isCustom)
                               return updateCustomQuantityByDelta(item, -1);
-                            return updateQuantity(item.id, -1);
+                            return updateQuantity(item, -1);
                           }}
                         >
                           <Minus size={14} />
@@ -2193,9 +2240,9 @@ const CashierPage = () => {
                             }
                             const numValue = parseFloat(value);
                             if (isNaN(numValue)) return;
-                            if (!item.isCustom) {
+                            if (!item.isCustom && !item.salePackage) {
                               const product = products.find(
-                                (p) => p.id === item.id,
+                                (p) => p.id === item.productId,
                               );
                               if (product) {
                                 const availableQuantity = parseFloat(
@@ -2235,9 +2282,9 @@ const CashierPage = () => {
                             const qtyNum = normalizeQuantity(
                               Math.max(0, parseFloat(value) || 0),
                             );
-                            if (!item.isCustom) {
+                            if (!item.isCustom && !item.salePackage) {
                               const product = products.find(
-                                (p) => p.id === item.id,
+                                (p) => p.id === item.productId,
                               );
                               if (product) {
                                 const availableQuantity = parseFloat(
@@ -2266,13 +2313,13 @@ const CashierPage = () => {
                               if (item.isCustom) {
                                 await removeCustomFromCart(item);
                               } else {
-                                await removeFromCart(item.id);
+                                await removeFromCart(item);
                               }
                             } else if (qtyNum !== item.quantity) {
                               if (item.isCustom) {
                                 await updateCustomQuantityDirect(item, qtyNum);
                               } else {
-                                await updateQuantityDirect(item.id, qtyNum);
+                                await updateQuantityDirect(item, qtyNum);
                               }
                             } else {
                               setCartQuantities((prev) => ({
@@ -2291,7 +2338,7 @@ const CashierPage = () => {
                           onClick={() => {
                             if (item.isCustom)
                               return updateCustomQuantityByDelta(item, 1);
-                            return updateQuantity(item.id, 1);
+                            return updateQuantity(item, 1);
                           }}
                         >
                           <Plus size={14} />
@@ -2302,7 +2349,7 @@ const CashierPage = () => {
                         className="cashier-page__cart-item-remove"
                         onClick={() => {
                           if (item.isCustom) return removeCustomFromCart(item);
-                          return removeFromCart(item.id);
+                          return removeFromCart(item);
                         }}
                         title="Удалить"
                       >

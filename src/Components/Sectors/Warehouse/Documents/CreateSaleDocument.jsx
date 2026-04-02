@@ -53,6 +53,9 @@ const VALID_DOC_TYPES = [
   "TRANSFER",
 ];
 
+/** Остаток 0 с учётом строк из API (например "0.000"). */
+const isZeroStockQty = (quantity) => Number(quantity ?? 0) === 0;
+
 // Маленькая модалка с полным текстом при наведении
 const FullNamePopover = ({ fullText, children, className = "" }) => {
   const [show, setShow] = useState(false);
@@ -957,12 +960,17 @@ const CreateSaleDocument = () => {
                           const isKeyboardActive =
                             activeGroupKeyForKeyboard === gKey &&
                             currentIndex === index;
+                          const isZeroQty = isZeroStockQty(product.quantity);
                           return (
                             <div
                               key={product.id}
                               className={`create-sale-document__group-product-item ${
                                 isSelected || isInCart ? "active" : ""
-                              } ${isKeyboardActive ? "active" : ""}`}
+                              } ${isKeyboardActive ? "active" : ""}${
+                                isZeroQty
+                                  ? " create-sale-document__group-product-item--zero-qty"
+                                  : ""
+                              }`}
                               onMouseEnter={() => {
                                 setActiveGroupKeyForKeyboard(gKey);
                                 setGroupKeyboardIndexMap((prev) => ({
@@ -1091,9 +1099,16 @@ const CreateSaleDocument = () => {
           typeof doc.counterparty === "object" && doc.counterparty != null
             ? (doc.counterparty?.id ?? doc.counterparty?.uuid ?? "")
             : String(doc.counterparty ?? "");
+        const agentFromDoc =
+          typeof doc.agent === "object" && doc.agent != null
+            ? (doc.agent?.id ?? doc.agent?.uuid ?? "")
+            : doc.agent != null && doc.agent !== ""
+              ? String(doc.agent)
+              : "";
         setWarehouse(whFrom);
         setWarehouseTo(whTo);
         setClientId(cpId);
+        setAgentId(agentFromDoc ? String(agentFromDoc) : "");
         setDocType(doc.doc_type || "SALE");
         setComment(doc.comment || "");
         setDocumentDiscount(
@@ -1389,9 +1404,10 @@ const CreateSaleDocument = () => {
   }, [agentOptions, currentUserAgentId, userProfile]);
 
   useEffect(() => {
+    if (editDocumentId) return;
     if (isOwnerOrAdmin || !currentUserAgentId) return;
     setAgentId(currentUserAgentId);
-  }, [isOwnerOrAdmin, currentUserAgentId]);
+  }, [editDocumentId, isOwnerOrAdmin, currentUserAgentId]);
 
   const warehouseOptions = useMemo(() => {
     return (Array.isArray(warehouses) ? warehouses : [])
@@ -1956,6 +1972,7 @@ const CreateSaleDocument = () => {
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
+        ...(isAgentFilterRelevant && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -2096,6 +2113,7 @@ const CreateSaleDocument = () => {
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
+        ...(isAgentFilterRelevant && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -2590,12 +2608,19 @@ const CreateSaleDocument = () => {
                                     const isKeyboardActive =
                                       activeGroupKeyForKeyboard === key &&
                                       currentIndex === index;
+                                    const isZeroQty = isZeroStockQty(
+                                      product.quantity,
+                                    );
                                     return (
                                       <div
                                         key={product.id}
                                         className={`create-sale-document__group-product-item ${
                                           isSelected || isInCart ? "active" : ""
-                                        } ${isKeyboardActive ? "active" : ""}`}
+                                        } ${isKeyboardActive ? "active" : ""}${
+                                          isZeroQty
+                                            ? " create-sale-document__group-product-item--zero-qty"
+                                            : ""
+                                        }`}
                                         onMouseEnter={() => {
                                           setActiveGroupKeyForKeyboard(key);
                                           setGroupKeyboardIndexMap((prev) => ({
@@ -2981,9 +3006,8 @@ const CreateSaleDocument = () => {
                         item.price || item.unit_price || 0,
                       );
                       const itemQuantity = Number(item.quantity);
-                      const docDiscNum = Number(
-                        String(documentDiscount).replace(",", "."),
-                      ) || 0;
+                      const docDiscNum =
+                        Number(String(documentDiscount).replace(",", ".")) || 0;
                       const rawLineDiscount = Number(
                         item.discount_percent ?? item.discount ?? 0,
                       );
@@ -2995,9 +3019,7 @@ const CreateSaleDocument = () => {
                             ? rawLineDiscount
                             : docDiscNum;
                       const discountDisplay =
-                        effectiveDiscount > 0
-                          ? `${effectiveDiscount}%`
-                          : "–";
+                        effectiveDiscount > 0 ? `${effectiveDiscount}%` : "–";
                       const itemTotal =
                         itemPrice *
                         itemQuantity *

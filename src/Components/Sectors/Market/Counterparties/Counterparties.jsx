@@ -1,24 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { UserCircle, Package, Users, Filter } from "lucide-react";
 import "./Counterparties.scss";
-import AlertModal from "../../../common/AlertModal/AlertModal";
 import CounterpartyHeader from "./components/CounterpartyHeader";
 import CounterpartySearchSection from "./components/CounterpartySearchSection";
-import BulkActionsBar from "./components/BulkActionsBar";
 import CounterpartyTable from "./components/CounterpartyTable";
 import CounterpartyCards from "./components/CounterpartyCards";
 import Pagination from "./components/Pagination";
 import CreateCounterpartyModal from "./components/CreateCounterpartyModal";
-import {
-  bulkDeleteWarehouseCounterparties,
-  fetchWarehouseCounterparties,
-} from "../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../store/slices/userSlice";
 import { useSearch } from "./hooks/useSearch";
 import { usePagination } from "./hooks/usePagination";
-import { useCounterpartySelection } from "./hooks/useCounterpartySelection";
 import { useCounterpartyData } from "./hooks/useCounterpartyData";
 import {
   STORAGE_KEY,
@@ -27,15 +19,24 @@ import {
   TYPE_TAB_LABELS,
   COUNTERPARTY_TYPES,
 } from "./constants";
-import { formatDeleteMessage, getAgentDisplay } from "./utils";
+import { getAgentDisplay } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 
 /** Показывать колонку «Агент» для владельца и админа */
 const showAgentColumn = (profile) =>
   profile?.role === "owner" || profile?.role === "admin";
 
+const toDateInputValue = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const Counterparties = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { profile } = useUser() || {};
   const showAgent = showAgentColumn(profile);
@@ -47,8 +48,14 @@ const Counterparties = () => {
 
   // Состояние фильтров и модальных окон
   const [filters, setFilters] = useState({});
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      from: toDateInputValue(monthStart),
+      to: toDateInputValue(now),
+    };
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -77,8 +84,16 @@ const Counterparties = () => {
     if (debouncedSearchTerm?.trim()) {
       params.search = debouncedSearchTerm.trim();
     }
+    if (period.from) {
+      params.period_start = period.from;
+      params.date_from = period.from;
+    }
+    if (period.to) {
+      params.period_end = period.to;
+      params.date_to = period.to;
+    }
     return params;
-  }, [currentPageFromUrl, filters, debouncedSearchTerm]);
+  }, [currentPageFromUrl, filters, debouncedSearchTerm, period.from, period.to]);
 
   // Загрузка контрагентов
   const {
@@ -139,9 +154,7 @@ const Counterparties = () => {
 
   // Сброс на первую страницу при изменении поиска или вкладки типа
   useEffect(() => {
-    if (debouncedSearchTerm) {
-      resetToFirstPage();
-    }
+    resetToFirstPage();
   }, [debouncedSearchTerm, resetToFirstPage]);
 
   useEffect(() => {
@@ -152,16 +165,9 @@ const Counterparties = () => {
     setAgentFilter("");
   }, [typeTab]);
 
-  // Хук для выбора контрагентов
-  const {
-    selectedRows,
-    isAllSelected,
-    selectedCount,
-    handleRowSelect,
-    handleSelectAll,
-    clearSelection,
-    setSelectedRows,
-  } = useCounterpartySelection(filteredCounterparties);
+  useEffect(() => {
+    resetToFirstPage();
+  }, [period.from, period.to, resetToFirstPage]);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -180,40 +186,10 @@ const Counterparties = () => {
 
   const handlePageChange = useCallback(
     (newPage) => {
-      handlePageChangeBase(newPage, () => setSelectedRows(new Set()));
+      handlePageChangeBase(newPage);
     },
-    [handlePageChangeBase, setSelectedRows]
+    [handlePageChangeBase]
   );
-
-  const handleBulkDelete = useCallback(() => {
-    if (selectedCount === 0) return;
-    setShowDeleteConfirmModal(true);
-  }, [selectedCount]);
-
-  const confirmBulkDelete = useCallback(async () => {
-    setShowDeleteConfirmModal(false);
-    setBulkDeleting(true);
-    try {
-      await dispatch(
-        bulkDeleteWarehouseCounterparties(Array.from(selectedRows))
-      ).unwrap();
-
-      setSelectedRows(new Set());
-      dispatch(fetchWarehouseCounterparties(requestParams));
-    } catch (e) {
-      console.error("Ошибка при удалении контрагентов:", e);
-      alert(
-        "Не удалось удалить контрагентов: " +
-          (e?.message || e?.detail || "Неизвестная ошибка")
-      );
-    } finally {
-      setBulkDeleting(false);
-    }
-  }, [dispatch, selectedRows, requestParams]);
-
-  const handleResetFilters = useCallback(() => {
-    setFilters({});
-  }, []);
 
   const handleCreateCounterparty = useCallback(() => {
     setShowCreateModal(true);
@@ -222,12 +198,6 @@ const Counterparties = () => {
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);
   }, []);
-
-  // Мемоизация сообщения для модального окна удаления
-  const deleteModalMessage = useMemo(
-    () => formatDeleteMessage(selectedCount),
-    [selectedCount]
-  );
 
   const typeTabConfig = [
     {
@@ -296,6 +266,33 @@ const Counterparties = () => {
             </select>
           </div>
         )}
+        <div className="counterparties-period-filter">
+          <label
+            htmlFor="counterparties-period-from"
+            className="counterparties-period-filter__label"
+          >
+            Период:
+          </label>
+          <input
+            id="counterparties-period-from"
+            type="date"
+            className="counterparties-period-filter__input"
+            value={period.from}
+            onChange={(e) =>
+              setPeriod((prev) => ({ ...prev, from: e.target.value }))
+            }
+            max={period.to || undefined}
+          />
+          <span className="counterparties-period-filter__dash">-</span>
+          <input
+            id="counterparties-period-to"
+            type="date"
+            className="counterparties-period-filter__input"
+            value={period.to}
+            onChange={(e) => setPeriod((prev) => ({ ...prev, to: e.target.value }))}
+            min={period.from || undefined}
+          />
+        </div>
       </section>
 
       <CounterpartySearchSection
@@ -305,13 +302,6 @@ const Counterparties = () => {
         onViewModeChange={handleViewModeChange}
         count={count}
         foundCount={filteredCounterparties.length}
-      />
-
-      <BulkActionsBar
-        selectedCount={selectedCount}
-        onClearSelection={clearSelection}
-        onBulkDelete={handleBulkDelete}
-        isDeleting={bulkDeleting}
       />
 
       <div className="counterparties-content">
@@ -345,10 +335,6 @@ const Counterparties = () => {
             <CounterpartyTable
               counterparties={filteredCounterparties}
               loading={loading}
-              selectedRows={selectedRows}
-              isAllSelected={isAllSelected}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAll}
               onCounterpartyClick={handleCounterpartyClick}
               getRowNumber={getRowNumber}
               showAgentColumn={showAgent}
@@ -359,10 +345,6 @@ const Counterparties = () => {
             <CounterpartyCards
               counterparties={filteredCounterparties}
               loading={loading}
-              selectedRows={selectedRows}
-              isAllSelected={isAllSelected}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAll}
               onCounterpartyClick={handleCounterpartyClick}
               getRowNumber={getRowNumber}
               showAgentColumn={showAgent}
@@ -382,16 +364,6 @@ const Counterparties = () => {
           />
         )}
       </div>
-
-      <AlertModal
-        open={showDeleteConfirmModal}
-        type="warning"
-        title="Подтверждение удаления"
-        message={deleteModalMessage}
-        okText="Удалить"
-        onClose={() => setShowDeleteConfirmModal(false)}
-        onConfirm={confirmBulkDelete}
-      />
 
       {showCreateModal && (
         <ReactPortal wrapperId="create_counter_modal">

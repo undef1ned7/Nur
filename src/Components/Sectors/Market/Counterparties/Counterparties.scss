@@ -92,6 +92,39 @@
   }
 }
 
+.counterparties-period-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 0;
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--counterparties-tab-text);
+    white-space: nowrap;
+  }
+
+  &__input {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--counterparties-tab-text-active);
+    background: var(--counterparties-surface);
+    border: 1px solid var(--counterparties-border);
+    border-radius: 8px;
+
+    &:focus {
+      outline: none;
+      border-color: var(--counterparties-tab-active);
+    }
+  }
+
+  &__dash {
+    color: var(--counterparties-tab-text);
+    font-weight: 500;
+  }
+}
+
 /* Контейнер контента */
 .counterparties-content {
   margin-top: 0.5rem;

@@ -99,11 +99,19 @@ export const getSale = createAsyncThunk(
 
 export const manualFilling = createAsyncThunk(
   "sale/manualFilling",
-  async ({ id, productId, quantity, discount_total }, { rejectWithValue }) => {
+  async (
+    { id, productId, quantity, discount_total, salePackageId },
+    { rejectWithValue },
+  ) => {
     try {
       const { data: response } = await api.post(
         `/main/pos/sales/${id}/add-item/`,
-        { product_id: productId, quantity, discount_total },
+        {
+          product_id: productId,
+          quantity,
+          discount_total,
+          ...(salePackageId ? { sale_package_id: salePackageId } : {}),
+        },
       );
       return response;
     } catch (error) {

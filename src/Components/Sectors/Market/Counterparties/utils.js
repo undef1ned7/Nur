@@ -11,6 +11,96 @@ export const formatPhone = (phone) => {
 };
 
 /**
+ * Преобразует значение в число
+ * @param {string|number|null|undefined} value
+ * @returns {number}
+ */
+export const toNumber = (value) => Number(value) || 0;
+
+/**
+ * Форматирует число в ru-RU с 2 знаками после запятой
+ * @param {string|number|null|undefined} value
+ * @returns {string}
+ */
+export const formatMoneyRu = (value) =>
+  toNumber(value).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+/**
+ * Возвращает "debit/credit" по знаку баланса
+ * @param {string|number|null|undefined} value
+ * @returns {{ debit: number, credit: number }}
+ */
+export const splitBySign = (value) => {
+  const amount = toNumber(value);
+  if (amount >= 0) return { debit: amount, credit: 0 };
+  return { debit: 0, credit: Math.abs(amount) };
+};
+
+const pickFirstDefined = (...values) => {
+  const found = values.find((v) => v !== null && v !== undefined && v !== "");
+  return found ?? null;
+};
+
+/**
+ * Нормализует аналитику контрагента для отображения в табличном отчете
+ * @param {Object} counterparty
+ * @returns {{
+ *   openingDebit: number|null,
+ *   openingCredit: number|null,
+ *   turnoverDebit: number,
+ *   turnoverCredit: number,
+ *   closingDebit: number,
+ *   closingCredit: number
+ * }}
+ */
+export const getCounterpartyAnalyticsView = (counterparty) => {
+  const analytics = counterparty?.analytics || {};
+  const debts = analytics?.debts || {};
+  const cash = analytics?.cash || {};
+
+  const openingDebitRaw = pickFirstDefined(
+    debts?.opening_debit,
+    debts?.start_debit,
+    debts?.period_start_debit
+  );
+  const openingCreditRaw = pickFirstDefined(
+    debts?.opening_credit,
+    debts?.start_credit,
+    debts?.period_start_credit
+  );
+
+  const turnoverDebit = toNumber(cash?.received);
+  const turnoverCredit = toNumber(cash?.paid);
+
+  let closingDebit = toNumber(debts?.counterparty_owes_company);
+  let closingCredit = toNumber(debts?.company_owes_counterparty);
+
+  if (!closingDebit && !closingCredit) {
+    const byBalance = splitBySign(debts?.balance);
+    closingDebit = byBalance.debit;
+    closingCredit = byBalance.credit;
+  }
+
+  return {
+    openingDebit:
+      openingDebitRaw === null || openingDebitRaw === undefined
+        ? null
+        : toNumber(openingDebitRaw),
+    openingCredit:
+      openingCreditRaw === null || openingCreditRaw === undefined
+        ? null
+        : toNumber(openingCreditRaw),
+    turnoverDebit,
+    turnoverCredit,
+    closingDebit,
+    closingCredit,
+  };
+};
+
+/**
  * Форматирует сообщение для модального окна удаления
  * @param {number} count - Количество выбранных контрагентов
  * @returns {string} Отформатированное сообщение

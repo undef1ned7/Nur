@@ -1289,6 +1289,19 @@
   }
 }
 
+@media screen and (max-width: 992px) {
+  .market-product-form {
+    &__two-columns {
+      grid-template-columns: 1fr;
+    }
+    &__unit-row {
+      flex-wrap: wrap;
+      row-gap: 1px;
+      margin-bottom: 10px;
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .market-product-form {
     &__type-selector {
@@ -1331,5 +1344,140 @@
         width: 100%;
       }
     }
+  }
+}
+
+/* Ступени акции (ProductPromotionTier) */
+.promotion-rules-editor {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #fafafa;
+
+  &--compact {
+    padding: 12px;
+    margin-top: 12px;
+  }
+
+  &__checkbox-row {
+    margin-bottom: 12px;
+  }
+
+  &__checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #1a1a1a;
+    cursor: pointer;
+
+    input {
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  &__hint {
+    margin: 8px 0 0 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.45;
+  }
+
+  &__table-wrap {
+    margin-top: 12px;
+  }
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__add-btn {
+    padding: 6px 12px;
+    background: #ffd400;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__empty {
+    font-size: 13px;
+    color: #888;
+    margin: 0;
+  }
+
+  &__table {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 28px 1fr 1fr 1fr 32px;
+    gap: 8px;
+    align-items: center;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+      gap: 6px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+
+      &--header {
+        display: none;
+      }
+    }
+
+    &--header {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+  }
+
+  &__idx {
+    font-size: 13px;
+    color: #666;
+    text-align: center;
+  }
+
+  &__input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  &__remove {
+    background: none;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    color: #999;
+    cursor: pointer;
+    padding: 4px;
+
+    &:hover {
+      color: #e74c3c;
+    }
+  }
+
+  &__error {
+    margin-top: 8px;
   }
 }

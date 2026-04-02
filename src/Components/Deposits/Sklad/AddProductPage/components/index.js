@@ -4,4 +4,5 @@
 export { default as ProductTypeSelector } from "./ProductTypeSelector";
 export { default as ProductBasicInfo } from "./ProductBasicInfo";
 export { default as ProductImagesSection } from "./ProductImagesSection";
+export { default as PromotionRulesEditor } from "./PromotionRulesEditor";
 
