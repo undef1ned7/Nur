@@ -21,6 +21,8 @@ import { useClient } from "../../../store/slices/ClientSlice";
 import { createDeal } from "../../../store/creators/saleThunk";
 import api from "../../../api";
 import "./AddProductBarcode.scss";
+import { PromotionRulesEditor } from "./AddProductPage/components";
+import { buildPromotionRulesInput } from "./AddProductPage/utils/productUtils";
 
 // Функция для создания долга
 async function createDebt(payload) {
@@ -78,6 +80,8 @@ const AddProductBarcode = ({
   });
   const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
   const [isMarkupManuallyChanged, setIsMarkupManuallyChanged] = useState(false);
+  const [stockPromo, setStockPromo] = useState(false);
+  const [promotionRules, setPromotionRules] = useState([]);
   const [debt, setDebt] = useState("");
   const [amount, setAmount] = useState("");
   const [debtMonths, setDebtMonths] = useState("");
@@ -456,6 +460,18 @@ const AddProductBarcode = ({
         }
       }
 
+      if (stockPromo) {
+        const built = buildPromotionRulesInput(promotionRules);
+        if (built.length === 0) {
+          if (onShowErrorAlert) {
+            onShowErrorAlert(
+              "Для акционного товара добавьте хотя бы одну ступень скидки (сумма от, %).",
+            );
+          }
+          return;
+        }
+      }
+
       // Нормализуем наценку: если не заполнена, считаем её 0
       const normalizedMarkup =
         state.markup !== undefined &&
@@ -470,6 +486,10 @@ const AddProductBarcode = ({
         markup_percent: normalizedMarkup,
         plu: state.plu ? Number(state.plu) : null,
         scale_type: state.scale_type || null,
+        stock: stockPromo,
+        promotion_rules_input: stockPromo
+          ? buildPromotionRulesInput(promotionRules)
+          : [],
       };
       const result = await dispatch(
         warehouseUuid
@@ -562,6 +582,8 @@ const AddProductBarcode = ({
         plu: "",
         scale_type: "",
       });
+      setStockPromo(false);
+      setPromotionRules([]);
       setIsPriceManuallyChanged(false);
       setIsMarkupManuallyChanged(false);
       setBarcodeScan("");
@@ -625,6 +647,8 @@ const AddProductBarcode = ({
       plu: "",
       scale_type: "",
     });
+    setStockPromo(false);
+    setPromotionRules([]);
     setIsPriceManuallyChanged(false);
     setIsMarkupManuallyChanged(false);
     setBarcodeScan("");
@@ -648,6 +672,25 @@ const AddProductBarcode = ({
   // Вычисляем общую сумму
   const totalAmount =
     Number(state.quantity || 0) * Number(state.purchase_price || 0);
+
+  const handleStockPromoBarcodeChange = (checked) => {
+    setStockPromo(checked);
+    setPromotionRules((prev) => {
+      if (!checked) return [];
+      if (prev.length === 0) {
+        return [
+          {
+            id: Date.now(),
+            position: 0,
+            min_amount: "",
+            discount_percent: "",
+            promo_quantity: "",
+          },
+        ];
+      }
+      return prev;
+    });
+  };
 
   return (
     <div className="add-product-barcode">
@@ -801,6 +844,15 @@ const AddProductBarcode = ({
               <option value="weight">Весовой</option>
             </select>
           </div>
+
+          <PromotionRulesEditor
+            compact
+            stock={stockPromo}
+            onStockChange={handleStockPromoBarcodeChange}
+            tiers={promotionRules}
+            onTiersChange={setPromotionRules}
+            errorText=""
+          />
 
           {/* Переключатель долга */}
           <div className="add-product-barcode__debt-section">

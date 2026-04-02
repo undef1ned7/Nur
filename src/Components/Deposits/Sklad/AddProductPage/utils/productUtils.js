@@ -2,6 +2,70 @@
  * Утилиты для работы с товарами
  */
 
+const MAX_PROMOTION_TIERS = 30;
+
+/** Нормализация ступеней акции из API (поле promotion_rules) в состояние формы */
+export const normalizePromotionRulesFromApi = (rules) => {
+  if (!Array.isArray(rules)) return [];
+  return rules.slice(0, MAX_PROMOTION_TIERS).map((r, idx) => ({
+    id: `promo-${idx}-${r?.position ?? idx}`,
+    position: r?.position != null ? Number(r.position) : idx,
+    min_amount: r?.min_amount != null ? String(r.min_amount) : "",
+    discount_percent:
+      r?.discount_percent != null ? String(r.discount_percent) : "",
+    promo_quantity:
+      r?.promo_quantity === null || r?.promo_quantity === undefined
+        ? ""
+        : String(r.promo_quantity),
+  }));
+};
+
+/** Проверка одной строки ступени (для включения в promotion_rules_input) */
+export const isValidPromotionRow = (r) => {
+  const min = parseFloat(String(r?.min_amount ?? "").replace(",", "."));
+  const disc = parseFloat(String(r?.discount_percent ?? "").replace(",", "."));
+  if (!Number.isFinite(min) || min < 0) return false;
+  if (!Number.isFinite(disc) || disc < 0.01 || disc > 100) return false;
+  const pq = r?.promo_quantity;
+  if (pq !== "" && pq !== null && pq !== undefined && String(pq).trim() !== "") {
+    const n = Number(String(pq).replace(",", "."));
+    if (!Number.isFinite(n) || n < 1) return false;
+  }
+  return true;
+};
+
+/**
+ * Тело для API: promotion_rules_input (и совместимо promotion_rules)
+ * @param {Array} rules — строки из состояния формы
+ */
+export const buildPromotionRulesInput = (rules) => {
+  if (!Array.isArray(rules)) return [];
+  const withPos = rules.map((r, idx) => ({
+    ...r,
+    position:
+      r?.position != null && r.position !== ""
+        ? Number(r.position)
+        : idx,
+  }));
+  withPos.sort((a, b) => Number(a.position) - Number(b.position));
+  const out = [];
+  for (const r of withPos) {
+    if (!isValidPromotionRow(r)) continue;
+    const row = {
+      position: out.length,
+      min_amount: String(r.min_amount ?? "0").replace(",", "."),
+      discount_percent: String(r.discount_percent ?? "0").replace(",", "."),
+    };
+    const pq = r.promo_quantity;
+    if (pq !== "" && pq != null && String(pq).trim() !== "") {
+      row.promo_quantity = Math.floor(Number(String(pq).replace(",", ".")));
+    }
+    out.push(row);
+    if (out.length >= MAX_PROMOTION_TIERS) break;
+  }
+  return out;
+};
+
 /**
  * Формирует payload для создания/обновления товара
  * @param {Object} params - Параметры товара
@@ -113,13 +177,19 @@ export const buildProductPayload = ({
   const quantityValue =
     quantity && quantity.toString().trim() !== "" ? Number(quantity) : 0;
 
+  const stockPromotional = Boolean(marketData.stock);
+  const promotionRulesInput = stockPromotional
+    ? buildPromotionRulesInput(marketData.promotionRules || [])
+    : [];
+
   if (itemType === "product") {
     payload = {
       ...payload,
       purchase_price: (purchase_price || "0").toString(),
       markup_percent: normalizedMarkup,
       quantity: quantityValue,
-      stock: true,
+      stock: stockPromotional,
+      promotion_rules_input: promotionRulesInput,
     };
   } else if (itemType === "service") {
     payload = {
@@ -206,6 +276,23 @@ export const validateProductData = ({
     }
     if (!marketData.kitProducts || marketData.kitProducts.length === 0) {
       errors.kitProducts = "Добавьте хотя бы один товар в комплект";
+    }
+  }
+
+  if (itemType === "product" && marketData.stock) {
+    const rules = marketData.promotionRules || [];
+    const built = buildPromotionRulesInput(rules);
+    if (built.length === 0) {
+      const partial = rules.some((r) => {
+        const hasAny =
+          String(r?.min_amount ?? "").trim() ||
+          String(r?.discount_percent ?? "").trim() ||
+          String(r?.promo_quantity ?? "").trim();
+        return hasAny && !isValidPromotionRow(r);
+      });
+      errors.promotion_rules = partial
+        ? "Проверьте ступени: сумма от ≥ 0, скидка 0,01–100%, лимит шт. — целое ≥ 1 или пусто"
+        : "Для акционного товара добавьте хотя бы одну ступень скидки";
     }
   }
 

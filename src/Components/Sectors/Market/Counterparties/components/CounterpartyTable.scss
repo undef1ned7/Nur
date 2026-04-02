@@ -10,10 +10,32 @@
   border: 1px solid #f7d74f;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 
   &:hover {
     background: #f7d74f;
     color: #000;
+  }
+}
+
+.warehouse-table {
+  &__money {
+    text-align: left;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__money--strong {
+    font-weight: 600;
+  }
+
+  &__total-row {
+    td {
+      font-weight: 600;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+    }
   }
 }

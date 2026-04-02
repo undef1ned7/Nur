@@ -731,9 +731,6 @@
 
 // export default SchoolCoursesGroups;
 
-
-
-
 // проверь путь импорта api при вставке в проект
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
@@ -746,7 +743,7 @@ const GROUPS_EP = "/education/groups/";
 const STUDENTS_EP = "/education/students/";
 
 /* ===== Константы ===== */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* ===== Подписи ===== */
 const L = {
@@ -783,7 +780,11 @@ const normalizeGroup = (g = {}) => ({
 const normalizeStudent = (s = {}) => {
   const hasBool = typeof s.active === "boolean";
   const fromStatus = String(s.status ?? "").toLowerCase();
-  const isActive = hasBool ? s.active : fromStatus ? fromStatus === "active" : true;
+  const isActive = hasBool
+    ? s.active
+    : fromStatus
+      ? fromStatus === "active"
+      : true;
   return {
     id: s.id,
     name: s.name ?? "",
@@ -797,8 +798,14 @@ const toDecimalString = (v) => {
   const s = String(v ?? "").trim();
   return s ? s.replace(",", ".") : "0";
 };
-const lc = (s) => String(s || "").trim().toLowerCase();
-const normName = (s) => String(s || "").replace(/\s+/g, " ").trim();
+const lc = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
+const normName = (s) =>
+  String(s || "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const apiErr = (e, fb) => {
   const d = e?.response?.data;
@@ -831,22 +838,38 @@ const SchoolCoursesGroups = () => {
   const [activeGroupId, setActiveGroupId] = useState(null);
 
   /* confirm dialog */
-  const [confirm, setConfirm] = useState({ open: false, kind: null, id: null, name: "" });
-  const askDeleteCourse = (c) => setConfirm({ open: true, kind: "course", id: c.id, name: c.name });
-  const askDeleteGroup  = (g) => setConfirm({ open: true, kind: "group",  id: g.id, name: g.name });
-  const closeConfirm = () => setConfirm({ open: false, kind: null, id: null, name: "" });
+  const [confirm, setConfirm] = useState({
+    open: false,
+    kind: null,
+    id: null,
+    name: "",
+  });
+  const askDeleteCourse = (c) =>
+    setConfirm({ open: true, kind: "course", id: c.id, name: c.name });
+  const askDeleteGroup = (g) =>
+    setConfirm({ open: true, kind: "group", id: g.id, name: g.name });
+  const closeConfirm = () =>
+    setConfirm({ open: false, kind: null, id: null, name: "" });
 
   /* modals: course */
   const [isCourseOpen, setCourseOpen] = useState(false);
   const [courseMode, setCourseMode] = useState("create"); // 'create' | 'edit'
-  const [courseForm, setCourseForm] = useState({ id: null, name: "", price: "" });
+  const [courseForm, setCourseForm] = useState({
+    id: null,
+    name: "",
+    price: "",
+  });
   const [courseSaving, setCourseSaving] = useState(false);
   const [courseErr, setCourseErr] = useState("");
 
   /* modals: group */
   const [isGroupOpen, setGroupOpen] = useState(false);
   const [groupMode, setGroupMode] = useState("create"); // 'create' | 'edit'
-  const [groupForm, setGroupForm] = useState({ id: null, name: "", courseId: "" });
+  const [groupForm, setGroupForm] = useState({
+    id: null,
+    name: "",
+    courseId: "",
+  });
   const [groupSaving, setGroupSaving] = useState(false);
   const [groupErr, setGroupErr] = useState("");
 
@@ -880,24 +903,36 @@ const SchoolCoursesGroups = () => {
     const t = lc(query);
     if (!t) return courses;
     return courses.filter((c) =>
-      [c.name, c.price].some((v) => String(v ?? "").toLowerCase().includes(t))
+      [c.name, c.price].some((v) =>
+        String(v ?? "")
+          .toLowerCase()
+          .includes(t),
+      ),
     );
   }, [courses, query]);
 
   /* derived: courses pagination (15/стр) */
   const [cPage, setCPage] = useState(1);
-  const cTotalPages = Math.max(1, Math.ceil(filteredCourses.length / PAGE_SIZE));
+  const cTotalPages = Math.max(
+    1,
+    Math.ceil(filteredCourses.length / PAGE_SIZE),
+  );
   useEffect(() => setCPage(1), [filteredCourses.length, query]);
-  useEffect(() => { if (cPage > cTotalPages) setCPage(cTotalPages); }, [cPage, cTotalPages]);
+  useEffect(() => {
+    if (cPage > cTotalPages) setCPage(cTotalPages);
+  }, [cPage, cTotalPages]);
   const currentCourses = useMemo(() => {
     const s = (cPage - 1) * PAGE_SIZE;
     return filteredCourses.slice(s, s + PAGE_SIZE);
   }, [filteredCourses, cPage]);
   const cPagesWindow = useMemo(() => {
-    const around = 2, start = Math.max(1, cPage - around), end = Math.min(cTotalPages, cPage + around);
+    const around = 2,
+      start = Math.max(1, cPage - around),
+      end = Math.min(cTotalPages, cPage + around);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [cPage, cTotalPages]);
-  const gotoCPage = (n) => setCPage(Math.max(1, Math.min(cTotalPages, Number(n) || 1)));
+  const gotoCPage = (n) =>
+    setCPage(Math.max(1, Math.min(cTotalPages, Number(n) || 1)));
 
   /* derived: details for selected group + members pagination */
   const groupDetails = useMemo(() => {
@@ -905,7 +940,9 @@ const SchoolCoursesGroups = () => {
     const group = groups.find((g) => String(g.id) === String(activeGroupId));
     if (!group) return null;
     const course = courses.find((c) => String(c.id) === String(group.courseId));
-    const members = students.filter((s) => s.isActive && String(s.groupId) === String(activeGroupId));
+    const members = students.filter(
+      (s) => s.isActive && String(s.groupId) === String(activeGroupId),
+    );
     return { group, course, members };
   }, [activeGroupId, groups, courses, students]);
 
@@ -913,21 +950,27 @@ const SchoolCoursesGroups = () => {
   const mTotal = groupDetails?.members?.length || 0;
   const mTotalPages = Math.max(1, Math.ceil(mTotal / PAGE_SIZE));
   useEffect(() => setMPage(1), [activeGroupId, mTotal]);
-  useEffect(() => { if (mPage > mTotalPages) setMPage(mTotalPages); }, [mPage, mTotalPages]);
+  useEffect(() => {
+    if (mPage > mTotalPages) setMPage(mTotalPages);
+  }, [mPage, mTotalPages]);
   const membersPage = useMemo(() => {
     if (!groupDetails) return [];
     const s = (mPage - 1) * PAGE_SIZE;
     return groupDetails.members.slice(s, s + PAGE_SIZE);
   }, [groupDetails, mPage]);
   const mPagesWindow = useMemo(() => {
-    const around = 2, start = Math.max(1, mPage - around), end = Math.min(mTotalPages, mPage + around);
+    const around = 2,
+      start = Math.max(1, mPage - around),
+      end = Math.min(mTotalPages, mPage + around);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [mPage, mTotalPages]);
-  const gotoMPage = (n) => setMPage(Math.max(1, Math.min(mTotalPages, Number(n) || 1)));
+  const gotoMPage = (n) =>
+    setMPage(Math.max(1, Math.min(mTotalPages, Number(n) || 1)));
 
   /* counts (активных) */
   const countStudents = (groupId) =>
-    students.filter((s) => s.isActive && String(s.groupId) === String(groupId)).length;
+    students.filter((s) => s.isActive && String(s.groupId) === String(groupId))
+      .length;
 
   /* actions: course */
   const openCreateCourse = () => {
@@ -938,7 +981,11 @@ const SchoolCoursesGroups = () => {
   };
   const openEditCourse = (c) => {
     setCourseMode("edit");
-    setCourseForm({ id: c.id, name: c.name || "", price: String(c.price ?? "") });
+    setCourseForm({
+      id: c.id,
+      name: c.name || "",
+      price: String(c.price ?? ""),
+    });
     setCourseErr("");
     setCourseOpen(true);
   };
@@ -952,14 +999,20 @@ const SchoolCoursesGroups = () => {
     if (name.length < 2 || name.length > 80)
       return setCourseErr(`${L.dir.sg}: длина названия 2–80 символов`);
     if (String(courseForm.price).trim() !== "") {
-      if (!Number.isFinite(priceNum)) return setCourseErr(`${L.pricePerMonth}: некорректное число`);
-      if (priceNum < 0) return setCourseErr(`${L.pricePerMonth}: должно быть ≥ 0`);
-      if (priceNum > 1_000_000_000) return setCourseErr(`${L.pricePerMonth}: слишком большое значение`);
+      if (!Number.isFinite(priceNum))
+        return setCourseErr(`${L.pricePerMonth}: некорректное число`);
+      if (priceNum < 0)
+        return setCourseErr(`${L.pricePerMonth}: должно быть ≥ 0`);
+      if (priceNum > 1_000_000_000)
+        return setCourseErr(`${L.pricePerMonth}: слишком большое значение`);
     }
     const isDup = courses.some(
-      (c) => lc(c.name) === lc(name) && (courseMode !== "edit" || c.id !== courseForm.id)
+      (c) =>
+        lc(c.name) === lc(name) &&
+        (courseMode !== "edit" || c.id !== courseForm.id),
     );
-    if (isDup) return setCourseErr(`Дубликат: такое ${L.dir.sg.toLowerCase()} уже есть`);
+    if (isDup)
+      return setCourseErr(`Дубликат: такое ${L.dir.sg.toLowerCase()} уже есть`);
 
     const payload = { title: name, price_per_month: toDecimalString(priceNum) };
 
@@ -972,15 +1025,24 @@ const SchoolCoursesGroups = () => {
         if (created.id) setCourses((prev) => [created, ...prev]);
         else await fetchAll();
       } else {
-        const { data } = await api.put(`${COURSES_EP}${courseForm.id}/`, payload);
-        const updated = normalizeCourse(data || { id: courseForm.id, ...payload });
-        setCourses((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        const { data } = await api.put(
+          `${COURSES_EP}${courseForm.id}/`,
+          payload,
+        );
+        const updated = normalizeCourse(
+          data || { id: courseForm.id, ...payload },
+        );
+        setCourses((prev) =>
+          prev.map((x) => (x.id === updated.id ? updated : x)),
+        );
       }
       setCourseOpen(false);
       setCourseForm({ id: null, name: "", price: "" });
     } catch (err) {
       console.error(err);
-      setCourseErr(apiErr(err, `Не удалось сохранить «${L.dir.sg.toLowerCase()}»`));
+      setCourseErr(
+        apiErr(err, `Не удалось сохранить «${L.dir.sg.toLowerCase()}»`),
+      );
     } finally {
       setCourseSaving(false);
     }
@@ -992,7 +1054,8 @@ const SchoolCoursesGroups = () => {
       setCourses((prev) => prev.filter((c) => c.id !== id));
       // если открыта группа из этого направления — снять выделение
       const related = groups.filter((g) => String(g.courseId) === String(id));
-      if (related.some((g) => String(g.id) === String(activeGroupId))) setActiveGroupId(null);
+      if (related.some((g) => String(g.id) === String(activeGroupId)))
+        setActiveGroupId(null);
       // подтянуть группы заново
       const gr = await api.get(GROUPS_EP);
       setGroups(asArray(gr.data).map(normalizeGroup));
@@ -1029,11 +1092,11 @@ const SchoolCoursesGroups = () => {
       (g) =>
         lc(g.name) === lc(name) &&
         String(g.courseId) === String(courseId) &&
-        (groupMode !== "edit" || g.id !== groupForm.id)
+        (groupMode !== "edit" || g.id !== groupForm.id),
     );
     if (dup)
       return setGroupErr(
-        `Дубликат: в выбранном «${L.dir.sg.toLowerCase()}» уже есть такая ${L.grp.sg.toLowerCase()}`
+        `Дубликат: в выбранном «${L.dir.sg.toLowerCase()}» уже есть такая ${L.grp.sg.toLowerCase()}`,
       );
 
     const payload = { course: courseId, name, teacher: null };
@@ -1048,15 +1111,22 @@ const SchoolCoursesGroups = () => {
         else await fetchAll();
       } else {
         const { data } = await api.put(`${GROUPS_EP}${groupForm.id}/`, payload);
-        const updated = normalizeGroup(data || { id: groupForm.id, ...payload });
-        setGroups((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-        if (String(activeGroupId) === String(updated.id)) setActiveGroupId(updated.id);
+        const updated = normalizeGroup(
+          data || { id: groupForm.id, ...payload },
+        );
+        setGroups((prev) =>
+          prev.map((x) => (x.id === updated.id ? updated : x)),
+        );
+        if (String(activeGroupId) === String(updated.id))
+          setActiveGroupId(updated.id);
       }
       setGroupOpen(false);
       setGroupForm({ id: null, name: "", courseId: "" });
     } catch (err) {
       console.error(err);
-      setGroupErr(apiErr(err, `Не удалось сохранить «${L.grp.sg.toLowerCase()}»`));
+      setGroupErr(
+        apiErr(err, `Не удалось сохранить «${L.grp.sg.toLowerCase()}»`),
+      );
     } finally {
       setGroupSaving(false);
     }
@@ -1135,7 +1205,8 @@ const SchoolCoursesGroups = () => {
                     <div className="Schoolcourses__courseName">{c.name}</div>
                     <div className="Schoolcourses__courseRight">
                       <div className="Schoolcourses__coursePrice">
-                        {Number(c.price || 0).toLocaleString("ru-RU")} {L.pricePerMonth}
+                        {Number(c.price || 0).toLocaleString("ru-RU")}{" "}
+                        {L.pricePerMonth}
                       </div>
                       <div className="Schoolcourses__miniActions">
                         <button
@@ -1170,7 +1241,9 @@ const SchoolCoursesGroups = () => {
                             title="Детали"
                           >
                             {g.name}
-                            <span className="Schoolcourses__badge">{countStudents(g.id)}</span>
+                            <span className="Schoolcourses__badge">
+                              {countStudents(g.id)}
+                            </span>
                           </button>
                           <div className="Schoolcourses__groupActions">
                             <button
@@ -1193,7 +1266,8 @@ const SchoolCoursesGroups = () => {
                         </li>
                       ))}
 
-                    {groups.filter((g) => String(g.courseId) === String(c.id)).length === 0 && (
+                    {groups.filter((g) => String(g.courseId) === String(c.id))
+                      .length === 0 && (
                       <li className="Schoolcourses__muted">{L.noGroups}</li>
                     )}
                   </ul>
@@ -1219,7 +1293,13 @@ const SchoolCoursesGroups = () => {
                 </button>
                 {cPagesWindow[0] > 1 && (
                   <>
-                    <button type="button" className="Schoolcourses__pageBtn" onClick={() => gotoCPage(1)}>1</button>
+                    <button
+                      type="button"
+                      className="Schoolcourses__pageBtn"
+                      onClick={() => gotoCPage(1)}
+                    >
+                      1
+                    </button>
                     <span className="Schoolcourses__dots">…</span>
                   </>
                 )}
@@ -1267,7 +1347,9 @@ const SchoolCoursesGroups = () => {
             ) : (
               <div className="Schoolcourses__panel">
                 <div className="Schoolcourses__panelHead">
-                  <h3 className="Schoolcourses__panelTitle">{groupDetails.group.name}</h3>
+                  <h3 className="Schoolcourses__panelTitle">
+                    {groupDetails.group.name}
+                  </h3>
                   <p className="Schoolcourses__panelSub">
                     {L.dir.sg}: <b>{groupDetails.course?.name || "—"}</b>
                   </p>
@@ -1278,8 +1360,12 @@ const SchoolCoursesGroups = () => {
                   <ul className="Schoolcourses__members">
                     {membersPage.map((m) => (
                       <li key={m.id} className="Schoolcourses__memberItem">
-                        <span className="Schoolcourses__memberName">{m.name}</span>
-                        <span className="Schoolcourses__memberMeta">{m.status}</span>
+                        <span className="Schoolcourses__memberName">
+                          {m.name}
+                        </span>
+                        <span className="Schoolcourses__memberMeta">
+                          {m.status}
+                        </span>
                       </li>
                     ))}
                     {mTotal === 0 && (
@@ -1301,7 +1387,13 @@ const SchoolCoursesGroups = () => {
                       </button>
                       {mPagesWindow[0] > 1 && (
                         <>
-                          <button type="button" className="Schoolcourses__pageBtn" onClick={() => gotoMPage(1)}>1</button>
+                          <button
+                            type="button"
+                            className="Schoolcourses__pageBtn"
+                            onClick={() => gotoMPage(1)}
+                          >
+                            1
+                          </button>
                           <span className="Schoolcourses__dots">…</span>
                         </>
                       )}
@@ -1336,7 +1428,9 @@ const SchoolCoursesGroups = () => {
                       >
                         →
                       </button>
-                      <div className="Schoolcourses__pageInfo">Стр. {mPage}/{mTotalPages}</div>
+                      <div className="Schoolcourses__pageInfo">
+                        Стр. {mPage}/{mTotalPages}
+                      </div>
                     </div>
                   )}
 
@@ -1409,21 +1503,27 @@ const SchoolCoursesGroups = () => {
                   <input
                     className="Schoolcourses__input"
                     value={courseForm.name}
-                    onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })}
+                    onChange={(e) =>
+                      setCourseForm({ ...courseForm, name: e.target.value })
+                    }
                     placeholder={`${L.dir.sg}: например, Математика / Английский / Танцы`}
                     required
                   />
                 </div>
 
                 <div className="Schoolcourses__field">
-                  <label className="Schoolcourses__label">{L.pricePerMonth}</label>
+                  <label className="Schoolcourses__label">
+                    {L.pricePerMonth}
+                  </label>
                   <input
                     className="Schoolcourses__input"
                     type="number"
                     min="0"
                     step="1"
                     value={courseForm.price}
-                    onChange={(e) => setCourseForm({ ...courseForm, price: e.target.value })}
+                    onChange={(e) =>
+                      setCourseForm({ ...courseForm, price: e.target.value })
+                    }
                     placeholder="0"
                   />
                 </div>
@@ -1448,8 +1548,8 @@ const SchoolCoursesGroups = () => {
                     {courseSaving
                       ? "Сохранение…"
                       : courseMode === "create"
-                      ? "Сохранить"
-                      : "Сохранить изменения"}
+                        ? "Сохранить"
+                        : "Сохранить изменения"}
                   </button>
                 </div>
               </div>
@@ -1501,7 +1601,9 @@ const SchoolCoursesGroups = () => {
                   <select
                     className="Schoolcourses__input"
                     value={groupForm.courseId}
-                    onChange={(e) => setGroupForm({ ...groupForm, courseId: e.target.value })}
+                    onChange={(e) =>
+                      setGroupForm({ ...groupForm, courseId: e.target.value })
+                    }
                     required
                   >
                     <option value="">{L.choose}</option>
@@ -1515,12 +1617,15 @@ const SchoolCoursesGroups = () => {
 
                 <div className="Schoolcourses__field">
                   <label className="Schoolcourses__label">
-                    Название группы <span className="Schoolcourses__req">*</span>
+                    Название группы{" "}
+                    <span className="Schoolcourses__req">*</span>
                   </label>
                   <input
                     className="Schoolcourses__input"
                     value={groupForm.name}
-                    onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                    onChange={(e) =>
+                      setGroupForm({ ...groupForm, name: e.target.value })
+                    }
                     placeholder={`${L.grp.sg}: например, 5А / Поток 1 / Смена 2`}
                     required
                   />
@@ -1546,8 +1651,8 @@ const SchoolCoursesGroups = () => {
                     {groupSaving
                       ? "Сохранение…"
                       : groupMode === "create"
-                      ? "Сохранить"
-                      : "Сохранить изменения"}
+                        ? "Сохранить"
+                        : "Сохранить изменения"}
                   </button>
                 </div>
               </div>
@@ -1558,19 +1663,41 @@ const SchoolCoursesGroups = () => {
 
       {/* Confirm (Да/Нет) — общий для курсов/групп */}
       {confirm.open && (
-        <div className="Schoolcourses__modalOverlay" role="dialog" aria-modal="true" onClick={closeConfirm}>
-          <div className="Schoolcourses__confirm" role="document" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="Schoolcourses__modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeConfirm}
+        >
+          <div
+            className="Schoolcourses__confirm"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="Schoolcourses__confirmTitle">{L.confirmTitle}</div>
             <div className="Schoolcourses__confirmText">
-              Удалить «{confirm.name || (confirm.kind === "course" ? L.dir.sg.toLowerCase() : L.grp.sg.toLowerCase())}»?
+              Удалить «
+              {confirm.name ||
+                (confirm.kind === "course"
+                  ? L.dir.sg.toLowerCase()
+                  : L.grp.sg.toLowerCase())}
+              »?
               <br />
               {L.confirmText}
             </div>
             <div className="Schoolcourses__confirmActions">
-              <button type="button" className="Schoolcourses__btn Schoolcourses__btn--secondary" onClick={closeConfirm}>
+              <button
+                type="button"
+                className="Schoolcourses__btn Schoolcourses__btn--secondary"
+                onClick={closeConfirm}
+              >
                 {L.no}
               </button>
-              <button type="button" className="Schoolcourses__btn Schoolcourses__btn--danger" onClick={confirmYes}>
+              <button
+                type="button"
+                className="Schoolcourses__btn Schoolcourses__btn--danger"
+                onClick={confirmYes}
+              >
                 {L.yes}
               </button>
             </div>

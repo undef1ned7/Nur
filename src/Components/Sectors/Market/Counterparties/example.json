@@ -1,0 +1,20 @@
+{
+  "doc_type": "SALE",
+  "payment_kind": "cash",
+  "warehouse_from": "4cf95f0e-e72e-4621-8c4c-e5c88bafb09e",
+  "counterparty": "525cb63c-5706-4916-9786-c75680bd53d9",
+  "agent": "062ca63c-0fe5-4070-ab01-a9ef554fce1e",
+  "comment": "",
+  "discount_percent": "10.00",
+  "discount_amount": "0.00",
+  "items": [
+    {
+      "product": "e7756379-5e6f-4b44-806e-3db62c6984af",
+      "qty": "3",
+      "price": "1450.02",
+      "discount_percent": "0.00",
+      "discount_amount": "0.00",
+      "line_total": "4350.06"
+    }
+  ]
+}

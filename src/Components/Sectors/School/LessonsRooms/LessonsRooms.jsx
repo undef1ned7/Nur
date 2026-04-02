@@ -811,8 +811,6 @@
 
 // export default LessonsRooms;
 
-
-
 // src/components/Education/LessonsRooms.jsx
 // проверь путь импорта api при вставке в проект
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -830,15 +828,15 @@ import "./LessonsRooms.scss";
 import api from "../../../../api";
 
 /* ===== endpoints ===== */
-const LESSONS_EP   = "/education/lessons/";
-const COURSES_EP   = "/education/courses/";
-const GROUPS_EP    = "/education/groups/";
-const STUDENTS_EP  = "/education/students/";
+const LESSONS_EP = "/education/lessons/";
+const COURSES_EP = "/education/courses/";
+const GROUPS_EP = "/education/groups/";
+const STUDENTS_EP = "/education/students/";
 const EMPLOYEES_EP = "/users/employees/";
-const LESSON_ATT   = (id) => `/education/lessons/${id}/attendance/`;
+const LESSON_ATT = (id) => `/education/lessons/${id}/attendance/`;
 
 /* ===== constants ===== */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* ===== helpers ===== */
 const asArray = (data) =>
@@ -853,7 +851,9 @@ const apiErr = (e, fb = "Ошибка запроса.") => {
       const k = Object.keys(d)[0];
       const v = Array.isArray(d[k]) ? d[k][0] : d[k];
       return String(v || fb);
-    } catch { return fb; }
+    } catch {
+      return fb;
+    }
   }
   return fb;
 };
@@ -876,7 +876,9 @@ const listFromAttendance = (res) => {
 
 const toMin = (t) => {
   if (!t) return 0;
-  const [h, m] = String(t).split(":").map((n) => parseInt(n || "0", 10));
+  const [h, m] = String(t)
+    .split(":")
+    .map((n) => parseInt(n || "0", 10));
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 };
 const overlap = (aS, aD, bS, bD) => aS < bS + bD && bS < aS + aD;
@@ -895,7 +897,11 @@ const normalizeGroup = (g = {}) => ({
 const normalizeStudent = (s = {}) => {
   const hasBool = typeof s.active === "boolean";
   const statusStr = String(s.status ?? "").toLowerCase();
-  const isActive = hasBool ? s.active : statusStr ? statusStr === "active" : true;
+  const isActive = hasBool
+    ? s.active
+    : statusStr
+      ? statusStr === "active"
+      : true;
   return {
     id: s.id,
     name: s.name ?? "",
@@ -907,8 +913,8 @@ const normalizeStudent = (s = {}) => {
 
 const normalizeEmployee = (e = {}) => {
   const first = String(e.first_name || "").trim();
-  const last  = String(e.last_name  || "").trim();
-  const full  = `${first} ${last}`.trim();
+  const last = String(e.last_name || "").trim();
+  const full = `${first} ${last}`.trim();
   return { id: e.id, name: full || e.email || "—" };
 };
 
@@ -928,11 +934,11 @@ const normalizeLesson = (l = {}) => ({
 /* ===== component ===== */
 const LessonsRooms = () => {
   /* server data */
-  const [courses, setCourses]     = useState([]);
-  const [groups, setGroups]       = useState([]);
-  const [students, setStudents]   = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [students, setStudents] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [lessons, setLessons]     = useState([]);
+  const [lessons, setLessons] = useState([]);
 
   /* ui */
   const [query, setQuery] = useState("");
@@ -982,7 +988,9 @@ const LessonsRooms = () => {
       setError("Не удалось загрузить данные.");
     }
   }, []);
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   /* search + date filters */
   const filtered = useMemo(() => {
@@ -995,14 +1003,18 @@ const LessonsRooms = () => {
           ? true
           : [r.courseName, r.groupName, r.teacher, r.time, r.date]
               .filter(Boolean)
-              .some((v) => String(v).toLowerCase().includes(t))
+              .some((v) => String(v).toLowerCase().includes(t)),
       );
   }, [lessons, query, dateFrom, dateTo]);
 
   /* paginate */
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
-  useEffect(() => { setPage(1); }, [query, dateFrom, dateTo, filtered.length]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  useEffect(() => {
+    setPage(1);
+  }, [query, dateFrom, dateTo, filtered.length]);
   const pageWindow = useMemo(() => {
     const around = 2;
     const start = Math.max(1, page - around);
@@ -1029,7 +1041,8 @@ const LessonsRooms = () => {
   };
   const [form, setForm] = useState(emptyForm);
 
-  const findGroup = (gid) => groups.find((g) => String(g.id) === String(gid)) || null;
+  const findGroup = (gid) =>
+    groups.find((g) => String(g.id) === String(gid)) || null;
 
   const openCreate = () => {
     setMode("create");
@@ -1063,14 +1076,18 @@ const LessonsRooms = () => {
 
   /* занятость преподавателей */
   const busyTeacherIds = useMemo(() => {
-    if (!form.date || !isTimeStr(form.time) || !Number(form.duration)) return new Set();
+    if (!form.date || !isTimeStr(form.time) || !Number(form.duration))
+      return new Set();
     const s = toMin(form.time);
     const d = Number(form.duration);
     const busy = new Set();
     lessons.forEach((x) => {
       if (String(x.id) === String(editingId)) return;
       if (x.date !== form.date) return;
-      if (overlap(toMin(x.time), Number(x.duration || 0), s, d) && x.teacherId) {
+      if (
+        overlap(toMin(x.time), Number(x.duration || 0), s, d) &&
+        x.teacherId
+      ) {
         busy.add(String(x.teacherId));
       }
     });
@@ -1078,7 +1095,13 @@ const LessonsRooms = () => {
   }, [lessons, form.date, form.time, form.duration, editingId]);
 
   const groupOverlapNow = useMemo(() => {
-    if (!form.groupId || !form.date || !isTimeStr(form.time) || !Number(form.duration)) return false;
+    if (
+      !form.groupId ||
+      !form.date ||
+      !isTimeStr(form.time) ||
+      !Number(form.duration)
+    )
+      return false;
     const s = toMin(form.time);
     const d = Number(form.duration);
     return lessons.some(
@@ -1086,7 +1109,7 @@ const LessonsRooms = () => {
         String(x.id) !== String(editingId) &&
         x.date === form.date &&
         String(x.groupId) === String(form.groupId) &&
-        overlap(toMin(x.time), Number(x.duration || 0), s, d)
+        overlap(toMin(x.time), Number(x.duration || 0), s, d),
     );
   }, [lessons, form, editingId]);
 
@@ -1097,7 +1120,7 @@ const LessonsRooms = () => {
         (!excludeId || String(x.id) !== String(excludeId)) &&
         String(x.groupId) === String(c.groupId) &&
         x.date === c.date &&
-        x.time === c.time
+        x.time === c.time,
     );
 
   const hasGroupOverlap = (c, excludeId = null) => {
@@ -1108,7 +1131,7 @@ const LessonsRooms = () => {
         (!excludeId || String(x.id) !== String(excludeId)) &&
         x.date === c.date &&
         String(x.groupId) === String(c.groupId) &&
-        overlap(toMin(x.time), Number(x.duration || 0), cS, cD)
+        overlap(toMin(x.time), Number(x.duration || 0), cS, cD),
     );
   };
 
@@ -1121,7 +1144,7 @@ const LessonsRooms = () => {
         (!excludeId || String(x.id) !== String(excludeId)) &&
         x.date === c.date &&
         String(x.teacherId || "") === String(c.teacherId || "") &&
-        overlap(toMin(x.time), Number(x.duration || 0), cS, cD)
+        overlap(toMin(x.time), Number(x.duration || 0), cS, cD),
     );
   };
 
@@ -1142,7 +1165,8 @@ const LessonsRooms = () => {
 
     if (!form.groupId) return setError("Выберите группу.");
     if (!form.date) return setError("Укажите дату.");
-    if (!isTimeStr(form.time)) return setError("Укажите корректное время (ЧЧ:ММ).");
+    if (!isTimeStr(form.time))
+      return setError("Укажите корректное время (ЧЧ:ММ).");
     const dur = Number(form.duration ?? 0);
     if (!Number.isFinite(dur) || dur <= 0 || dur > 1440)
       return setError("Длительность должна быть от 1 до 1440 минут.");
@@ -1156,14 +1180,18 @@ const LessonsRooms = () => {
       id: editingId || "tmp",
       courseId: form.courseId || g?.courseId || "",
       courseName:
-        courses.find((c) => String(c.id) === String(form.courseId || g?.courseId))?.name || "",
+        courses.find(
+          (c) => String(c.id) === String(form.courseId || g?.courseId),
+        )?.name || "",
       groupId: form.groupId,
       groupName: g?.name || "",
       date: form.date,
       time: form.time,
       duration: dur,
       teacherId: form.teacherId || "",
-      teacher: employees.find((t) => String(t.id) === String(form.teacherId))?.name || "",
+      teacher:
+        employees.find((t) => String(t.id) === String(form.teacherId))?.name ||
+        "",
     };
 
     if (hasExactDuplicate(candidate, mode === "edit" ? editingId : null)) {
@@ -1208,7 +1236,14 @@ const LessonsRooms = () => {
       closeModal();
     } catch (err) {
       console.error(err);
-      setError(apiErr(err, mode === "create" ? "Не удалось создать занятие." : "Не удалось обновить занятие."));
+      setError(
+        apiErr(
+          err,
+          mode === "create"
+            ? "Не удалось создать занятие."
+            : "Не удалось обновить занятие.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -1226,7 +1261,9 @@ const LessonsRooms = () => {
       setError("Не удалось удалить занятие.");
     } finally {
       setDeletingIds((prev) => {
-        const n = new Set(prev); n.delete(id); return n;
+        const n = new Set(prev);
+        n.delete(id);
+        return n;
       });
     }
   };
@@ -1260,7 +1297,11 @@ const LessonsRooms = () => {
       console.error(e);
       setError("Не удалось загрузить посещаемость.");
     } finally {
-      setAttLoading((prev) => { const n = new Set(prev); n.delete(lessonId); return n; });
+      setAttLoading((prev) => {
+        const n = new Set(prev);
+        n.delete(lessonId);
+        return n;
+      });
     }
   };
 
@@ -1269,7 +1310,10 @@ const LessonsRooms = () => {
     setAtt((prev) => {
       const cur = prev[lid] || {};
       const curItem = cur[sid] || { present: false, note: "" };
-      return { ...prev, [lid]: { ...cur, [sid]: { ...curItem, present: !curItem.present } } };
+      return {
+        ...prev,
+        [lid]: { ...cur, [sid]: { ...curItem, present: !curItem.present } },
+      };
     });
   };
 
@@ -1284,15 +1328,28 @@ const LessonsRooms = () => {
     setAttSaving((p) => new Set(p).add(lid));
     setError("");
     try {
-      try { await api.put(LESSON_ATT(lid), { items }); }
-      catch { try { await api.put(LESSON_ATT(lid), { attendances: items }); }
-      catch { try { await api.put(LESSON_ATT(lid), { lesson: lid, items }); }
-      catch { await api.put(LESSON_ATT(lid), items); }}}
+      try {
+        await api.put(LESSON_ATT(lid), { items });
+      } catch {
+        try {
+          await api.put(LESSON_ATT(lid), { attendances: items });
+        } catch {
+          try {
+            await api.put(LESSON_ATT(lid), { lesson: lid, items });
+          } catch {
+            await api.put(LESSON_ATT(lid), items);
+          }
+        }
+      }
     } catch (e) {
       console.error(e);
       setError(apiErr(e, "Не удалось сохранить посещаемость."));
     } finally {
-      setAttSaving((prev) => { const n = new Set(prev); n.delete(lid); return n; });
+      setAttSaving((prev) => {
+        const n = new Set(prev);
+        n.delete(lid);
+        return n;
+      });
     }
   };
 
@@ -1366,7 +1423,10 @@ const LessonsRooms = () => {
                     <p className="Schoollessons__name">
                       {r.groupName || "Группа"}
                       {r.courseName ? (
-                        <span className="Schoollessons__muted"> · {r.courseName}</span>
+                        <span className="Schoollessons__muted">
+                          {" "}
+                          · {r.courseName}
+                        </span>
                       ) : null}
                     </p>
                     <span className="Schoollessons__time" title="Дата и время">
@@ -1380,7 +1440,9 @@ const LessonsRooms = () => {
 
                   <div className="Schoollessons__meta">
                     <span>Преподаватель: {r.teacher || "—"}</span>
-                    {Number(r.duration) ? <span> • {r.duration} мин</span> : null}
+                    {Number(r.duration) ? (
+                      <span> • {r.duration} мин</span>
+                    ) : null}
                   </div>
 
                   <details
@@ -1428,7 +1490,9 @@ const LessonsRooms = () => {
                               onClick={() => saveAttendance(r)}
                               disabled={isSavingAtt}
                             >
-                              {isSavingAtt ? "Сохранение…" : "Сохранить посещаемость"}
+                              {isSavingAtt
+                                ? "Сохранение…"
+                                : "Сохранить посещаемость"}
                             </button>
                           </div>
                         )}
@@ -1468,7 +1532,11 @@ const LessonsRooms = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="Schoollessons__pagination" role="navigation" aria-label="Пагинация">
+        <div
+          className="Schoollessons__pagination"
+          role="navigation"
+          aria-label="Пагинация"
+        >
           <button
             type="button"
             className="Schoollessons__pageBtn"
@@ -1481,7 +1549,13 @@ const LessonsRooms = () => {
 
           {pageWindow[0] > 1 && (
             <>
-              <button type="button" className="Schoollessons__pageBtn" onClick={() => setPage(1)}>1</button>
+              <button
+                type="button"
+                className="Schoollessons__pageBtn"
+                onClick={() => setPage(1)}
+              >
+                1
+              </button>
               <span className="Schoollessons__dots">…</span>
             </>
           )}
@@ -1500,7 +1574,11 @@ const LessonsRooms = () => {
           {pageWindow[pageWindow.length - 1] < totalPages && (
             <>
               <span className="Schoollessons__dots">…</span>
-              <button type="button" className="Schoollessons__pageBtn" onClick={() => setPage(totalPages)}>
+              <button
+                type="button"
+                className="Schoollessons__pageBtn"
+                onClick={() => setPage(totalPages)}
+              >
                 {totalPages}
               </button>
             </>
@@ -1517,14 +1595,19 @@ const LessonsRooms = () => {
           </button>
 
           <div className="Schoollessons__pageInfo">
-            Стр. {page}/{totalPages} • Показано {paged.length} из {filtered.length}
+            Стр. {page}/{totalPages} • Показано {paged.length} из{" "}
+            {filtered.length}
           </div>
         </div>
       )}
 
       {/* Modal */}
       {isModal && (
-        <div className="Schoollessons__modalOverlay" role="dialog" aria-modal="true">
+        <div
+          className="Schoollessons__modalOverlay"
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="Schoollessons__modal" role="document">
             <div className="Schoollessons__modalHeader">
               <h3 className="Schoollessons__modalTitle">
@@ -1550,7 +1633,9 @@ const LessonsRooms = () => {
                   >
                     <option value="">— любой/не указан —</option>
                     {courses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1568,10 +1653,14 @@ const LessonsRooms = () => {
                     <option value="">— выберите —</option>
                     {groups
                       .filter((g) =>
-                        form.courseId ? String(g.courseId) === String(form.courseId) : true
+                        form.courseId
+                          ? String(g.courseId) === String(form.courseId)
+                          : true,
                       )
                       .map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
                       ))}
                   </select>
                 </div>
@@ -1607,27 +1696,36 @@ const LessonsRooms = () => {
                   <select
                     className="Schoollessons__input"
                     value={form.teacherId}
-                    onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, teacherId: e.target.value })
+                    }
                   >
                     <option value="">— не указан —</option>
                     {employees.map((t) => {
                       const disabled = busyTeacherIds.has(String(t.id));
                       return (
                         <option key={t.id} value={t.id} disabled={disabled}>
-                          {t.name}{disabled ? " (занят)" : ""}
+                          {t.name}
+                          {disabled ? " (занят)" : ""}
                         </option>
                       );
                     })}
                   </select>
-                  {form.teacherId && busyTeacherIds.has(String(form.teacherId)) && (
-                    <div className="Schoollessons__alert" style={{ marginTop: 6 }}>
-                      Преподаватель занят в выбранное время.
-                    </div>
-                  )}
+                  {form.teacherId &&
+                    busyTeacherIds.has(String(form.teacherId)) && (
+                      <div
+                        className="Schoollessons__alert"
+                        style={{ marginTop: 6 }}
+                      >
+                        Преподаватель занят в выбранное время.
+                      </div>
+                    )}
                 </div>
 
                 <div className="Schoollessons__field">
-                  <label className="Schoollessons__label">Длительность (мин)</label>
+                  <label className="Schoollessons__label">
+                    Длительность (мин)
+                  </label>
                   <input
                     className="Schoollessons__input"
                     type="number"
@@ -1635,7 +1733,12 @@ const LessonsRooms = () => {
                     max="1440"
                     step="1"
                     value={form.duration}
-                    onChange={(e) => setForm({ ...form, duration: Number(e.target.value || 0) })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        duration: Number(e.target.value || 0),
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -1663,15 +1766,20 @@ const LessonsRooms = () => {
                     disabled={saving}
                   >
                     {saving
-                      ? mode === "create" ? "Сохранение…" : "Обновление…"
-                      : mode === "create" ? "Сохранить" : "Сохранить изменения"}
+                      ? mode === "create"
+                        ? "Сохранение…"
+                        : "Обновление…"
+                      : mode === "create"
+                        ? "Сохранить"
+                        : "Сохранить изменения"}
                   </button>
                 </div>
               </div>
             </form>
 
             <div className="Schoollessons__hint">
-              Проверяются дубликаты и перекрытия по группе, занятость преподавателя и согласованность курс⇄группа.
+              Проверяются дубликаты и перекрытия по группе, занятость
+              преподавателя и согласованность курс⇄группа.
             </div>
           </div>
         </div>
@@ -1679,17 +1787,34 @@ const LessonsRooms = () => {
 
       {/* Confirm */}
       {confirm.open && (
-        <div className="Schoollessons__modalOverlay" role="dialog" aria-modal="true" onClick={closeConfirm}>
-          <div className="Schoollessons__confirm" role="document" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="Schoollessons__modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeConfirm}
+        >
+          <div
+            className="Schoollessons__confirm"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="Schoollessons__confirmTitle">Подтверждение</div>
             <div className="Schoollessons__confirmText">
               Удалить занятие «{confirm.name}»? Действие необратимо.
             </div>
             <div className="Schoollessons__confirmActions">
-              <button type="button" className="Schoollessons__btn Schoollessons__btn--secondary" onClick={closeConfirm}>
+              <button
+                type="button"
+                className="Schoollessons__btn Schoollessons__btn--secondary"
+                onClick={closeConfirm}
+              >
                 Нет
               </button>
-              <button type="button" className="Schoollessons__btn Schoollessons__btn--danger" onClick={confirmYes}>
+              <button
+                type="button"
+                className="Schoollessons__btn Schoollessons__btn--danger"
+                onClick={confirmYes}
+              >
                 Да
               </button>
             </div>

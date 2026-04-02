@@ -47,6 +47,7 @@ import {
   ProductTypeSelector,
   ProductBasicInfo,
   ProductImagesSection,
+  PromotionRulesEditor,
 } from "./AddProductPage/components";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
@@ -113,6 +114,8 @@ const AddProductPage = () => {
     kitProducts: [], // Для комплекта
     kitSearchTerm: "",
     packagings: [], // Список упаковок
+    stock: false, // Акционный товар (поле stock в API)
+    promotionRules: [], // Ступени скидки → promotion_rules_input
   });
 
   // Для поиска товаров в комплекте - используем хук
@@ -134,6 +137,27 @@ const AddProductPage = () => {
   // Объявляем ДО использования в useEffect
   const handleMarketDataChange = useCallback((field, value) => {
     setMarketData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handlePromotionStockChange = useCallback((checked) => {
+    setMarketData((prev) => ({
+      ...prev,
+      stock: checked,
+      promotionRules:
+        checked && (!prev.promotionRules || prev.promotionRules.length === 0)
+          ? [
+              {
+                id: Date.now(),
+                position: 0,
+                min_amount: "",
+                discount_percent: "",
+                promo_quantity: "",
+              },
+            ]
+          : checked
+            ? prev.promotionRules
+            : [],
+    }));
   }, []);
 
   // Синхронизируем с marketData
@@ -255,7 +279,7 @@ const AddProductPage = () => {
     // Оптимизация: загружаем только необходимое количество товаров
     dispatch(fetchProductsAsync({ page_size: 100 }));
   }, [dispatch]);
-  console.log(cashData);
+  // console.log(cashData);
 
   // Загрузка данных товара для редактирования
   useEffect(() => {
@@ -324,6 +348,10 @@ const AddProductPage = () => {
               name: pkg.name || "",
               quantity: String(pkg.quantity_in_package || 1),
             })),
+            stock: Boolean(product.stock),
+            promotionRules: utils.normalizePromotionRulesFromApi(
+              product.promotion_rules || [],
+            ),
           });
 
           // Загружаем изображения используя хук
@@ -337,7 +365,7 @@ const AddProductPage = () => {
             }));
             setImages(loadedImages);
             setInitialProductImageIds(
-              product.images.map((img) => img.id).filter(Boolean)
+              product.images.map((img) => img.id).filter(Boolean),
             );
           } else {
             setInitialProductImageIds([]);
@@ -350,12 +378,11 @@ const AddProductPage = () => {
           }
         } catch (error) {
           console.error("Ошибка при загрузке товара:", error);
-          const errorMessage = validateResErrors(error, "Ошибка при загрузке товара. ")
-          showAlert(
-            errorMessage,
-            "error",
-            "Ошибка"
+          const errorMessage = validateResErrors(
+            error,
+            "Ошибка при загрузке товара. ",
           );
+          showAlert(errorMessage, "error", "Ошибка");
         } finally {
           setLoadingProduct(false);
         }
@@ -430,6 +457,10 @@ const AddProductPage = () => {
           name: pkg.name || "",
           quantity: String(pkg.quantity_in_package || 1),
         })),
+        stock: Boolean(product.stock),
+        promotionRules: utils.normalizePromotionRulesFromApi(
+          product.promotion_rules || [],
+        ),
       });
 
       // Загружаем изображения (копируем ссылки, но не файлы); для нового товара не храним id для удаления
@@ -500,8 +531,8 @@ const AddProductPage = () => {
         name === "scale_type"
           ? value
           : prevData.scale_type || productType === "piece"
-          ? "piece"
-          : "weight",
+            ? "piece"
+            : "weight",
     }));
   };
 
@@ -566,7 +597,7 @@ const AddProductPage = () => {
         quantity,
         debtState,
       },
-      company
+      company,
     );
 
     if (Object.keys(debtErrors).length > 0) {
@@ -591,7 +622,7 @@ const AddProductPage = () => {
           updateProductAsync({
             productId,
             updatedData: payload,
-          })
+          }),
         ).unwrap();
       } else {
         // Режим создания
@@ -614,15 +645,15 @@ const AddProductPage = () => {
           if (isEditMode && initialProductImageIds.length > 0) {
             const currentIds = images.filter((im) => im.id).map((im) => im.id);
             const removedIds = initialProductImageIds.filter(
-              (id) => !currentIds.includes(id)
+              (id) => !currentIds.includes(id),
             );
             if (removedIds.length > 0) {
               await Promise.allSettled(
                 removedIds.map((imageId) =>
                   api.delete(
-                    `/main/products/${targetProductId}/images/${imageId}/`
-                  )
-                )
+                    `/main/products/${targetProductId}/images/${imageId}/`,
+                  ),
+                ),
               );
             }
           }
@@ -640,7 +671,7 @@ const AddProductPage = () => {
                   fd,
                   {
                     headers: { "Content-Type": "multipart/form-data" },
-                  }
+                  },
                 );
               });
               if (uploads.length) await Promise.allSettled(uploads);
@@ -671,7 +702,7 @@ const AddProductPage = () => {
             statusRu: debt,
             amount: totalAmount,
             debtMonths: Number(debtMonths),
-          })
+          }),
         ).unwrap();
       }
 
@@ -684,7 +715,7 @@ const AddProductPage = () => {
             amount: totalAmount,
             prepayment: Number(amount),
             debtMonths: Number(debtMonths),
-          })
+          }),
         ).unwrap();
       }
 
@@ -716,7 +747,7 @@ const AddProductPage = () => {
                   company?.subscription_plan?.name === "Старт"
                     ? "approved"
                     : "pending",
-              })
+              }),
             ).unwrap();
           } catch (cashError) {
             console.warn("Ошибка при создании денежного потока:", cashError);
@@ -739,7 +770,7 @@ const AddProductPage = () => {
             title: newItemData?.name,
             statusRu: "Продажа",
             amount: totalAmount,
-          })
+          }),
         ).unwrap();
       }
 
@@ -756,19 +787,18 @@ const AddProductPage = () => {
       showAlert(
         isEditMode ? "Товар успешно обновлен!" : "Товар успешно добавлен!",
         "success",
-        "Успех"
+        "Успех",
       );
       setTimeout(() => {
         navigate("/crm/sklad");
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
-      const errorMessage = validateResErrors(err, "Ошибка при добавлении товара. ")
-      showAlert(
-        errorMessage,
-        "error",
-        "Ошибка"
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при добавлении товара. ",
       );
+      showAlert(errorMessage, "error", "Ошибка");
     }
   };
 
@@ -804,7 +834,7 @@ const AddProductPage = () => {
       showAlert(
         `Ошибка при создании поставщика: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -817,7 +847,7 @@ const AddProductPage = () => {
     }
     try {
       const brand = await dispatch(
-        createBrandAsync({ name: newBrand.name.trim() })
+        createBrandAsync({ name: newBrand.name.trim() }),
       ).unwrap();
       dispatch(fetchBrandsAsync());
       setShowBrandInputs(false);
@@ -833,7 +863,7 @@ const AddProductPage = () => {
       showAlert(
         `Ошибка при создании бренда: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -846,7 +876,7 @@ const AddProductPage = () => {
     }
     try {
       const category = await dispatch(
-        createCategoryAsync({ name: newCategory.name.trim() })
+        createCategoryAsync({ name: newCategory.name.trim() }),
       ).unwrap();
       dispatch(fetchCategoriesAsync());
       setShowCategoryInputs(false);
@@ -862,7 +892,7 @@ const AddProductPage = () => {
       showAlert(
         `Ошибка при создании категории: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -1036,7 +1066,7 @@ const AddProductPage = () => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
                     "success",
-                    "Успех"
+                    "Успех",
                   );
                   setTimeout(() => {
                     navigate("/crm/sklad");
@@ -1060,6 +1090,7 @@ const AddProductPage = () => {
               setNewItemData={setNewItemData}
               marketData={marketData}
               handleMarketDataChange={handleMarketDataChange}
+              handlePromotionStockChange={handlePromotionStockChange}
               handleChange={handleChange}
               brands={brands || []}
               categories={categories || []}
@@ -1713,6 +1744,7 @@ const MarketProductForm = ({
   setNewItemData,
   marketData,
   handleMarketDataChange,
+  handlePromotionStockChange,
   handleChange,
   brands,
   categories,
@@ -1810,7 +1842,7 @@ const MarketProductForm = ({
   const handleUpdatePackaging = (id, field, value) => {
     const currentPackagings = marketData.packagings || [];
     const updatedPackagings = currentPackagings.map((p) =>
-      p.id === id ? { ...p, [field]: value } : p
+      p.id === id ? { ...p, [field]: value } : p,
     );
     handleMarketDataChange("packagings", updatedPackagings);
   };
@@ -1820,7 +1852,7 @@ const MarketProductForm = ({
     const currentPackagings = marketData.packagings || [];
     handleMarketDataChange(
       "packagings",
-      currentPackagings.filter((p) => p.id !== id)
+      currentPackagings.filter((p) => p.id !== id),
     );
   };
 
@@ -1831,7 +1863,7 @@ const MarketProductForm = ({
     }
     const searchLower = countrySearchTerm.toLowerCase();
     return countries.filter((country) =>
-      country.name.toLowerCase().includes(searchLower)
+      country.name.toLowerCase().includes(searchLower),
     );
   }, [countrySearchTerm]);
 
@@ -2126,7 +2158,7 @@ const MarketProductForm = ({
                       itemType === "product"
                         ? "isWeightProduct"
                         : "isFractionalService",
-                      e.target.checked
+                      e.target.checked,
                     )
                   }
                 />
@@ -2158,7 +2190,7 @@ const MarketProductForm = ({
                         handleUpdatePackaging(
                           packaging.id,
                           "name",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                     />
@@ -2176,7 +2208,7 @@ const MarketProductForm = ({
                           handleUpdatePackaging(
                             packaging.id,
                             "quantity",
-                            e.target.value
+                            e.target.value,
                           )
                         }
                       />
@@ -2218,6 +2250,21 @@ const MarketProductForm = ({
 
         {/* Список упаковок */}
       </div>
+
+      {itemType === "product" && (
+        <div className="market-product-form__section">
+          <h3 className="market-product-form__section-title">Акция</h3>
+          <PromotionRulesEditor
+            stock={marketData.stock}
+            onStockChange={handlePromotionStockChange}
+            tiers={marketData.promotionRules || []}
+            onTiersChange={(next) =>
+              handleMarketDataChange("promotionRules", next)
+            }
+            errorText={fieldErrors.promotion_rules}
+          />
+        </div>
+      )}
 
       {/* Добавить PLU код - показывается для весового товара или дробной услуги */}
       {((itemType === "product" && marketData.isWeightProduct) ||
@@ -2869,7 +2916,7 @@ const MarketProductForm = ({
                         onChange={(e) =>
                           handleUpdateKitProductQuantity(
                             product.id,
-                            e.target.value
+                            e.target.value,
                           )
                         }
                       />
@@ -2980,8 +3027,8 @@ const MarketProductForm = ({
               ? "Сохранение..."
               : "Создание..."
             : isEditMode
-            ? "Сохранить изменения"
-            : "Создать товар"}
+              ? "Сохранить изменения"
+              : "Создать товар"}
         </button>
       </div>
     </div>

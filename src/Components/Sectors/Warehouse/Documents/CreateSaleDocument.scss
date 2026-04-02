@@ -200,6 +200,37 @@ $due-red: #dc2626;
       background: #e0f2fe;
       border-color: #7dd3fc;
     }
+
+    &--zero-qty {
+      box-shadow: inset 3px 0 0 0 #fb923c;
+      background: #fffbeb;
+
+      .create-sale-document__group-product-name {
+        color: #9a3412;
+      }
+
+      .create-sale-document__group-product-stock {
+        color: #c2410c;
+        font-weight: 700;
+      }
+
+      &:hover {
+        background: #fef3c7;
+      }
+
+      &.active {
+        background: #e0f2fe;
+        box-shadow: inset 3px 0 0 0 #fb923c;
+
+        .create-sale-document__group-product-name {
+          color: #0f172a;
+        }
+
+        .create-sale-document__group-product-stock {
+          color: #c2410c;
+        }
+      }
+    }
   }
 
   &__group-children {

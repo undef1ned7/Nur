@@ -1,10 +1,22 @@
 // src/.../OrdersParts.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaChevronDown, FaClipboardList, FaPlus, FaSearch, FaTimes } from "react-icons/fa";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  FaChevronDown,
+  FaClipboardList,
+  FaPlus,
+  FaSearch,
+  FaTimes,
+} from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import api from "../../../../../api";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* =========================================================
    SearchSelect — один открытый и закрывается после выбора
@@ -32,7 +44,7 @@ export const SearchSelect = ({
 
   const selected = useMemo(
     () => options.find((o) => String(o.value) === String(value)) || null,
-    [options, value]
+    [options, value],
   );
 
   const filtered = useMemo(() => {
@@ -125,12 +137,16 @@ export const SearchSelect = ({
   const shownValue = open ? q : selected?.label || "";
 
   return (
-    <div ref={rootRef} className={`cafeOrdersSselect ${open ? "cafeOrdersSselect--open" : ""}`}>
+    <div
+      ref={rootRef}
+      className={`cafeOrdersSselect ${open ? "cafeOrdersSselect--open" : ""}`}
+    >
       {label ? <div className="cafeOrdersSselect__label">{label}</div> : null}
 
       <div
-        className={`cafeOrdersSselect__control ${open ? "cafeOrdersSselect__control--open" : ""} ${disabled ? "cafeOrdersSselect__control--disabled" : ""
-          }`}
+        className={`cafeOrdersSselect__control ${open ? "cafeOrdersSselect__control--open" : ""} ${
+          disabled ? "cafeOrdersSselect__control--disabled" : ""
+        }`}
         onMouseDown={(e) => {
           if (disabled) return;
           e.preventDefault();
@@ -197,12 +213,16 @@ export const SearchSelect = ({
                       }}
                       title={opt.label}
                     >
-                      <span className="cafeOrdersSselect__itemLabel">{opt.label}</span>
+                      <span className="cafeOrdersSselect__itemLabel">
+                        {opt.label}
+                      </span>
                     </button>
                   );
                 })
               ) : (
-                <div className="cafeOrdersSselect__empty">Ничего не найдено</div>
+                <div className="cafeOrdersSselect__empty">
+                  Ничего не найдено
+                </div>
               )}
             </div>
           </div>
@@ -230,10 +250,13 @@ export const RightMenuPanel = ({
   onPageChange,
   cartItems,
   selectedCategoryFilter,
-  setSelectedCategoryFilter
+  setSelectedCategoryFilter,
 }) => {
   const [q, setQ] = useState("");
-  const isCart = useCallback((id) => cartItems.find(el => el.menu_item == id), [cartItems])
+  const isCart = useCallback(
+    (id) => cartItems.find((el) => el.menu_item == id),
+    [cartItems],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const searchTimeoutRef = useRef(null);
 
@@ -260,7 +283,7 @@ export const RightMenuPanel = ({
     const baseOptions = (Array.isArray(categories) ? categories : [])
       .map((cat) => ({
         value: String(cat.id),
-        label: (cat.title),
+        label: cat.title,
       }))
       .filter((opt) => opt.value && opt.label);
 
@@ -309,7 +332,7 @@ export const RightMenuPanel = ({
   // Пагинация - всегда используем данные с сервера
   const totalPages = useMemo(() => {
     // Если есть объект с пагинацией, используем count
-    if (menuItems?.count && typeof menuItems.count === 'number') {
+    if (menuItems?.count && typeof menuItems.count === "number") {
       return Math.ceil(menuItems.count / PAGE_SIZE);
     }
 
@@ -323,20 +346,23 @@ export const RightMenuPanel = ({
   const hasNextPage = currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
 
-  const handlePageChange = useCallback((newPage) => {
-    if (newPage < 1 || newPage > totalPages) return;
+  const handlePageChange = useCallback(
+    (newPage) => {
+      if (newPage < 1 || newPage > totalPages) return;
 
-    // Вызываем переданную функцию пагинации с текущим поисковым запросом
-    if (onPageChange) {
-      onPageChange(newPage, searchQuery);
-    }
+      // Вызываем переданную функцию пагинации с текущим поисковым запросом
+      if (onPageChange) {
+        onPageChange(newPage, searchQuery);
+      }
 
-    // Прокрутка вверх списка
-    const listEl = document.querySelector('.cafeOrdersRpanel__list');
-    if (listEl) {
-      listEl.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [totalPages, searchQuery, onPageChange]);
+      // Прокрутка вверх списка
+      const listEl = document.querySelector(".cafeOrdersRpanel__list");
+      if (listEl) {
+        listEl.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [totalPages, searchQuery, onPageChange],
+  );
 
   if (!open) return null;
 
@@ -344,7 +370,12 @@ export const RightMenuPanel = ({
     <aside className="cafeOrdersRpanel" aria-label="Меню">
       <div className="cafeOrdersRpanel__head">
         <div className="cafeOrdersRpanel__title">Меню</div>
-        <button type="button" className="cafeOrdersRpanel__close" onClick={onClose} aria-label="Закрыть">
+        <button
+          type="button"
+          className="cafeOrdersRpanel__close"
+          onClick={onClose}
+          aria-label="Закрыть"
+        >
           <FaTimes />
         </button>
       </div>
@@ -370,42 +401,42 @@ export const RightMenuPanel = ({
       </div>
 
       <div className="cafeOrdersRpanel__list">
-        {loading && (
-          <div className="cafeOrdersRpanel__empty">Загрузка…</div>
-        )}
-        {(
-          paginatedItems.map((m) => {
-            const img = menuImageUrl?.(m.id);
-            const cartItem = isCart(m.id);
-            const cartQty = cartItem?.quantity || 0;
-            return (
-              <button key={m.id} type="button" className={`cafeOrdersRpanel__item `} onClick={() => onPick(m)} title={m.title}>
-                {/* <span className="cafeOrdersRpanel__thumb" aria-hidden>
+        {loading && <div className="cafeOrdersRpanel__empty">Загрузка…</div>}
+        {paginatedItems.map((m) => {
+          const img = menuImageUrl?.(m.id);
+          const cartItem = isCart(m.id);
+          const cartQty = cartItem?.quantity || 0;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              className={`cafeOrdersRpanel__item `}
+              onClick={() => onPick(m)}
+              title={m.title}
+            >
+              {/* <span className="cafeOrdersRpanel__thumb" aria-hidden>
                   {img ? <img src={img} alt="" /> : <FaClipboardList />}
                 </span> */}
-                <div className="cafeOrdersRpanel__image" style={{backgroundImage: `url(${img})`}}>
-
-                </div>
-                <span className="cafeOrdersRpanel__meta">
-                  <span className="cafeOrdersRpanel__name">{m.title}</span>
-                  <span className="cafeOrdersRpanel__price">{fmtMoney?.(m.price)} сом</span>
+              <div
+                className="cafeOrdersRpanel__image"
+                style={{ backgroundImage: `url(${img})` }}
+              ></div>
+              <span className="cafeOrdersRpanel__meta">
+                <span className="cafeOrdersRpanel__name">{m.title}</span>
+                <span className="cafeOrdersRpanel__price">
+                  {fmtMoney?.(m.price)} сом
                 </span>
+              </span>
 
-
-                <span className="cafeOrdersRpanel__add" aria-hidden>
-                  {
-                    !cartQty ? (<FaPlus />) : cartQty
-                  }
-                </span>
-              </button>
-            );
-          })
+              <span className="cafeOrdersRpanel__add" aria-hidden>
+                {!cartQty ? <FaPlus /> : cartQty}
+              </span>
+            </button>
+          );
+        })}
+        {!loading && !paginatedItems.length && (
+          <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
         )}
-        {
-          !loading && !paginatedItems.length && (
-            <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
-          )
-        }
       </div>
 
       {/* Пагинация */}
@@ -435,7 +466,11 @@ export const RightMenuPanel = ({
       )}
 
       <div className="cafeOrdersRpanel__footer">
-        <button type="button" className="cafeOrders__btn cafeOrders__btn--primary cafeOrders__btn--wide" onClick={onClose}>
+        <button
+          type="button"
+          className="cafeOrders__btn cafeOrders__btn--primary cafeOrders__btn--wide"
+          onClick={onClose}
+        >
           Готов
         </button>
       </div>

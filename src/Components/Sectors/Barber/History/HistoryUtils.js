@@ -1,5 +1,5 @@
 // HistoryUtils.js
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 100;
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -49,7 +49,9 @@ export const barberNameOf = (a, employees) => {
   if (a?.employee_name) return a.employee_name;
   if (a?.master_name) return a.master_name;
 
-  const barberId = (a?.barber && typeof a.barber === "object" ? a.barber.id : a?.barber) ?? a?.barber_id;
+  const barberId =
+    (a?.barber && typeof a.barber === "object" ? a.barber.id : a?.barber) ??
+    a?.barber_id;
   const e = employees.find((x) => String(x.id) === String(barberId));
   return e ? fullNameEmp(e) : "—";
 };
@@ -72,7 +74,9 @@ export const serviceNamesFromRecord = (r, services) => {
 
 export const clientNameOf = (r, clients) => {
   if (r?.client_name) return r.client_name;
-  const clientId = (r?.client && typeof r.client === "object" ? r.client.id : r?.client) ?? r?.client_id;
+  const clientId =
+    (r?.client && typeof r.client === "object" ? r.client.id : r?.client) ??
+    r?.client_id;
   const c = clients.find((x) => String(x.id) === String(clientId));
   return c?.full_name || c?.name || "—";
 };
@@ -80,7 +84,9 @@ export const clientNameOf = (r, clients) => {
 // NOTE: не используется в History.jsx прямо сейчас (может пригодиться в другом месте)
 export const clientPhoneOf = (r, clients) => {
   if (r?.client_phone) return r.client_phone;
-  const clientId = (r?.client && typeof r.client === "object" ? r.client.id : r?.client) ?? r?.client_id;
+  const clientId =
+    (r?.client && typeof r.client === "object" ? r.client.id : r?.client) ??
+    r?.client_id;
   const c = clients.find((x) => String(x.id) === String(clientId));
   return c?.phone || c?.phone_number || "";
 };
@@ -110,13 +116,19 @@ export const priceOfAppointment = (a, services) => {
   }
 
   if (Array.isArray(a?.services_details) && a.services_details.length) {
-    const s = a.services_details.reduce((acc, it) => acc + (num(it?.price) || 0), 0);
+    const s = a.services_details.reduce(
+      (acc, it) => acc + (num(it?.price) || 0),
+      0,
+    );
     if (s > 0) return s;
   }
 
   if (Array.isArray(a?.services) && a.services.length) {
     const m = new Map(services.map((s) => [String(s.id), s]));
-    const s = a.services.reduce((acc, id) => acc + (num(m.get(String(id))?.price) || 0), 0);
+    const s = a.services.reduce(
+      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
+      0,
+    );
     if (s > 0) return s;
   }
 
@@ -137,7 +149,8 @@ export const basePriceOfAppointment = (a, services) => {
   }
 
   const totalPrice = priceOfAppointment(a, services);
-  const discountRaw = a?.discount_percent ?? a?.discount ?? a?.discount_value ?? null;
+  const discountRaw =
+    a?.discount_percent ?? a?.discount ?? a?.discount_value ?? null;
   const discountPct = num(discountRaw);
 
   if (
@@ -151,13 +164,19 @@ export const basePriceOfAppointment = (a, services) => {
   }
 
   if (Array.isArray(a?.services_details) && a.services_details.length) {
-    const s = a.services_details.reduce((acc, it) => acc + (num(it?.price) || 0), 0);
+    const s = a.services_details.reduce(
+      (acc, it) => acc + (num(it?.price) || 0),
+      0,
+    );
     if (s > 0) return s;
   }
 
   if (Array.isArray(a?.services) && a.services.length) {
     const m = new Map(services.map((s) => [String(s.id), s]));
-    const s = a.services.reduce((acc, id) => acc + (num(m.get(String(id))?.price) || 0), 0);
+    const s = a.services.reduce(
+      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
+      0,
+    );
     if (s > 0) return s;
   }
 
@@ -165,7 +184,8 @@ export const basePriceOfAppointment = (a, services) => {
 };
 
 export const discountPercentOfAppointment = (a, basePrice, totalPrice) => {
-  const direct = a?.discount_percent ?? a?.discount ?? a?.discount_value ?? null;
+  const direct =
+    a?.discount_percent ?? a?.discount ?? a?.discount_value ?? null;
   const nDirect = num(direct);
   if (nDirect !== null) {
     const x = Math.round(nDirect);
@@ -197,7 +217,8 @@ export const parseUserDate = (str) => {
   const hh = hasTime ? Number(m[4]) : 0;
   const mi = hasTime ? Number(m[5]) : 0;
 
-  if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return "";
+  if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy))
+    return "";
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return "";
   if (yyyy < 1900 || yyyy > 2500) return "";
 
@@ -208,7 +229,12 @@ export const parseUserDate = (str) => {
 
   // валидация реальной даты (например 31.02)
   const dt = new Date(yyyy, mm - 1, dd, hh, mi, 0);
-  if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return "";
+  if (
+    dt.getFullYear() !== yyyy ||
+    dt.getMonth() !== mm - 1 ||
+    dt.getDate() !== dd
+  )
+    return "";
 
   const MM = pad(mm);
   const DD = pad(dd);
@@ -222,14 +248,14 @@ export const statusLabel = (s) =>
   s === "booked"
     ? "Забронировано"
     : s === "confirmed"
-    ? "Подтверждено"
-    : s === "completed"
-    ? "Завершено"
-    : s === "canceled"
-    ? "Отменено"
-    : s === "no_show"
-    ? "Не пришёл"
-    : s || "—";
+      ? "Подтверждено"
+      : s === "completed"
+        ? "Завершено"
+        : s === "canceled"
+          ? "Отменено"
+          : s === "no_show"
+            ? "Не пришёл"
+            : s || "—";
 
 /* ===== дата / фильтры ===== */
 export const getYMD = (iso) => {

@@ -1,5 +1,11 @@
 // src/Components/Sectors/cafe/Menu/Menu.jsx
-import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { FaListUl, FaThLarge } from "react-icons/fa";
 import api from "../../../../api";
@@ -10,14 +16,18 @@ import MenuItemsTab from "./components/MenuItemsTab";
 import MenuCategoriesTab from "./components/MenuCategoriesTab";
 import MenuItemModal from "./components/MenuItemModal";
 import MenuCategoryModal from "./components/MenuCategoryModal";
-import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import {
+  useAlert,
+  useConfirm,
+  useErrorModal,
+} from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Утилиты
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 const toNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -39,10 +49,10 @@ const normalizeDecimalValue = (value) => {
 };
 
 const Menu = () => {
-  const confirm = useConfirm()
-  const alert = useAlert()
+  const confirm = useConfirm();
+  const alert = useAlert();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Основное состояние
   const [activeTab, setActiveTab] = useState("items");
   const [viewMode, setViewMode] = useState("cards");
@@ -52,12 +62,12 @@ const Menu = () => {
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
   const [items, setItems] = useState([]);
-  
+
   // Данные пагинации
   const [itemsCount, setItemsCount] = useState(0);
   const [itemsNext, setItemsNext] = useState(null);
   const [itemsPrevious, setItemsPrevious] = useState(null);
-  
+
   // Refs для отслеживания изменений данных
   const isInitialMountRef = useRef(true);
   const prevItemsRef = useRef([]);
@@ -71,19 +81,19 @@ const Menu = () => {
   const debouncedItemSearch = useDebouncedValue(queryItems, 400);
   const [queryCats, setQueryCats] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
-  
+
   // Получаем текущую страницу из URL
   const currentPage = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
-  
+
   // Расчет общего количества страниц
   const totalPages = useMemo(
     () => (itemsCount && PAGE_SIZE ? Math.ceil(itemsCount / PAGE_SIZE) : 1),
-    [itemsCount]
+    [itemsCount],
   );
-  
+
   const hasNextPage = !!itemsNext;
   const hasPrevPage = !!itemsPrevious;
 
@@ -116,10 +126,14 @@ const Menu = () => {
   const kitchensMap = useMemo(() => {
     const map = new Map();
     kitchens.forEach((kitchen) => {
-      const title = kitchen.title || kitchen.name || kitchen.kitchen_title || "Кухня";
+      const title =
+        kitchen.title || kitchen.name || kitchen.kitchen_title || "Кухня";
       const number = kitchen.number ?? kitchen.kitchen_number;
-      const label = `${title}${number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
-        }`;
+      const label = `${title}${
+        number !== undefined && number !== null && number !== ""
+          ? ` №${number}`
+          : ""
+      }`;
       map.set(kitchen.id, label);
     });
     return map;
@@ -132,7 +146,10 @@ const Menu = () => {
   }, [warehouse]);
 
   // Вспомогательные функции для получения данных по ID
-  const getCategoryTitle = useCallback((id) => categoriesMap.get(id) || "Без категории", [categoriesMap]);
+  const getCategoryTitle = useCallback(
+    (id) => categoriesMap.get(id) || "Без категории",
+    [categoriesMap],
+  );
   // const getKitchenTitle = useCallback((id) => kitchensMap.get(id) || "", [kitchensMap]);
   // const getProductTitle = useCallback((id) => warehouseMap.get(id)?.title || id || "", [warehouseMap]);
   // const getProductUnit = useCallback((id) => warehouseMap.get(id)?.unit || "", [warehouseMap]);
@@ -175,7 +192,7 @@ const Menu = () => {
         page: params.page || 1,
         search: params.search || "",
         category: params.category || null,
-      }
+      },
     });
     const data = res?.data || {};
     setItems(data?.results || (Array.isArray(data) ? data : []));
@@ -187,7 +204,9 @@ const Menu = () => {
   const fetchMenuItemDetail = useCallback(async (id) => {
     if (!id) return null;
     try {
-      const res = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+      const res = await api.get(
+        `/cafe/menu-items/${encodeURIComponent(String(id))}/`,
+      );
       return res?.data || null;
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка при загрузке блюда");
@@ -214,7 +233,10 @@ const Menu = () => {
       try {
         await fetchKitchens();
       } catch (err) {
-        const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+        const errorMessage = validateResErrors(
+          err,
+          "Ошибка при загрузке кухонь",
+        );
         alert(errorMessage, true);
         // Ошибка загрузки кухонь - продолжаем работу
       }
@@ -227,7 +249,10 @@ const Menu = () => {
       try {
         await fetchWarehouse();
       } catch (err) {
-        const errorMessage = validateResErrors(err, "Ошибка при загрузке склада");
+        const errorMessage = validateResErrors(
+          err,
+          "Ошибка при загрузке склада",
+        );
         alert(errorMessage, true);
         // Ошибка загрузки склада - продолжаем работу
       }
@@ -250,16 +275,19 @@ const Menu = () => {
   }, [currentPage, searchParams, setSearchParams]);
 
   // Обработчик смены страницы
-  const handlePageChange = useCallback((newPage) => {
-    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
-    const params = new URLSearchParams(searchParams);
-    if (newPage > 1) {
-      params.set("page", newPage.toString());
-    } else {
-      params.delete("page");
-    }
-    setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams, totalPages]);
+  const handlePageChange = useCallback(
+    (newPage) => {
+      if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+      const params = new URLSearchParams(searchParams);
+      if (newPage > 1) {
+        params.set("page", newPage.toString());
+      } else {
+        params.delete("page");
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams, totalPages],
+  );
 
   // Сброс на первую страницу при изменении поиска или фильтра
   useEffect(() => {
@@ -278,13 +306,18 @@ const Menu = () => {
         await fetchMenuItems({
           page: currentPage,
           search: debouncedItemSearch,
-          category: selectedCategoryFilter || null
+          category: selectedCategoryFilter || null,
         });
       } finally {
         setLoadingItems(false);
       }
     })();
-  }, [fetchMenuItems, currentPage, debouncedItemSearch, selectedCategoryFilter]);
+  }, [
+    fetchMenuItems,
+    currentPage,
+    debouncedItemSearch,
+    selectedCategoryFilter,
+  ]);
 
   // Плавно прокручиваем страницу вверх при изменении данных блюд
   useEffect(() => {
@@ -307,15 +340,15 @@ const Menu = () => {
       prevItems[0]?.id !== currentItems[0]?.id;
 
     if (isNewData) {
-      const rootElement = document.getElementById('root');
+      const rootElement = document.getElementById("root");
       if (rootElement) {
         rootElement.scrollTo({
           top: 0,
-          behavior: 'smooth'
+          behavior: "smooth",
         });
       } else {
         // Fallback на window, если root не найден
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     }
     prevItemsRef.current = currentItems;
@@ -358,7 +391,9 @@ const Menu = () => {
   const filteredCategories = useMemo(() => {
     const query = queryCats.trim().toLowerCase();
     if (!query) return categories;
-    return categories.filter((cat) => (cat.title || "").toLowerCase().includes(query));
+    return categories.filter((cat) =>
+      (cat.title || "").toLowerCase().includes(query),
+    );
   }, [categories, queryCats]);
 
   // Открытие модала создания блюда
@@ -396,9 +431,9 @@ const Menu = () => {
       is_active: !!fullItem.is_active,
       ingredients: Array.isArray(fullItem.ingredients)
         ? fullItem.ingredients.map((ing) => ({
-          product: ing.product,
-          amount: String(ing.amount ?? "").replace(",", "."),
-        }))
+            product: ing.product,
+            amount: String(ing.amount ?? "").replace(",", "."),
+          }))
         : [],
     });
 
@@ -427,15 +462,17 @@ const Menu = () => {
       category: form.category,
       kitchen: form.kitchen ? form.kitchen : null,
       price: numberToString(
-        Math.max(0, Number(String(form.price ?? "0").replace(",", ".")) || 0)
+        Math.max(0, Number(String(form.price ?? "0").replace(",", ".")) || 0),
       ),
       is_active: !!form.is_active,
       ingredients: (form.ingredients || [])
-        .filter((row) => row && row.product && String(row.amount || "").trim() !== "")
+        .filter(
+          (row) => row && row.product && String(row.amount || "").trim() !== "",
+        )
         .map((row) => ({
           product: row.product,
           amount: numberToString(
-            Math.max(0, Number(String(row.amount).replace(",", ".")) || 0)
+            Math.max(0, Number(String(row.amount).replace(",", ".")) || 0),
           ),
         })),
     };
@@ -452,9 +489,13 @@ const Menu = () => {
     formData.append("image", imageFile);
 
     try {
-      await api.patch(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.patch(
+        `/cafe/menu-items/${encodeURIComponent(String(id))}/`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
       return true;
     } catch (err) {
       try {
@@ -470,9 +511,13 @@ const Menu = () => {
         formData2.append("ingredients", JSON.stringify(payload.ingredients));
         formData2.append("image", imageFile);
 
-        await api.put(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, formData2, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.put(
+          `/cafe/menu-items/${encodeURIComponent(String(id))}/`,
+          formData2,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
 
         return true;
       } catch (err2) {
@@ -497,7 +542,7 @@ const Menu = () => {
       } else {
         const res = await api.put(
           `/cafe/menu-items/${encodeURIComponent(String(editingId))}/`,
-          payload
+          payload,
         );
         saved = res?.data || null;
       }
@@ -513,9 +558,13 @@ const Menu = () => {
 
       if (finalItem?.id) {
         setItems((prev) => {
-          const exists = prev.some((m) => String(m.id) === String(finalItem.id));
+          const exists = prev.some(
+            (m) => String(m.id) === String(finalItem.id),
+          );
           if (!exists) return [...prev, finalItem];
-          return prev.map((m) => (String(m.id) === String(finalItem.id) ? finalItem : m));
+          return prev.map((m) =>
+            String(m.id) === String(finalItem.id) ? finalItem : m,
+          );
         });
       } else {
         await fetchMenuItems();
@@ -529,39 +578,56 @@ const Menu = () => {
       setImageFile(null);
       setImagePreview("");
     } catch (err) {
-      alert(validateResErrors(err, 'Произошла ошибка при сохранении блюда'), true)
+      alert(
+        validateResErrors(err, "Произошла ошибка при сохранении блюда"),
+        true,
+      );
       // Ошибка сохранения
     }
   };
 
   const handleDeleteItemSubmit = useCallback((id) => {
-    confirm('Вы действительно хотите удалить позицию?', async (result) => {
+    confirm("Вы действительно хотите удалить позицию?", async (result) => {
       if (result) {
         try {
-          await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+          await api.delete(
+            `/cafe/menu-items/${encodeURIComponent(String(id))}/`,
+          );
           setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
         } catch (err) {
-          const errorMessage = validateResErrors(err, "Ошибка при удалении блюда");
+          const errorMessage = validateResErrors(
+            err,
+            "Ошибка при удалении блюда",
+          );
           alert(errorMessage, true);
         }
       }
-    })
-  }, [])
+    });
+  }, []);
 
   // Открыть модал подтверждения удаления категории
   const openConfirmDeleteCategory = useCallback((id) => {
-    confirm('Вы действительно хотите удалить категорию?\nУбедитесь, что в этой категории нет блюд', async (result) => {
-      if (result) {
-        try {
-          await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
-          setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
-        } catch (err) {
-          const errorMessage = validateResErrors(err, "Ошибка при удалении категории");
-          alert(errorMessage, true);
+    confirm(
+      "Вы действительно хотите удалить категорию?\nУбедитесь, что в этой категории нет блюд",
+      async (result) => {
+        if (result) {
+          try {
+            await api.delete(
+              `/cafe/categories/${encodeURIComponent(String(id))}/`,
+            );
+            setCategories((prev) =>
+              prev.filter((c) => String(c.id) !== String(id)),
+            );
+          } catch (err) {
+            const errorMessage = validateResErrors(
+              err,
+              "Ошибка при удалении категории",
+            );
+            alert(errorMessage, true);
+          }
         }
-      }
-    })
-
+      },
+    );
   });
   // Управление ингредиентами
   const addIngredientRow = () =>
@@ -615,16 +681,21 @@ const Menu = () => {
       if (catEditId) {
         const res = await api.put(
           `/cafe/categories/${encodeURIComponent(String(catEditId))}/`,
-          payload
+          payload,
         );
-        setCategories((prev) => prev.map((c) => (c.id === catEditId ? res.data : c)));
+        setCategories((prev) =>
+          prev.map((c) => (c.id === catEditId ? res.data : c)),
+        );
       } else {
         const res = await api.post("/cafe/categories/", payload);
         setCategories((prev) => [...prev, res.data]);
       }
       setCatModalOpen(false);
     } catch (err) {
-      const errorMessage = validateResErrors(err, "Ошибка при сохранении категории");
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при сохранении категории",
+      );
       alert(errorMessage, true);
     }
   };

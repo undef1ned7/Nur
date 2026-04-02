@@ -1,4 +1,3 @@
-
 // // src/components/Education/Teachers.jsx
 // import React, { useEffect, useMemo, useState, useCallback } from "react";
 // import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
@@ -1072,7 +1071,6 @@
 
 // export default SchoolTeachers;
 
-
 // src/components/Education/Teachers.jsx
 // проверь путь импорта api при вставке в проект
 import React, { useEffect, useMemo, useState, useCallback } from "react";
@@ -1081,18 +1079,18 @@ import "./Teachers.scss";
 import api from "../../../../api";
 
 /* ===== API ===== */
-const EMPLOYEES_LIST_URL = "/users/employees/";              // GET
-const EMPLOYEES_CREATE_URL = "/users/employees/create/";     // POST
+const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
+const EMPLOYEES_CREATE_URL = "/users/employees/create/"; // POST
 const EMPLOYEE_ITEM_URL = (id) => `/users/employees/${id}/`; // PUT / DELETE
-const ROLES_LIST_URL = "/users/roles/";                      // GET (кастомные роли)
-const ROLE_CREATE_URL = "/users/roles/custom/";              // POST
-const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`;  // PUT / DELETE
+const ROLES_LIST_URL = "/users/roles/"; // GET (кастомные роли)
+const ROLE_CREATE_URL = "/users/roles/custom/"; // POST
+const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`; // PUT / DELETE
 
 /* ===== Системные роли из swagger enum ===== */
 const SYSTEM_ROLES = ["owner", "admin"];
 
 /* ===== Константы ===== */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 /* ===== utils ===== */
 const asArray = (data) =>
@@ -1103,7 +1101,7 @@ const normalizeEmployee = (e = {}) => ({
   email: e.email ?? "",
   first_name: e.first_name ?? "",
   last_name: e.last_name ?? "",
-  role: e.role ?? null,               // 'admin' | 'owner' | null
+  role: e.role ?? null, // 'admin' | 'owner' | null
   custom_role: e.custom_role ?? null, // uuid | null
   role_display: e.role_display ?? "",
 });
@@ -1120,8 +1118,11 @@ const ruLabelSys = (code) => {
 
 /* распознаём попытки назвать кастомную роль как системную */
 const sysCodeFromName = (name) => {
-  const l = String(name || "").trim().toLowerCase();
-  if (["admin", "administrator", "админ", "администратор"].includes(l)) return "admin";
+  const l = String(name || "")
+    .trim()
+    .toLowerCase();
+  if (["admin", "administrator", "админ", "администратор"].includes(l))
+    return "admin";
   if (["owner", "владелец"].includes(l)) return "owner";
   return null;
 };
@@ -1135,13 +1136,18 @@ const pickApiError = (e, fallback) => {
       const k = Object.keys(data)[0];
       const v = Array.isArray(data[k]) ? data[k][0] : data[k];
       return String(v || fallback);
-    } catch { return fallback; }
+    } catch {
+      return fallback;
+    }
   }
   return fallback;
 };
 
 /* ===== local validation helpers ===== */
-const cleanSpaces = (s) => String(s || "").replace(/\s+/g, " ").trim();
+const cleanSpaces = (s) =>
+  String(s || "")
+    .replace(/\s+/g, " ")
+    .trim();
 const isHumanName = (s) => {
   const v = cleanSpaces(s);
   if (v.length < 2 || v.length > 60) return false;
@@ -1190,16 +1196,34 @@ const SchoolTeachers = () => {
   const [empEditOpen, setEmpEditOpen] = useState(false);
   const [empEditSaving, setEmpEditSaving] = useState(false);
   const [empEditErr, setEmpEditErr] = useState("");
-  const emptyEmpEdit = { id: null, email: "", first_name: "", last_name: "", roleChoice: "" };
+  const emptyEmpEdit = {
+    id: null,
+    email: "",
+    first_name: "",
+    last_name: "",
+    roleChoice: "",
+  };
   const [empEditForm, setEmpEditForm] = useState(emptyEmpEdit);
   const [empDeletingIds, setEmpDeletingIds] = useState(new Set());
 
   /* ===== confirm modal (общий) ===== */
-  const [confirm, setConfirm] = useState({ open: false, kind: null, id: null, name: "" });
-  const askDeleteRole = (r) => setConfirm({ open: true, kind: "role", id: r.id, name: r.name || "—" });
+  const [confirm, setConfirm] = useState({
+    open: false,
+    kind: null,
+    id: null,
+    name: "",
+  });
+  const askDeleteRole = (r) =>
+    setConfirm({ open: true, kind: "role", id: r.id, name: r.name || "—" });
   const askDeleteEmployee = (u) =>
-    setConfirm({ open: true, kind: "employee", id: u.id, name: fullName(u) || u.email || "—" });
-  const closeConfirm = () => setConfirm({ open: false, kind: null, id: null, name: "" });
+    setConfirm({
+      open: true,
+      kind: "employee",
+      id: u.id,
+      name: fullName(u) || u.email || "—",
+    });
+  const closeConfirm = () =>
+    setConfirm({ open: false, kind: null, id: null, name: "" });
 
   /* ===== fetch ===== */
   const fetchEmployees = useCallback(async () => {
@@ -1256,7 +1280,10 @@ const SchoolTeachers = () => {
     return out.sort((a, b) => a.label.localeCompare(b.label, "ru"));
   }, [roles]);
 
-  const roleChoiceKeys = useMemo(() => new Set(roleOptions.map((o) => o.key)), [roleOptions]);
+  const roleChoiceKeys = useMemo(
+    () => new Set(roleOptions.map((o) => o.key)),
+    [roleOptions],
+  );
 
   /* ===== filters ===== */
   const filteredEmployees = useMemo(() => {
@@ -1265,7 +1292,7 @@ const SchoolTeachers = () => {
     return employees.filter((e) =>
       [fullName(e), e.email, e.role_display, ruLabelSys(e.role)]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t))
+        .some((v) => String(v).toLowerCase().includes(t)),
     );
   }, [employees, q]);
 
@@ -1274,7 +1301,9 @@ const SchoolTeachers = () => {
     const seen = new Set();
     const dedup = [];
     for (const r of base) {
-      const key = String(r.name || "").trim().toLowerCase();
+      const key = String(r.name || "")
+        .trim()
+        .toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
         dedup.push(r);
@@ -1282,33 +1311,51 @@ const SchoolTeachers = () => {
     }
     const t = q.trim().toLowerCase();
     if (!t) return dedup;
-    return dedup.filter((r) => String(r.name || "").toLowerCase().includes(t));
+    return dedup.filter((r) =>
+      String(r.name || "")
+        .toLowerCase()
+        .includes(t),
+    );
   }, [roles, q]);
 
   /* ===== pagination (15/стр) ===== */
   const [rolesPage, setRolesPage] = useState(1);
-  const rolesTotalPages = Math.max(1, Math.ceil(filteredRoles.length / PAGE_SIZE));
+  const rolesTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRoles.length / PAGE_SIZE),
+  );
   useEffect(() => setRolesPage(1), [q, filteredRoles.length, tab]);
-  useEffect(() => { if (rolesPage > rolesTotalPages) setRolesPage(rolesTotalPages); }, [rolesPage, rolesTotalPages]);
+  useEffect(() => {
+    if (rolesPage > rolesTotalPages) setRolesPage(rolesTotalPages);
+  }, [rolesPage, rolesTotalPages]);
   const rolesPageItems = useMemo(() => {
     const s = (rolesPage - 1) * PAGE_SIZE;
     return filteredRoles.slice(s, s + PAGE_SIZE);
   }, [filteredRoles, rolesPage]);
   const rolesPagesWindow = useMemo(() => {
-    const around = 2, start = Math.max(1, rolesPage - around), end = Math.min(rolesTotalPages, rolesPage + around);
+    const around = 2,
+      start = Math.max(1, rolesPage - around),
+      end = Math.min(rolesTotalPages, rolesPage + around);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [rolesPage, rolesTotalPages]);
 
   const [empPage, setEmpPage] = useState(1);
-  const empTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE));
+  const empTotalPages = Math.max(
+    1,
+    Math.ceil(filteredEmployees.length / PAGE_SIZE),
+  );
   useEffect(() => setEmpPage(1), [q, filteredEmployees.length, tab]);
-  useEffect(() => { if (empPage > empTotalPages) setEmpPage(empTotalPages); }, [empPage, empTotalPages]);
+  useEffect(() => {
+    if (empPage > empTotalPages) setEmpPage(empTotalPages);
+  }, [empPage, empTotalPages]);
   const empPageItems = useMemo(() => {
     const s = (empPage - 1) * PAGE_SIZE;
     return filteredEmployees.slice(s, s + PAGE_SIZE);
   }, [filteredEmployees, empPage]);
   const empPagesWindow = useMemo(() => {
-    const around = 2, start = Math.max(1, empPage - around), end = Math.min(empTotalPages, empPage + around);
+    const around = 2,
+      start = Math.max(1, empPage - around),
+      end = Math.min(empTotalPages, empPage + around);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [empPage, empTotalPages]);
 
@@ -1316,14 +1363,21 @@ const SchoolTeachers = () => {
   const isRoleNameDuplicate = (name, excludeId = null) => {
     const key = cleanSpaces(name).toLowerCase();
     return roles.some((r) =>
-      (excludeId && r.id === excludeId) ? false : cleanSpaces(r.name).toLowerCase() === key
+      excludeId && r.id === excludeId
+        ? false
+        : cleanSpaces(r.name).toLowerCase() === key,
     );
   };
   const isEmailDuplicate = (email, excludeId = null) => {
-    const key = String(email || "").trim().toLowerCase();
+    const key = String(email || "")
+      .trim()
+      .toLowerCase();
     return employees.some((e) =>
-      (excludeId && e.id === excludeId) ? false :
-      String(e.email || "").trim().toLowerCase() === key
+      excludeId && e.id === excludeId
+        ? false
+        : String(e.email || "")
+            .trim()
+            .toLowerCase() === key,
     );
   };
 
@@ -1407,7 +1461,9 @@ const SchoolTeachers = () => {
       setError(pickApiError(err, "Не удалось удалить роль."));
     } finally {
       setRoleDeletingIds((prev) => {
-        const next = new Set(prev); next.delete(id); return next;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
     }
   };
@@ -1424,8 +1480,7 @@ const SchoolTeachers = () => {
 
     if (!email || !first_name || !last_name || !roleChoice)
       return setEmpErr("Заполните Email, Имя, Фамилию и выберите роль.");
-    if (!isEmailValid(email))
-      return setEmpErr("Неверный формат e-mail.");
+    if (!isEmailValid(email)) return setEmpErr("Неверный формат e-mail.");
     if (isEmailDuplicate(email))
       return setEmpErr("Сотрудник с таким e-mail уже существует.");
     if (!isHumanName(first_name) || !isHumanName(last_name))
@@ -1462,7 +1517,7 @@ const SchoolTeachers = () => {
     if (emp?.role) return `sys:${emp.role}`;
     if (emp?.custom_role) return `cus:${emp.custom_role}`;
     return "";
-    };
+  };
 
   const openEmpEdit = (u) => {
     setEmpEditErr("");
@@ -1487,12 +1542,13 @@ const SchoolTeachers = () => {
 
     if (!email || !first_name || !last_name || !roleChoice)
       return setEmpEditErr("Заполните Email, Имя, Фамилию и выберите роль.");
-    if (!isEmailValid(email))
-      return setEmpEditErr("Неверный формат e-mail.");
+    if (!isEmailValid(email)) return setEmpEditErr("Неверный формат e-mail.");
     if (isEmailDuplicate(email, empEditForm.id))
       return setEmpEditErr("Другой сотрудник уже использует этот e-mail.");
     if (!isHumanName(first_name) || !isHumanName(last_name))
-      return setEmpEditErr("Имя и Фамилия: 2–60 символов (буквы, пробел, ' -).");
+      return setEmpEditErr(
+        "Имя и Фамилия: 2–60 символов (буквы, пробел, ' -).",
+      );
     if (!roleChoiceKeys.has(roleChoice))
       return setEmpEditErr("Выберите доступную роль.");
 
@@ -1530,7 +1586,11 @@ const SchoolTeachers = () => {
       console.error(err);
       setError(pickApiError(err, "Не удалось удалить сотрудника."));
     } finally {
-      setEmpDeletingIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setEmpDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -1574,7 +1634,9 @@ const SchoolTeachers = () => {
             <FaSearch className="Schoolteachers__searchIcon" aria-hidden />
             <input
               className="Schoolteachers__searchInput"
-              placeholder={tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам…"}
+              placeholder={
+                tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам…"
+              }
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Поиск"
@@ -1649,7 +1711,9 @@ const SchoolTeachers = () => {
                     {(r.name || "•").trim().charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="Schoolteachers__name">{r.name || "Без названия"}</p>
+                    <p className="Schoolteachers__name">
+                      {r.name || "Без названия"}
+                    </p>
                     <div className="Schoolteachers__meta">
                       <span>Пользовательская роль</span>
                     </div>
@@ -1672,23 +1736,32 @@ const SchoolTeachers = () => {
                     disabled={roleDeletingIds.has(r.id)}
                     title="Удалить"
                   >
-                    <FaTrash /> {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
+                    <FaTrash />{" "}
+                    {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
                   </button>
                 </div>
               </div>
             ))}
 
             {filteredRoles.length === 0 && roles.length > 0 && (
-              <div className="Schoolteachers__alert">Роли по запросу не найдены.</div>
+              <div className="Schoolteachers__alert">
+                Роли по запросу не найдены.
+              </div>
             )}
             {!loading && roles.length === 0 && (
-              <div className="Schoolteachers__alert">Пока нет пользовательских ролей.</div>
+              <div className="Schoolteachers__alert">
+                Пока нет пользовательских ролей.
+              </div>
             )}
           </div>
 
           {/* Pagination (roles) */}
           {rolesTotalPages > 1 && (
-            <div className="Schoolteachers__pagination" role="navigation" aria-label="Пагинация ролей">
+            <div
+              className="Schoolteachers__pagination"
+              role="navigation"
+              aria-label="Пагинация ролей"
+            >
               <button
                 type="button"
                 className="Schoolteachers__pageBtn"
@@ -1700,7 +1773,13 @@ const SchoolTeachers = () => {
               </button>
               {rolesPagesWindow[0] > 1 && (
                 <>
-                  <button type="button" className="Schoolteachers__pageBtn" onClick={() => setRolesPage(1)}>1</button>
+                  <button
+                    type="button"
+                    className="Schoolteachers__pageBtn"
+                    onClick={() => setRolesPage(1)}
+                  >
+                    1
+                  </button>
                   <span className="Schoolteachers__dots">…</span>
                 </>
               )}
@@ -1714,7 +1793,8 @@ const SchoolTeachers = () => {
                   {p}
                 </button>
               ))}
-              {rolesPagesWindow[rolesPagesWindow.length - 1] < rolesTotalPages && (
+              {rolesPagesWindow[rolesPagesWindow.length - 1] <
+                rolesTotalPages && (
                 <>
                   <span className="Schoolteachers__dots">…</span>
                   <button
@@ -1729,14 +1809,17 @@ const SchoolTeachers = () => {
               <button
                 type="button"
                 className="Schoolteachers__pageBtn"
-                onClick={() => setRolesPage(Math.min(rolesTotalPages, rolesPage + 1))}
+                onClick={() =>
+                  setRolesPage(Math.min(rolesTotalPages, rolesPage + 1))
+                }
                 disabled={rolesPage >= rolesTotalPages}
                 aria-label="Следующая страница"
               >
                 →
               </button>
               <div className="Schoolteachers__pageInfo">
-                Стр. {rolesPage}/{rolesTotalPages} • Показано {rolesPageItems.length} из {filteredRoles.length}
+                Стр. {rolesPage}/{rolesTotalPages} • Показано{" "}
+                {rolesPageItems.length} из {filteredRoles.length}
               </div>
             </div>
           )}
@@ -1749,12 +1832,15 @@ const SchoolTeachers = () => {
           <div className="Schoolteachers__list">
             {empPageItems.map((u) => {
               const initial =
-                (fullName(u) || u.email || "•").trim().charAt(0).toUpperCase() || "•";
+                (fullName(u) || u.email || "•")
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase() || "•";
               const roleLabel = u.role
                 ? ruLabelSys(u.role)
                 : roles.length
-                ? roleById.get(u.custom_role)?.name || u.role_display || "—"
-                : u.role_display || "—";
+                  ? roleById.get(u.custom_role)?.name || u.role_display || "—"
+                  : u.role_display || "—";
 
               const deleting = empDeletingIds.has(u.id);
 
@@ -1765,7 +1851,9 @@ const SchoolTeachers = () => {
                       {initial}
                     </div>
                     <div>
-                      <p className="Schoolteachers__name">{fullName(u) || "Без имени"}</p>
+                      <p className="Schoolteachers__name">
+                        {fullName(u) || "Без имени"}
+                      </p>
                       <div className="Schoolteachers__meta">
                         <span>{u.email || "—"}</span>
                         <span>•</span>
@@ -1798,7 +1886,9 @@ const SchoolTeachers = () => {
             })}
 
             {filteredEmployees.length === 0 && employees.length > 0 && (
-              <div className="Schoolteachers__alert">Сотрудники по запросу не найдены.</div>
+              <div className="Schoolteachers__alert">
+                Сотрудники по запросу не найдены.
+              </div>
             )}
             {!loading && employees.length === 0 && (
               <div className="Schoolteachers__alert">Пока нет сотрудников.</div>
@@ -1807,7 +1897,11 @@ const SchoolTeachers = () => {
 
           {/* Pagination (employees) */}
           {empTotalPages > 1 && (
-            <div className="Schoolteachers__pagination" role="navigation" aria-label="Пагинация сотрудников">
+            <div
+              className="Schoolteachers__pagination"
+              role="navigation"
+              aria-label="Пагинация сотрудников"
+            >
               <button
                 type="button"
                 className="Schoolteachers__pageBtn"
@@ -1819,7 +1913,13 @@ const SchoolTeachers = () => {
               </button>
               {empPagesWindow[0] > 1 && (
                 <>
-                  <button type="button" className="Schoolteachers__pageBtn" onClick={() => setEmpPage(1)}>1</button>
+                  <button
+                    type="button"
+                    className="Schoolteachers__pageBtn"
+                    onClick={() => setEmpPage(1)}
+                  >
+                    1
+                  </button>
                   <span className="Schoolteachers__dots">…</span>
                 </>
               )}
@@ -1855,7 +1955,8 @@ const SchoolTeachers = () => {
                 →
               </button>
               <div className="Schoolteachers__pageInfo">
-                Стр. {empPage}/{empTotalPages} • Показано {empPageItems.length} из {filteredEmployees.length}
+                Стр. {empPage}/{empTotalPages} • Показано {empPageItems.length}{" "}
+                из {filteredEmployees.length}
               </div>
             </div>
           )}
@@ -1889,10 +1990,16 @@ const SchoolTeachers = () => {
             </div>
 
             {!!roleCreateErr && (
-              <div className="Schoolteachers__alert" role="alert">{roleCreateErr}</div>
+              <div className="Schoolteachers__alert" role="alert">
+                {roleCreateErr}
+              </div>
             )}
 
-            <form className="Schoolteachers__form" onSubmit={submitRoleCreate} noValidate>
+            <form
+              className="Schoolteachers__form"
+              onSubmit={submitRoleCreate}
+              noValidate
+            >
               <div className="Schoolteachers__formGrid">
                 <div className="Schoolteachers__field Schoolteachers__field--full">
                   <label className="Schoolteachers__label">
@@ -1959,10 +2066,16 @@ const SchoolTeachers = () => {
             </div>
 
             {!!roleEditErr && (
-              <div className="Schoolteachers__alert" role="alert">{roleEditErr}</div>
+              <div className="Schoolteachers__alert" role="alert">
+                {roleEditErr}
+              </div>
             )}
 
-            <form className="Schoolteachers__form" onSubmit={submitRoleEdit} noValidate>
+            <form
+              className="Schoolteachers__form"
+              onSubmit={submitRoleEdit}
+              noValidate
+            >
               <div className="Schoolteachers__formGrid">
                 <div className="Schoolteachers__field Schoolteachers__field--full">
                   <label className="Schoolteachers__label">
@@ -2028,9 +2141,17 @@ const SchoolTeachers = () => {
               </button>
             </div>
 
-            {!!empErr && <div className="Schoolteachers__alert" role="alert">{empErr}</div>}
+            {!!empErr && (
+              <div className="Schoolteachers__alert" role="alert">
+                {empErr}
+              </div>
+            )}
 
-            <form className="Schoolteachers__form" onSubmit={submitEmployeeCreate} noValidate>
+            <form
+              className="Schoolteachers__form"
+              onSubmit={submitEmployeeCreate}
+              noValidate
+            >
               <div className="Schoolteachers__formGrid">
                 <div className="Schoolteachers__field">
                   <label className="Schoolteachers__label">
@@ -2041,7 +2162,9 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="user@mail.com"
                     value={empForm.email}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, email: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, email: e.target.value }))
+                    }
                     maxLength={254}
                     required
                   />
@@ -2055,7 +2178,9 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="Алия"
                     value={empForm.first_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, first_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
+                    }
                     maxLength={60}
                     required
                   />
@@ -2069,7 +2194,9 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="Жумалиева"
                     value={empForm.last_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, last_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
+                    }
                     maxLength={60}
                     required
                   />
@@ -2082,7 +2209,9 @@ const SchoolTeachers = () => {
                   <select
                     className="Schoolteachers__input"
                     value={empForm.roleChoice}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, roleChoice: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, roleChoice: e.target.value }))
+                    }
                     required
                   >
                     <option value="">Выберите роль</option>
@@ -2133,7 +2262,9 @@ const SchoolTeachers = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">Изменить сотрудника</h3>
+              <h3 className="Schoolteachers__modalTitle">
+                Изменить сотрудника
+              </h3>
               <button
                 type="button"
                 className="Schoolteachers__iconBtn"
@@ -2144,9 +2275,17 @@ const SchoolTeachers = () => {
               </button>
             </div>
 
-            {!!empEditErr && <div className="Schoolteachers__alert" role="alert">{empEditErr}</div>}
+            {!!empEditErr && (
+              <div className="Schoolteachers__alert" role="alert">
+                {empEditErr}
+              </div>
+            )}
 
-            <form className="Schoolteachers__form" onSubmit={submitEmployeeEdit} noValidate>
+            <form
+              className="Schoolteachers__form"
+              onSubmit={submitEmployeeEdit}
+              noValidate
+            >
               <div className="Schoolteachers__formGrid">
                 <div className="Schoolteachers__field">
                   <label className="Schoolteachers__label">
@@ -2157,7 +2296,9 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="user@mail.com"
                     value={empEditForm.email}
-                    onChange={(e) => setEmpEditForm((p) => ({ ...p, email: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpEditForm((p) => ({ ...p, email: e.target.value }))
+                    }
                     maxLength={254}
                     required
                   />
@@ -2171,7 +2312,12 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="Имя"
                     value={empEditForm.first_name}
-                    onChange={(e) => setEmpEditForm((p) => ({ ...p, first_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpEditForm((p) => ({
+                        ...p,
+                        first_name: e.target.value,
+                      }))
+                    }
                     maxLength={60}
                     required
                   />
@@ -2185,7 +2331,12 @@ const SchoolTeachers = () => {
                     className="Schoolteachers__input"
                     placeholder="Фамилия"
                     value={empEditForm.last_name}
-                    onChange={(e) => setEmpEditForm((p) => ({ ...p, last_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpEditForm((p) => ({
+                        ...p,
+                        last_name: e.target.value,
+                      }))
+                    }
                     maxLength={60}
                     required
                   />
@@ -2198,7 +2349,12 @@ const SchoolTeachers = () => {
                   <select
                     className="Schoolteachers__input"
                     value={empEditForm.roleChoice}
-                    onChange={(e) => setEmpEditForm((p) => ({ ...p, roleChoice: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpEditForm((p) => ({
+                        ...p,
+                        roleChoice: e.target.value,
+                      }))
+                    }
                     required
                   >
                     <option value="">Выберите роль</option>
@@ -2238,18 +2394,37 @@ const SchoolTeachers = () => {
 
       {/* Confirm (Да/Нет) — общий для ролей/сотрудников */}
       {confirm.open && (
-        <div className="Schoolteachers__modalOverlay" role="dialog" aria-modal="true" onClick={closeConfirm}>
-          <div className="Schoolteachers__confirm" role="document" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="Schoolteachers__modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeConfirm}
+        >
+          <div
+            className="Schoolteachers__confirm"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="Schoolteachers__confirmTitle">Подтверждение</div>
             <div className="Schoolteachers__confirmText">
-              {confirm.kind === "role" ? "Удалить роль" : "Удалить сотрудника"} «{confirm.name}»?
-              <br />Действие необратимо.
+              {confirm.kind === "role" ? "Удалить роль" : "Удалить сотрудника"}{" "}
+              «{confirm.name}»?
+              <br />
+              Действие необратимо.
             </div>
             <div className="Schoolteachers__confirmActions">
-              <button type="button" className="Schoolteachers__btn Schoolteachers__btn--secondary" onClick={closeConfirm}>
+              <button
+                type="button"
+                className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                onClick={closeConfirm}
+              >
                 Нет
               </button>
-              <button type="button" className="Schoolteachers__btn Schoolteachers__btn--danger" onClick={confirmYes}>
+              <button
+                type="button"
+                className="Schoolteachers__btn Schoolteachers__btn--danger"
+                onClick={confirmYes}
+              >
                 Да
               </button>
             </div>
