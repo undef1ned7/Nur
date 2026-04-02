@@ -1905,6 +1905,7 @@ const CashierPage = () => {
               </div>
             ) : (
               filteredProducts.map((product) => {
+                const piecePackage = getDefaultPiecePackage(product);
                 const cartItem = cart.find(
                   (item) => !item.isCustom && item.productId === product.id,
                 );
@@ -1930,7 +1931,7 @@ const CashierPage = () => {
 
                     <div className="cashier-page__product-stock flex items-center gap-2">
                       {product.quantity || 0} {product.unit || "шт"}
-                      {getDefaultPiecePackage(product) && (
+                      {piecePackage && (
                         <button
                           type="button"
                           className="cashier-page__cart-item-btn cursor-pointer"
@@ -1938,13 +1939,12 @@ const CashierPage = () => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            const pkg = getDefaultPiecePackage(product);
-                            if (!pkg?.id) return;
-                            addToCartWithPackage(product, pkg.id);
+                            if (!piecePackage?.id) return;
+                            addToCartWithPackage(product, piecePackage.id);
                           }}
-                          title="Добавить 1 шт (поштучно)"
+                          title={`Добавить 1 шт из упаковки (${piecePackage.quantity_in_package} в упаковке)`}
                         >
-                          +1 шт
+                          +1 шт (из {piecePackage.quantity_in_package})
                         </button>
                       )}
                     </div>
