@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Filter,
   X,
+  ChevronDown,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -59,12 +60,19 @@ const Analytics = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [openProductTable, setOpenProductTable] = useState("topByRevenue");
   const [openFinanceTable, setOpenFinanceTable] = useState("expenseBreakdown");
+  /** Вкладка «Сотрудники»: раскрытый tr с product_names / sold_products */
+  const [expandedUserPerformanceId, setExpandedUserPerformanceId] =
+    useState(null);
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     return { from, to };
   });
+
+  useEffect(() => {
+    if (activeTab !== "users") setExpandedUserPerformanceId(null);
+  }, [activeTab]);
 
   // Фильтры для всех вкладок
   const [filters, setFilters] = useState({
@@ -274,6 +282,20 @@ const Analytics = () => {
     return num.toLocaleString("ru-RU", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
+    });
+  };
+
+  /** Количества из API (строки с до 3 знаков после запятой) */
+  const formatAnalyticsQty = (v) => {
+    if (v == null || v === "") return "—";
+    const n =
+      typeof v === "string"
+        ? parseFloat(String(v).replace(",", "."))
+        : Number(v);
+    if (Number.isNaN(n)) return String(v);
+    return n.toLocaleString("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
     });
   };
 
@@ -2298,24 +2320,123 @@ const Analytics = () => {
                     <th>Выручка</th>
                     <th>Транзакций</th>
                     <th>Средний чек</th>
+                    <th>Ед. продано</th>
+                    <th>Уник. позиций</th>
+                    <th className="analytics-page__users-products-col">
+                      Товары
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {usersData.usersPerformance.length > 0 ? (
-                    usersData.usersPerformance.map((row) => (
-                      <tr key={row.user_id}>
-                        <td>{row.user}</td>
-                        <td>{row.email}</td>
-                        <td>{row.phone}</td>
-                        <td>{formatCurrency(row.revenue, 0)}</td>
-                        <td>{row.transactions}</td>
-                        <td>{formatCurrency(row.avg_check, 0)}</td>
-                      </tr>
-                    ))
+                    usersData.usersPerformance.map((row, rowIndex) => {
+                      const soldProducts = Array.isArray(row.sold_products)
+                        ? row.sold_products
+                        : [];
+                      const namesFallback = Array.isArray(row.product_names)
+                        ? row.product_names
+                        : [];
+                      const hasProducts =
+                        soldProducts.length > 0 || namesFallback.length > 0;
+                      const rowKey = String(
+                        row.user_id != null && row.user_id !== ""
+                          ? row.user_id
+                          : `idx-${rowIndex}`,
+                      );
+                      const isOpen =
+                        hasProducts &&
+                        expandedUserPerformanceId === rowKey;
+                      return (
+                        <React.Fragment key={rowKey}>
+                          <tr
+                            className={
+                              hasProducts
+                                ? "analytics-page__table-row--expandable"
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!hasProducts) return;
+                              setExpandedUserPerformanceId((prev) =>
+                                prev === rowKey ? null : rowKey,
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (!hasProducts) return;
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setExpandedUserPerformanceId((prev) =>
+                                  prev === rowKey ? null : rowKey,
+                                );
+                              }
+                            }}
+                            tabIndex={hasProducts ? 0 : undefined}
+                            aria-expanded={hasProducts ? isOpen : undefined}
+                          >
+                            <td>{row.user}</td>
+                            <td>{row.email}</td>
+                            <td>{row.phone}</td>
+                            <td>{formatCurrency(row.revenue, 0)}</td>
+                            <td>{row.transactions}</td>
+                            <td>{formatCurrency(row.avg_check, 0)}</td>
+                            <td className="analytics-page__users-sold-qty">
+                              {formatAnalyticsQty(row.units_sold)}
+                            </td>
+                            <td>
+                              {row.products_sold_count != null
+                                ? row.products_sold_count
+                                : "—"}
+                            </td>
+                            <td className="analytics-page__users-products-toggle">
+                              {hasProducts ? (
+                                <span className="analytics-page__users-products-toggle-inner">
+                                  <ChevronDown
+                                    size={18}
+                                    className={
+                                      isOpen
+                                        ? "analytics-page__users-chevron analytics-page__users-chevron--open"
+                                        : "analytics-page__users-chevron"
+                                    }
+                                    aria-hidden
+                                  />
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr className="analytics-page__users-products-dropdown">
+                              <td colSpan={9}>
+                                <div
+                                  className="analytics-page__users-products-dropdown-panel"
+                                  role="region"
+                                  aria-label={String(row.user ?? "Товары")}
+                                >
+                                  {soldProducts.length > 0 ? (
+                                    <ul className="analytics-page__users-sold-products">
+                                      {soldProducts.map((p, i) => (
+                                        <li key={`${rowKey}-sp-${i}`}>
+                                          {p.name ?? "—"} —{" "}
+                                          {formatAnalyticsQty(p.quantity)}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <div className="analytics-page__users-product-names-line">
+                                      {namesFallback.join(", ")}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={9}
                         style={{ textAlign: "center", color: "#6b7280" }}
                       >
                         Нет данных

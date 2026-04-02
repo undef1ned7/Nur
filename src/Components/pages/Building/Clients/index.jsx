@@ -1,33 +1,25 @@
+import Modal from "@/Components/common/Modal/Modal";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
+import { fetchBuildingContractors } from "@/store/creators/building/contractorsCreators";
+import { fetchBuildingSuppliers } from "@/store/creators/building/suppliersCreators";
+import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
+import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { LayoutGrid, Table2 } from "lucide-react";
-import Modal from "@/Components/common/Modal/Modal";
-import { useAlert, useConfirm } from "@/hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
-  fetchBuildingClients,
   createBuildingClient,
-  updateBuildingClient,
   deleteBuildingClient,
+  fetchBuildingClients,
+  updateBuildingClient,
 } from "../../../../store/creators/building/clientsCreators";
 import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
-import {
-  fetchBuildingSuppliers,
-  deleteBuildingSupplier,
-} from "@/store/creators/building/suppliersCreators";
-import {
-  fetchBuildingContractors,
-  deleteBuildingContractor,
-} from "@/store/creators/building/contractorsCreators";
-import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
-import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
-import { validateResErrors } from "../../../../../tools/validateResErrors";
-import BuildingActionsMenu from "../shared/ActionsMenu";
-import ClientsTab from "./ClientsTab";
-import SuppliersTab from "./SuppliersTab";
-import ContractorsTab from "./ContractorsTab";
 import "./Clients.scss";
+import ClientsTab from "./ClientsTab";
+import ContractorsTab from "./ContractorsTab";
+import SuppliersTab from "./SuppliersTab";
 
 const FORM_INITIAL = {
   name: "",
@@ -272,7 +264,7 @@ export default function BuildingClients() {
       const hay =
         `${c.name || ""} ${c.phone || ""} ${c.email || ""} ${c.inn || ""}`
           .toLowerCase()
-          .trim();  
+          .trim();
       return hay.includes(search.toLowerCase().trim());
     });
   }, [list, search, onlyActive]);
@@ -285,16 +277,13 @@ export default function BuildingClients() {
             {mainTab === MAIN_TAB_SUPPLIERS
               ? "Поставщики"
               : mainTab === MAIN_TAB_CONTRACTORS
-              ? "Подрядчики"
-              : "Клиенты"}
+                ? "Подрядчики"
+                : "Клиенты"}
           </h1>
           <p className="sell-header__subtitle">
             {mainTab === MAIN_TAB_CLIENTS ? (
               selectedProjectId ? (
-                <>
-              Список
-                  клиентов по объекту
-                </>
+                <>Список клиентов по объекту</>
               ) : (
                 "Выберите жилой комплекс в шапке раздела"
               )
@@ -328,9 +317,7 @@ export default function BuildingClients() {
           <button
             type="button"
             className="sell-header__btn"
-            onClick={() =>
-              navigate("/crm/building/clients/contractors/new")
-            }
+            onClick={() => navigate("/crm/building/clients/contractors/new")}
           >
             Добавить подрядчика
           </button>
@@ -385,7 +372,6 @@ export default function BuildingClients() {
         </div>
       )}
 
-   
       {mainTab === MAIN_TAB_SUPPLIERS && <SuppliersTab />}
       {mainTab === MAIN_TAB_CONTRACTORS && <ContractorsTab />}
 

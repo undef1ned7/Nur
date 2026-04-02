@@ -476,6 +476,85 @@
     }
   }
 
+  &__users-sold-qty {
+    white-space: nowrap;
+  }
+
+  &__table-row--expandable {
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid #f7d617;
+      outline-offset: -2px;
+    }
+  }
+
+  &__users-products-col {
+    width: 88px;
+    text-align: center;
+  }
+
+  &__users-products-toggle {
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  &__users-products-toggle-inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__users-chevron {
+    color: #6b7280;
+    transition: transform 0.2s ease;
+
+    &--open {
+      transform: rotate(-180deg);
+    }
+  }
+
+  &__users-products-dropdown {
+    td {
+      padding: 0 !important;
+      border-bottom: 1px solid #e5e7eb !important;
+      background: #fafafa;
+    }
+
+    &:hover td {
+      background: #fafafa;
+    }
+  }
+
+  &__users-products-dropdown-panel {
+    padding: 12px 16px 14px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  &__users-sold-products {
+    margin: 0;
+    padding-left: 1.15em;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #374151;
+
+    li {
+      margin: 0.2em 0;
+    }
+  }
+
+  &__users-product-names-line {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #374151;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+
   // Status badges
   &__status {
     display: inline-block;

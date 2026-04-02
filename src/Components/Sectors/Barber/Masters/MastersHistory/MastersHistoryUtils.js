@@ -1,7 +1,7 @@
 // MastersHistoryUtils.js
 
 /* ===== базовые утилиты ===== */
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 100;
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -39,10 +39,7 @@ export const fmtMoney = (v) =>
 
 /* ===== name helpers ===== */
 export const fullNameEmp = (e) =>
-  [e?.last_name || "", e?.first_name || ""]
-    .filter(Boolean)
-    .join(" ")
-    .trim() ||
+  [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim() ||
   e?.email ||
   "—";
 
@@ -60,7 +57,7 @@ export const serviceNamesFromRecord = (r, services) => {
   if (Array.isArray(r.services) && r.services.length) {
     const m = new Map(services.map((s) => [String(s.id), s]));
     const names = r.services.map(
-      (id) => m.get(String(id))?.service_name || m.get(String(id))?.name || id
+      (id) => m.get(String(id))?.service_name || m.get(String(id))?.name || id,
     );
     return names.join(", ");
   }
@@ -105,7 +102,7 @@ export const priceOfAppointment = (a, services) => {
   if (Array.isArray(a.services_details) && a.services_details.length) {
     const s = a.services_details.reduce(
       (acc, it) => acc + (num(it?.price) || 0),
-      0
+      0,
     );
     if (s > 0) return s;
   }
@@ -114,7 +111,7 @@ export const priceOfAppointment = (a, services) => {
     const m = new Map(services.map((s) => [String(s.id), s]));
     const s = a.services.reduce(
       (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
-      0
+      0,
     );
     if (s > 0) return s;
   }
@@ -161,7 +158,7 @@ export const basePriceOfAppointment = (a, services) => {
   if (Array.isArray(a.services_details) && a.services_details.length) {
     const s = a.services_details.reduce(
       (acc, it) => acc + (num(it?.price) || 0),
-      0
+      0,
     );
     if (s > 0) return s;
   }
@@ -170,7 +167,7 @@ export const basePriceOfAppointment = (a, services) => {
     const m = new Map(services.map((s) => [String(s.id), s]));
     const s = a.services.reduce(
       (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
-      0
+      0,
     );
     if (s > 0) return s;
   }

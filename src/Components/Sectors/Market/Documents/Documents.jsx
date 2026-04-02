@@ -76,7 +76,7 @@ const Documents = () => {
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 100;
   const getDocumentNumber = (index, prefix = "ЧЕК") => {
     const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
@@ -160,7 +160,7 @@ const Documents = () => {
         fetchDocuments({
           page: currentPage,
           search: debouncedSearchTerm,
-        })
+        }),
       );
     }
   }, [dispatch, activeTab, currentPage, debouncedSearchTerm]);
@@ -213,15 +213,18 @@ const Documents = () => {
   const handleSaved = async () => {
     // Перезагружаем документы после сохранения
     if (activeTab === "receipts" || activeTab === "invoices") {
-      try { 
+      try {
         await dispatch(
           fetchDocuments({
             page: currentPage,
             search: debouncedSearchTerm,
-          })
+          }),
         ).unwrap();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при сохранении документа. ")
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при сохранении документа. ",
+        );
         alert(errorMessage, true);
       }
     }
@@ -243,7 +246,7 @@ const Documents = () => {
 
           // Генерируем PDF из JSON используя InvoicePdfDocument
           const blob = await pdf(
-            <InvoicePdfDocument data={invoiceData} />
+            <InvoicePdfDocument data={invoiceData} />,
           ).toBlob();
 
           const fileName = `invoice_${
@@ -269,7 +272,7 @@ const Documents = () => {
         if (!isPrinterConnected) {
           alert(
             "Принтер не подключен. Пожалуйста, подключите принтер перед печатью.",
-            true
+            true,
           );
           return;
         }
@@ -290,7 +293,7 @@ const Documents = () => {
               total: parseFloat(documentData.totals?.total || 0),
               subtotal: parseFloat(documentData.totals?.subtotal || 0),
               discount_total: parseFloat(
-                documentData.totals?.discount_total || 0
+                documentData.totals?.discount_total || 0,
               ),
               company: documentData.company?.name || "",
               payment: documentData.payment || {},
@@ -304,7 +307,7 @@ const Documents = () => {
         }
       }
     } catch (printError) {
-      const errorMessage = validateResErrors(printError, "Ошибка при печати. ")
+      const errorMessage = validateResErrors(printError, "Ошибка при печати. ");
       alert(errorMessage, true);
     }
   };
@@ -378,139 +381,138 @@ const Documents = () => {
 
       {/* Table */}
       <DataContainer>
-
-      <div className="documents__table-wrapper">
-        <table className="documents__table">
-          <thead>
-            <tr>
-              {activeTab === "receipts" && (
-                <>
-                  <th>Номер</th>
-                  <th>Дата и время</th>
-                  <th>Клиент</th>
-                  <th>Товаров</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </>
-              )}
-              {activeTab === "invoices" && (
-                <>
-                  <th>Номер</th>
-                  <th>Дата</th>
-                  <th>Контрагент</th>
-                  <th>Позиций</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {documentsLoading ? (
+        <div className="documents__table-wrapper">
+          <table className="documents__table">
+            <thead>
               <tr>
-                <td colSpan={7} className="documents__empty">
-                  Загрузка...
-                </td>
+                {activeTab === "receipts" && (
+                  <>
+                    <th>Номер</th>
+                    <th>Дата и время</th>
+                    <th>Клиент</th>
+                    <th>Товаров</th>
+                    <th>Сумма</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                  </>
+                )}
+                {activeTab === "invoices" && (
+                  <>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Контрагент</th>
+                    <th>Позиций</th>
+                    <th>Сумма</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                  </>
+                )}
               </tr>
-            ) : getCurrentData().length === 0 ? (
-              <tr>
-                <td colSpan={7} className="documents__empty">
-                  Документы не найдены
-                </td>
-              </tr>
-            ) : (
-              getCurrentData().map((item, idx) => (
-                <tr key={item.id}>
-                  {activeTab === "receipts" && (
-                    <>
-                      <td>{item.number}</td>
-                      <td>{item.date}</td>
-                      <td>{item.client}</td>
-                      <td>{item.products}</td>
-                      <td>{formatAmount(item.amount)} сом</td>
-                      <td>
-                        <span
-                          className={`documents__status documents__status--${item.statusType}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="documents__actions">
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handleView(item)}
-                            title="Просмотр"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {/* <button
-                            className="documents__action-btn"
-                            onClick={() => handleEdit(item)}
-                            title="Редактировать"
-                          >
-                            <Pencil size={18} />
-                          </button> */}
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handlePrint(item)}
-                            title="Печать"
-                          >
-                            <Printer size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
-                  {activeTab === "invoices" && (
-                    <>
-                      <td>{item.number}</td>
-                      <td>{item.date}</td>
-                      <td>{item.counterparty}</td>
-                      <td>{item.positions}</td>
-                      <td>{formatAmount(item.amount)} сом</td>
-                      <td>
-                        <span
-                          className={`documents__status documents__status--${item.statusType}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="documents__actions">
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handleView(item)}
-                            title="Просмотр"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {/* <button
-                            className="documents__action-btn"
-                            onClick={() => handleEdit(item)}
-                            title="Редактировать"
-                          >
-                            <Pencil size={18} />
-                          </button> */}
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handlePrint(item)}
-                            title="Печать"
-                          >
-                            <Printer size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
+            </thead>
+            <tbody>
+              {documentsLoading ? (
+                <tr>
+                  <td colSpan={7} className="documents__empty">
+                    Загрузка...
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : getCurrentData().length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="documents__empty">
+                    Документы не найдены
+                  </td>
+                </tr>
+              ) : (
+                getCurrentData().map((item, idx) => (
+                  <tr key={item.id}>
+                    {activeTab === "receipts" && (
+                      <>
+                        <td>{item.number}</td>
+                        <td>{item.date}</td>
+                        <td>{item.client}</td>
+                        <td>{item.products}</td>
+                        <td>{formatAmount(item.amount)} сом</td>
+                        <td>
+                          <span
+                            className={`documents__status documents__status--${item.statusType}`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="documents__actions">
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handleView(item)}
+                              title="Просмотр"
+                            >
+                              <Eye size={18} />
+                            </button>
+                            {/* <button
+                            className="documents__action-btn"
+                            onClick={() => handleEdit(item)}
+                            title="Редактировать"
+                          >
+                            <Pencil size={18} />
+                          </button> */}
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handlePrint(item)}
+                              title="Печать"
+                            >
+                              <Printer size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                    {activeTab === "invoices" && (
+                      <>
+                        <td>{item.number}</td>
+                        <td>{item.date}</td>
+                        <td>{item.counterparty}</td>
+                        <td>{item.positions}</td>
+                        <td>{formatAmount(item.amount)} сом</td>
+                        <td>
+                          <span
+                            className={`documents__status documents__status--${item.statusType}`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="documents__actions">
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handleView(item)}
+                              title="Просмотр"
+                            >
+                              <Eye size={18} />
+                            </button>
+                            {/* <button
+                            className="documents__action-btn"
+                            onClick={() => handleEdit(item)}
+                            title="Редактировать"
+                          >
+                            <Pencil size={18} />
+                          </button> */}
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handlePrint(item)}
+                              title="Печать"
+                            >
+                              <Printer size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </DataContainer>
 
       {/* Пагинация для чеков и накладных */}

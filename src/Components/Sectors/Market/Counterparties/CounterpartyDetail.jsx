@@ -763,6 +763,27 @@ const CounterpartyDetail = () => {
             <div className="counterparty-detail-page__summary-cards">
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
                 <span className="counterparty-detail-page__summary-label">
+                  Продажи
+                </span>
+                <span className="counterparty-detail-page__summary-value">
+                  {counterpartyAnalytics
+                    ? `${fmtRu2(counterpartyAnalytics.sales?.total)} COM`
+                    : loadingOperations
+                      ? "…"
+                      : "—"}
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  {counterpartyAnalytics
+                    ? `${counterpartyAnalytics.sales?.count ?? 0} док. · наличные ${fmtRu2(
+                        counterpartyAnalytics.sales?.cash_total,
+                      )} · в долг ${fmtRu2(
+                        counterpartyAnalytics.sales?.credit_total,
+                      )}`
+                    : ""}
+                </span>
+              </div>
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--saldo">
+                <span className="counterparty-detail-page__summary-label">
                   Сальдо
                 </span>
                 <span className="counterparty-detail-page__summary-value">
@@ -771,17 +792,6 @@ const CounterpartyDetail = () => {
                     : loadingOperations
                       ? "…"
                       : "—"}
-                </span>
-                <span className="counterparty-detail-page__summary-hint">
-                  {counterpartyAnalytics
-                    ? `Продажи: ${fmtRu2(counterpartyAnalytics.sales?.total)} COM · ${
-                        counterpartyAnalytics.sales?.count ?? 0
-                      } док. · наличные ${fmtRu2(
-                        counterpartyAnalytics.sales?.cash_total,
-                      )} · в долг ${fmtRu2(
-                        counterpartyAnalytics.sales?.credit_total,
-                      )}`
-                    : ""}
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">

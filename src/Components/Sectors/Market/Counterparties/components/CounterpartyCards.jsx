@@ -8,9 +8,7 @@ import "./CounterpartyCards.scss";
 const CounterpartyCard = React.memo(
   ({
     counterparty,
-    isSelected,
     rowNumber,
-    onRowSelect,
     onCounterpartyClick,
     showAgentColumn,
   }) => {
@@ -32,16 +30,6 @@ const CounterpartyCard = React.memo(
     return (
       <div className="warehouse-table__row warehouse-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
         <div className="flex items-start gap-3">
-          <div className="pt-1" onClick={(e) => onRowSelect(counterparty.id, e)}>
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => onRowSelect(counterparty.id, e)}
-              onClick={(e) => e.stopPropagation()}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-          </div>
-
           <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xl">
             👥
           </div>
@@ -122,7 +110,6 @@ const CounterpartyCard = React.memo(
   (prevProps, nextProps) => {
     return (
       prevProps.counterparty.id === nextProps.counterparty.id &&
-      prevProps.isSelected === nextProps.isSelected &&
       prevProps.rowNumber === nextProps.rowNumber &&
       prevProps.showAgentColumn === nextProps.showAgentColumn
     );
@@ -137,22 +124,16 @@ CounterpartyCard.displayName = "CounterpartyCard";
 const CounterpartyCards = ({
   counterparties,
   loading,
-  selectedRows,
-  isAllSelected,
-  onRowSelect,
-  onSelectAll,
   onCounterpartyClick,
   getRowNumber,
   showAgentColumn = false,
 }) => {
-  const selectedRowsSize = selectedRows.size;
   const counterpartiesData = useMemo(() => {
     return counterparties.map((counterparty, index) => ({
       counterparty,
-      isSelected: selectedRows.has(counterparty.id),
       rowNumber: getRowNumber(index, counterparties.length),
     }));
-  }, [counterparties, selectedRows, selectedRowsSize, getRowNumber]);
+  }, [counterparties, getRowNumber]);
 
   if (loading && counterparties.length === 0) {
     return (
@@ -177,34 +158,12 @@ const CounterpartyCards = ({
           <div className="text-sm text-slate-600">Загрузка...</div>
         </div>
       )}
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <label
-          className="flex items-center gap-2 text-sm text-slate-700"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={isAllSelected}
-            onChange={onSelectAll}
-            disabled={loading}
-            className="h-4 w-4 rounded border-slate-300"
-          />
-          Выбрать все
-        </label>
-
-        <div className="text-sm text-slate-600">
-          Выбрано: <span className="font-semibold">{selectedRows.size}</span>
-        </div>
-      </div>
-
       <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {counterpartiesData.map((data) => (
           <CounterpartyCard
             key={data.counterparty.id}
             counterparty={data.counterparty}
-            isSelected={data.isSelected}
             rowNumber={data.rowNumber}
-            onRowSelect={onRowSelect}
             onCounterpartyClick={onCounterpartyClick}
             showAgentColumn={showAgentColumn}
           />
@@ -217,8 +176,6 @@ const CounterpartyCards = ({
 const areEqual = (prevProps, nextProps) => {
   if (
     prevProps.loading !== nextProps.loading ||
-    prevProps.isAllSelected !== nextProps.isAllSelected ||
-    prevProps.selectedRows.size !== nextProps.selectedRows.size ||
     prevProps.getRowNumber !== nextProps.getRowNumber ||
     prevProps.showAgentColumn !== nextProps.showAgentColumn
   ) {

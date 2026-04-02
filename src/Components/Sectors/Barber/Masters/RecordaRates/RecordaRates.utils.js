@@ -1,5 +1,5 @@
 // RecordaRates.utils.js
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 100;
 
 export const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -32,7 +32,7 @@ export const dateKG = (iso) => {
   if (!Number.isFinite(t)) return "";
   const d = new Date(t + KG_OFFSET_MS);
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(
-    d.getUTCDate()
+    d.getUTCDate(),
   )}`;
 };
 

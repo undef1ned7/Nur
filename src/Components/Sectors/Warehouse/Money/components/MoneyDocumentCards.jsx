@@ -5,10 +5,13 @@ import "./MoneyDocumentCards.scss";
 const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) + " с";
 
+/** 02.04.2026:00:35:20 */
 const fmtDate = (v) => {
-  if (!v) return "—";
+  if (v == null || v === "") return "—";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("ru-RU");
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
 const statusLabel = (s) =>

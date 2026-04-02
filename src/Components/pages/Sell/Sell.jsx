@@ -89,7 +89,7 @@ const paymentMethodTranslate = {
   transfer: "Перевод",
   debt: "Долг",
 };
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 const Sell = () => {
   const navigate = useNavigate();

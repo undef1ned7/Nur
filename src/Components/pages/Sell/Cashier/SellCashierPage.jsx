@@ -840,7 +840,7 @@ const SellCashierPage = () => {
   // Расчет пагинации
   // Используем фиксированный размер страницы
   // Если есть next или previous, значит есть еще страницы
-  const PAGE_SIZE = 50; // Размер страницы для API
+  const PAGE_SIZE = 100; // Размер страницы для API
   const hasNextPage = !!next;
   const hasPrevPage = !!previous;
 
@@ -1872,12 +1872,9 @@ const SellCashierPage = () => {
                           }}
                           onBlur={(e) => {
                             const v = e.target.value;
-                            const mode =
-                              cartDiscountModes[item.id] || "amount";
+                            const mode = cartDiscountModes[item.id] || "amount";
                             const num = parseFloat(v);
-                            const current = parseFloat(
-                              item.discountTotal ?? 0,
-                            );
+                            const current = parseFloat(item.discountTotal ?? 0);
 
                             if (v === "" || isNaN(num) || num < 0) {
                               return;
@@ -2043,9 +2040,7 @@ const SellCashierPage = () => {
                               // Если количество не изменилось, просто обновляем локальное значение
                               setCartQuantities((prev) => ({
                                 ...prev,
-                                [item.id]: formatQuantity(
-                                  item.quantity || 0,
-                                ),
+                                [item.id]: formatQuantity(item.quantity || 0),
                               }));
                             }
                           }}
@@ -2160,8 +2155,8 @@ const SellCashierPage = () => {
           discountValue={discountValue}
           setDiscountValue={setDiscountValue}
           currentSubtotal={currentSale?.subtotal || 0}
-           mode={discountMode}
-           setMode={setDiscountMode}
+          mode={discountMode}
+          setMode={setDiscountMode}
           onApply={(discount) => {
             handleDiscountChange(discount, discountMode);
             setShowDiscountModal(false);

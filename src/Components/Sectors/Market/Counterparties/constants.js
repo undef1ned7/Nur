@@ -1,6 +1,6 @@
 // Константы для компонента Counterparties
 export const STORAGE_KEY = "counterparties_view_mode";
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 100;
 export const DEBOUNCE_DELAY = 300;
 
 export const VIEW_MODES = {
@@ -34,4 +34,3 @@ export const getInitialViewMode = () => {
   const isSmall = window.matchMedia("(max-width: 1199px)").matches;
   return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
 };
-
