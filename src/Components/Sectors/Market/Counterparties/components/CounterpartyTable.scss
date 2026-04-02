@@ -25,6 +25,7 @@
     text-align: left;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    padding: 12px 16px;
   }
 
   &__money--strong {
@@ -37,5 +38,10 @@
       background: #f8fafc;
       border-top: 1px solid #e2e8f0;
     }
+  }
+
+  &__total-row--top td {
+    border-top: none;
+    border-bottom: 1px solid #e2e8f0;
   }
 }

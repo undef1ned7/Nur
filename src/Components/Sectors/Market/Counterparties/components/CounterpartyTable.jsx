@@ -130,6 +130,50 @@ const CounterpartyTable = ({
     );
   }, [counterparties]);
 
+  const renderTotalsRow = (variant = "bottom") => (
+    <tr
+      className={`warehouse-table__total-row ${
+        variant === "top" ? "warehouse-table__total-row--top" : ""
+      }`}
+    >
+      <td></td>
+      <td>Итого</td>
+      <td
+        className="warehouse-table__money"
+        style={
+          totals.hasOpeningDebit ? { textAlign: "right" } : { textAlign: "center" }
+        }
+      >
+        {totals.hasOpeningDebit ? formatMoneyRu(totals.openingDebit) : "—"}
+      </td>
+      <td
+        className="warehouse-table__money"
+        style={
+          totals.hasOpeningCredit
+            ? { textAlign: "right" }
+            : { textAlign: "center" }
+        }
+      >
+        {totals.hasOpeningCredit
+          ? formatMoneyRu(totals.openingCredit)
+          : "—"}
+      </td>
+      <td className="warehouse-table__money text-center">
+        {formatMoneyRu(totals.turnoverDebit)}
+      </td>
+      <td className="warehouse-table__money text-center">
+        {formatMoneyRu(totals.turnoverCredit)}
+      </td>
+      <td className="warehouse-table__money warehouse-table__money--strong">
+        {formatMoneyRu(totals.closingDebit)}
+      </td>
+      <td className="warehouse-table__money warehouse-table__money--strong">
+        {formatMoneyRu(totals.closingCredit)}
+      </td>
+      {showAgentColumn && <td></td>}
+    </tr>
+  );
+
   if (loading && counterparties.length === 0) {
     return (
       <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -216,6 +260,7 @@ const CounterpartyTable = ({
           </tr>
         </thead>
         <tbody>
+          {renderTotalsRow("top")}
           {counterpartiesData.map((data) => (
             <CounterpartyRow
               key={data.counterparty.id}
@@ -226,49 +271,7 @@ const CounterpartyTable = ({
             />
           ))}
         </tbody>
-        <tfoot>
-          <tr className="warehouse-table__total-row">
-            <td></td>
-            <td>Итого</td>
-            <td
-              className={"warehouse-table__money"}
-              style={
-                totals.hasOpeningCredit
-                  ? { textAlign: "right" }
-                  : { textAlign: "center" }
-              }
-            >
-              {totals.hasOpeningDebit
-                ? formatMoneyRu(totals.openingDebit)
-                : "—"}
-            </td>
-            <td
-              className="warehouse-table__money"
-              style={
-                totals.hasOpeningCredit
-                  ? { textAlign: "right" }
-                  : { textAlign: "center" }
-              }
-            >
-              {totals.hasOpeningCredit
-                ? formatMoneyRu(totals.openingCredit)
-                : "—"}
-            </td>
-            <td className="warehouse-table__money text-center">
-              {formatMoneyRu(totals.turnoverDebit)}
-            </td>
-            <td className="warehouse-table__money text-center">
-              {formatMoneyRu(totals.turnoverCredit)}
-            </td>
-            <td className="warehouse-table__money warehouse-table__money--strong">
-              {formatMoneyRu(totals.closingDebit)}
-            </td>
-            <td className="warehouse-table__money warehouse-table__money--strong">
-              {formatMoneyRu(totals.closingCredit)}
-            </td>
-            {showAgentColumn && <td></td>}
-          </tr>
-        </tfoot>
+        <tfoot>{renderTotalsRow("bottom")}</tfoot>
       </table>
     </div>
   );

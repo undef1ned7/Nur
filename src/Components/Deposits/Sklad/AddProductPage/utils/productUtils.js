@@ -181,6 +181,29 @@ export const buildProductPayload = ({
   const promotionRulesInput = stockPromotional
     ? buildPromotionRulesInput(marketData.promotionRules || [])
     : [];
+  const isPieceSaleEnabled =
+    itemType === "product" ? Boolean(marketData.enablePieceSale) : true;
+
+  const packagingItems = (marketData.packagings || [])
+    .filter((pkg) => pkg.name && String(pkg.name).trim())
+    .map((pkg) => {
+      const quantityInPackage = Number(pkg.quantity || 1);
+      const pieceUnitPriceRaw = String(
+        pkg.piece_unit_price ?? pkg.pieceUnitPrice ?? "",
+      )
+        .trim()
+        .replace(",", ".");
+      const parsedPieceUnitPrice = Number(pieceUnitPriceRaw);
+      return {
+        name: String(pkg.name).trim(),
+        quantity_in_package: quantityInPackage > 0 ? quantityInPackage : 1,
+        unit: marketData.unit || "шт",
+        piece_unit_price:
+          pieceUnitPriceRaw !== "" && Number.isFinite(parsedPieceUnitPrice)
+            ? pieceUnitPriceRaw
+            : "0",
+      };
+    });
 
   if (itemType === "product") {
     payload = {
@@ -190,6 +213,7 @@ export const buildProductPayload = ({
       quantity: quantityValue,
       stock: stockPromotional,
       promotion_rules_input: promotionRulesInput,
+      packages_input: isPieceSaleEnabled ? packagingItems : [],
     };
   } else if (itemType === "service") {
     payload = {
@@ -207,17 +231,23 @@ export const buildProductPayload = ({
         name: product.name || "",
         quantity_in_package: Number(product.quantity || 1),
         unit: product.unit || marketData.unit || "шт",
+        piece_unit_price: "0",
       }));
 
-    const packagingItems = (marketData.packagings || [])
+    const kitPackagingItems = (marketData.packagings || [])
       .filter((pkg) => pkg.name && pkg.name.trim())
       .map((pkg) => ({
         name: pkg.name.trim(),
         quantity_in_package: Number(pkg.quantity || 1),
         unit: marketData.unit || "шт",
+        piece_unit_price: String(
+          pkg.piece_unit_price ?? pkg.pieceUnitPrice ?? "0",
+        )
+          .trim()
+          .replace(",", "."),
       }));
 
-    const allPackages = [...kitPackages, ...packagingItems];
+    const allPackages = [...kitPackages, ...kitPackagingItems];
 
     payload = {
       ...payload,
@@ -293,6 +323,26 @@ export const validateProductData = ({
       errors.promotion_rules = partial
         ? "Проверьте ступени: сумма от ≥ 0, скидка 0,01–100%, лимит шт. — целое ≥ 1 или пусто"
         : "Для акционного товара добавьте хотя бы одну ступень скидки";
+    }
+  }
+
+  if (itemType === "product" && Boolean(marketData.enablePieceSale)) {
+    const packagings = Array.isArray(marketData.packagings)
+      ? marketData.packagings.filter((pkg) => String(pkg?.name || "").trim())
+      : [];
+    const hasInvalidPackaging = packagings.some((pkg) => {
+      const qty = Number(pkg?.quantity);
+      const piecePriceStr = String(
+        pkg?.piece_unit_price ?? pkg?.pieceUnitPrice ?? "",
+      )
+        .trim()
+        .replace(",", ".");
+      const piecePrice = Number(piecePriceStr);
+      return !(qty > 0) || piecePriceStr === "" || !Number.isFinite(piecePrice) || piecePrice < 0;
+    });
+    if (hasInvalidPackaging) {
+      errors.packagings =
+        "Для каждой упаковки заполните количество > 0 и цену за штуку (>= 0)";
     }
   }
 

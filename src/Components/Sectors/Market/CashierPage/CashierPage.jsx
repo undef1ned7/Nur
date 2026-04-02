@@ -118,6 +118,27 @@ const CashierPage = () => {
     return packages.find((pkg) => Number(pkg?.quantity_in_package) > 0) || null;
   };
 
+  /**
+   * Считает суммарное потребление пачек для товара по всем строкам корзины.
+   * items — currentSale.items
+   * productId — ID товара
+   * productsList — список товаров (для поиска packages)
+   */
+  const calcTotalConsumeForProduct = (items, productId, productsList) => {
+    const product = productsList.find((p) => p.id === productId);
+    return items
+      .filter((item) => (item.product || item.product_id) === productId)
+      .reduce((sum, item) => {
+        const qty = parseFloat(item.quantity) || 0;
+        if (item.sale_package) {
+          const pkg = product?.packages?.find((p) => p.id === item.sale_package);
+          const qip = Number(pkg?.quantity_in_package);
+          return sum + (qip > 0 ? qty / qip : 0);
+        }
+        return sum + qty;
+      }, 0);
+  };
+
   // Функция для поиска открытой смены на всех страницах
   const findOpenShift = useCallback(async () => {
     try {
@@ -1167,9 +1188,11 @@ const CashierPage = () => {
       const existingItem = items.find((item) => {
         const itemProductId = item.product || item.product_id;
         const itemSalePackage = item.sale_package || null;
+        const normalizedItemPkg = itemSalePackage ?? null;
+        const normalizedNewPkg = salePackageId ?? null;
         return (
           itemProductId === product.id &&
-          itemSalePackage === (salePackageId || null)
+          normalizedItemPkg === normalizedNewPkg
         );
       });
 
@@ -1233,11 +1256,11 @@ const CashierPage = () => {
 
       const currentQty = normalizeQuantity(existingItem.quantity);
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
+      const availableQuantity = parseFloat(product.quantity || 0);
 
       // Проверяем наличие при увеличении количества
       if (delta > 0 && !item.salePackage) {
         // Для весовых товаров stock может быть false, но quantity > 0
-        const availableQuantity = parseFloat(product.quantity || 0);
         const isInStock = availableQuantity > 0;
 
         if (!isInStock) {
@@ -1250,6 +1273,43 @@ const CashierPage = () => {
         }
 
         if (availableQuantity > 0 && newQuantity > availableQuantity) {
+          showAlert(
+            "warning",
+            "Недостаточно товара",
+            `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+          );
+          return;
+        }
+      } else if (delta > 0 && item.salePackage) {
+        const isInStock = availableQuantity > 0;
+        if (!isInStock) {
+          showAlert(
+            "warning",
+            "Товар отсутствует",
+            "Товар отсутствует в наличии",
+          );
+          return;
+        }
+        const qip = Number(
+          product?.packages?.find((p) => p.id === item.salePackage)
+            ?.quantity_in_package,
+        );
+        if (!(qip > 0)) {
+          showAlert(
+            "error",
+            "Ошибка упаковки",
+            "Для поштучной продажи не найдена корректная упаковка товара",
+          );
+          return;
+        }
+        const totalConsume = calcTotalConsumeForProduct(
+          items,
+          item.productId,
+          products,
+        );
+        const newTotalConsume =
+          totalConsume - currentQty / qip + newQuantity / qip;
+        if (newTotalConsume > availableQuantity) {
           showAlert(
             "warning",
             "Недостаточно товара",
@@ -1320,9 +1380,9 @@ const CashierPage = () => {
       const qtyNum = normalizeQuantity(
         Math.max(0, parseFloat(newQuantity) || 0),
       );
+      const availableQuantity = parseFloat(product.quantity || 0);
 
       // Проверяем наличие
-      const availableQuantity = parseFloat(product.quantity || 0);
       if (
         !item.salePackage &&
         availableQuantity > 0 &&
@@ -1334,6 +1394,44 @@ const CashierPage = () => {
           `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
         );
         return;
+      } else if (item.salePackage) {
+        if (!(availableQuantity > 0)) {
+          showAlert(
+            "warning",
+            "Товар отсутствует",
+            "Товар отсутствует в наличии",
+          );
+          return;
+        }
+        const items = currentSale?.items || currentSale?.cart?.items || [];
+        const currentItem = items.find((el) => el.id === item.itemId);
+        const currentQty = normalizeQuantity(currentItem?.quantity || 0);
+        const qip = Number(
+          product?.packages?.find((p) => p.id === item.salePackage)
+            ?.quantity_in_package,
+        );
+        if (!(qip > 0)) {
+          showAlert(
+            "error",
+            "Ошибка упаковки",
+            "Для поштучной продажи не найдена корректная упаковка товара",
+          );
+          return;
+        }
+        const totalConsume = calcTotalConsumeForProduct(
+          items,
+          item.productId,
+          products,
+        );
+        const newTotalConsume = totalConsume - currentQty / qip + qtyNum / qip;
+        if (newTotalConsume > availableQuantity) {
+          showAlert(
+            "warning",
+            "Недостаточно товара",
+            `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+          );
+          return;
+        }
       }
 
       if (qtyNum === 0) {
@@ -1415,7 +1513,7 @@ const CashierPage = () => {
   // Без скидки по строке — цена не может быть ниже закупочной; при наличии скидки — можно.
   const patchCartItemPrice = async (item, value) => {
     if (!currentSale?.id) return;
-    const cartItemId = item.isCustom ? item.itemId : item.id;
+    const cartItemId = item.itemId;
     const num = normalizePrice(parseFloat(value) || 0);
     const hasDiscount = parseFloat(item.discountTotal ?? 0) > 0;
     if (!item.isCustom && item.productId && !hasDiscount) {
@@ -1460,7 +1558,7 @@ const CashierPage = () => {
   const patchCartItemDiscount = async (item, value, options = {}) => {
     const { mode = "amount", displayValue } = options;
     if (!currentSale?.id) return;
-    const cartItemId = item.isCustom ? item.itemId : item.id;
+    const cartItemId = item.itemId;
     const lineTotal = (item.price || 0) * (item.quantity || 0);
     let num = Math.max(0, normalizePrice(parseFloat(value) || 0));
     if (num > lineTotal) {
@@ -1534,20 +1632,11 @@ const CashierPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    const cartItemsMap = new Map();
-    (currentSale?.items || []).forEach((el) => {
-      const productId = el.product || el.product_id;
-      if (!productId) return;
-      const prev = cartItemsMap.get(productId) || { qty: 0 };
-      cartItemsMap.set(productId, {
-        qty: prev.qty + (parseFloat(el.quantity) || 0),
-      });
-    });
+    const items = currentSale?.items || [];
     return products
       .map((el) => {
         const qty = parseFloat(el.quantity);
-        const cartItem = cartItemsMap.get(el.id);
-        const cartQty = cartItem?.qty || 0;
+        const cartQty = calcTotalConsumeForProduct(items, el.id, products);
         const primaryImg = el.images.find((el) => el.is_primary);
         return {
           ...el,
@@ -1816,7 +1905,10 @@ const CashierPage = () => {
               </div>
             ) : (
               filteredProducts.map((product) => {
-                const cartItem = cart.find((item) => item.id === product.id);
+                const piecePackage = getDefaultPiecePackage(product);
+                const cartItem = cart.find(
+                  (item) => !item.isCustom && item.productId === product.id,
+                );
                 return (
                   <div
                     key={product.id}
@@ -1839,7 +1931,7 @@ const CashierPage = () => {
 
                     <div className="cashier-page__product-stock flex items-center gap-2">
                       {product.quantity || 0} {product.unit || "шт"}
-                      {getDefaultPiecePackage(product) && (
+                      {piecePackage && (
                         <button
                           type="button"
                           className="cashier-page__cart-item-btn cursor-pointer"
@@ -1847,13 +1939,12 @@ const CashierPage = () => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            const pkg = getDefaultPiecePackage(product);
-                            if (!pkg?.id) return;
-                            addToCartWithPackage(product, pkg.id);
+                            if (!piecePackage?.id) return;
+                            addToCartWithPackage(product, piecePackage.id);
                           }}
-                          title="Добавить 1 шт (поштучно)"
+                          title={`Добавить 1 шт из упаковки (${piecePackage.quantity_in_package} в упаковке)`}
                         >
-                          +1 шт
+                          +1 шт (из {piecePackage.quantity_in_package})
                         </button>
                       )}
                     </div>
@@ -2256,6 +2347,44 @@ const CashierPage = () => {
                                     ...prev,
                                     [item.id]: String(availableQuantity),
                                   }));
+                                  showAlert(
+                                    "warning",
+                                    "Недостаточно товара",
+                                    `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+                                  );
+                                  return;
+                                }
+                              }
+                            }
+                            if (!item.isCustom && item.salePackage) {
+                              const product = products.find(
+                                (p) => p.id === item.productId,
+                              );
+                              const items =
+                                currentSale?.items || currentSale?.cart?.items || [];
+                              const currentItem = items.find(
+                                (el) => el.id === item.itemId,
+                              );
+                              const currentQty = normalizeQuantity(
+                                currentItem?.quantity || 0,
+                              );
+                              const qip = Number(
+                                product?.packages?.find(
+                                  (p) => p.id === item.salePackage,
+                                )?.quantity_in_package,
+                              );
+                              if (product && qip > 0) {
+                                const totalConsume = calcTotalConsumeForProduct(
+                                  items,
+                                  item.productId,
+                                  products,
+                                );
+                                const newTotalConsume =
+                                  totalConsume - currentQty / qip + numValue / qip;
+                                const availableQuantity = parseFloat(
+                                  product.quantity || 0,
+                                );
+                                if (newTotalConsume > availableQuantity) {
                                   showAlert(
                                     "warning",
                                     "Недостаточно товара",

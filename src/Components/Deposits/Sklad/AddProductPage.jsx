@@ -113,6 +113,7 @@ const AddProductPage = () => {
     expiryDate: "",
     kitProducts: [], // Для комплекта
     kitSearchTerm: "",
+    enablePieceSale: false, // Продажа поштучно через упаковки (только для товара)
     packagings: [], // Список упаковок
     stock: false, // Акционный товар (поле stock в API)
     promotionRules: [], // Ступени скидки → promotion_rules_input
@@ -343,10 +344,12 @@ const AddProductPage = () => {
             expiryDate: product.expiration_date || "",
             kitProducts: [], // Будет загружено из packages
             kitSearchTerm: "",
+            enablePieceSale: Boolean((product.packages || []).length),
             packagings: (product.packages || []).map((pkg, idx) => ({
               id: Date.now() + idx,
               name: pkg.name || "",
               quantity: String(pkg.quantity_in_package || 1),
+              pieceUnitPrice: formatPrice3Decimals(pkg.piece_unit_price || ""),
             })),
             stock: Boolean(product.stock),
             promotionRules: utils.normalizePromotionRulesFromApi(
@@ -452,10 +455,12 @@ const AddProductPage = () => {
         expiryDate: product.expiration_date || "",
         kitProducts: [], // Для комплекта можно будет доработать
         kitSearchTerm: "",
+        enablePieceSale: Boolean((product.packages || []).length),
         packagings: (product.packages || []).map((pkg, idx) => ({
           id: Date.now() + idx,
           name: pkg.name || "",
           quantity: String(pkg.quantity_in_package || 1),
+          pieceUnitPrice: formatPrice3DecimalsDup(pkg.piece_unit_price || ""),
         })),
         stock: Boolean(product.stock),
         promotionRules: utils.normalizePromotionRulesFromApi(
@@ -1640,7 +1645,7 @@ const AddProductPage = () => {
 
                   <div className="add-product-page__form-group">
                     <label className="add-product-page__label">
-                      Закупочная цена *
+                      Закупочная цена за 1 {marketData.unit || "ед."} *
                     </label>
                     <div className="add-product-page__price-input">
                       <input
@@ -1664,7 +1669,7 @@ const AddProductPage = () => {
 
                   <div className="add-product-page__form-group">
                     <label className="add-product-page__label">
-                      Розничная цена *
+                      Розничная цена за 1 {marketData.unit || "ед."} *
                     </label>
                     <div className="add-product-page__price-input">
                       <input
@@ -1806,6 +1811,14 @@ const MarketProductForm = ({
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
 
+  const sanitizePriceTo3DecimalsLocal = (val) => {
+    const s = String(val ?? "").replace(",", ".");
+    const cleaned = s.replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 1) return cleaned;
+    return parts[0] + "." + parts.slice(1).join("").slice(0, 3);
+  };
+
   // Закрытие dropdown при клике вне его
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1833,6 +1846,7 @@ const MarketProductForm = ({
       id: Date.now(),
       name: "",
       quantity: "1",
+      pieceUnitPrice: "",
     };
     const currentPackagings = marketData.packagings || [];
     handleMarketDataChange("packagings", [...currentPackagings, packaging]);
@@ -1841,8 +1855,12 @@ const MarketProductForm = ({
   // Обновление упаковки
   const handleUpdatePackaging = (id, field, value) => {
     const currentPackagings = marketData.packagings || [];
+    const normalizedValue =
+      field === "pieceUnitPrice" || field === "piece_unit_price"
+        ? sanitizePriceTo3DecimalsLocal(value)
+        : value;
     const updatedPackagings = currentPackagings.map((p) =>
-      p.id === id ? { ...p, [field]: value } : p,
+      p.id === id ? { ...p, [field]: normalizedValue } : p,
     );
     handleMarketDataChange("packagings", updatedPackagings);
   };
@@ -1854,6 +1872,15 @@ const MarketProductForm = ({
       "packagings",
       currentPackagings.filter((p) => p.id !== id),
     );
+  };
+
+  const handleTogglePieceSale = (enabled) => {
+    handleMarketDataChange("enablePieceSale", enabled);
+    // При выключении поштучной продажи очищаем упаковки,
+    // чтобы случайно не отправить packages_input.
+    if (!enabled) {
+      handleMarketDataChange("packagings", []);
+    }
   };
 
   // Фильтрация стран по поисковому запросу
@@ -2120,11 +2147,15 @@ const MarketProductForm = ({
 
       {/* Единица измерения и Количество */}
       <div className="market-product-form__section">
-        <div className="market-product-form__unit-row justify-between items-center">
-          <div className="market-product-form__form-group w-full">
+        <div className="market-product-form__unit-row justify-between !items-end">
+          <div className="market-product-form__form-group w-full !mb-0">
             <label className="market-product-form__label">
               Единица измерения
             </label>
+            <p className="market-product-form__hint mb-2">
+              Цена закупки и цена продажи указываются за 1{" "}
+              {marketData.unit || "единицу учета"}.
+            </p>
             <div className="flex items-center gap-2 w-full">
               <input
                 type="text"
@@ -2132,13 +2163,25 @@ const MarketProductForm = ({
                 value={marketData.unit}
                 onChange={(e) => handleMarketDataChange("unit", e.target.value)}
               />
-              <button
-                type="button"
-                className="market-product-form__add-packaging-btn"
-                onClick={handleAddPackaging}
-              >
-                Добавить упаковку
-              </button>
+              {itemType === "product" && (
+                <label className="market-product-form__toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(marketData.enablePieceSale)}
+                    onChange={(e) => handleTogglePieceSale(e.target.checked)}
+                  />
+                  <span>Поштучная продажа</span>
+                </label>
+              )}
+              {(itemType !== "product" || marketData.enablePieceSale) && (
+                <button
+                  type="button"
+                  className="market-product-form__add-packaging-btn"
+                  onClick={handleAddPackaging}
+                >
+                  Добавить упаковку
+                </button>
+              )}
             </div>
           </div>
 
@@ -2169,67 +2212,97 @@ const MarketProductForm = ({
             </div>
           )}
         </div>
-        {marketData.packagings && marketData.packagings.length > 0 && (
-          <div className="market-product-form__packaging-list">
-            {marketData.packagings.map((packaging) => (
-              <div
-                key={packaging.id}
-                className="market-product-form__packaging-item"
-              >
-                <div className="market-product-form__packaging-item-row">
-                  <div className="market-product-form__form-group">
-                    <label className="market-product-form__label">
-                      Упаковка
-                    </label>
-                    <input
-                      type="text"
-                      className="market-product-form__input"
-                      placeholder="Введите название упаковки"
-                      value={packaging.name}
-                      onChange={(e) =>
-                        handleUpdatePackaging(
-                          packaging.id,
-                          "name",
-                          e.target.value,
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="market-product-form__form-group">
-                    <label className="market-product-form__label">
-                      Количество в упаковке
-                    </label>
-                    <div className="market-product-form__packaging-quantity">
+        {(itemType !== "product" || marketData.enablePieceSale) &&
+          marketData.packagings &&
+          marketData.packagings.length > 0 && (
+            <div className="market-product-form__packaging-list">
+              {marketData.packagings.map((packaging) => (
+                <div
+                  key={packaging.id}
+                  className="market-product-form__packaging-item"
+                >
+                  <div className="market-product-form__packaging-item-row mt-[20px]">
+                    <div className="market-product-form__form-group">
+                      <label className="market-product-form__label">
+                        Упаковка
+                      </label>
                       <input
                         type="text"
                         className="market-product-form__input"
-                        value={packaging.quantity}
+                        placeholder="Введите название упаковки"
+                        value={packaging.name}
                         onChange={(e) =>
                           handleUpdatePackaging(
                             packaging.id,
-                            "quantity",
+                            "name",
                             e.target.value,
                           )
                         }
                       />
-                      <span className="market-product-form__unit-label">
-                        ШТ
-                      </span>
-                      <button
-                        type="button"
-                        className="market-product-form__remove-packaging-btn"
-                        onClick={() => handleRemovePackaging(packaging.id)}
-                        title="Удалить упаковку"
-                      >
-                        ×
-                      </button>
+                    </div>
+                    <div className="market-product-form__form-group">
+                      <label className="market-product-form__label">
+                        Количество в упаковке
+                      </label>
+                      <div className="market-product-form__packaging-quantity">
+                        <input
+                          type="text"
+                          className="market-product-form__input"
+                          value={packaging.quantity}
+                          onChange={(e) =>
+                            handleUpdatePackaging(
+                              packaging.id,
+                              "quantity",
+                              e.target.value,
+                            )
+                          }
+                        />
+                        <span className="market-product-form__unit-label">
+                          ШТ
+                        </span>
+                        <button
+                          type="button"
+                          className="market-product-form__remove-packaging-btn"
+                          onClick={() => handleRemovePackaging(packaging.id)}
+                          title="Удалить упаковку"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <div className="market-product-form__form-group">
+                      <label className="market-product-form__label">
+                        Цена за штуку
+                      </label>
+                      <div className="market-product-form__packaging-quantity">
+                        <input
+                          type="text"
+                          className="market-product-form__input"
+                          placeholder="0.000"
+                          inputMode="decimal"
+                          value={packaging.pieceUnitPrice || ""}
+                          onChange={(e) =>
+                            handleUpdatePackaging(
+                              packaging.id,
+                              "pieceUnitPrice",
+                              e.target.value,
+                            )
+                          }
+                        />
+                        <span className="market-product-form__unit-label">
+                          COM
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        {(itemType !== "product" || marketData.enablePieceSale) &&
+          fieldErrors.packagings && (
+            <p className="add-product-page__error">{fieldErrors.packagings}</p>
+          )}
         <div className="market-product-form__form-group mt-4">
           <label className="market-product-form__label">Количество *</label>
           <div className="market-product-form__price-input">
@@ -2455,7 +2528,7 @@ const MarketProductForm = ({
             <div className="market-product-form__prices-grid">
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
-                  Цена закупки
+                  Цена закупки (за 1 {marketData.unit || "ед."})
                 </label>
                 <div className="market-product-form__price-input">
                   <input
@@ -2489,7 +2562,7 @@ const MarketProductForm = ({
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
-                  Цена продажи
+                  Цена продажи (за 1 {marketData.unit || "ед."})
                 </label>
                 <div className="market-product-form__price-input">
                   <input
