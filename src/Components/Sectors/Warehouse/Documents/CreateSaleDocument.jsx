@@ -973,7 +973,7 @@ const CreateSaleDocument = () => {
                               } ${isKeyboardActive ? "active" : ""}${
                                 isZeroQty
                                   ? " create-sale-document__group-product-item--zero-qty"
-                                  : ""
+                                  : " create-sale-document__group-product-item--in-stock"
                               }`}
                               onMouseEnter={() => {
                                 setActiveGroupKeyForKeyboard(gKey);
@@ -2625,7 +2625,7 @@ const CreateSaleDocument = () => {
                                         } ${isKeyboardActive ? "active" : ""}${
                                           isZeroQty
                                             ? " create-sale-document__group-product-item--zero-qty"
-                                            : ""
+                                            : " create-sale-document__group-product-item--in-stock"
                                         }`}
                                         onMouseEnter={() => {
                                           setActiveGroupKeyForKeyboard(key);

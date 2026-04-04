@@ -231,6 +231,37 @@ $due-red: #dc2626;
         }
       }
     }
+
+    &--in-stock {
+      box-shadow: inset 3px 0 0 0 #22c55e;
+      background: #f0fdf4;
+
+      .create-sale-document__group-product-name {
+        color: #166534;
+      }
+
+      .create-sale-document__group-product-stock {
+        color: #15803d;
+        font-weight: 700;
+      }
+
+      &:hover {
+        background: #dcfce7;
+      }
+
+      &.active {
+        background: #e0f2fe;
+        box-shadow: inset 3px 0 0 0 #22c55e;
+
+        .create-sale-document__group-product-name {
+          color: #0f172a;
+        }
+
+        .create-sale-document__group-product-stock {
+          color: #15803d;
+        }
+      }
+    }
   }
 
   &__group-children {
