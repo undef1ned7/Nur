@@ -8,7 +8,6 @@ import {
   updateClient,
   removeClient,
   getOrdersByClient,
-  getOrdersStatsByClient,
 } from "./clientStore";
 import "./cafeclients.scss";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
@@ -147,46 +146,6 @@ const CafeClients = () => {
   const anyModalOpen = isFormOpen || !!openId || confirmId != null;
   useBodyScrollLock(anyModalOpen);
 
-  const hydrateStats = useCallback(async (clientsList) => {
-    const ids = clientsList.map((c) => c.id);
-    let idx = 0;
-    const POOL = 4;
-
-    const worker = async () => {
-      while (true) {
-        const i = idx++;
-        if (i >= ids.length) break;
-
-        const id = ids[i];
-        try {
-          const stats = await getOrdersStatsByClient(id);
-          setRows((prev) => {
-            const next = prev.map((c) =>
-              String(c.id) === String(id)
-                ? {
-                  ...c,
-                  orders_count: stats.orders_count,
-                  updated_at_derived: stats.updated_at_derived,
-                }
-                : c
-            );
-            return next.sort(
-              (a, b) =>
-                new Date(b.updated_at_derived || b.updated_at || 0) -
-                new Date(a.updated_at_derived || a.updated_at || 0)
-            );
-          });
-        } catch {
-          // ignore
-        }
-      }
-    };
-
-    await Promise.all(
-      Array.from({ length: Math.min(POOL, ids.length) }, worker)
-    );
-  }, []);
-
   const load = useCallback(async () => {
     try {
       setLoading(true);
@@ -230,14 +189,13 @@ const CafeClients = () => {
         )
       );
 
-      hydrateStats(augmented);
     } catch (e) {
       const errorMessage = validateResErrors(e, "Ошибка загрузки гостей");
       setErr(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [hydrateStats]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -268,21 +226,6 @@ const CafeClients = () => {
         );
       });
 
-      getOrdersStatsByClient(c.id)
-        .then((stats) =>
-          setRows((prev) =>
-            prev.map((x) =>
-              String(x.id) === String(c.id)
-                ? {
-                  ...x,
-                  orders_count: stats.orders_count,
-                  updated_at_derived: stats.updated_at_derived,
-                }
-                : x
-            )
-          )
-        )
-        .catch(() => { });
     };
 
     window.addEventListener("clients:refresh", onClientsRefresh);
@@ -501,7 +444,6 @@ const CafeClients = () => {
               <tr>
                 <th>Имя</th>
                 <th>Телефон</th>
-                <th>Заказы</th>
                 <th>Обновлён</th>
                 <th></th>
               </tr>
@@ -522,7 +464,6 @@ const CafeClients = () => {
                         {c.full_name || "—"}
                       </td>
                       <td>{c.phone || "—"}</td>
-                      <td>{c.orders_count ?? 0}</td>
                       <td>
                         {updated ? new Date(updated).toLocaleString() : "—"}
                       </td>
@@ -646,7 +587,6 @@ const CafeClients = () => {
           tablesMap={tablesMap}
           useMediaQuery={useMediaQuery}
           fetchAll={fetchAll}
-          getAll={getAll}
           getOrdersByClient={getOrdersByClient}
           toNum={toNum}
           fmtMoney={fmtMoney}

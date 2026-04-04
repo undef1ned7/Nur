@@ -207,7 +207,9 @@ const ReportsModalContent = ({
               className="cafeAnalytics__input"
               value={staffQ}
               onChange={(e) => setStaffQ(e.target.value)}
-              placeholder="Имя сотрудника…"
+              placeholder={
+                modalKey === "cooks" ? "Кухня…" : "Официант…"
+              }
             />
           </label>
 
@@ -252,14 +254,14 @@ const ReportsModalContent = ({
 
         <div className="cafeAnalyticsModalContent__block">
           <div className="cafeAnalyticsModalContent__blockTitle">
-            {modalKey === "cooks" ? "Рейтинг поваров" : "Рейтинг официантов"}
+            {modalKey === "cooks" ? "Выручка по кухням" : "Выручка по официантам"}
           </div>
 
           <div className="cafeAnalyticsModalContent__tableWrap">
             <table className="cafeAnalyticsModalContent__table cafeAnalyticsModalContent__table--staff">
               <thead>
                 <tr>
-                  <th>Сотрудник</th>
+                  <th>{modalKey === "cooks" ? "Кухня" : "Официант"}</th>
                   <th>Чеки</th>
                   <th>Позиции</th>
                   <th>Выручка</th>

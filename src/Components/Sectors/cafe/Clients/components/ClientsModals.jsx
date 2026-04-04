@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
 import { useAlert } from "../../../../../hooks/useDialog";
+import api from "../../../../../api";
+import { computeBalanceDue, getClient, fetchCafeOrderDetail } from "../clientStore";
 
 /* ===== confirm delete ===== */
 const ConfirmDeleteModal = ({ busy, onClose, onConfirm }) => {
@@ -245,7 +247,6 @@ const ClientCard = ({
   tablesMap,
   useMediaQuery,
   fetchAll,
-  getAll,
   getOrdersByClient,
   toNum,
   fmtMoney,
@@ -258,7 +259,18 @@ const ClientCard = ({
   const [loadErr, setLoadErr] = useState("");
 
   const [openOrder, setOpenOrder] = useState(null);
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false);
+  const [orderDetailErr, setOrderDetailErr] = useState("");
   const [menuMap, setMenuMap] = useState(new Map());
+  const [debtOrderId, setDebtOrderId] = useState(null);
+  const [debtForm, setDebtForm] = useState({
+    amount: "",
+    payment_method: "cash",
+    cash_received: "",
+    note: "",
+  });
+  const [debtPaying, setDebtPaying] = useState(false);
 
   const isNarrow = useMediaQuery("(max-width: 640px)");
 
@@ -295,34 +307,51 @@ const ClientCard = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, openOrder]);
 
+  const newIdempotencyKey = () => {
+    try {
+      if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    } catch {
+      /* ignore */
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  };
+
+  const loadCardData = async () => {
+    setLoading(true);
+    setLoadErr("");
+    try {
+      const [c, ords] = await Promise.all([
+        getClient(id),
+        getOrdersByClient(id),
+      ]);
+      setClient(c);
+      setOrders(Array.isArray(ords) ? ords : []);
+      if (!c) setLoadErr("Гость не найден или был удалён");
+    } catch (e) {
+      console.error(e);
+      setLoadErr("Не удалось загрузить данные гостя");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        setLoading(true);
-        setLoadErr("");
-
-        const all = await getAll();
-        const c = all.find((x) => String(x.id) === String(id)) || null;
-
-        const ords = await getOrdersByClient(id);
-
-        if (mounted) {
-          setClient(c);
-          setOrders(Array.isArray(ords) ? ords : []);
-          if (!c) setLoadErr("Гость не найден или был удалён");
-        }
+        await loadCardData();
       } catch (e) {
         console.error(e);
-        if (mounted) setLoadErr("Не удалось загрузить данные гостя");
-      } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoadErr("Не удалось загрузить данные гостя");
+          setLoading(false);
+        }
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [id, getAll, getOrdersByClient]);
+  }, [id, getOrdersByClient]);
 
   useEffect(() => {
     const onOrderCreated = (e) => {
@@ -362,9 +391,37 @@ const ClientCard = ({
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!openOrder) {
+      setOrderDetail(null);
+      setOrderDetailErr("");
+      setOrderDetailLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setOrderDetail(null);
+    setOrderDetailErr("");
+    setOrderDetailLoading(true);
+    fetchCafeOrderDetail(openOrder)
+      .then((d) => {
+        if (!cancelled && d) setOrderDetail(d);
+      })
+      .catch(() => {
+        if (!cancelled) setOrderDetailErr("Не удалось загрузить заказ");
+      })
+      .finally(() => {
+        if (!cancelled) setOrderDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openOrder]);
+
   const ordersSorted = orders
     .slice()
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+
+  const displayOrder = orderDetail || openOrder;
 
   const lastUpdated =
     ordersSorted.map((o) => o.created_at).filter(Boolean).slice(0, 1)[0] ||
@@ -380,6 +437,10 @@ const ClientCard = ({
   };
 
   const itemName = (it) => {
+    if (String(it?.line_kind || "menu").toLowerCase() === "service") {
+      const t = String(it.service_title || it.title || "").trim();
+      return t || "Услуга";
+    }
     const direct =
       it?.menu_item_title ??
       it?.menu_title ??
@@ -399,6 +460,9 @@ const ClientCard = ({
   };
 
   const itemPrice = (it) => {
+    if (String(it?.line_kind || "menu").toLowerCase() === "service") {
+      return toNum(it.unit_price ?? it.price ?? it.price_each ?? 0);
+    }
     const direct = toNum(it.menu_item_price ?? it.price ?? it.price_each ?? 0);
     if (direct > 0) return direct;
 
@@ -418,6 +482,62 @@ const ClientCard = ({
     if (t > 0) return t;
     const items = Array.isArray(o.items) ? o.items : [];
     return items.reduce((s, it) => s + lineTotal(it), 0);
+  };
+
+  const isDebtOrder = (o) =>
+    String(o?.payment_method || "").toLowerCase() === "debt" ||
+    String(o?.original_payment_method || "").toLowerCase() === "debt";
+
+  const debtOrders = ordersSorted.filter(
+    (o) => isDebtOrder(o) && computeBalanceDue(o) > 0.005
+  );
+  const debtTotal = debtOrders.reduce((s, o) => s + computeBalanceDue(o), 0);
+
+  /** Для архива API ожидает id исходного заказа, не id строки истории. */
+  const payDebtTargetId = (o) =>
+    o?.original_order_id ?? o?.original_id ?? o?.id;
+
+  const openDebtPay = (order) => {
+    const due = computeBalanceDue(order);
+    setDebtOrderId(order.id);
+    setDebtForm({
+      amount: due > 0 ? String(due) : "",
+      payment_method: "cash",
+      cash_received: due > 0 ? String(due) : "",
+      note: "",
+    });
+  };
+
+  const submitDebtPay = async (order) => {
+    const amt = toNum(debtForm.amount);
+    if (!(amt > 0)) {
+      alert("Укажите сумму взноса.", true);
+      return;
+    }
+    const body = {
+      amount: String(amt).replace(",", "."),
+      payment_method: debtForm.payment_method,
+      idempotency_key: newIdempotencyKey(),
+      note: debtForm.note?.trim() || undefined,
+    };
+    if (debtForm.payment_method === "cash") {
+      const cashReceived =
+        debtForm.cash_received === "" ? amt : toNum(debtForm.cash_received);
+      body.cash_received = String(cashReceived).replace(",", ".");
+    }
+
+    setDebtPaying(true);
+    try {
+      await api.post(`/cafe/orders/${payDebtTargetId(order)}/pay-debt/`, body);
+      setDebtOrderId(null);
+      await loadCardData();
+      alert("Взнос по долгу проведён");
+    } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка погашения долга");
+      alert(errorMessage, true);
+    } finally {
+      setDebtPaying(false);
+    }
   };
 
   return (
@@ -500,6 +620,15 @@ const ClientCard = ({
                   type="button"
                 >
                   Заказы
+                </button>
+                <button
+                  className={`cafeclients__tab ${
+                    tab === "debts" ? "cafeclients__tab--active" : ""
+                  }`}
+                  onClick={() => setTab("debts")}
+                  type="button"
+                >
+                  Долги
                 </button>
               </div>
 
@@ -603,6 +732,147 @@ const ClientCard = ({
                   )}
                 </>
               )}
+
+              {tab === "debts" && (
+                <div className="cafeclients__profileBody">
+                  <div className="cafeclients__debtTotal">
+                    <span>Итог долга</span>
+                    <strong>{fmtMoney(debtTotal)}</strong>
+                  </div>
+
+                  {!debtOrders.length ? (
+                    <div className="cafeclients__empty">Заказов с долгом не найдено</div>
+                  ) : (
+                    <div className="cafeclients__ordersList">
+                      {debtOrders.map((o) => (
+                        <div key={o.id} className="cafeclients__orderCard">
+                          <div className="cafeclients__orderTop">
+                            <div className="cafeclients__orderTitle">{tableLabel(o)}</div>
+                            <div className="cafeclients__orderSum">
+                              Остаток: {fmtMoney(computeBalanceDue(o))}
+                            </div>
+                          </div>
+                          <div className="cafeclients__orderMeta">
+                            <div>
+                              <span className="cafeclients__muted">Статус:</span>{" "}
+                              {o.status || "—"}
+                            </div>
+                            <div>
+                              <span className="cafeclients__muted">Сумма:</span>{" "}
+                              {fmtMoney(orderTotal(o))}
+                            </div>
+                            <div>
+                              <span className="cafeclients__muted">Оплачено:</span>{" "}
+                              {fmtMoney(toNum(o.paid_amount))}
+                            </div>
+                            <div>
+                              <span className="cafeclients__muted">Создан:</span>{" "}
+                              {o.created_at ? new Date(o.created_at).toLocaleString() : "—"}
+                            </div>
+                          </div>
+
+                          {String(debtOrderId) === String(o.id) ? (
+                            <div className="cafeclients__debtForm">
+                              <div className="cafeclients__field">
+                                <label className="cafeclients__label">Сумма взноса</label>
+                                <input
+                                  className="cafeclients__input"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={debtForm.amount}
+                                  onChange={(e) =>
+                                    setDebtForm((f) => ({
+                                      ...f,
+                                      amount: e.target.value.replace(",", "."),
+                                    }))
+                                  }
+                                />
+                              </div>
+
+                              <div className="cafeclients__field">
+                                <label className="cafeclients__label">Способ оплаты</label>
+                                <select
+                                  className="cafeclients__input"
+                                  value={debtForm.payment_method}
+                                  onChange={(e) =>
+                                    setDebtForm((f) => ({
+                                      ...f,
+                                      payment_method: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  <option value="cash">Наличные</option>
+                                  <option value="card">Карта</option>
+                                  <option value="transfer">Перевод</option>
+                                </select>
+                              </div>
+
+                              {debtForm.payment_method === "cash" && (
+                                <div className="cafeclients__field">
+                                  <label className="cafeclients__label">Получено наличными</label>
+                                  <input
+                                    className="cafeclients__input"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={debtForm.cash_received}
+                                    onChange={(e) =>
+                                      setDebtForm((f) => ({
+                                        ...f,
+                                        cash_received: e.target.value.replace(",", "."),
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              )}
+
+                              <div className="cafeclients__field cafeclients__field--full">
+                                <label className="cafeclients__label">Комментарий</label>
+                                <input
+                                  className="cafeclients__input"
+                                  type="text"
+                                  value={debtForm.note}
+                                  onChange={(e) =>
+                                    setDebtForm((f) => ({ ...f, note: e.target.value }))
+                                  }
+                                />
+                              </div>
+
+                              <div className="cafeclients__rowActions">
+                                <button
+                                  type="button"
+                                  className="cafeclients__btn cafeclients__btn--secondary"
+                                  onClick={() => setDebtOrderId(null)}
+                                  disabled={debtPaying}
+                                >
+                                  Отмена
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cafeclients__btn cafeclients__btn--primary"
+                                  onClick={() => submitDebtPay(o)}
+                                  disabled={debtPaying}
+                                >
+                                  {debtPaying ? "Оплата…" : "Оплатить долг"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="cafeclients__rowActions">
+                              <button
+                                type="button"
+                                className="cafeclients__btn cafeclients__btn--primary"
+                                onClick={() => openDebtPay(o)}
+                              >
+                                Оплатить долг
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -645,25 +915,31 @@ const ClientCard = ({
               <div className="cafeclients__formGrid">
                 <div className="cafeclients__field">
                   <label className="cafeclients__label">Стол</label>
-                  <div>{tableLabel(openOrder)}</div>
+                  <div>{tableLabel(displayOrder)}</div>
                 </div>
                 <div className="cafeclients__field">
                   <label className="cafeclients__label">Гостей</label>
-                  <div>{openOrder.guests ?? "—"}</div>
+                  <div>{displayOrder.guests ?? "—"}</div>
                 </div>
                 <div className="cafeclients__field">
                   <label className="cafeclients__label">Статус</label>
-                  <div>{openOrder.status || "—"}</div>
+                  <div>{displayOrder.status || "—"}</div>
                 </div>
                 <div className="cafeclients__field">
                   <label className="cafeclients__label">Создан</label>
                   <div>
-                    {openOrder.created_at
-                      ? new Date(openOrder.created_at).toLocaleString()
+                    {displayOrder.created_at
+                      ? new Date(displayOrder.created_at).toLocaleString()
                       : "—"}
                   </div>
                 </div>
               </div>
+
+              {orderDetailErr ? (
+                <div className="cafeclients__error" style={{ marginTop: 10 }}>
+                  {orderDetailErr}
+                </div>
+              ) : null}
 
               <div className="cafeclients__tableWrap" style={{ marginTop: 10 }}>
                 <table className="cafeclients__table">
@@ -676,8 +952,14 @@ const ClientCard = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {(openOrder.items || []).length ? (
-                      openOrder.items.map((it, i) => (
+                    {orderDetailLoading && !orderDetail ? (
+                      <tr>
+                        <td className="cafeclients__empty" colSpan={4}>
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : (displayOrder.items || []).length ? (
+                      displayOrder.items.map((it, i) => (
                         <tr key={it?.id || it?.menu_item || i}>
                           <td className="cafeclients__ellipsis" title={itemName(it)}>
                             {itemName(it)}
@@ -696,13 +978,13 @@ const ClientCard = ({
                     )}
                   </tbody>
 
-                  {openOrder.items?.length ? (
+                  {!orderDetailLoading && displayOrder.items?.length ? (
                     <tfoot>
                       <tr>
                         <th colSpan={3} style={{ textAlign: "right" }}>
                           Итого:
                         </th>
-                        <th>{fmtMoney(orderTotal(openOrder))}</th>
+                        <th>{fmtMoney(orderTotal(displayOrder))}</th>
                       </tr>
                     </tfoot>
                   ) : null}

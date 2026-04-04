@@ -1,5 +1,5 @@
 // src/.../CafeAnalyticsModals.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FaChevronDown, FaChevronRight, FaSync, FaTimes } from "react-icons/fa";
 
 const fmtDateTime = (iso) => {
@@ -117,12 +117,53 @@ const CafeAnalyticsModalContent = ({
   exportLoading,
   exportError,
   onExport,
+
+  revenueInflowRows = [],
+  rejectionRows = [],
+  expensesBlock = { total: 0, count: 0, categories: [] },
+  debtRows = [],
+  waiterSalaryRows = [],
 }) => {
   const [expandedGuestId, setExpandedGuestId] = useState(null);
+  const [salaryQ, setSalaryQ] = useState("");
+  const [salarySort, setSalarySort] = useState("total_desc");
 
   useEffect(() => {
     if (modalKey !== "clients") setExpandedGuestId(null);
   }, [modalKey]);
+
+  useEffect(() => {
+    if (modalKey !== "salary_waiters") {
+      setSalaryQ("");
+      setSalarySort("total_desc");
+    }
+  }, [modalKey]);
+
+  const salaryFiltered = useMemo(() => {
+    const rows = Array.isArray(waiterSalaryRows) ? waiterSalaryRows : [];
+    const q = (salaryQ || "").trim().toLowerCase();
+    const base = q
+      ? rows.filter((x) => String(x?.name || "").toLowerCase().includes(q))
+      : rows.slice();
+    base.sort((a, b) => {
+      if (salarySort === "name_asc")
+        return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+      if (salarySort === "revenue_desc")
+        return toNum(b.waiter_revenue) - toNum(a.waiter_revenue);
+      return toNum(b.total) - toNum(a.total);
+    });
+    return base;
+  }, [waiterSalaryRows, salaryQ, salarySort]);
+
+  const salaryTotals = useMemo(() => {
+    const rows = Array.isArray(waiterSalaryRows) ? waiterSalaryRows : [];
+    return {
+      total: rows.reduce((a, x) => a + toNum(x?.total), 0),
+      base: rows.reduce((a, x) => a + toNum(x?.base_part), 0),
+      percent: rows.reduce((a, x) => a + toNum(x?.percent_part), 0),
+      revenue: rows.reduce((a, x) => a + toNum(x?.waiter_revenue), 0),
+    };
+  }, [waiterSalaryRows]);
 
   if (!modalKey) return null;
 
@@ -343,7 +384,9 @@ const CafeAnalyticsModalContent = ({
               className="cafeAnalytics__input"
               value={staffQ}
               onChange={(e) => setStaffQ(e.target.value)}
-              placeholder="Имя сотрудника…"
+              placeholder={
+                modalKey === "cooks" ? "Кухня…" : "Официант…"
+              }
             />
           </label>
 
@@ -388,14 +431,14 @@ const CafeAnalyticsModalContent = ({
 
         <div className="cafeAnalytics__modalBlock">
           <div className="cafeAnalytics__modalBlockTitle">
-            {modalKey === "cooks" ? "Рейтинг поваров" : "Рейтинг официантов"}
+            {modalKey === "cooks" ? "Выручка по кухням" : "Выручка по официантам"}
           </div>
 
           <div className="cafeAnalytics__modalTableWrap">
             <table className="cafeAnalytics__modalTable cafeAnalytics__modalTable--staff">
               <thead>
                 <tr>
-                  <th>Сотрудник</th>
+                  <th>{modalKey === "cooks" ? "Кухня" : "Официант"}</th>
                   <th>Чеки</th>
                   <th>Позиции</th>
                   <th>Выручка</th>
@@ -428,6 +471,324 @@ const CafeAnalyticsModalContent = ({
                   <tr>
                     <td colSpan={5} className="cafeAnalytics__modalEmpty">
                       Нет данных за выбранный период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "payment_inflow") {
+    const rows = Array.isArray(revenueInflowRows) ? revenueInflowRows : [];
+    const sumAmt = rows.reduce((a, x) => a + toNum(x?.amount), 0);
+    const sumOrd = rows.reduce((a, x) => a + toNum(x?.orders_count), 0);
+
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Сумма по способам</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(sumAmt)}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Заказов (строк)</div>
+            <div className="cafeAnalytics__modalKVal">{fmtInt(sumOrd)}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">Разбивка по способу оплаты</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Способ</th>
+                  <th>Заказов</th>
+                  <th>Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((x) => (
+                  <tr key={x._id}>
+                    <td className="cafeAnalytics__modalTdTitle" title={x.label}>
+                      {x.label}
+                    </td>
+                    <td>{fmtInt(x.orders_count)}</td>
+                    <td>{fmtMoney(toNum(x.amount))}</td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                      Нет данных за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "rejections") {
+    const rows = Array.isArray(rejectionRows) ? rejectionRows : [];
+    const lines = rows.reduce((a, x) => a + toNum(x?.count), 0);
+
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--1">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Отказов (позиций)</div>
+            <div className="cafeAnalytics__modalKVal">{fmtInt(lines)}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">По причине отказа</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Причина</th>
+                  <th>Кол-во</th>
+                  <th>Последний отказ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((x) => (
+                  <tr key={x._id}>
+                    <td className="cafeAnalytics__modalTdTitle" title={x.reason}>
+                      {x.reason}
+                    </td>
+                    <td>{fmtInt(x.count)}</td>
+                    <td>{fmtDateTime(x.last_at)}</td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                      Нет отказов за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "expenses") {
+    const block = expensesBlock || { total: 0, count: 0, categories: [] };
+    const cats = Array.isArray(block.categories) ? block.categories : [];
+
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Всего расходов</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(block.total))}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Записей</div>
+            <div className="cafeAnalytics__modalKVal">{fmtInt(block.count)}</div>
+          </div>
+        </div>
+
+        {cats.length > 0 && (
+          <div className="cafeAnalytics__modalBlock">
+            <div className="cafeAnalytics__modalBlockTitle">По категориям / статьям</div>
+            <div className="cafeAnalytics__modalTableWrap">
+              <table className="cafeAnalytics__modalTable">
+                <thead>
+                  <tr>
+                    <th>Статья</th>
+                    <th>Записей</th>
+                    <th>Сумма</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cats.map((x) => (
+                    <tr key={String(x._id)}>
+                      <td className="cafeAnalytics__modalTdTitle" title={x.name}>
+                        {x.name}
+                      </td>
+                      <td>{fmtInt(x.count)}</td>
+                      <td>{fmtMoney(toNum(x.amount))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {!cats.length && (
+          <div className="cafeAnalytics__modalNote">
+            Детализация по категориям недоступна — показаны только итоги периода (если API их
+            возвращает).
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (modalKey === "debts") {
+    const rows = Array.isArray(debtRows) ? debtRows : [];
+
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Сумма долга</div>
+            <div className="cafeAnalytics__modalKVal">
+              {fmtMoney(rows.reduce((a, x) => a + toNum(x?.balance), 0))}
+            </div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Чеков</div>
+            <div className="cafeAnalytics__modalKVal">{fmtInt(rows.length)}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">Неоплаченные заказы</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Чек / заказ</th>
+                  <th>Стол</th>
+                  <th>К доплате</th>
+                  <th>Создан</th>
+                  <th>Официант</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((x) => {
+                  const title =
+                    [x.check_label, x.order_number ? `#${x.order_number}` : ""]
+                      .filter(Boolean)
+                      .join(" · ") || String(x._id ?? "—");
+                  return (
+                    <tr key={String(x._id)}>
+                      <td className="cafeAnalytics__modalTdTitle" title={title}>
+                        {title}
+                      </td>
+                      <td>
+                        {x.table_number != null && x.table_number !== ""
+                          ? String(x.table_number)
+                          : "—"}
+                      </td>
+                      <td>{fmtMoney(toNum(x.balance))}</td>
+                      <td>{fmtDateTime(x.created_at)}</td>
+                      <td>{x.waiter_label || "—"}</td>
+                    </tr>
+                  );
+                })}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={5} className="cafeAnalytics__modalEmpty">
+                      Открытых долгов нет.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "salary_waiters") {
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__staffBar">
+          <label className="cafeAnalytics__staffField">
+            <span>Поиск</span>
+            <input
+              type="text"
+              className="cafeAnalytics__input"
+              value={salaryQ}
+              onChange={(e) => setSalaryQ(e.target.value)}
+              placeholder="Официант…"
+            />
+          </label>
+
+          <label className="cafeAnalytics__staffField">
+            <span>Сортировка</span>
+            <select
+              className="cafeAnalytics__staffSelect"
+              value={salarySort}
+              onChange={(e) => setSalarySort(e.target.value)}
+            >
+              <option value="total_desc">Итого ↓</option>
+              <option value="revenue_desc">Выручка ↓</option>
+              <option value="name_asc">Имя A–Я</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--4">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Начислено</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(salaryTotals.total)}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Окладная часть</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(salaryTotals.base)}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Процент</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(salaryTotals.percent)}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Личная выручка</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(salaryTotals.revenue)}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">По официантам</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable cafeAnalytics__modalTable--staff">
+              <thead>
+                <tr>
+                  <th>Официант</th>
+                  <th>Дней</th>
+                  <th>Выручка</th>
+                  <th>Оклад</th>
+                  <th>%</th>
+                  <th>Итого</th>
+                  <th>Профиль</th>
+                </tr>
+              </thead>
+              <tbody>
+                {salaryFiltered.map((x) => (
+                  <tr key={String(x._id)}>
+                    <td className="cafeAnalytics__modalTdTitle" title={x.name}>
+                      {x.name}
+                    </td>
+                    <td>{fmtInt(x.days)}</td>
+                    <td>{fmtMoney(toNum(x.waiter_revenue))}</td>
+                    <td>{fmtMoney(toNum(x.base_part))}</td>
+                    <td>{fmtMoney(toNum(x.percent_part))}</td>
+                    <td>{fmtMoney(toNum(x.total))}</td>
+                    <td title={x.scope}>{x.scope || "—"}</td>
+                  </tr>
+                ))}
+                {!salaryFiltered.length && (
+                  <tr>
+                    <td colSpan={7} className="cafeAnalytics__modalEmpty">
+                      Нет данных: задайте период и профили зарплаты у официантов.
                     </td>
                   </tr>
                 )}

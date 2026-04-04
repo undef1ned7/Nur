@@ -254,7 +254,12 @@ export const RightMenuPanel = ({
 }) => {
   const [q, setQ] = useState("");
   const isCart = useCallback(
-    (id) => cartItems.find((el) => el.menu_item == id),
+    (id) =>
+      cartItems.find(
+        (el) =>
+          String(el.line_kind || "menu").toLowerCase() !== "service" &&
+          String(el.menu_item) === String(id)
+      ),
     [cartItems],
   );
   const [searchQuery, setSearchQuery] = useState("");

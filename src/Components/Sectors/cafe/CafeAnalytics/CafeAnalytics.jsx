@@ -8,6 +8,11 @@ import {
   FaShoppingCart,
   FaUsers,
   FaDownload,
+  FaMoneyBillWave,
+  FaBan,
+  FaReceipt,
+  FaExclamationTriangle,
+  FaCoins,
 } from "react-icons/fa";
 import {
   Chart,
@@ -133,6 +138,9 @@ async function fetchAllPages(url0) {
 
 /* ===== kitchen analytics normalizers ===== */
 const pickName = (x) =>
+  x?.waiter_label ||
+  x?.kitchen_name ||
+  x?.kitchen?.name ||
   x?.name ||
   x?.full_name ||
   x?.fullName ||
@@ -146,11 +154,19 @@ const pickName = (x) =>
   "—";
 
 const pickId = (x, idx) =>
-  x?.id || x?.user_id || x?.user?.id || x?.waiter_id || x?.cook_id || `${pickName(x)}_${idx}`;
+  x?.id ||
+  x?.kitchen_id ||
+  x?.kitchen?.id ||
+  x?.user_id ||
+  x?.user?.id ||
+  x?.waiter_id ||
+  x?.cook_id ||
+  `${pickName(x)}_${idx}`;
 
 const normalizeStaffRow = (x, idx) => {
   const revenue =
     toNum(x?.revenue) ||
+    toNum(x?.waiter_revenue) ||
     toNum(x?.sum) ||
     toNum(x?.total) ||
     toNum(x?.total_revenue) ||
@@ -203,6 +219,135 @@ const normalizeStaffRow = (x, idx) => {
 
 const sumBy = (arr, key) => arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
 
+const PAYMENT_INFLOW_LABELS = {
+  cash: "Наличные",
+  card: "Карта",
+  transfer: "Перевод",
+  mixed: "Смешанная оплата",
+  debt: "В долг",
+  other: "Прочее",
+};
+
+const labelPaymentMethod = (code) =>
+  (code && PAYMENT_INFLOW_LABELS[String(code).toLowerCase()]) ||
+  (code ? String(code) : "—");
+
+/** Нормализует ответы list | { results } | { items } и т.п. */
+const apiListPayload = (data) => {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+  const inner =
+    data.results ||
+    data.items ||
+    data.rows ||
+    data.debts ||
+    data.open_debts ||
+    data.data;
+  if (Array.isArray(inner)) return inner;
+  return [];
+};
+
+const normalizeRevenueInflowRows = (data) => {
+  const rows = apiListPayload(data);
+  return rows.map((x, idx) => ({
+    _id: String(x.payment_method ?? x.method ?? x.code ?? idx),
+    method: x.payment_method ?? x.method ?? x.code,
+    label: labelPaymentMethod(x.payment_method ?? x.method ?? x.code),
+    amount: toNum(x.amount ?? x.revenue ?? x.sum ?? x.total ?? x.total_amount),
+    orders_count: toNum(x.orders_count ?? x.orders ?? x.count ?? x.checks_count),
+  }));
+};
+
+const normalizeRejectionRows = (data) => {
+  const rows = apiListPayload(data);
+  return rows.map((x, idx) => ({
+    _id: `${String(x.rejection_reason ?? x.reason ?? idx)}_${idx}`,
+    reason: String(x.rejection_reason ?? x.reason ?? x.title ?? "—").trim() || "—",
+    count: toNum(x.count ?? x.qty ?? x.items_count ?? x.rejected_count ?? x.lines),
+    last_at: x.rejected_at ?? x.last_rejected_at ?? x.last_at ?? null,
+  }));
+};
+
+const normalizeExpensesBlock = (data) => {
+  if (!data) return { total: 0, count: 0, categories: [] };
+  if (Array.isArray(data)) {
+    const categories = data.map((x, idx) => ({
+      _id: x.category ?? x.id ?? idx,
+      name:
+        x.category_name ??
+        x.category ??
+        x.title ??
+        x.name ??
+        `Статья ${idx + 1}`,
+      amount: toNum(x.amount ?? x.sum ?? x.total),
+      count: toNum(x.count ?? x.expenses_count ?? 1),
+    }));
+    return {
+      total: sumBy(categories, "amount"),
+      count: categories.reduce((a, c) => a + toNum(c.count), 0) || categories.length,
+      categories,
+    };
+  }
+  const total = toNum(
+    data.total_amount ?? data.total ?? data.sum ?? data.amount ?? data.expenses_sum
+  );
+  const count = toNum(
+    data.count ?? data.expenses_count ?? data.items_count ?? data.cafe_expenses_count
+  );
+  const rawCat = data.by_category ?? data.categories ?? data.breakdown ?? data.items;
+  const catList = apiListPayload(rawCat);
+  const categories = catList.map((x, idx) => ({
+    _id: x.category_id ?? x.category ?? x.id ?? idx,
+    name:
+      x.category_name ??
+      x.category ??
+      x.title ??
+      x.name ??
+      "—",
+    amount: toNum(x.amount ?? x.sum ?? x.total),
+    count: toNum(x.count ?? x.expenses_count ?? 1),
+  }));
+  const catSum = sumBy(categories, "amount");
+  return {
+    total: total || catSum,
+    count: count || categories.reduce((a, c) => a + toNum(c.count), 0),
+    categories,
+  };
+};
+
+const normalizeDebtRows = (data) => {
+  const rows = apiListPayload(data);
+  return rows.map((x, idx) => ({
+    _id: x.id ?? x.order_id ?? idx,
+    check_label: x.check_label ?? x.label ?? "",
+    order_number: x.order_number ?? x.number ?? x.order_num,
+    balance: toNum(x.balance_due ?? x.balance ?? x.amount_due ?? x.due ?? x.total),
+    table_number: x.table_number ?? x.table,
+    created_at: x.created_at ?? x.opened_at,
+    waiter_label: x.waiter_label,
+  }));
+};
+
+const normalizeWaiterSalaryRows = (data) => {
+  const rows = apiListPayload(data);
+  return rows.map((x, idx) => ({
+    _id: x.user_id ?? x.user?.id ?? x.id ?? idx,
+    name:
+      x.waiter_label ??
+      pickName(x),
+    waiter_revenue: toNum(x.waiter_revenue ?? x.revenue ?? x.personal_revenue),
+    base_part: toNum(
+      x.base_salary_part ?? x.monthly_part ?? x.salary_base ?? x.base_part
+    ),
+    percent_part: toNum(
+      x.percent_part ?? x.commission_part ?? x.revenue_bonus ?? x.percent_bonus
+    ),
+    total: toNum(x.total_salary ?? x.salary ?? x.total ?? x.amount),
+    scope: x.profile_scope ?? x.scope ?? "",
+    days: toNum(x.days_in_period ?? x.days),
+  }));
+};
+
 /* ===== component ===== */
 const CafeAnalytics = () => {
   const { tariff, company } = useUser();
@@ -242,8 +387,18 @@ const CafeAnalytics = () => {
   // series для графика
   const [revenueSeries, setRevenueSeries] = useState([]);
 
+  const [revenueInflowRows, setRevenueInflowRows] = useState([]);
+  const [rejectionRows, setRejectionRows] = useState([]);
+  const [expensesBlock, setExpensesBlock] = useState({
+    total: 0,
+    count: 0,
+    categories: [],
+  });
+  const [debtRows, setDebtRows] = useState([]);
+  const [waiterSalaryRows, setWaiterSalaryRows] = useState([]);
+
   // modal
-  const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters
+  const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters | payment_inflow | rejections | expenses | debts | salary_waiters
   const [staffQ, setStaffQ] = useState("");
   const [staffSort, setStaffSort] = useState("revenue_desc"); // revenue_desc | orders_desc | avg_desc | name_asc
   const [exportReport, setExportReport] = useState("analytics");
@@ -276,8 +431,12 @@ const CafeAnalytics = () => {
     setKitchenLoading(true);
     try {
       const [rCooks, rWaiters] = await Promise.all([
-        api.get("/cafe/kitchen/analytics/cooks/", { params }).catch(() => ({ data: [] })),
-        api.get("/cafe/kitchen/analytics/waiters/", { params }).catch(() => ({ data: [] })),
+        api
+          .get("/cafe/analytics/sales/kitchens/", { params })
+          .catch(() => ({ data: [] })),
+        api
+          .get("/cafe/analytics/waiter-sales/", { params })
+          .catch(() => ({ data: [] })),
       ]);
 
       const cooks = asArray(rCooks?.data).map(normalizeStaffRow);
@@ -297,13 +456,32 @@ const CafeAnalytics = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rSalesSummary, rSalesItems, rSalesCategories, rLowStock] = await Promise.all([
+      const salaryReq = hideKitchenStaffKpi
+        ? Promise.resolve({ data: null })
+        : api.get("/cafe/analytics/waiter-salary/", { params }).catch(() => ({ data: null }));
+
+      const [
+        rSalesSummary,
+        rSalesItems,
+        rSalesCategories,
+        rLowStock,
+        rInflow,
+        rRejections,
+        rExpenses,
+        rDebts,
+        rSalary,
+      ] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
           .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 10 } })
           .catch(() => ({ data: [] })),
         api.get("/cafe/analytics/sales/categories/", { params }).catch(() => ({ data: [] })),
         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
+        api.get("/cafe/analytics/revenue-inflow/", { params }).catch(() => ({ data: null })),
+        api.get("/cafe/analytics/rejections/", { params }).catch(() => ({ data: null })),
+        api.get("/cafe/analytics/expenses/summary/", { params }).catch(() => ({ data: null })),
+        api.get("/cafe/analytics/debts/", { params }).catch(() => ({ data: null })),
+        salaryReq,
       ]);
 
       setSalesSummary(rSalesSummary?.data || { orders_count: 0, items_qty: 0, revenue: "0.00" });
@@ -312,6 +490,14 @@ const CafeAnalytics = () => {
         Array.isArray(listFrom(rSalesCategories)) ? listFrom(rSalesCategories) : []
       );
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
+
+      setRevenueInflowRows(normalizeRevenueInflowRows(rInflow?.data));
+      setRejectionRows(normalizeRejectionRows(rRejections?.data));
+      setExpensesBlock(normalizeExpensesBlock(rExpenses?.data));
+      setDebtRows(normalizeDebtRows(rDebts?.data));
+      setWaiterSalaryRows(
+        hideKitchenStaffKpi ? [] : normalizeWaiterSalaryRows(rSalary?.data)
+      );
 
       fetchGuestsCount().catch(() => {});
       if (!hideKitchenStaffKpi) {
@@ -326,6 +512,11 @@ const CafeAnalytics = () => {
       setSalesItems([]);
       setSalesCategories([]);
       setLowStock([]);
+      setRevenueInflowRows([]);
+      setRejectionRows([]);
+      setExpensesBlock({ total: 0, count: 0, categories: [] });
+      setDebtRows([]);
+      setWaiterSalaryRows([]);
     } finally {
       setLoading(false);
     }
@@ -453,6 +644,22 @@ const CafeAnalytics = () => {
   const cooksCount = useMemo(() => cooksRows.length, [cooksRows]);
   const waitersCount = useMemo(() => waitersRows.length, [waitersRows]);
 
+  const inflowTotal = useMemo(
+    () => sumBy(revenueInflowRows, "amount"),
+    [revenueInflowRows]
+  );
+  const rejectionLinesTotal = useMemo(
+    () => sumBy(rejectionRows, "count"),
+    [rejectionRows]
+  );
+  const expensesTotal = useMemo(() => toNum(expensesBlock?.total), [expensesBlock]);
+  const debtsSum = useMemo(() => sumBy(debtRows, "balance"), [debtRows]);
+  const debtsCount = useMemo(() => debtRows.length, [debtRows]);
+  const salaryAccruedTotal = useMemo(
+    () => sumBy(waiterSalaryRows, "total"),
+    [waiterSalaryRows]
+  );
+
   const openModal = (key) => {
     setModalKey(key);
     setStaffQ("");
@@ -472,9 +679,14 @@ const CafeAnalytics = () => {
     if (modalKey === "avg") return "Средний чек";
     if (modalKey === "clients") return "Гости";
     if (modalKey === "stock") return "Склад";
-    if (modalKey === "cooks") return "Аналитика по поварам";
-    if (modalKey === "waiters") return "Аналитика по официантам";
+    if (modalKey === "cooks") return "По кухням";
+    if (modalKey === "waiters") return "Официанты (выручка)";
     if (modalKey === "export") return "Экспорт отчета";
+    if (modalKey === "payment_inflow") return "Оплаты по способу";
+    if (modalKey === "rejections") return "Отказы по позициям";
+    if (modalKey === "expenses") return "Операционные расходы";
+    if (modalKey === "debts") return "Открытые долги";
+    if (modalKey === "salary_waiters") return "Зарплата официантов (расчёт)";
     return "";
   }, [modalKey]);
 
@@ -656,13 +868,13 @@ const CafeAnalytics = () => {
               disabled={kitchenLoading}
             >
               <div className="cafeAnalytics__kpiTop">
-                <div className="cafeAnalytics__kpiLabel">ПОВАРА</div>
+                <div className="cafeAnalytics__kpiLabel">КУХНИ</div>
                 <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
                   <FaUsers />
                 </div>
               </div>
               <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
-              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}</div>
+              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Выручка по кухням"}</div>
             </button>
 
             <button
@@ -682,6 +894,98 @@ const CafeAnalytics = () => {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="cafeAnalytics__opsSection">
+        <div className="cafeAnalytics__opsSectionTitle">Дополнительная аналитика</div>
+        <div className="cafeAnalytics__opsMinis">
+          <button
+            className="cafeAnalytics__mini"
+            type="button"
+            onClick={() => openModal("payment_inflow")}
+          >
+            <div className="cafeAnalytics__miniTop">
+              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
+                <FaMoneyBillWave />
+              </div>
+              <div className="cafeAnalytics__miniLabel">Оплаты</div>
+            </div>
+            <div className="cafeAnalytics__miniValue">{fmtMoney(inflowTotal)}</div>
+            <div className="cafeAnalytics__miniMeta">По способу оплаты за период</div>
+          </button>
+
+          <button
+            className="cafeAnalytics__mini"
+            type="button"
+            onClick={() => openModal("rejections")}
+          >
+            <div className="cafeAnalytics__miniTop">
+              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--red">
+                <FaBan />
+              </div>
+              <div className="cafeAnalytics__miniLabel">Отказы</div>
+            </div>
+            <div className="cafeAnalytics__miniValue">{fmtInt(rejectionLinesTotal)}</div>
+            <div className="cafeAnalytics__miniMeta">Строк меню с отказом</div>
+          </button>
+
+          <button
+            className="cafeAnalytics__mini"
+            type="button"
+            onClick={() => openModal("expenses")}
+          >
+            <div className="cafeAnalytics__miniTop">
+              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
+                <FaReceipt />
+              </div>
+              <div className="cafeAnalytics__miniLabel">Расходы</div>
+            </div>
+            <div className="cafeAnalytics__miniValue">{fmtMoney(expensesTotal)}</div>
+            <div className="cafeAnalytics__miniMeta">
+              Операционные расходы кафе
+              {expensesBlock?.count ? (
+                <>
+                  {" "}
+                  · <b>{fmtInt(expensesBlock.count)}</b> записей
+                </>
+              ) : null}
+            </div>
+          </button>
+
+          <button
+            className="cafeAnalytics__mini"
+            type="button"
+            onClick={() => openModal("debts")}
+          >
+            <div className="cafeAnalytics__miniTop">
+              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--red">
+                <FaExclamationTriangle />
+              </div>
+              <div className="cafeAnalytics__miniLabel">Долги</div>
+            </div>
+            <div className="cafeAnalytics__miniValue">{fmtMoney(debtsSum)}</div>
+            <div className="cafeAnalytics__miniMeta">
+              Неоплаченный баланс · <b>{fmtInt(debtsCount)}</b> чеков
+            </div>
+          </button>
+
+          {!hideKitchenStaffKpi && (
+            <button
+              className="cafeAnalytics__mini"
+              type="button"
+              onClick={() => openModal("salary_waiters")}
+            >
+              <div className="cafeAnalytics__miniTop">
+                <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
+                  <FaCoins />
+                </div>
+                <div className="cafeAnalytics__miniLabel">Зарплата</div>
+              </div>
+              <div className="cafeAnalytics__miniValue">{fmtMoney(salaryAccruedTotal)}</div>
+              <div className="cafeAnalytics__miniMeta">Оклад + % за период (по профилям)</div>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Chart */}
@@ -836,6 +1140,11 @@ const CafeAnalytics = () => {
           exportLoading={exportLoading}
           exportError={exportError}
           onExport={handleExport}
+          revenueInflowRows={revenueInflowRows}
+          rejectionRows={rejectionRows}
+          expensesBlock={expensesBlock}
+          debtRows={debtRows}
+          waiterSalaryRows={waiterSalaryRows}
         />
       </CafeAnalyticsModal>
     </section>

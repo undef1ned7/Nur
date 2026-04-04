@@ -52,6 +52,7 @@ import DepartmentAnalyticsChart from "../Components/DepartmentAnalyticsChart/Dep
 // Sectors
 import SectorSelect from "../Components/Sectors/SectorSelect";
 import Masters from "../Components/Sectors/Barber/Masters/Masters";
+import CafeEmployEmployeeDetail from "../Components/Sectors/Barber/Masters/CafeEmployEmployeeDetail";
 
 // Barber
 import BarberServices from "../Components/Sectors/Barber/Services/Services";
@@ -397,6 +398,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("registration", Registration),
   createProtectedRoute("obzor", Obzor),
   createProtectedRoute("zakaz", Zakaz),
+  createProtectedRoute("employ/:employeeId", CafeEmployEmployeeDetail),
   createProtectedRoute("employ", Masters),
   createProtectedRoute("sklad", MarketWarehouse),
   createProtectedRoute("sklad/:id", MarketProductDetail),
