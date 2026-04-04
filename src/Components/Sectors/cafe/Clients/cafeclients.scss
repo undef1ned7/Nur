@@ -578,6 +578,26 @@ html {
     margin-top: 10px;
   }
 
+  &__debtTotal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+    font-weight: 550;
+  }
+
+  &__debtForm {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+  }
+
   &__notes {
     display: grid;
     gap: 6px;

@@ -124,6 +124,9 @@ async function fetchAllPages(url0) {
 
 /* ===== kitchen analytics normalizers ===== */
 const pickName = (x) =>
+  x?.waiter_label ||
+  x?.kitchen_name ||
+  x?.kitchen?.name ||
   x?.name ||
   x?.full_name ||
   x?.fullName ||
@@ -138,6 +141,8 @@ const pickName = (x) =>
 
 const pickId = (x, idx) =>
   x?.id ||
+  x?.kitchen_id ||
+  x?.kitchen?.id ||
   x?.user_id ||
   x?.user?.id ||
   x?.waiter_id ||
@@ -147,6 +152,7 @@ const pickId = (x, idx) =>
 const normalizeStaffRow = (x, idx) => {
   const revenue =
     toNum(x?.revenue) ||
+    toNum(x?.waiter_revenue) ||
     toNum(x?.sum) ||
     toNum(x?.total) ||
     toNum(x?.total_revenue) ||
@@ -261,8 +267,12 @@ const Reports = () => {
     setKitchenLoading(true);
     try {
       const [rCooks, rWaiters] = await Promise.all([
-        api.get("/cafe/kitchen/analytics/cooks/", { params }).catch(() => ({ data: [] })),
-        api.get("/cafe/kitchen/analytics/waiters/", { params }).catch(() => ({ data: [] })),
+        api
+          .get("/cafe/analytics/sales/kitchens/", { params })
+          .catch(() => ({ data: [] })),
+        api
+          .get("/cafe/analytics/waiter-sales/", { params })
+          .catch(() => ({ data: [] })),
       ]);
 
       const cooks = asArray(rCooks?.data).map(normalizeStaffRow);
@@ -445,8 +455,8 @@ const Reports = () => {
     if (modalKey === "avg") return "Средний чек";
     if (modalKey === "clients") return "Гости";
     if (modalKey === "stock") return "Склад";
-    if (modalKey === "cooks") return "Аналитика по поварам";
-    if (modalKey === "waiters") return "Аналитика по официантам";
+    if (modalKey === "cooks") return "По кухням";
+    if (modalKey === "waiters") return "Официанты (выручка)";
     return "";
   }, [modalKey]);
 
@@ -579,13 +589,13 @@ const Reports = () => {
               disabled={kitchenLoading}
             >
               <div className="cafeAnalytics__kpiTop">
-                <div className="cafeAnalytics__kpiLabel">ПОВАРА</div>
+                <div className="cafeAnalytics__kpiLabel">КУХНИ</div>
                 <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
                   <FaUsers />
                 </div>
               </div>
               <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
-              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}</div>
+              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Выручка по кухням"}</div>
             </button>
 
             <button

@@ -101,6 +101,46 @@ const stripEmpty = (obj) =>
     Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "")
   );
 
+const newIdempotencyKey = () => {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {
+    /* ignore */
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const getOrderClientId = (order) => {
+  const c = order?.client;
+  if (c == null || c === "") {
+    const raw = order?.client_id;
+    return raw != null && raw !== "" ? String(raw).trim() : "";
+  }
+  if (typeof c === "object") return String(c.id ?? c.uuid ?? "").trim();
+  return String(c).trim();
+};
+
+const PAY_CHECKOUT_METHODS = [
+  { value: "cash", label: "Наличные", search: "наличные нал cash" },
+  { value: "card", label: "Карта", search: "карта card" },
+  { value: "transfer", label: "Перевод", search: "перевод transfer" },
+  { value: "debt", label: "В долг", search: "долг debt" },
+];
+
+const normalizePaymentMethod = (v) => {
+  const m = String(v || "").trim().toLowerCase();
+  if (["наличные", "нал", "cash"].includes(m)) return "cash";
+  if (["карта", "card"].includes(m)) return "card";
+  if (["перевод", "transfer"].includes(m)) return "transfer";
+  if (["долг", "в долг", "debt"].includes(m)) return "debt";
+  if (["cash", "card", "transfer", "debt"].includes(m)) return m;
+  return "";
+};
+
+const pickClientLabel = (c) =>
+  String(c?.full_name || c?.name || c?.title || c?.company_name || "Без имени").trim() ||
+  "Без имени";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -114,22 +154,96 @@ const normalizeTableLabel = (raw) => {
   return v;
 };
 
-const normalizeOrderPayload = (f, isNew = false) =>
-  stripEmpty({
+/** Заголовок позиции в UI / печати (меню или услуга). */
+const orderItemTitle = (it) => {
+  const lk = String(it?.line_kind || "menu").toLowerCase();
+  if (lk === "service") {
+    const t = String(it.service_title || it.title || "").trim();
+    return t || "Услуга";
+  }
+  return String(it.menu_item_title || it.title || "Позиция");
+};
+
+const MAX_QTY = 2147483647;
+
+/** unit_price как строка decimal или null (x-nullable). */
+const decimalStringOrNull = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(String(v).replace(",", "."));
+  if (!Number.isFinite(n)) return null;
+  return numStr(n);
+};
+
+/**
+ * Одна строка заказа под OpenAPI OrderItemInline:
+ * order, line_kind, menu_item | service_title, unit_price, quantity, is_rejected, rejection_reason.
+ * `order`: null при создании заказа, uuid при PATCH.
+ */
+const serializeOrderItemInline = (i, orderRef) => {
+  const qty = Math.max(
+    1,
+    Math.min(MAX_QTY, Math.floor(Number(i.quantity) || 1))
+  );
+  const rejected = Boolean(i.is_rejected);
+  const reasonRaw = String(i.rejection_reason || "").trim();
+  const rejection_reason = rejected
+    ? (reasonRaw || "—").slice(0, 500)
+    : "";
+
+  const lk = String(i.line_kind || "menu").toLowerCase();
+
+  if (lk === "service") {
+    const row = {
+      order: orderRef,
+      line_kind: "service",
+      menu_item: null,
+      service_title: String(i.service_title || "").trim().slice(0, 255),
+      unit_price: decimalStringOrNull(i.unit_price ?? i.price),
+      quantity: qty,
+      is_rejected: rejected,
+      rejection_reason,
+    };
+    if (i.id) row.id = i.id;
+    return row;
+  }
+
+  const row = {
+    order: orderRef,
+    line_kind: "menu",
+    menu_item: toId(i.menu_item),
+    unit_price: decimalStringOrNull(i.price ?? i.unit_price),
+    quantity: qty,
+    is_rejected: rejected,
+    rejection_reason,
+  };
+  if (i.id) row.id = i.id;
+  return row;
+};
+
+const normalizeOrderPayload = (f, isNew = false, editingOrderId = null) => {
+  const orderRef =
+    !isNew && editingOrderId != null && String(editingOrderId).trim() !== ""
+      ? toId(editingOrderId)
+      : null;
+
+  const items = (f.items || [])
+    .filter((i) => {
+      if (!i || Number(i.quantity) <= 0) return false;
+      const lk = String(i.line_kind || "menu").toLowerCase();
+      if (lk === "service") return String(i.service_title || "").trim().length > 0;
+      return !!toId(i.menu_item);
+    })
+    .map((i) => serializeOrderItemInline(i, orderRef));
+
+  return stripEmpty({
     table: toId(f.table),
     waiter: toId(f.waiter),
     client: toId(f.client),
     guests: Math.max(0, Number(f.guests) || 0),
     status: isNew ? "open" : undefined,
-    items: (f.items || [])
-      .filter((i) => i && i.menu_item && Number(i.quantity) > 0)
-      .map((i) =>
-        stripEmpty({
-          menu_item: toId(i.menu_item),
-          quantity: Math.max(1, Number(i.quantity) || 1),
-        })
-      ),
+    items,
   });
+};
 
 const normalizeEmployee = (e = {}) => ({
   id: e.id,
@@ -637,6 +751,8 @@ const Orders = () => {
 
 
   const linePrice = (it) => {
+    const lk = String(it?.line_kind || "menu").toLowerCase();
+    if (lk === "service") return toNum(it.unit_price ?? it.price);
     if (it?.menu_item_price != null) return toNum(it.menu_item_price);
     if (it?.price != null) return toNum(it.price);
     const key = String(it?.menu_item ?? "");
@@ -694,7 +810,7 @@ const Orders = () => {
         paid_card: 0,
         change: 0,
         items: items.map((it) => ({
-          name: String(it.menu_item_title || it.title || "Позиция"),
+          name: orderItemTitle(it),
           qty: Math.max(1, Number(it.quantity) || 1),
           price: linePrice(it),
         })),
@@ -761,7 +877,7 @@ const Orders = () => {
         change: 0,
         kitchen_id: kitchenId,
         items: (items || []).map((it) => ({
-          name: String(it.menu_item_title || it.title || "Позиция"),
+          name: orderItemTitle(it),
           qty: Math.max(1, Number(it.quantity) || 1),
           // price: linePrice(it),
         })),
@@ -976,12 +1092,34 @@ const Orders = () => {
     setEditingId(order.id);
 
     const itemsNormalized = Array.isArray(order.items)
-      ? order.items.map((it) => ({
-        menu_item: String(it.menu_item || it.id),
+      ? order.items.map((it, idx) => {
+          const lk = String(it.line_kind || "menu").toLowerCase();
+          if (lk === "service") {
+            return {
+              _key: it.id ? `i:${it.id}` : `s:${idx}`,
+              id: it.id,
+              line_kind: "service",
+              menu_item: "",
+              service_title: it.service_title || it.title || "",
+              price: toNum(it.unit_price ?? it.price),
+              quantity: Number(it.quantity) || 1,
+              is_rejected: !!it.is_rejected,
+              rejection_reason: it.rejection_reason || "",
+            };
+          }
+          const mid = String(it.menu_item || it.menu_item_id || "");
+          return {
+            _key: it.id ? `i:${it.id}` : `m:${mid}`,
+            id: it.id,
+            line_kind: "menu",
+            menu_item: mid,
         title: it.menu_item_title || it.title,
         price: linePrice(it),
         quantity: Number(it.quantity) || 1,
-      }))
+            is_rejected: !!it.is_rejected,
+            rejection_reason: it.rejection_reason || "",
+          };
+        })
       : [];
 
     setForm({
@@ -1001,56 +1139,75 @@ const Orders = () => {
   const addOrIncMenuItem = (menu) => {
     if (!menu?.id) return;
     const idStr = String(menu.id);
+    const mkey = `m:${idStr}`;
 
     setForm((prev) => {
-      const ex = prev.items.find((i) => String(i.menu_item) === idStr);
+      const ex = prev.items.find(
+        (i) => String(i.line_kind || "menu") !== "service" && String(i.menu_item) === idStr
+      );
       if (ex) {
         return {
           ...prev,
-          items: prev.items.map((i) => (String(i.menu_item) === idStr ? { ...i, quantity: i.quantity + 1 } : i)),
+          items: prev.items.map((i) =>
+            i._key === ex._key ? { ...i, quantity: (Number(i.quantity) || 1) + 1 } : i
+          ),
         };
       }
       return {
         ...prev,
-        items: [...prev.items, { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: 1 }],
+        items: [
+          ...prev.items,
+          {
+            _key: mkey,
+            line_kind: "menu",
+            menu_item: idStr,
+            title: menu.title,
+            price: toNum(menu.price),
+            quantity: 1,
+            is_rejected: false,
+            rejection_reason: "",
+          },
+        ],
       };
     });
   };
 
-  const changeItemQty = (id, nextQty) => {
+  const changeItemQty = (lineKey, nextQty) => {
     const q = Math.max(1, Number(nextQty) || 1);
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) => (String(i.menu_item) === String(id) ? { ...i, quantity: q } : i)),
+      items: prev.items.map((i) => (i._key === lineKey ? { ...i, quantity: q } : i)),
     }));
   };
 
-  const incItem = (id) => {
+  const incItem = (lineKey) => {
     setForm((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        String(i.menu_item) === String(id)
+        i._key === lineKey
           ? { ...i, quantity: Math.max(1, (Number(i.quantity) || 1) + 1) }
           : i
       ),
     }));
   };
 
-  const decItem = (id) => {
+  const decItem = (lineKey) => {
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) =>
-        String(i.menu_item) === String(id)
+      items: prev.items
+        .map((i) =>
+          i._key === lineKey
           ? { ...i, quantity: Math.max(0, (Number(i.quantity) || 1) - 1) }
           : i
-      ).filter(el => el.quantity),
+        )
+        .filter((el) => el.quantity),
     }));
   };
 
-  const removeItem = (id) => {
+  const removeItem = (lineKey) => {
     setForm((prev) => ({
       ...prev,
-      items: prev.items.filter((i) => String(i.menu_item) !== String(id)),
+      items: prev.items.filter((i) => i._key !== lineKey),
     }));
   };
 
@@ -1102,7 +1259,7 @@ const Orders = () => {
 
         await autoPrintKitchenTickets(res?.data?.id);
       } else {
-        const payload = normalizeOrderPayload(form);
+        const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
       }
@@ -1155,13 +1312,49 @@ const Orders = () => {
   };
 
 
-  /* ===== ОПЛАТА (DELETE order после прихода) ===== */
+  /* ===== ОПЛАТА: POST /cafe/orders/<id>/pay/ и /pay-debt/ ===== */
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payOrder, setPayOrder] = useState(null);
+  const [payForm, setPayForm] = useState({
+    paymentMethod: "cash",
+    discountAmount: "0",
+    payNow: "",
+    usePrepaid: false,
+    prepaidAmount: "",
+    prepaidPaymentMethod: "cash",
+    clientId: "",
+    debtAmount: "",
+    debtPaymentMethod: "cash",
+    debtCashReceived: "",
+    debtNote: "",
+  });
+
+  const checkoutDue = useCallback((order, discountStr) => {
+    const itemsTotal = calcTotals(order).total;
+    const disc = toNum(discountStr);
+    const after = Math.max(0, itemsTotal - disc);
+    const paid = toNum(order?.paid_amount);
+    return Math.max(0, after - paid);
+  }, []);
 
   const openPay = (order) => {
     setPayOrder(order);
+    const due = checkoutDue(order, "0");
+    const bal = toNum(order?.balance_due);
+    setPayForm({
+      paymentMethod: "cash",
+      discountAmount: "0",
+      payNow: numStr(due),
+      usePrepaid: false,
+      prepaidAmount: "",
+      prepaidPaymentMethod: "cash",
+      clientId: getOrderClientId(order),
+      debtAmount: bal > 0 ? numStr(bal) : "",
+      debtPaymentMethod: "cash",
+      debtCashReceived: bal > 0 ? numStr(bal) : "",
+      debtNote: "",
+    });
     setPayOpen(true);
   };
 
@@ -1171,51 +1364,129 @@ const Orders = () => {
     setPayOrder(null);
   };
 
-  const paidGuardKey = useCallback((orderId) => `orders_paid_income_created_${orderId}`, []);
-
-  const confirmPay = async () => {
-    if (!payOrder?.id) return;
-
-    setPaying(true);
-    try {
-      const totals = calcTotals(payOrder);
-
-      // 1) Создаём приход (если ещё не создавали)
-      const guardKey = paidGuardKey(payOrder.id);
-      const alreadyCreated = localStorage.getItem(guardKey);
-
-      if (!alreadyCreated) {
-        const income = await createCashflowIncome(payOrder, totals.total);
-        localStorage.setItem(guardKey, String(income?.id || income?.uuid || "1"));
+  useEffect(() => {
+    if (!payOpen) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setClientsLoading(true);
+        setClientsErr("");
+        const data = await getAllClients();
+        if (mounted) setClients(Array.isArray(data) ? data : []);
+      } catch (e) {
+        const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
+        alert(errorMessage, true);
+        if (mounted) setClientsErr("Не удалось загрузить клиентов");
+      } finally {
+        if (mounted) setClientsLoading(false);
       }
+    })();
 
-      // 2) Оплачиваем заказ
-      await api.post(`/cafe/orders/${payOrder.id}/pay/`);
+    return () => {
+      mounted = false;
+    };
+  }, [payOpen]);
 
-      // 3) Освобождаем стол
-      await freeTable(payOrder.table);
+  const postPayCashflowDelta = async (order, paidBefore, data) => {
+    const delta = toNum(data?.paid_amount) - toNum(paidBefore);
+    if (!(delta > 0)) return;
+    await createCashflowIncome(order, delta);
+  };
 
-      // 4) Сразу убираем из UI
-      setOrders((prev) => (prev || []).filter((o) => String(o.id) !== String(payOrder.id)));
-
-      // 5) Закрываем модалку
-      printOrder(payOrder)
+  const finishPaySuccess = async (orderBefore, data) => {
+    const bal = toNum(data?.balance_due);
+    if (bal <= 0.005) {
+      await freeTable(orderBefore.table);
+    }
+    try {
+      printOrder({ ...orderBefore, ...data });
+    } catch {
+      /* ignore */
+    }
+    await fetchOrders();
       setPayOpen(false);
       setPayOrder(null);
+  };
 
-      // 6) Сокеты автоматически обновят список заказов через событие order_updated
-      // Не нужно вызывать fetchOrders() - это вызывает ненужную перезагрузку
+  const submitCheckoutPay = async () => {
+    if (!payOrder?.id) return;
 
-      // успех — снимаем guard
-      localStorage.removeItem(guardKey);
+    const order = payOrder;
+    const discount_amount = numStr(toNum(payForm.discountAmount));
+    const due = checkoutDue(order, payForm.discountAmount);
+    const clientId = String(payForm.clientId || getOrderClientId(order) || "").trim();
+
+    let payload = {};
+    const pm = payForm.paymentMethod;
+
+    if (pm === "debt") {
+      if (!clientId) {
+        alert("Укажите гостя: для оплаты в долг нужен client_id (выберите гостя).", true);
+        return;
+      }
+      if (payForm.usePrepaid) {
+        const pre = toNum(payForm.prepaidAmount);
+        if (!(pre > 0)) {
+          alert("Укажите сумму предоплаты.", true);
+          return;
+        }
+        payload = stripEmpty({
+          payment_method: "debt",
+          prepaid_amount: numStr(pre),
+          prepaid_payment_method: payForm.prepaidPaymentMethod,
+          idempotency_key: newIdempotencyKey(),
+          discount_amount,
+          close_order: true,
+          client_id: clientId,
+        });
+      } else {
+        payload = stripEmpty({
+          payment_method: "debt",
+          discount_amount,
+          close_order: true,
+          client_id: clientId,
+        });
+      }
+    } else {
+      const payNowNum =
+        payForm.payNow.trim() === "" ? due : Math.max(0, toNum(payForm.payNow));
+      const restDebt = due - payNowNum > 0.009;
+      if (restDebt && !clientId) {
+        alert("Выберите гостя: остаток уйдёт в долг.", true);
+        return;
+      }
+      if (restDebt) {
+        payload = stripEmpty({
+          payment_method: pm,
+          pay_now: numStr(payNowNum),
+          idempotency_key: newIdempotencyKey(),
+          client_id: clientId,
+          close_order: true,
+          discount_amount,
+        });
+      } else {
+        payload = stripEmpty({
+          payment_method: pm,
+          discount_amount,
+          close_order: true,
+        });
+      }
+    }
+
+    setPaying(true);
+    const paidBefore = toNum(order.paid_amount);
+    try {
+      const { data } = await api.post(`/cafe/orders/${order.id}/pay/`, payload);
+      await postPayCashflowDelta(order, paidBefore, data);
+      await finishPaySuccess(order, data);
     } catch (e) {
       const errorMessage = validateResErrors(e, "Ошибка оплаты заказа");
       alert(errorMessage, true);
-      // Ошибка оплаты заказa
     } finally {
       setPaying(false);
     }
   };
+
 
 
   /* options */
@@ -1242,10 +1513,21 @@ const Orders = () => {
   const clientOptions = useMemo(() => {
     return (clients || []).map((c) => ({
       value: String(c.id),
-      label: String(c.full_name || "Без имени").trim() || "Без имени",
-      search: `${c.full_name || ""} ${c.phone || ""}`.trim(),
+      label: pickClientLabel(c),
+      search: `${pickClientLabel(c)} ${c.phone || ""}`.trim(),
     }));
   }, [clients]);
+
+  const payClientOptions = useMemo(() => {
+    const base = [{ value: "", label: "— Не выбран —", search: "" }, ...clientOptions];
+    const selectedId = String(payForm.clientId || "").trim();
+    if (!selectedId) return base;
+    if (base.some((o) => String(o.value) === selectedId)) return base;
+
+    const orderClient = payOrder?.client && typeof payOrder.client === "object" ? payOrder.client : null;
+    const fallbackLabel = orderClient ? pickClientLabel(orderClient) : `Клиент ${selectedId}`;
+    return [{ value: selectedId, label: fallbackLabel, search: fallbackLabel }, ...base];
+  }, [clientOptions, payForm.clientId, payOrder]);
 
 
   return (
@@ -1295,6 +1577,10 @@ const Orders = () => {
               const totals = calcTotals(o);
               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
               const isTakeaway = tableLabel === TAKEAWAY_LABEL;
+              const debtDue = toNum(o.balance_due);
+              const showPayActions =
+                String(o.status || "").toLowerCase() === "open" &&
+                (!o.is_paid || debtDue > 0);
 
               const items = Array.isArray(o.items) ? o.items : [];
               const expanded = expandedOrders.has(String(o.id));
@@ -1315,12 +1601,12 @@ const Orders = () => {
                   <div className="cafeOrders__receiptItems">
                     {sliceItems.map((it, i) => {
                       const itemPrice = linePrice(it);
-                      const itemTitle = it.menu_item_title || it.title || "Позиция";
+                      const itemTitle = orderItemTitle(it);
                       const itemQty = Number(it.quantity) || 0;
                       const sum = itemPrice * itemQty;
 
                       return (
-                        <div key={it.id || it.menu_item || i} className="cafeOrders__receiptItem">
+                        <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`} className="cafeOrders__receiptItem">
                           <span className="cafeOrders__receiptItemName">{itemTitle}</span>
                           <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
                           <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
@@ -1349,28 +1635,42 @@ const Orders = () => {
                       <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
                     </div>
 
+                    {toNum(o.paid_amount) > 0 && (
+                      <div className="cafeOrders__receiptSubline">
+                        <span>Оплачено</span>
+                        <span>{fmtMoney(o.paid_amount)}</span>
+                      </div>
+                    )}
+                    {debtDue > 0 && (
+                      <div className="cafeOrders__receiptSubline cafeOrders__receiptSubline--debt">
+                        <span>Долг</span>
+                        <span>{fmtMoney(debtDue)}</span>
+                      </div>
+                    )}
+
                     <div className="cafeOrders__receiptActions">
-                      {
-                        !o.is_paid && o.status == 'open' && (<button
+                      {!o.is_paid && String(o.status || "").toLowerCase() === "open" && (
+                        <button
                           className="cafeOrders__btn cafeOrders__btn--secondary"
                           onClick={() => openEdit(o)}
                           type="button"
                           disabled={saving || paying || printingId === o.id}
                         >
                           <FaEdit /> Редактировать
-                        </button>)
-                      }
+                        </button>
+                      )}
 
-                      {
-                        !o.is_paid && o.status == 'open' && (<button
+                      {showPayActions && (
+                        <button
                           className="cafeOrders__btn cafeOrders__btn--primary"
                           onClick={() => openPay(o)}
                           type="button"
                           disabled={saving || paying || printingId === o.id}
                         >
-                          <FaCheckCircle /> Оплатить
-                        </button>)
-                      }
+                          <FaCheckCircle />{" "}
+                          {debtDue > 0 && o.is_paid ? "Долг" : "Оплатить"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -1563,21 +1863,26 @@ const Orders = () => {
                   {form.items.length ? (
                     <div className="cafeOrders__itemsList">
                       {form.items.map((it) => {
-                        const img = menuImageUrl(it.menu_item);
+                        const isService = String(it.line_kind || "menu").toLowerCase() === "service";
+                        const img = isService ? "" : menuImageUrl(it.menu_item);
                         const qty = Math.max(1, Number(it.quantity) || 1);
                         const price = toNum(it.price);
                         const sum = price * qty;
+                        const lineTitle = isService ? it.service_title || "Услуга" : it.title;
 
                         return (
-                          <div key={it.menu_item} className="cafeOrders__itemRow">
+                          <div key={it._key} className="cafeOrders__itemRow">
                             <div className="cafeOrders__itemLeft">
                               <span className="cafeOrders__thumb cafeOrders__thumb--sm" aria-hidden>
                                 {img ? <img src={img} alt="" /> : <FaClipboardList />}
                               </span>
 
                               <div className="cafeOrders__itemInfo">
-                                <div className="cafeOrders__itemTitle" title={it.title}>
-                                  {it.title}
+                                <div className="cafeOrders__itemTitle" title={lineTitle}>
+                                  {lineTitle}
+                                  {isService ? (
+                                    <span className="cafeOrders__itemKind"> · услуга</span>
+                                  ) : null}
                                 </div>
                                 <div className="cafeOrders__itemMeta">
                                   <span>{fmtMoney(price)} сом</span>
@@ -1592,7 +1897,7 @@ const Orders = () => {
                                 <button
                                   type="button"
                                   className="cafeOrders__qtyBtn"
-                                  onClick={() => decItem(it.menu_item)}
+                                  onClick={() => decItem(it._key)}
                                   disabled={saving || qty <= 0}
                                   aria-label="Уменьшить"
                                 >
@@ -1602,7 +1907,7 @@ const Orders = () => {
                                 <input
                                   className="cafeOrders__qtyInput"
                                   value={qty}
-                                  onChange={(e) => changeItemQty(it.menu_item, e.target.value)}
+                                  onChange={(e) => changeItemQty(it._key, e.target.value)}
                                   disabled={saving}
                                   inputMode="numeric"
                                 />
@@ -1610,7 +1915,7 @@ const Orders = () => {
                                 <button
                                   type="button"
                                   className="cafeOrders__qtyBtn"
-                                  onClick={() => incItem(it.menu_item)}
+                                  onClick={() => incItem(it._key)}
                                   disabled={saving}
                                   aria-label="Увеличить"
                                 >
@@ -1621,7 +1926,7 @@ const Orders = () => {
                               <button
                                 type="button"
                                 className="cafeOrders__btn cafeOrders__btn--danger cafeOrders__itemRemove"
-                                onClick={() => removeItem(it.menu_item)}
+                                onClick={() => removeItem(it._key)}
                                 disabled={saving}
                                 title="Удалить"
                               >
@@ -1710,7 +2015,7 @@ const Orders = () => {
           <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
-                <h3 className="cafeOrdersModal__title">Чек перед оплатой</h3>
+                <h3 className="cafeOrdersModal__title">Оплата заказа</h3>
                 <button
                   className="cafeOrdersModal__close"
                   onClick={closePay}
@@ -1729,6 +2034,9 @@ const Orders = () => {
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);
                   const isTakeaway = tableLabel === TAKEAWAY_LABEL;
+                  const due = checkoutDue(payOrder, payForm.discountAmount);
+                  const bal = toNum(payOrder.balance_due);
+                  const paidShown = toNum(payOrder.paid_amount);
 
                   return (
                     <>
@@ -1744,13 +2052,13 @@ const Orders = () => {
                       <div className="cafeOrdersPay__list">
                         {items.length ? (
                           items.map((it, idx) => {
-                            const title = it.menu_item_title || it.title || "Позиция";
+                            const title = orderItemTitle(it);
                             const qty = Number(it.quantity) || 0;
                             const price = linePrice(it);
                             const sum = price * qty;
 
                             return (
-                              <div key={it.id || it.menu_item || idx} className="cafeOrdersPay__row">
+                              <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`} className="cafeOrdersPay__row">
                                 <span className="cafeOrdersPay__name" title={title}>
                                   {title}
                                 </span>
@@ -1767,8 +2075,159 @@ const Orders = () => {
                       <div className="cafeOrdersPay__divider cafeOrdersPay__divider--dashed" />
 
                       <div className="cafeOrdersPay__total">
-                        <span>ИТОГО</span>
-                        <span>{fmtShort(totals.total)}</span>
+                        <span>По позициям</span>
+                        <span>{fmtMoney(totals.total)}</span>
+                      </div>
+                      {(paidShown > 0 || bal > 0) && (
+                        <div className="cafeOrdersPay__summary">
+                          {paidShown > 0 && (
+                            <div className="cafeOrdersPay__summaryRow">
+                              <span>Уже оплачено</span>
+                              <span>{fmtMoney(paidShown)}</span>
+                            </div>
+                          )}
+                          {bal > 0 && (
+                            <div className="cafeOrdersPay__summaryRow cafeOrdersPay__summaryRow--debt">
+                              <span>Долг</span>
+                              <span>{fmtMoney(bal)}</span>
+                            </div>
+                          )}
+                          <div className="cafeOrdersPay__summaryRow cafeOrdersPay__summaryRow--strong">
+                            <span>К оплате (чек)</span>
+                            <span>{fmtMoney(due)}</span>
+                          </div>
+                        </div>
+                      )}
+  <div className="cafeOrdersPay__field">
+                            <label className="cafeOrdersPay__label">
+                              Гость (для долга){payForm.paymentMethod === "debt" ? " *" : ""}
+                            </label>
+                            <SearchableCombobox
+                              value={payForm.clientId}
+                              onChange={(v) =>
+                                setPayForm((f) => {
+                                  const nextId = String(v || "").trim();
+                                  if (f.paymentMethod === "debt" && !nextId) return f;
+                                  return { ...f, clientId: nextId };
+                                })
+                              }
+                              options={payClientOptions}
+                              placeholder="Выберите гостя…"
+                              disabled={paying}
+                              hideClear={payForm.paymentMethod === "debt"}
+                              classNamePrefix="cafeOrdersPayCombo"
+                            />
+                          </div>
+                           <div className="cafeOrdersPay__field">
+                            <label className="cafeOrdersPay__label">Способ оплаты</label>
+                            <SearchableCombobox
+                              value={payForm.paymentMethod}
+                              onChange={(v) =>
+                                setPayForm((f) => {
+                                  const nextMethod = normalizePaymentMethod(v) || "cash";
+                                  const next = { ...f, paymentMethod: nextMethod };
+                                  if (nextMethod === "debt" && !String(next.clientId || "").trim()) {
+                                    next.clientId = getOrderClientId(payOrder) || "";
+                                  }
+                                  return next;
+                                })
+                              }
+                              options={PAY_CHECKOUT_METHODS}
+                              placeholder="Способ…"
+                              disabled={paying}
+                              hideClear
+                              classNamePrefix="cafeOrdersPayCombo"
+                            />
+                          </div>
+                              <div className="cafeOrdersPay__field">
+                                <label className="cafeOrdersPay__label">Способ предоплаты</label>
+                                <SearchableCombobox
+                                  value={payForm.prepaidPaymentMethod}
+                                  onChange={(v) =>
+                                    setPayForm((f) => ({ ...f, prepaidPaymentMethod: v }))
+                                  }
+                                  options={[
+                                    { value: "cash", label: "Наличные" },
+                                    { value: "card", label: "Карта" },
+                                    { value: "transfer", label: "Перевод" },
+                                  ]}
+                                  placeholder="Способ…"
+                                  disabled={paying}
+                                  classNamePrefix="cafeOrdersPayCombo"
+                                />
+                              </div>
+
+                         
+                      <div className="cafeOrdersPay__form">
+                          <div className="cafeOrdersPay__field">
+                            <label className="cafeOrdersPay__label">Скидка (сумма)</label>
+                            <input
+                              className="cafeOrdersPay__input"
+                              type="text"
+                              inputMode="decimal"
+                              value={payForm.discountAmount}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(",", ".");
+                                setPayForm((f) => {
+                                  const next = { ...f, discountAmount: v };
+                                  const d = checkoutDue(payOrder, v);
+                                  next.payNow = numStr(d);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </div>
+
+                          {payForm.paymentMethod !== "debt" && (
+                            <div className="cafeOrdersPay__field">
+                              <label className="cafeOrdersPay__label">
+                                Сумма сейчас (остаток в долг, если меньше {fmtMoney(due)})
+                              </label>
+                              <input
+                                className="cafeOrdersPay__input"
+                                type="text"
+                                inputMode="decimal"
+                                value={payForm.payNow}
+                                onChange={(e) =>
+                                  setPayForm((f) => ({ ...f, payNow: e.target.value.replace(",", ".") }))
+                                }
+                              />
+                            </div>
+                          )}
+                          {payForm.paymentMethod === "debt" && (
+                            <label className="cafeOrdersPay__check">
+                              <input
+                                type="checkbox"
+                                checked={payForm.usePrepaid}
+                                onChange={(e) =>
+                                  setPayForm((f) => ({ ...f, usePrepaid: e.target.checked }))
+                                }
+                                disabled={paying}
+                              />
+                              <span>Предоплата + долг на остаток</span>
+                            </label>
+                          )}
+                          {payForm.paymentMethod === "debt" && payForm.usePrepaid && (
+                            <>
+                              <div className="cafeOrdersPay__field">
+                                <label className="cafeOrdersPay__label">Предоплата</label>
+                                <input
+                                  className="cafeOrdersPay__input"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={payForm.prepaidAmount}
+                                  onChange={(e) =>
+                                    setPayForm((f) => ({
+                                      ...f,
+                                      prepaidAmount: e.target.value.replace(",", "."),
+                                    }))
+                                  }
+                                />
+                              </div>
+                          
+                            </>
+                          )}
+                        
                       </div>
                     </>
                   );
@@ -1797,10 +2256,10 @@ const Orders = () => {
                   <button
                     type="button"
                     className="cafeOrders__btn cafeOrders__btn--primary"
-                    onClick={confirmPay}
+                    onClick={submitCheckoutPay}
                     disabled={paying || printingId === payOrder.id}
                   >
-                    {paying ? "Оплата…" : "Оплатить"}
+                    {paying ? "Оплата…" : "Провести оплату"}
                   </button>
                 </div>
               </div>

@@ -40,6 +40,15 @@ const toNum = (x) => {
 
 const fmtShort = (n) => String(Math.round(toNum(n)));
 
+const orderItemTitle = (it) => {
+  const lk = String(it?.line_kind || "menu").toLowerCase();
+  if (lk === "service") {
+    const t = String(it.service_title || it.title || "").trim();
+    return t || "Услуга";
+  }
+  return String(it.menu_item_title || it.title || "Позиция");
+};
+
 const fullName = (u) =>
   [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
   u?.email ||
@@ -265,6 +274,8 @@ const CafeOrderHistory = () => {
   }, [roleFiltered]);
 
   const linePrice = (it) => {
+    const lk = String(it?.line_kind || "menu").toLowerCase();
+    if (lk === "service") return toNum(it.unit_price ?? it.price);
     if (it?.menu_item_price != null) return toNum(it.menu_item_price);
     if (it?.price != null) return toNum(it.price);
     const key = String(it?.menu_item ?? "");
@@ -318,7 +329,7 @@ const CafeOrderHistory = () => {
         paid_card: 0,
         change: 0,
         items: items.map((it) => ({
-          name: String(it.menu_item_title || it.title || "Позиция"),
+          name: orderItemTitle(it),
           qty: Math.max(1, Number(it.quantity) || 1),
           price: linePrice(it),
         })),
@@ -447,11 +458,11 @@ const CafeOrderHistory = () => {
                   <div className="cafeOrders__receiptItems">
                     {sliceItems.map((it, i) => {
                       const itemPrice = linePrice(it);
-                      const itemTitle = it.menu_item_title || it.title || "Позиция";
+                      const itemTitle = orderItemTitle(it);
                       const itemQty = Number(it.quantity) || 0;
                       const sum = itemPrice * itemQty;
                       return (
-                        <div key={it.id || it.menu_item || i} className="cafeOrders__receiptItem">
+                        <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`} className="cafeOrders__receiptItem">
                           <span className="cafeOrders__receiptItemName">{itemTitle}</span>
                           <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
                           <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
@@ -562,13 +573,13 @@ const CafeOrderHistory = () => {
                       <div className="cafeOrdersPay__list">
                         {items.length ? (
                           items.map((it, idx) => {
-                            const title = it.menu_item_title || it.title || "Позиция";
+                            const title = orderItemTitle(it);
                             const qty = Number(it.quantity) || 0;
                             const price = linePrice(it);
                             const sum = price * qty;
 
                             return (
-                              <div key={it.id || it.menu_item || idx} className="cafeOrdersPay__row">
+                              <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`} className="cafeOrdersPay__row">
                                 <span className="cafeOrdersPay__name" title={title}>
                                   {title}
                                 </span>
