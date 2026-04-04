@@ -364,39 +364,52 @@ const CafeEmployEmployeeDetail = () => {
 
       {!loading && !loadErr && display && (
         <>
-          <div className="cafeEmployDetail__card">
-            <div className="cafeEmployDetail__head">
+          <div className="cafeEmployDetail__main">
+            <header className="cafeEmployDetail__head">
               <div className="barbermasters__avatar cafeEmployDetail__avatar">
                 {(fullName(display) || display.email || "•")
                   .trim()
                   .charAt(0)
                   .toUpperCase() || "•"}
               </div>
-              <div>
+              <div className="cafeEmployDetail__headText">
                 <h1 className="cafeEmployDetail__title">
                   {fullName(display) || "Без имени"}
                 </h1>
                 <div className="cafeEmployDetail__meta">
-                  <span>{display.email || "—"}</span>
-                  <span>{roleLabel}</span>
+                  <span className="cafeEmployDetail__metaItem">
+                    {display.email || "—"}
+                  </span>
+                  <span className="cafeEmployDetail__metaDot" aria-hidden>
+                    ·
+                  </span>
+                  <span className="cafeEmployDetail__metaItem">{roleLabel}</span>
                 </div>
               </div>
-            </div>
+            </header>
 
-            <div className="cafeEmployDetail__grid">
-              <div>
-                <div className="cafeEmployDetail__label">Телефон</div>
-                <div>{display.phone_number || "—"}</div>
+            <section className="cafeEmployDetail__section" aria-label="Контакты">
+              <div className="cafeEmployDetail__grid">
+                <div>
+                  <div className="cafeEmployDetail__label">Телефон</div>
+                  <div className="cafeEmployDetail__value">
+                    {display.phone_number || "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="cafeEmployDetail__label">Трек-номер</div>
+                  <div className="cafeEmployDetail__value">
+                    {display.track_number || "—"}
+                  </div>
+                </div>
+                <div className="cafeEmployDetail__gridFull">
+                  <div className="cafeEmployDetail__label">ID</div>
+                  <div className="cafeEmployDetail__mono cafeEmployDetail__value">
+                    {display.id}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="cafeEmployDetail__label">Трек-номер</div>
-                <div>{display.track_number || "—"}</div>
-              </div>
-              <div className="cafeEmployDetail__gridFull">
-                <div className="cafeEmployDetail__label">ID</div>
-                <div className="cafeEmployDetail__mono">{display.id}</div>
-              </div>
-            </div>
+            </section>
 
             <div className="cafeEmployDetail__actions">
               {canSalary && (
