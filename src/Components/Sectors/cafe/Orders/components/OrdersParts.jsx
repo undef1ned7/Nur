@@ -410,7 +410,13 @@ export const RightMenuPanel = ({
         {paginatedItems.map((m) => {
           const img = menuImageUrl?.(m.id);
           const cartItem = isCart(m.id);
-          const cartQty = cartItem?.quantity || 0;
+          const rawQty = cartItem?.quantity;
+          const cartQty =
+            rawQty === ""
+              ? "—"
+              : cartItem
+                ? Math.max(0, Math.floor(Number(rawQty)) || 0)
+                : 0;
           return (
             <button
               key={m.id}
@@ -434,7 +440,7 @@ export const RightMenuPanel = ({
               </span>
 
               <span className="cafeOrdersRpanel__add" aria-hidden>
-                {!cartQty ? <FaPlus /> : cartQty}
+                {!cartItem ? <FaPlus /> : cartQty}
               </span>
             </button>
           );

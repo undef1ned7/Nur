@@ -201,6 +201,25 @@
     align-items: center;
     font-size: 14px;
     min-width: 0;
+
+    &--rejected {
+      opacity: 0.9;
+
+      .cafeOrders__receiptItemName {
+        text-decoration: line-through;
+        color: var(--muted);
+      }
+    }
+  }
+
+  &__receiptRejectedNote {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+    font-weight: 500;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e5e7eb;
   }
 
   &__receiptItemName {
@@ -1271,6 +1290,14 @@
     justify-content: flex-end;
     gap: 10px;
     flex-wrap: wrap;
+
+    &--historyView {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid #e5e7eb;
+      justify-content: flex-start;
+      gap: 12px;
+    }
   }
 
   @media (max-width: 560px) {
@@ -1305,6 +1332,258 @@
     }
 
     &__actions .cafeOrders__btn {
+      width: 100%;
+    }
+
+    &__actions--historyView {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+}
+
+.cafeOrdersPay__row--rejected {
+  opacity: 0.9;
+
+  .cafeOrdersPay__name {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+}
+
+.cafeOrdersPay__rejectedLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #d1d5db;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Модалка «Позиции и возвраты» (история заказов) */
+.cafeOrdersHistoryItemsEdit__shell.cafeOrdersModal__shell {
+  width: min(560px, 96vw);
+  max-height: min(88dvh, 720px);
+}
+
+.cafeOrdersHistoryItemsEdit__card.cafeOrdersModal__card {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+
+.cafeOrdersHistoryItemsEdit__body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cafeOrdersHistoryItemsEdit__hint {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.cafeOrdersHistoryItemsEdit__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 100px;
+  max-height: min(48vh, 400px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 8px 2px;
+  margin: 0 -2px 0 0;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+.cafeOrdersHistoryItemsEdit__row {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.cafeOrdersHistoryItemsEdit__rowHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.cafeOrdersHistoryItemsEdit__title {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  flex: 1;
+  min-width: min(100%, 220px);
+  color: var(--text);
+}
+
+.cafeOrdersHistoryItemsEdit__qtyBlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cafeOrdersHistoryItemsEdit__price {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.cafeOrdersHistoryItemsEdit__times {
+  opacity: 0.45;
+  font-weight: 500;
+  margin: 0 2px;
+}
+
+.cafeOrdersHistoryItemsEdit__qtyField {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 88px;
+}
+
+.cafeOrdersHistoryItemsEdit__qtyCaption {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.cafeOrdersHistoryItemsEdit__qty {
+  width: 100% !important;
+  min-width: 88px;
+  padding: 8px 10px !important;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cafeOrdersHistoryItemsEdit__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+  padding: 2px 0;
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--primary-dark, #ca8a04);
+  }
+}
+
+.cafeOrdersHistoryItemsEdit__reasonWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.cafeOrdersHistoryItemsEdit__reasonLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cafeOrdersHistoryItemsEdit__reason {
+  resize: vertical;
+  min-height: 72px;
+  font-size: 14px;
+  line-height: 1.45;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cafeOrdersHistoryItemsEdit__footerActions {
+  margin-top: auto;
+  padding: 16px 20px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafbfc;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .cafeOrdersHistoryItemsEdit__body {
+    padding: 14px 16px 10px;
+  }
+
+  .cafeOrdersHistoryItemsEdit__rowHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cafeOrdersHistoryItemsEdit__qtyBlock {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .cafeOrdersHistoryItemsEdit__qtyField {
+    flex: 1;
+    max-width: 120px;
+  }
+
+  .cafeOrdersHistoryItemsEdit__footerActions {
+    padding: 14px 16px 18px;
+    flex-direction: column-reverse;
+    align-items: stretch;
+
+    .cafeOrders__btn {
       width: 100%;
     }
   }

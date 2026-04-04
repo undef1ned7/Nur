@@ -2745,127 +2745,113 @@
   }
 }
 
-/* Cafe: employee detail (/crm/employ/:id) */
+/* Cafe: employee detail (/crm/employ/:id) — без «карточки», в линию со страницей сотрудников */
 .cafeEmployDetail {
-  padding: 24px;
-  max-width: 720px;
-  margin: 0 auto;
+  padding: 0 20px 24px;
+  max-width: 960px;
+
+  .barbermasters__top {
+    padding: 16px 0 12px;
+  }
+
+  &__main {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
 
   &__head {
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    margin-bottom: 20px;
+    padding: 8px 0 20px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  &__headText {
+    min-width: 0;
+    flex: 1;
   }
 
   &__avatar {
     flex-shrink: 0;
-    width: 56px;
-    height: 56px;
-    font-size: 22px;
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+  }
+
+  &__title {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text, #0f172a);
+    letter-spacing: -0.02em;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted, #6b7280);
+  }
+
+  &__metaItem {
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  &__metaDot {
+    color: #cbd5e1;
+    user-select: none;
+  }
+
+  &__section {
+    padding: 20px 0 8px;
+  }
+
+  &__grid {
+    display: grid;
+    gap: 16px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
 
   &__gridFull {
     grid-column: 1 / -1;
   }
 
-  &__mono {
-    font-family: ui-monospace, monospace;
-    font-size: 13px;
-    word-break: break-all;
-  }
-
-  &__back {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 20px;
-    padding: 8px 14px;
-    border-radius: 10px;
-    border: 1px solid var(--border, #e5e7eb);
-    background: var(--surface, #fff);
-    color: inherit;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.15s ease;
-
-    &:hover {
-      background: var(--surface-hover, #f9fafb);
-    }
-  }
-
-  &__card {
-    border: 1px solid var(--border, #e5e7eb);
-    border-radius: 14px;
-    padding: 22px 24px;
-    background: var(--surface, #fff);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  }
-
-  &__title {
-    margin: 0 0 6px;
-    font-size: 22px;
-    font-weight: 700;
-  }
-
-  &__meta {
-    margin: 0 0 18px;
-    font-size: 14px;
-    color: var(--muted, #6b7280);
-  }
-
-  &__grid {
-    display: grid;
-    gap: 12px 20px;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    margin-bottom: 22px;
-  }
-
   &__label {
     display: block;
     font-size: 12px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--muted, #6b7280);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
 
   &__value {
     font-size: 15px;
     font-weight: 500;
+    color: var(--text, #0f172a);
+    line-height: 1.4;
+  }
+
+  &__mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    word-break: break-all;
   }
 
   &__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border, #e5e7eb);
-  }
-
-  &__btn {
-    padding: 10px 16px;
-    border-radius: 10px;
-    border: 1px solid var(--border, #e5e7eb);
-    background: var(--surface, #fff);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
-
-    &:hover:not(:disabled) {
-      background: var(--surface-hover, #f9fafb);
-    }
-
-    &:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-
-    &--primary {
-      border-color: var(--primary, #2563eb);
-      color: var(--primary, #2563eb);
-    }
+    padding-top: 20px;
+    margin-top: 8px;
+    border-top: 1px solid #e5e7eb;
   }
 
   &__loading,

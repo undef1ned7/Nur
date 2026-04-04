@@ -6,6 +6,7 @@ import {
   FaSearch,
   FaTimes,
   FaClipboardList,
+  FaEdit,
 } from "react-icons/fa";
 import api from "../../../../api";
 import "./Orders.scss";
@@ -28,6 +29,7 @@ import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { MAX_QTY, normalizeOrderPayload } from "./cafeOrderItemPayload";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -64,6 +66,14 @@ const safeUserData = () => {
   }
 };
 
+/** Как в Masters / CafeEmployEmployeeDetail: роль с бэка может быть en или ru. */
+const normalizeCafeMgmtRole = (raw) => {
+  const l = String(raw || "").trim().toLowerCase();
+  if (["owner", "владелец"].includes(l)) return "owner";
+  if (["admin", "administrator", "админ", "администратор"].includes(l)) return "admin";
+  return l;
+};
+
 const statusFilterOptions =
   [
     { value: "", label: "Все статусы" },
@@ -76,7 +86,7 @@ const statusFilterOptions =
    ========================================================= */
 const CafeOrderHistory = () => {
   const alert = useAlert();
-  const { company, tariff } = useUser();
+  const { company, tariff, profile } = useUser();
   const startPlan = useMemo(
     () => isStartPlan(tariff || company?.subscription_plan?.name),
     [tariff, company?.subscription_plan?.name],
@@ -103,28 +113,60 @@ const CafeOrderHistory = () => {
     totalCount: 0
   })
 
-  const userData = useMemo(() => safeUserData(), []);
-  const userRole = userData?.role || "";
+  const userData = profile || safeUserData();
+  const userRole = String(userData?.role || "");
   const userId = localStorage.getItem("userId");
 
+  const canManageReturns = useMemo(() => {
+    const m = normalizeCafeMgmtRole(profile?.role || userRole);
+    return m === "owner" || m === "admin";
+  }, [profile?.role, userRole]);
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
 
   const [viewOpen, setViewOpen] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
+  const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [printingId, setPrintingId] = useState(null);
 
-  const openView = useCallback((order) => {
-    setViewOrder(order || null);
+  const [itemsEditOpen, setItemsEditOpen] = useState(false);
+  const [itemsEditOrder, setItemsEditOrder] = useState(null);
+  const [itemsEditRows, setItemsEditRows] = useState([]);
+  const [itemsEditSaving, setItemsEditSaving] = useState(false);
+
+  const openView = useCallback(async (order) => {
+    if (!order) {
+      setViewOrder(null);
+      setViewOpen(true);
+      return;
+    }
+    setViewOrder(order);
     setViewOpen(true);
+    const noItems = !Array.isArray(order.items) || order.items.length === 0;
+    if (order.id && noItems) {
+      setViewOrderLoading(true);
+      try {
+        const r = await api.get(`/cafe/orders/${order.id}/`);
+        setViewOrder((prev) => {
+          if (!prev || String(prev.id) !== String(order.id)) return r.data;
+          return { ...prev, ...r.data };
+        });
+      } catch {
+        /* оставляем заказ с карточки */
+      } finally {
+        setViewOrderLoading(false);
+      }
+    }
   }, []);
 
   const closeView = useCallback(() => {
+    setItemsEditOpen(false);
+    setItemsEditOrder(null);
+    setItemsEditRows([]);
     setViewOpen(false);
     setViewOrder(null);
   }, []);
-
 
   /* ===== API ===== */
   const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
@@ -285,9 +327,133 @@ const CafeOrderHistory = () => {
 
   const calcTotals = (o) => {
     const items = Array.isArray(o.items) ? o.items : [];
-    const total = items.reduce((s, it) => s + linePrice(it) * (Number(it.quantity) || 0), 0);
+    let total = 0;
+    let rejectedSum = 0;
     const count = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-    return { count, total };
+    for (const it of items) {
+      const line = linePrice(it) * (Number(it.quantity) || 0);
+      if (it.is_rejected) rejectedSum += line;
+      else total += line;
+    }
+    return { count, total, rejectedSum };
+  };
+
+  const orderItemRowKey = (it, idx) =>
+    it.id != null && it.id !== ""
+      ? `id:${it.id}`
+      : `${it.line_kind || "menu"}-${it.menu_item || it.service_title || ""}-${idx}`;
+
+  const patchOrderWithWaiterFallback = async (orderId, payload) => {
+    const url = `/cafe/orders/${orderId}/`;
+    try {
+      return await api.patch(url, payload);
+    } catch (err) {
+      const r = err?.response;
+      if (r?.status === 400 && r?.data && r.data.waiter) {
+        const next = { ...payload };
+        delete next.waiter;
+        return await api.patch(url, next);
+      }
+      throw err;
+    }
+  };
+
+  const openItemsEdit = () => {
+    if (!viewOrder?.id || !canManageReturns) return;
+    const items = Array.isArray(viewOrder.items) ? viewOrder.items : [];
+    setItemsEditOrder(viewOrder);
+    setItemsEditRows(
+      items.map((it, i) => ({
+        _key: orderItemRowKey(it, i),
+        id: it.id,
+        line_kind: String(it.line_kind || "menu").toLowerCase(),
+        menu_item: it.menu_item,
+        service_title: String(it.service_title || it.title || "").trim(),
+        title: orderItemTitle(it),
+        price: linePrice(it),
+        quantity: Math.max(1, Math.floor(Number(it.quantity) || 1)),
+        is_rejected: Boolean(it.is_rejected),
+        rejection_reason: String(it.rejection_reason || "").trim(),
+      }))
+    );
+    setItemsEditOpen(true);
+  };
+
+  const saveItemsEdit = async () => {
+    if (!itemsEditOrder?.id) return;
+    const missingId = itemsEditRows.some((r) => !r.id);
+    if (missingId) {
+      alert(
+        "У части позиций нет идентификатора — сохранение невозможно. Обновите страницу.",
+        true
+      );
+      return;
+    }
+    const badReason = itemsEditRows.some(
+      (r) => r.is_rejected && !String(r.rejection_reason || "").trim()
+    );
+    if (badReason) {
+      alert("Укажите причину возврата для каждой отмеченной позиции.", true);
+      return;
+    }
+    const badQty = itemsEditRows.some(
+      (r) => !Number.isFinite(Number(r.quantity)) || Number(r.quantity) < 1
+    );
+    if (badQty) {
+      alert("Количество по каждой позиции должно быть не меньше 1.", true);
+      return;
+    }
+
+    const form = {
+      table: itemsEditOrder.table,
+      waiter: itemsEditOrder.waiter,
+      client:
+        itemsEditOrder.client != null && itemsEditOrder.client !== ""
+          ? itemsEditOrder.client
+          : itemsEditOrder.client_id,
+      guests: Math.max(0, Number(itemsEditOrder.guests) || 0),
+      items: itemsEditRows.map((r) => ({
+        id: r.id,
+        line_kind: r.line_kind,
+        menu_item: r.menu_item,
+        service_title: r.service_title,
+        price: r.price,
+        quantity: r.quantity,
+        is_rejected: r.is_rejected,
+        rejection_reason: r.is_rejected ? r.rejection_reason : "",
+      })),
+    };
+
+    const payload = normalizeOrderPayload(form, false, itemsEditOrder.id);
+    setItemsEditSaving(true);
+    try {
+      const res = await patchOrderWithWaiterFallback(itemsEditOrder.id, payload);
+      const updated = res.data || {};
+      const mergeOrder = (prevOrder) => {
+        if (!prevOrder || String(prevOrder.id) !== String(updated.id)) return prevOrder;
+        return {
+          ...prevOrder,
+          ...updated,
+          items: Array.isArray(updated.items) ? updated.items : prevOrder.items,
+        };
+      };
+      setOrders((prev) => prev.map((o) => mergeOrder(o) || o));
+      setViewOrder((vo) => mergeOrder(vo));
+      setItemsEditOpen(false);
+      setItemsEditOrder(null);
+      setItemsEditRows([]);
+      alert("Позиции заказа обновлены.");
+      try {
+        window.dispatchEvent(new Event("orders:refresh"));
+      } catch {
+        /* ignore */
+      }
+    } catch (e) {
+      const msg = validateResErrors(e, "Не удалось сохранить позиции");
+      alert(msg, true);
+    } finally {
+      setItemsEditSaving(false);
+    }
   };
 
   const formatReceiptDate = (dateStr) => {
@@ -461,9 +627,20 @@ const CafeOrderHistory = () => {
                       const itemTitle = orderItemTitle(it);
                       const itemQty = Number(it.quantity) || 0;
                       const sum = itemPrice * itemQty;
+                      const rej = Boolean(it.is_rejected);
+                      const reason = String(it.rejection_reason || "").trim();
                       return (
-                        <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`} className="cafeOrders__receiptItem">
-                          <span className="cafeOrders__receiptItemName">{itemTitle}</span>
+                        <div
+                          key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`}
+                          className={`cafeOrders__receiptItem${rej ? " cafeOrders__receiptItem--rejected" : ""}`}
+                        >
+                          <span
+                            className="cafeOrders__receiptItemName"
+                            title={rej && reason ? `Возврат: ${reason}` : undefined}
+                          >
+                            {rej ? "↩ " : ""}
+                            {itemTitle}
+                          </span>
                           <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
                           <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
                         </div>
@@ -502,6 +679,11 @@ const CafeOrderHistory = () => {
                       <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
                       <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
                     </div>
+                    {totals.rejectedSum > 0 ? (
+                      <div className="cafeOrders__receiptRejectedNote">
+                        Возвраты не входят в сумму: {fmtShort(totals.rejectedSum)}
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -577,10 +759,19 @@ const CafeOrderHistory = () => {
                             const qty = Number(it.quantity) || 0;
                             const price = linePrice(it);
                             const sum = price * qty;
+                            const rej = Boolean(it.is_rejected);
+                            const reason = String(it.rejection_reason || "").trim();
 
                             return (
-                              <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`} className="cafeOrdersPay__row">
-                                <span className="cafeOrdersPay__name" title={title}>
+                              <div
+                                key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`}
+                                className={`cafeOrdersPay__row${rej ? " cafeOrdersPay__row--rejected" : ""}`}
+                              >
+                                <span
+                                  className="cafeOrdersPay__name"
+                                  title={rej && reason ? `Возврат: ${reason}` : title}
+                                >
+                                  {rej ? "↩ " : ""}
                                   {title}
                                 </span>
                                 <span className="cafeOrdersPay__qty">x{qty}</span>
@@ -599,19 +790,55 @@ const CafeOrderHistory = () => {
                         <span>ИТОГО</span>
                         <span>{fmtShort(totals.total)}</span>
                       </div>
+                      {totals.rejectedSum > 0 ? (
+                        <div className="cafeOrdersPay__rejectedLine">
+                          <span>Возвраты (не в сумме)</span>
+                          <span>{fmtShort(totals.rejectedSum)}</span>
+                        </div>
+                      ) : null}
                     </>
                   );
                 })()}
 
-                <div className="cafeOrdersPay__actions">
+                <div className="cafeOrdersPay__actions cafeOrdersPay__actions--historyView">
                   <button
                     type="button"
                     className="cafeOrders__btn cafeOrders__btn--secondary"
                     onClick={closeView}
-                    disabled={printingId === viewOrder.id}
+                    disabled={printingId === viewOrder.id || itemsEditSaving}
                   >
                     Закрыть
                   </button>
+
+                  {canManageReturns && viewOrder?.id ? (
+                    <button
+                      type="button"
+                      className="cafeOrders__btn cafeOrders__btn--primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openItemsEdit();
+                      }}
+                      disabled={
+                        printingId === viewOrder.id ||
+                        itemsEditSaving ||
+                        viewOrderLoading ||
+                        !Array.isArray(viewOrder.items) ||
+                        viewOrder.items.length === 0
+                      }
+                      title={
+                        viewOrderLoading
+                          ? "Загружаем позиции заказа…"
+                          : !viewOrder.items?.length
+                            ? "Нет позиций в заказе"
+                            : "Изменить количество, отметить возврат с причиной"
+                      }
+                    >
+                      <FaEdit />{" "}
+                      {viewOrderLoading
+                        ? "Загрузка позиций…"
+                        : "Позиции и возвраты"}
+                    </button>
+                  ) : null}
 
                   <button
                     type="button"
@@ -628,6 +855,172 @@ const CafeOrderHistory = () => {
           </div>
         </div>
       )}
+
+      {itemsEditOpen && itemsEditOrder ? (
+        <div
+          className="cafeOrdersModal__overlay cafeOrdersHistoryItemsEdit__overlay"
+          style={{ zIndex: 120 }}
+          onClick={() => {
+            if (!itemsEditSaving) {
+              setItemsEditOpen(false);
+              setItemsEditOrder(null);
+              setItemsEditRows([]);
+            }
+          }}
+        >
+          <div
+            className="cafeOrdersModal__shell cafeOrdersHistoryItemsEdit__shell"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cafeOrdersModal__card cafeOrdersHistoryItemsEdit__card">
+              <div className="cafeOrdersModal__header">
+                <h3 className="cafeOrdersModal__title">Позиции и возвраты</h3>
+                <button
+                  type="button"
+                  className="cafeOrdersModal__close"
+                  onClick={() => {
+                    if (!itemsEditSaving) {
+                      setItemsEditOpen(false);
+                      setItemsEditOrder(null);
+                      setItemsEditRows([]);
+                    }
+                  }}
+                  aria-label="Закрыть"
+                  disabled={itemsEditSaving}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="cafeOrdersHistoryItemsEdit__body">
+                <p className="cafeOrdersHistoryItemsEdit__hint">
+                  Для возврата отметьте позицию и укажите причину. При необходимости
+                  измените количество.
+                </p>
+
+                <div className="cafeOrdersHistoryItemsEdit__list">
+                  {itemsEditRows.map((row) => (
+                    <div key={row._key} className="cafeOrdersHistoryItemsEdit__row">
+                      <div className="cafeOrdersHistoryItemsEdit__rowHead">
+                        <span
+                          className="cafeOrdersHistoryItemsEdit__title"
+                          title={row.title}
+                        >
+                          {row.title}
+                        </span>
+                        <div className="cafeOrdersHistoryItemsEdit__qtyBlock">
+                          <span className="cafeOrdersHistoryItemsEdit__price">
+                            {fmtShort(row.price)} сом
+                          </span>
+                          <span className="cafeOrdersHistoryItemsEdit__times" aria-hidden>
+                            ×
+                          </span>
+                          <label className="cafeOrdersHistoryItemsEdit__qtyField">
+                            <span className="cafeOrdersHistoryItemsEdit__qtyCaption">
+                              Кол-во
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              className="cafeOrders__input cafeOrdersHistoryItemsEdit__qty"
+                              value={row.quantity}
+                              onChange={(e) => {
+                                const v = Math.max(
+                                  1,
+                                  Math.min(
+                                    MAX_QTY,
+                                    Math.floor(Number(e.target.value) || 1)
+                                  )
+                                );
+                                setItemsEditRows((prev) =>
+                                  prev.map((x) =>
+                                    x._key === row._key ? { ...x, quantity: v } : x
+                                  )
+                                );
+                              }}
+                              disabled={itemsEditSaving}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <label className="cafeOrdersHistoryItemsEdit__check">
+                        <input
+                          type="checkbox"
+                          checked={row.is_rejected}
+                          onChange={(e) => {
+                            const on = e.target.checked;
+                            setItemsEditRows((prev) =>
+                              prev.map((x) =>
+                                x._key === row._key
+                                  ? {
+                                      ...x,
+                                      is_rejected: on,
+                                      rejection_reason: on ? x.rejection_reason : "",
+                                    }
+                                  : x
+                              )
+                            );
+                          }}
+                          disabled={itemsEditSaving}
+                        />
+                        <span>Возврат</span>
+                      </label>
+                      {row.is_rejected ? (
+                        <div className="cafeOrdersHistoryItemsEdit__reasonWrap">
+                          <label className="cafeOrdersHistoryItemsEdit__reasonLabel">
+                            Причина возврата
+                          </label>
+                          <textarea
+                            className="cafeOrders__input cafeOrdersHistoryItemsEdit__reason"
+                            rows={3}
+                            placeholder="Укажите причину…"
+                            value={row.rejection_reason}
+                            onChange={(e) =>
+                              setItemsEditRows((prev) =>
+                                prev.map((x) =>
+                                  x._key === row._key
+                                    ? { ...x, rejection_reason: e.target.value }
+                                    : x
+                                )
+                              )
+                            }
+                            disabled={itemsEditSaving}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="cafeOrdersHistoryItemsEdit__footerActions">
+                <button
+                  type="button"
+                  className="cafeOrders__btn cafeOrders__btn--secondary"
+                  onClick={() => {
+                    if (!itemsEditSaving) {
+                      setItemsEditOpen(false);
+                      setItemsEditOrder(null);
+                      setItemsEditRows([]);
+                    }
+                  }}
+                  disabled={itemsEditSaving}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeOrders__btn cafeOrders__btn--primary"
+                  onClick={saveItemsEdit}
+                  disabled={itemsEditSaving}
+                >
+                  {itemsEditSaving ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 };

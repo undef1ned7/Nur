@@ -36,6 +36,13 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  MAX_QTY,
+  normalizeOrderPayload,
+  numStr,
+  stripEmpty,
+  toId,
+} from "./cafeOrderItemPayload";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -53,7 +60,6 @@ const fmtMoney = (n) =>
   }).format(toNum(n));
 
 const fmtShort = (n) => String(Math.round(toNum(n)));
-const numStr = (n) => String(Number(n) || 0).replace(",", ".");
 
 const isUnpaidStatus = (s) => {
   const v = (s || "").toString().trim().toLowerCase();
@@ -77,12 +83,6 @@ const fullName = (u) =>
   u?.email ||
   "Без имени";
 
-const toId = (v) => {
-  if (v === "" || v === undefined || v === null) return null;
-  const s = String(v);
-  return /^\d+$/.test(s) ? Number(s) : s;
-};
-
 const formatApiErrors = (e) => {
   if (!e) return "Неизвестная ошибка";
   if (typeof e === "string") return e;
@@ -95,11 +95,6 @@ const formatApiErrors = (e) => {
     return JSON.stringify(e, null, 2);
   }
 };
-
-const stripEmpty = (obj) =>
-  Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "")
-  );
 
 const newIdempotencyKey = () => {
   try {
@@ -162,87 +157,6 @@ const orderItemTitle = (it) => {
     return t || "Услуга";
   }
   return String(it.menu_item_title || it.title || "Позиция");
-};
-
-const MAX_QTY = 2147483647;
-
-/** unit_price как строка decimal или null (x-nullable). */
-const decimalStringOrNull = (v) => {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Number(String(v).replace(",", "."));
-  if (!Number.isFinite(n)) return null;
-  return numStr(n);
-};
-
-/**
- * Одна строка заказа под OpenAPI OrderItemInline:
- * order, line_kind, menu_item | service_title, unit_price, quantity, is_rejected, rejection_reason.
- * `order`: null при создании заказа, uuid при PATCH.
- */
-const serializeOrderItemInline = (i, orderRef) => {
-  const qty = Math.max(
-    1,
-    Math.min(MAX_QTY, Math.floor(Number(i.quantity) || 1))
-  );
-  const rejected = Boolean(i.is_rejected);
-  const reasonRaw = String(i.rejection_reason || "").trim();
-  const rejection_reason = rejected
-    ? (reasonRaw || "—").slice(0, 500)
-    : "";
-
-  const lk = String(i.line_kind || "menu").toLowerCase();
-
-  if (lk === "service") {
-    const row = {
-      order: orderRef,
-      line_kind: "service",
-      menu_item: null,
-      service_title: String(i.service_title || "").trim().slice(0, 255),
-      unit_price: decimalStringOrNull(i.unit_price ?? i.price),
-      quantity: qty,
-      is_rejected: rejected,
-      rejection_reason,
-    };
-    if (i.id) row.id = i.id;
-    return row;
-  }
-
-  const row = {
-    order: orderRef,
-    line_kind: "menu",
-    menu_item: toId(i.menu_item),
-    unit_price: decimalStringOrNull(i.price ?? i.unit_price),
-    quantity: qty,
-    is_rejected: rejected,
-    rejection_reason,
-  };
-  if (i.id) row.id = i.id;
-  return row;
-};
-
-const normalizeOrderPayload = (f, isNew = false, editingOrderId = null) => {
-  const orderRef =
-    !isNew && editingOrderId != null && String(editingOrderId).trim() !== ""
-      ? toId(editingOrderId)
-      : null;
-
-  const items = (f.items || [])
-    .filter((i) => {
-      if (!i || Number(i.quantity) <= 0) return false;
-      const lk = String(i.line_kind || "menu").toLowerCase();
-      if (lk === "service") return String(i.service_title || "").trim().length > 0;
-      return !!toId(i.menu_item);
-    })
-    .map((i) => serializeOrderItemInline(i, orderRef));
-
-  return stripEmpty({
-    table: toId(f.table),
-    waiter: toId(f.waiter),
-    client: toId(f.client),
-    guests: Math.max(0, Number(f.guests) || 0),
-    status: isNew ? "open" : undefined,
-    items,
-  });
 };
 
 const normalizeEmployee = (e = {}) => ({
@@ -1149,7 +1063,13 @@ const Orders = () => {
         return {
           ...prev,
           items: prev.items.map((i) =>
-            i._key === ex._key ? { ...i, quantity: (Number(i.quantity) || 1) + 1 } : i
+            i._key === ex._key
+              ? {
+                  ...i,
+                  quantity:
+                    (i.quantity === "" ? 0 : Number(i.quantity) || 0) + 1,
+                }
+              : i
           ),
         };
       }
@@ -1172,11 +1092,28 @@ const Orders = () => {
     });
   };
 
-  const changeItemQty = (lineKey, nextQty) => {
-    const q = Math.max(1, Number(nextQty) || 1);
+  const lineQtyInputValue = (q) => (q === "" ? "" : String(q));
+
+  const parseLineQtyDigits = (raw) => {
+    const s = String(raw ?? "").replace(/\D/g, "");
+    if (s === "") return "";
+    let n = parseInt(s, 10);
+    if (!Number.isFinite(n) || n < 0) return "";
+    if (n > MAX_QTY) n = MAX_QTY;
+    return n;
+  };
+
+  const lineQtyNum = (q) => {
+    if (q === "" || q === null || q === undefined) return 0;
+    const n = Math.floor(Number(q));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  const changeItemQty = (lineKey, raw) => {
+    const next = parseLineQtyDigits(raw);
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) => (i._key === lineKey ? { ...i, quantity: q } : i)),
+      items: prev.items.map((i) => (i._key === lineKey ? { ...i, quantity: next } : i)),
     }));
   };
 
@@ -1185,7 +1122,10 @@ const Orders = () => {
       ...prev,
       items: prev.items.map((i) =>
         i._key === lineKey
-          ? { ...i, quantity: Math.max(1, (Number(i.quantity) || 1) + 1) }
+          ? {
+              ...i,
+              quantity: (i.quantity === "" ? 0 : Number(i.quantity) || 0) + 1,
+            }
           : i
       ),
     }));
@@ -1197,10 +1137,16 @@ const Orders = () => {
       items: prev.items
         .map((i) =>
           i._key === lineKey
-          ? { ...i, quantity: Math.max(0, (Number(i.quantity) || 1) - 1) }
-          : i
+            ? {
+                ...i,
+                quantity: Math.max(
+                  0,
+                  (i.quantity === "" ? 0 : Number(i.quantity) || 0) - 1
+                ),
+              }
+            : i
         )
-        .filter((el) => el.quantity),
+        .filter((el) => Number(el.quantity) > 0),
     }));
   };
 
@@ -1236,6 +1182,12 @@ const Orders = () => {
   const saveForm = async (e) => {
     e.preventDefault();
     if (!form.items.length) return;
+
+    const invalidQty = form.items.some((i) => lineQtyNum(i.quantity) < 1);
+    if (invalidQty) {
+      alert("Укажите количество не меньше 1 для каждой позиции.", true);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -1865,9 +1817,9 @@ const Orders = () => {
                       {form.items.map((it) => {
                         const isService = String(it.line_kind || "menu").toLowerCase() === "service";
                         const img = isService ? "" : menuImageUrl(it.menu_item);
-                        const qty = Math.max(1, Number(it.quantity) || 1);
+                        const qtyNum = lineQtyNum(it.quantity);
                         const price = toNum(it.price);
-                        const sum = price * qty;
+                        const sum = price * qtyNum;
                         const lineTitle = isService ? it.service_title || "Услуга" : it.title;
 
                         return (
@@ -1898,7 +1850,7 @@ const Orders = () => {
                                   type="button"
                                   className="cafeOrders__qtyBtn"
                                   onClick={() => decItem(it._key)}
-                                  disabled={saving || qty <= 0}
+                                  disabled={saving || qtyNum <= 0}
                                   aria-label="Уменьшить"
                                 >
                                   <FaMinus />
@@ -1906,10 +1858,12 @@ const Orders = () => {
 
                                 <input
                                   className="cafeOrders__qtyInput"
-                                  value={qty}
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  value={lineQtyInputValue(it.quantity)}
                                   onChange={(e) => changeItemQty(it._key, e.target.value)}
                                   disabled={saving}
-                                  inputMode="numeric"
                                 />
 
                                 <button
@@ -1978,7 +1932,11 @@ const Orders = () => {
                   <button
                     type="submit"
                     className="cafeOrders__btn cafeOrders__btn--primary"
-                    disabled={saving || !form.items.length}
+                    disabled={
+                      saving ||
+                      !form.items.length ||
+                      form.items.some((i) => lineQtyNum(i.quantity) < 1)
+                    }
                   >
                     {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
                   </button>
