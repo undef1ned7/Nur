@@ -198,7 +198,7 @@
     display: grid;
     grid-template-columns: 1fr auto auto;
     gap: 12px;
-    align-items: center;
+    align-items: start;
     font-size: 14px;
     min-width: 0;
 
@@ -222,10 +222,24 @@
     border-top: 1px dashed #e5e7eb;
   }
 
+  &__receiptItemNameCol {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
   &__receiptItemName {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  &__receiptItemMeta {
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--muted);
+    font-weight: 500;
   }
 
   &__receiptItemQty,
@@ -1170,15 +1184,29 @@
     display: grid;
     grid-template-columns: 1fr auto auto;
     gap: 12px;
-    align-items: center;
+    align-items: start;
     min-width: 0;
     font-size: 14px;
+  }
+
+  &__nameCol {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
   }
 
   &__name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
+  }
+
+  &__meta {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--muted);
     font-weight: 500;
   }
 
@@ -1448,6 +1476,14 @@
   border-bottom: 1px dashed #e5e7eb;
 }
 
+.cafeOrdersHistoryItemsEdit__refundStats {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  font-weight: 500;
+  margin: -6px 0 0;
+}
+
 .cafeOrdersHistoryItemsEdit__title {
   font-weight: 600;
   font-size: 14px;
@@ -1503,6 +1539,20 @@
   font-size: 14px;
 }
 
+.cafeOrdersHistoryItemsEdit__qtyStatic {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
 .cafeOrdersHistoryItemsEdit__check {
   display: inline-flex;
   align-items: center;
@@ -1529,6 +1579,11 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 2px;
+}
+
+.cafeOrdersHistoryItemsEdit__qtyField--return {
+  max-width: 120px;
+  margin-bottom: 4px;
 }
 
 .cafeOrdersHistoryItemsEdit__reasonLabel {

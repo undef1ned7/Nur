@@ -1,9 +1,14 @@
 // src/Components/Sectors/cafe/kassaCafe/kassa.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Routes, Route, useNavigate, useParams, Link } from "react-router-dom";
 import api from "../../../../api";
 import "./kassa.scss";
-import { AddOperationModal, EditCashboxNameModal } from "./components/KassaModals";
+import {
+  AddOperationModal,
+  CashflowCategoriesManageModal,
+  EditCashboxNameModal,
+} from "./components/KassaModals";
+import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useUser } from "../../../../store/slices/userSlice";
 
@@ -12,6 +17,34 @@ const asArray = (d) => (Array.isArray(d?.results) ? d.results : Array.isArray(d)
 const money = (v) => (Number(v) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 0 }) + " c";
 const when = (iso) => (iso ? new Date(iso).toLocaleDateString() : "—");
 const whenDT = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
+
+const catListFromApi = (data) =>
+  Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+
+const mapFlowsToOps = (flows) =>
+  (flows || []).map((x, i) => {
+    const amt = Number(x.amount ?? x.sum ?? x.value ?? x.total ?? 0) || 0;
+    let type = String(x.type ?? x.kind ?? x.direction ?? "").toLowerCase();
+    if (type !== "income" && type !== "expense") type = amt >= 0 ? "income" : "expense";
+    const catTitle =
+      x.category_title != null && String(x.category_title).trim() !== ""
+        ? String(x.category_title).trim()
+        : null;
+    return {
+      id: x.id || x.uuid || `${i}`,
+      type,
+      title:
+        x.title ||
+        x.name ||
+        x.description ||
+        x.note ||
+        (type === "income" ? "Приход" : "Расход"),
+      amount: Math.abs(amt),
+      created_at: x.created_at || x.created || x.date || x.timestamp || x.createdAt || null,
+      category_title: catTitle,
+      raw: x,
+    };
+  });
 
 /* ───────────────────────────────────────────────── */
 const CafeKassa = () => {
@@ -277,6 +310,10 @@ const CashboxDetail = () => {
   const [opDetail, setOpDetail] = useState(null);
 
   const [addOpOpen, setAddOpOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [flowsLoading, setFlowsLoading] = useState(false);
 
   const fromAny = (res) => {
     const d = res?.data ?? res ?? [];
@@ -284,6 +321,57 @@ const CashboxDetail = () => {
     if (Array.isArray(d)) return d;
     return [];
   };
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const { data } = await api.get("/construction/cashflow-categories/", {
+        params: { page_size: 500 },
+      });
+      setCategories(catListFromApi(data));
+    } catch {
+      setCategories([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const syncFlows = useCallback(
+    async (detail, filterCat) => {
+      const cat = filterCat !== undefined ? filterCat : categoryFilter;
+      const key = detail?.uuid || detail?.id || id;
+      if (!detail || !key) return;
+
+      setFlowsLoading(true);
+      try {
+        let flows = [];
+        if (!cat) {
+          flows =
+            fromAny({ data: detail?.operations }) ||
+            fromAny({ data: detail?.flows }) ||
+            fromAny({ data: detail?.transactions });
+        }
+        if (!flows.length || cat) {
+          const params = { cashbox: key };
+          if (cat) params.category = cat;
+          const r1 = await api.get(`/construction/cashflows/`, { params });
+          flows = fromAny(r1);
+        }
+        if (!flows.length && !cat && detail?.uuid && String(key) !== String(detail.uuid)) {
+          const r2 = await api.get(`/construction/cashflows/`, { params: { cashbox: detail.uuid } });
+          flows = fromAny(r2);
+        }
+        setOps(mapFlowsToOps(flows));
+      } catch (e) {
+        console.error(e);
+        setOps([]);
+      } finally {
+        setFlowsLoading(false);
+      }
+    },
+    [id, categoryFilter]
+  );
 
   const load = async () => {
     setErr("");
@@ -307,42 +395,7 @@ const CashboxDetail = () => {
       }
 
       setBox(detail);
-
-      let flows =
-        fromAny({ data: detail?.operations }) ||
-        fromAny({ data: detail?.flows }) ||
-        fromAny({ data: detail?.transactions });
-
-      if (!flows.length) {
-        try {
-          const r1 = await api.get(`/construction/cashflows/`, { params: { cashbox: id } });
-          flows = fromAny(r1);
-        } catch { }
-      }
-
-      if (!flows.length && detail?.uuid) {
-        try {
-          const r2 = await api.get(`/construction/cashflows/`, { params: { cashbox: detail.uuid } });
-          flows = fromAny(r2);
-        } catch { }
-      }
-
-      const mapped = (flows || []).map((x, i) => {
-        const amt = Number(x.amount ?? x.sum ?? x.value ?? x.total ?? 0) || 0;
-        let type = String(x.type ?? x.kind ?? x.direction ?? "").toLowerCase();
-        if (type !== "income" && type !== "expense") type = amt >= 0 ? "income" : "expense";
-
-        return {
-          id: x.id || x.uuid || `${i}`,
-          type,
-          title: x.title || x.name || x.description || x.note || (type === "income" ? "Приход" : "Расход"),
-          amount: Math.abs(amt),
-          created_at: x.created_at || x.created || x.date || x.timestamp || x.createdAt || null,
-          raw: x,
-        };
-      });
-
-      setOps(mapped);
+      await syncFlows(detail);
     } catch (e) {
       console.error(e);
       setErr("Не удалось загрузить детали кассы");
@@ -380,6 +433,25 @@ const CashboxDetail = () => {
     if (dateFrom || dateTo) arr = arr.filter((o) => inDateRange(o.created_at));
     return arr;
   }, [ops, tab, dateFrom, dateTo]);
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: "", label: "Все категории" },
+      ...categories
+        .map((c) => ({
+          value: String(c.id ?? c.uuid ?? ""),
+          label: String(c.title ?? c.name ?? "—"),
+        }))
+        .filter((o) => o.value),
+    ],
+    [categories]
+  );
+
+  const onCategoryFilterChange = (v) => {
+    const next = v || "";
+    setCategoryFilter(next);
+    if (box) syncFlows(box, next);
+  };
 
   const openDetails = async (op) => {
     setOpenOp(op);
@@ -437,7 +509,10 @@ const CashboxDetail = () => {
         } catch { }
       }
 
-      const category = raw.category_name || raw.category || null;
+      const category =
+        (raw.category_title != null && String(raw.category_title).trim() !== ""
+          ? String(raw.category_title).trim()
+          : null) || raw.category_name || null;
       const method = raw.method || raw.payment_method || raw.payment_type || null;
       const userName = raw.user_name || raw.created_by_name || raw.owner_name || null;
       const comment = raw.note || raw.description || raw.comment || null;
@@ -500,6 +575,31 @@ const CashboxDetail = () => {
           Все
         </button>
 
+        <div className="cafeKassa__field cafeKassa__categoryFilter">
+          <span className="cafeKassa__label">Категория</span>
+          <SearchableCombobox
+            value={categoryFilter}
+            onChange={onCategoryFilterChange}
+            options={categoryFilterOptions}
+            placeholder="Все категории"
+            disabled={loading || flowsLoading}
+          />
+        </div>
+
+        {flowsLoading ? (
+          <span className="cafeKassa__muted" style={{ alignSelf: "center" }}>
+            Обновление…
+          </span>
+        ) : null}
+
+        <button
+          type="button"
+          className="cafeKassa__btn cafeKassa__btn--secondary cafeKassa__categoriesBtn"
+          onClick={() => setCategoriesModalOpen(true)}
+        >
+          Категории
+        </button>
+
         <div className="cafeKassa__grow" />
 
         <div className="cafeKassa__field">
@@ -542,6 +642,7 @@ const CashboxDetail = () => {
               <tr>
                 <th>Тип</th>
                 <th>Наименование</th>
+                <th>Категория</th>
                 <th>Сумма {tab !== 'all' ? `(${shown.reduce((acc, o) => acc + o.amount, 0)} c)` : ''}</th>
                 <th>Дата создания</th>
               </tr>
@@ -549,11 +650,11 @@ const CashboxDetail = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4}>Загрузка…</td>
+                  <td colSpan={5}>Загрузка…</td>
                 </tr>
               ) : err ? (
                 <tr>
-                  <td colSpan={4} className="cafeKassa__alert cafeKassa__alert--error">
+                  <td colSpan={5} className="cafeKassa__alert cafeKassa__alert--error">
                     {err}
                   </td>
                 </tr>
@@ -562,13 +663,14 @@ const CashboxDetail = () => {
                   <tr key={o.id} className="cafeKassa__rowClickable" onClick={() => openDetails(o)}>
                     <td>{o.type === "income" ? "Приход" : "Расход"}</td>
                     <td>{o.title}</td>
+                    <td>{o.category_title || "—"}</td>
                     <td>{money(o.amount)}</td>
                     <td>{when(o.created_at)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4}>Нет операций</td>
+                  <td colSpan={5}>Нет операций</td>
                 </tr>
               )}
             </tbody>
@@ -580,9 +682,23 @@ const CashboxDetail = () => {
           open={addOpOpen}
           cashboxId={id}
           onClose={() => setAddOpOpen(false)}
-          onSuccess={load}
+          onSuccess={() => {
+            load();
+            loadCategories();
+          }}
         />
       )}
+
+      {categoriesModalOpen ? (
+        <CashflowCategoriesManageModal
+          open={categoriesModalOpen}
+          onClose={() => setCategoriesModalOpen(false)}
+          onChanged={() => {
+            loadCategories();
+            if (box) syncFlows(box, categoryFilter);
+          }}
+        />
+      ) : null}
 
       {openOp && (
         <div className="cafeKassa__modalOverlay" onClick={closeDetails}>

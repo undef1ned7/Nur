@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { FaTimes } from "react-icons/fa";
+import React, { useEffect, useMemo, useState } from "react";
+import { FaPlus, FaTimes } from "react-icons/fa";
 import api from "../../../../../api";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
 /* helpers */
 const money = (v) =>
@@ -14,6 +15,9 @@ const sanitizeDecimalInput = (value) => {
   if (parts.length <= 1) return cleaned;
   return `${parts[0]}.${parts.slice(1).join("")}`;
 };
+
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
 /* ───────────────────────────────────────────────── */
 /* Row: используй внутри модалок (чтобы не плодить инлайны) */
@@ -126,11 +130,46 @@ export const AddOperationModal = ({
     name: "",
     amount: "",
     type: "expense",
+    category: "",
   });
+  const [categories, setCategories] = useState([]);
+  const [newCategoryTitle, setNewCategoryTitle] = useState("");
+  const [newCategoryCompanyWide, setNewCategoryCompanyWide] = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryModalOpen, setNewCategoryModalOpen] = useState(false);
+  const [categoryModalError, setCategoryModalError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get("/construction/cashflow-categories/", {
+          params: { page_size: 500 },
+        });
+        if (!cancelled) setCategories(asArray(data));
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   if (!open) return null;
+
+  const categoryOptions = [
+    { value: "", label: "Без категории" },
+    ...categories
+      .map((c) => ({
+        value: String(c.id ?? c.uuid ?? ""),
+        label: String(c.title ?? c.name ?? "—"),
+      }))
+      .filter((o) => o.value),
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -156,14 +195,18 @@ export const AddOperationModal = ({
       setError("");
       setLoading(true);
 
-      await api.post("/construction/cashflows/", {
+      const payload = {
         cashbox: cashboxId,
         type: form.type,
         name: title,
         amount: amt,
-      });
+      };
+      const cat = String(form.category || "").trim();
+      if (cat) payload.category = cat;
 
-      setForm({ name: "", amount: "", type: "expense" });
+      await api.post("/construction/cashflows/", payload);
+
+      setForm({ name: "", amount: "", type: "expense", category: "" });
       onSuccess?.();
       onClose();
     } catch (e) {
@@ -175,10 +218,49 @@ export const AddOperationModal = ({
   };
 
   const handleClose = () => {
-    if (!loading) {
-      setForm({ name: "", amount: "", type: "expense" });
+    if (!loading && !creatingCategory) {
+      setForm({ name: "", amount: "", type: "expense", category: "" });
+      setNewCategoryTitle("");
+      setNewCategoryCompanyWide(false);
+      setNewCategoryModalOpen(false);
+      setCategoryModalError("");
       setError("");
       onClose();
+    }
+  };
+
+  const closeNewCategoryModal = () => {
+    if (!creatingCategory) {
+      setNewCategoryModalOpen(false);
+      setNewCategoryTitle("");
+      setNewCategoryCompanyWide(false);
+      setCategoryModalError("");
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    const t = String(newCategoryTitle || "").trim();
+    if (!t) {
+      setCategoryModalError("Введите название категории");
+      return;
+    }
+    try {
+      setCategoryModalError("");
+      setCreatingCategory(true);
+      const body = { title: t };
+      if (newCategoryCompanyWide) body.branch = null;
+      const { data } = await api.post("/construction/cashflow-categories/", body);
+      const newId = data?.id ?? data?.uuid;
+      if (data) setCategories((prev) => [...prev, data]);
+      if (newId) setForm((f) => ({ ...f, category: String(newId) }));
+      setNewCategoryTitle("");
+      setNewCategoryCompanyWide(false);
+      setNewCategoryModalOpen(false);
+    } catch (e) {
+      console.error(e);
+      setCategoryModalError("Не удалось создать категорию.");
+    } finally {
+      setCreatingCategory(false);
     }
   };
 
@@ -259,6 +341,36 @@ export const AddOperationModal = ({
             />
           </div>
 
+          <div className="cafeKassa__field">
+            <label className="cafeKassa__label">Категория</label>
+            <div className="cafeKassa__categorySelectRow">
+              <div className="cafeKassa__categorySelectWrap">
+                <SearchableCombobox
+                  value={form.category}
+                  onChange={(v) => setForm((f) => ({ ...f, category: v || "" }))}
+                  options={categoryOptions}
+                  placeholder="Без категории"
+                  disabled={loading}
+                  menuPortal
+                />
+              </div>
+              <button
+                type="button"
+                className="cafeKassa__iconBtn cafeKassa__addCategoryPlus"
+                onClick={() => {
+                  setCategoryModalError("");
+                  setNewCategoryModalOpen(true);
+                }}
+                disabled={loading}
+                title="Новая категория"
+                aria-label="Новая категория"
+              >
+                <FaPlus />
+              </button>
+            </div>
+            <p className="cafeKassa__hint">Необязательно. Для расходов и приходов.</p>
+          </div>
+
           <div className="cafeKassa__formActions">
             <button
               type="button"
@@ -277,6 +389,258 @@ export const AddOperationModal = ({
             </button>
           </div>
         </form>
+      </div>
+
+      {newCategoryModalOpen ? (
+        <div
+          className="cafeKassa__modalOverlay cafeKassa__modalOverlay--nested"
+          onClick={(e) => {
+            e.stopPropagation();
+            closeNewCategoryModal();
+          }}
+          role="presentation"
+        >
+          <div
+            className="cafeKassa__modal cafeKassa__modal--nested"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cafeKassaNewCategoryTitle"
+          >
+            <div className="cafeKassa__modalHeader">
+              <h3 className="cafeKassa__modalTitle" id="cafeKassaNewCategoryTitle">
+                Новая категория
+              </h3>
+              <button
+                className="cafeKassa__iconBtn"
+                onClick={closeNewCategoryModal}
+                aria-label="Закрыть"
+                type="button"
+                disabled={creatingCategory}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="cafeKassa__form">
+              {categoryModalError ? (
+                <div className="cafeKassa__alert cafeKassa__alert--error">{categoryModalError}</div>
+              ) : null}
+
+              <div className="cafeKassa__field">
+                <label className="cafeKassa__label">Название *</label>
+                <input
+                  className="cafeKassa__input"
+                  type="text"
+                  placeholder="Например, продукты"
+                  value={newCategoryTitle}
+                  onChange={(e) => setNewCategoryTitle(e.target.value)}
+                  disabled={creatingCategory}
+                  autoFocus
+                />
+              </div>
+              <label className="cafeKassa__check">
+                <input
+                  type="checkbox"
+                  checked={newCategoryCompanyWide}
+                  onChange={(e) => setNewCategoryCompanyWide(e.target.checked)}
+                  disabled={creatingCategory}
+                />
+                <span>На всю компанию (без привязки к филиалу)</span>
+              </label>
+
+              <div className="cafeKassa__formActions">
+                <button
+                  type="button"
+                  className="cafeKassa__btn"
+                  onClick={closeNewCategoryModal}
+                  disabled={creatingCategory}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeKassa__btn cafeKassa__btn--primary"
+                  onClick={handleCreateCategory}
+                  disabled={creatingCategory}
+                >
+                  {creatingCategory ? "Создание…" : "Создать"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+/* ───────────────────────────────────────────────── */
+/* Модалка: категории движений (список, переименование, удаление) */
+export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [savingId, setSavingId] = useState(null);
+
+  const load = async () => {
+    try {
+      setError("");
+      setLoading(true);
+      const { data } = await api.get("/construction/cashflow-categories/", {
+        params: { page_size: 500 },
+      });
+      setRows(asArray(data));
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось загрузить категории");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return rows;
+    return rows.filter((r) =>
+      String(r.title ?? r.name ?? "").toLowerCase().includes(t)
+    );
+  }, [rows, q]);
+
+  if (!open) return null;
+
+  const rowId = (r) => String(r.id ?? r.uuid ?? "");
+
+  const handleRename = async (r) => {
+    const id = rowId(r);
+    const title = String(r._editTitle ?? r.title ?? r.name ?? "").trim();
+    if (!id || !title) return;
+    try {
+      setSavingId(id);
+      setError("");
+      await api.patch(`/construction/cashflow-categories/${id}/`, { title });
+      await load();
+      onChanged?.();
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось сохранить название");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDelete = async (r) => {
+    const id = rowId(r);
+    if (!id) return;
+    if (!window.confirm("Удалить категорию? Движения останутся без категории.")) return;
+    try {
+      setSavingId(id);
+      setError("");
+      await api.delete(`/construction/cashflow-categories/${id}/`);
+      await load();
+      onChanged?.();
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось удалить категорию");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <div className="cafeKassa__modalOverlay" onClick={onClose}>
+      <div
+        className="cafeKassa__modal cafeKassa__modal--wide"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cafeKassa__modalHeader">
+          <h3 className="cafeKassa__modalTitle">Категории движений</h3>
+          <button
+            className="cafeKassa__iconBtn"
+            onClick={onClose}
+            aria-label="Закрыть"
+            type="button"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="cafeKassa__form">
+          {error && <div className="cafeKassa__alert cafeKassa__alert--error">{error}</div>}
+
+          <div className="cafeKassa__field">
+            <label className="cafeKassa__label">Поиск</label>
+            <input
+              className="cafeKassa__input"
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="По названию…"
+            />
+          </div>
+
+          <div className="cafeKassa__catList">
+            {loading ? (
+              <div className="cafeKassa__muted">Загрузка…</div>
+            ) : filtered.length ? (
+              filtered.map((r, idx) => {
+                const id = rowId(r);
+                const editVal =
+                  r._editTitle !== undefined ? r._editTitle : String(r.title ?? r.name ?? "");
+                return (
+                  <div key={id || `cat-${idx}`} className="cafeKassa__catRow">
+                    <input
+                      className="cafeKassa__input"
+                      type="text"
+                      value={editVal}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRows((prev) =>
+                          prev.map((x) =>
+                            rowId(x) === id ? { ...x, _editTitle: v } : x
+                          )
+                        );
+                      }}
+                      disabled={savingId === id}
+                    />
+                    <button
+                      type="button"
+                      className="cafeKassa__btn cafeKassa__btn--secondary"
+                      onClick={() => handleRename({ ...r, _editTitle: editVal })}
+                      disabled={savingId === id}
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      className="cafeKassa__btn"
+                      onClick={() => handleDelete(r)}
+                      disabled={savingId === id}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="cafeKassa__muted">Нет категорий</div>
+            )}
+          </div>
+
+          <div className="cafeKassa__formActions">
+            <button type="button" className="cafeKassa__btn" onClick={onClose}>
+              Закрыть
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

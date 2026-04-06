@@ -1137,15 +1137,11 @@ const CashierPage = () => {
   }, [openShiftId]);
 
   const addToCartWithPackage = async (product, salePackageId = null) => {
-    // Проверяем наличие товара
-    // Для весовых товаров stock может быть false, но quantity > 0
-    const availableQuantity = parseFloat(product.quantity || 0);
-    const isInStock = availableQuantity > 0;
-
-    if (!isInStock) {
-      showAlert("warning", "Товар отсутствует", "Товар отсутствует в наличии");
-      return;
-    }
+    // Для весовых товаров при остатке < 1 добавляем весь остаток.
+    // Если остаток 0/минус/некорректный — подставляем 1.
+    const availableQuantity = normalizeQuantity(product?.quantity);
+    const qtyFromStock =
+      availableQuantity > 0 && availableQuantity < 1 ? availableQuantity : 1;
 
     try {
       // Проверяем наличие открытой смены перед добавлением товара
@@ -1197,9 +1193,8 @@ const CashierPage = () => {
       });
 
       if (existingItem) {
-        // Проверяем, не превышает ли новое количество доступное
         const currentQty = normalizeQuantity(existingItem.quantity);
-        const newQuantity = normalizeQuantity(currentQty + 1);
+        const newQuantity = normalizeQuantity(currentQty + qtyFromStock);
         // Обновляем количество
         await dispatch(
           updateManualFilling({
@@ -1216,7 +1211,7 @@ const CashierPage = () => {
           manualFilling({
             id: saleId,
             productId: product.id,
-            quantity: normalizeQuantity(1),
+            quantity: normalizeQuantity(qtyFromStock),
             ...(salePackageId ? { salePackageId } : {}),
           }),
         );
@@ -1244,9 +1239,6 @@ const CashierPage = () => {
 
     try {
       if (!item?.itemId || !item?.productId) return;
-      // Находим товар в списке продуктов для проверки наличия
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) return;
 
       // startSale возвращает items напрямую, а не cart.items
       const items = currentSale?.items || currentSale?.cart?.items || [];
@@ -1256,68 +1248,6 @@ const CashierPage = () => {
 
       const currentQty = normalizeQuantity(existingItem.quantity);
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
-      const availableQuantity = parseFloat(product.quantity || 0);
-
-      // Проверяем наличие при увеличении количества
-      if (delta > 0 && !item.salePackage) {
-        // Для весовых товаров stock может быть false, но quantity > 0
-        const isInStock = availableQuantity > 0;
-
-        if (!isInStock) {
-          showAlert(
-            "warning",
-            "Товар отсутствует",
-            "Товар отсутствует в наличии",
-          );
-          return;
-        }
-
-        if (availableQuantity > 0 && newQuantity > availableQuantity) {
-          showAlert(
-            "warning",
-            "Недостаточно товара",
-            `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
-          );
-          return;
-        }
-      } else if (delta > 0 && item.salePackage) {
-        const isInStock = availableQuantity > 0;
-        if (!isInStock) {
-          showAlert(
-            "warning",
-            "Товар отсутствует",
-            "Товар отсутствует в наличии",
-          );
-          return;
-        }
-        const qip = Number(
-          product?.packages?.find((p) => p.id === item.salePackage)
-            ?.quantity_in_package,
-        );
-        if (!(qip > 0)) {
-          showAlert(
-            "error",
-            "Ошибка упаковки",
-            "Для поштучной продажи не найдена корректная упаковка товара",
-          );
-          return;
-        }
-        const totalConsume = calcTotalConsumeForProduct(
-          items,
-          item.productId,
-          products,
-        );
-        const newTotalConsume =
-          totalConsume - currentQty / qip + newQuantity / qip;
-        if (newTotalConsume > availableQuantity) {
-          showAlert(
-            "warning",
-            "Недостаточно товара",
-            `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
-          );
-          return;
-        }
-      }
 
       if (newQuantity === 0) {
         // Удаляем товар из корзины
