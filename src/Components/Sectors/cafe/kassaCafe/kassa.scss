@@ -29,6 +29,86 @@
     }
   }
 
+  &__hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  &__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+  }
+
+  &__muted {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 8px 0;
+  }
+
+  &__box--compact {
+    padding: 12px 14px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: #fafafa;
+  }
+
+  &__modal--wide {
+    width: min(520px, 96vw);
+    max-height: min(80dvh, 640px);
+    display: flex;
+    flex-direction: column;
+
+    .cafeKassa__form {
+      overflow: auto;
+      min-height: 0;
+    }
+  }
+
+  &__catList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 360px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  &__catRow {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+
+    @media (max-width: 520px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__categoryFilter {
+    min-width: 200px;
+    max-width: 280px;
+    margin-right: 24px;
+  }
+
+  &__categoriesBtn {
+    margin-left: 12px;
+  }
+
   /* header */
   &__header {
     display: flex;
@@ -284,6 +364,32 @@
     padding: 12px;
     overflow: hidden;
     overscroll-behavior: none;
+
+    &--nested {
+      z-index: 101;
+      padding: 12px;
+    }
+  }
+
+  &__categorySelectRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__categorySelectWrap {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__addCategoryPlus {
+    flex-shrink: 0;
+  }
+
+  &__modal--nested {
+    width: min(420px, calc(100% - 24px));
+    max-height: min(85dvh, 520px);
   }
 
   &__modal {

@@ -1,6 +1,6 @@
 // src/.../CafeAnalyticsModals.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { FaChevronDown, FaChevronRight, FaSync, FaTimes } from "react-icons/fa";
+import { FaChevronDown, FaChevronRight, FaSync, FaTimes, FaDownload } from "react-icons/fa";
 
 const fmtDateTime = (iso) => {
   if (!iso) return "—";
@@ -90,6 +90,18 @@ const CafeAnalyticsModalContent = ({
   cafeClients,
 
   salesItems,
+  allMenuItems = [],
+  allMenuItemsLoading = false,
+  allMenuMeta = {},
+  onExportMenuAllPdf,
+  menuAllHideZeroQty = false,
+  setMenuAllHideZeroQty,
+  menuAllDateFrom = "",
+  setMenuAllDateFrom,
+  menuAllDateTo = "",
+  setMenuAllDateTo,
+  onMenuAllApplyDates,
+  onMenuAllQuickRange,
   lowStock,
 
   kitchenLoading,
@@ -206,6 +218,158 @@ const CafeAnalyticsModalContent = ({
                   <tr>
                     <td colSpan={3} className="cafeAnalytics__modalEmpty">
                       Нет данных.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "menu_all") {
+    const rowsBase = Array.isArray(allMenuItems) ? allMenuItems : [];
+    const rows = menuAllHideZeroQty
+      ? rowsBase.filter((x) => toNum(x?.qty) !== 0)
+      : rowsBase;
+    const totalQty = rows.reduce((a, x) => a + toNum(x?.qty), 0);
+    const totalRevenue = rows.reduce((a, x) => a + toNum(x?.revenue), 0);
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__staffBar">
+          <label className="cafeAnalytics__staffField">
+            <span>От</span>
+            <input
+              type="date"
+              className="cafeAnalytics__input"
+              value={menuAllDateFrom || ""}
+              onChange={(e) => setMenuAllDateFrom?.(e.target.value)}
+            />
+          </label>
+          <label className="cafeAnalytics__staffField">
+            <span>До</span>
+            <input
+              type="date"
+              className="cafeAnalytics__input"
+              value={menuAllDateTo || ""}
+              onChange={(e) => setMenuAllDateTo?.(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+            onClick={() => onMenuAllQuickRange?.("today")}
+          >
+            Сегодня
+          </button>
+          <button
+            type="button"
+            className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+            onClick={() => onMenuAllQuickRange?.("yesterday")}
+          >
+            Вчера
+          </button>
+          <button
+            type="button"
+            className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+            onClick={() => onMenuAllQuickRange?.("3days")}
+          >
+            За 3 дня
+          </button>
+          <button
+            type="button"
+            className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+            onClick={() => onMenuAllQuickRange?.("week")}
+          >
+            Неделя
+          </button>
+          <button
+            type="button"
+            className="cafeAnalytics__btn cafeAnalytics__staffBtn"
+            onClick={onMenuAllApplyDates}
+            disabled={allMenuItemsLoading}
+          >
+            <FaSync /> Обновить
+          </button>
+          <label className="cafeAnalytics__toggleCheck">
+            <input
+              type="checkbox"
+              checked={menuAllHideZeroQty}
+              onChange={(e) => setMenuAllHideZeroQty(e.target.checked)}
+            />
+            <span>Скрыть блюда с нулевым количеством продаж</span>
+          </label>
+        </div>
+
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--3">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Блюд в отчете</div>
+            <div className="cafeAnalytics__modalKVal">
+              {fmtInt(allMenuMeta?.total_items || rows.length)}
+            </div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Порций</div>
+            <div className="cafeAnalytics__modalKVal">{fmtInt(totalQty)}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Выручка</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(totalRevenue)}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockHead">
+            <div className="cafeAnalytics__modalBlockTitle">Все блюда по выручке</div>
+            <button
+              type="button"
+              className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+              onClick={onExportMenuAllPdf}
+              disabled={allMenuItemsLoading || !rows.length}
+            >
+              <FaDownload /> Экспорт PDF
+            </button>
+          </div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Блюдо</th>
+                  <th>Категория</th>
+                  <th>Кухня</th>
+                  <th>Цена</th>
+                  <th>Кол-во</th>
+                  <th>Выручка</th>
+                  <th>Средняя цена</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((x, idx) => (
+                  <tr key={x.menu_item_id || x.id || `${x.title || "menu"}_${idx}`}>
+                    <td className="cafeAnalytics__modalTdTitle" title={x.title}>
+                      {x.title || "—"}
+                    </td>
+                    <td>{x.category_title || "—"}</td>
+                    <td>{x.kitchen_title || "—"}</td>
+                    <td>{fmtMoney(toNum(x.price))}</td>
+                    <td>{fmtInt(x.qty)}</td>
+                    <td>{fmtMoney(toNum(x.revenue))}</td>
+                    <td>{fmtMoney(toNum(x.avg_unit_price))}</td>
+                  </tr>
+                ))}
+                {!allMenuItemsLoading && !rows.length && (
+                  <tr>
+                    <td colSpan={7} className="cafeAnalytics__modalEmpty">
+                      Нет данных за период.
+                    </td>
+                  </tr>
+                )}
+                {allMenuItemsLoading && (
+                  <tr>
+                    <td colSpan={7} className="cafeAnalytics__modalEmpty">
+                      Загрузка списка блюд...
                     </td>
                   </tr>
                 )}
@@ -538,26 +702,33 @@ const CafeAnalyticsModalContent = ({
 
   if (modalKey === "rejections") {
     const rows = Array.isArray(rejectionRows) ? rejectionRows : [];
-    const lines = rows.reduce((a, x) => a + toNum(x?.count), 0);
+    const lines = rows.reduce((a, x) => a + toNum(x?.qty), 0);
+    const lostRevenue = rows.reduce((a, x) => a + toNum(x?.lost_revenue), 0);
 
     return (
       <div className="cafeAnalytics__modalContent">
-        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--1">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
           <div className="cafeAnalytics__modalKpi">
             <div className="cafeAnalytics__modalKLabel">Отказов (позиций)</div>
             <div className="cafeAnalytics__modalKVal">{fmtInt(lines)}</div>
           </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Упущенная выручка</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(lostRevenue)}</div>
+          </div>
         </div>
 
         <div className="cafeAnalytics__modalBlock">
-          <div className="cafeAnalytics__modalBlockTitle">По причине отказа</div>
+          <div className="cafeAnalytics__modalBlockTitle">Отказы по позициям</div>
           <div className="cafeAnalytics__modalTableWrap">
             <table className="cafeAnalytics__modalTable">
               <thead>
                 <tr>
                   <th>Причина</th>
                   <th>Кол-во</th>
-                  <th>Последний отказ</th>
+                  <th>Упущенная выручка</th>
+                  <th>Сотрудник</th>
+                  <th>Дата</th>
                 </tr>
               </thead>
               <tbody>
@@ -566,13 +737,15 @@ const CafeAnalyticsModalContent = ({
                     <td className="cafeAnalytics__modalTdTitle" title={x.reason}>
                       {x.reason}
                     </td>
-                    <td>{fmtInt(x.count)}</td>
-                    <td>{fmtDateTime(x.last_at)}</td>
+                    <td>{fmtInt(x.qty)}</td>
+                    <td>{fmtMoney(toNum(x.lost_revenue))}</td>
+                    <td>{x.employee_name || "—"}</td>
+                    <td>{fmtDateTime(x.created_at)}</td>
                   </tr>
                 ))}
                 {!rows.length && (
                   <tr>
-                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                    <td colSpan={5} className="cafeAnalytics__modalEmpty">
                       Нет отказов за период.
                     </td>
                   </tr>

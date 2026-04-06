@@ -25,7 +25,9 @@ import {
   Filler,
   Legend,
 } from "chart.js";
+import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import api from "../../../../api";
+import { registerPdfFonts } from "../../../../pdf/registerFonts";
 import "./CafeAnalytics.scss";
 import { CafeAnalyticsModal, CafeAnalyticsModalContent } from "./CafeAnalyticsModals";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -70,6 +72,91 @@ const fmtMoney = (n) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(
     Math.round(Number(n) || 0)
   ) + " сом";
+
+const analyticsPdfStyles = StyleSheet.create({
+  page: { padding: 24, fontSize: 10, color: "#0b1220", fontFamily: "Roboto" },
+  title: { fontSize: 16, marginBottom: 4, fontWeight: 700 },
+  sub: { fontSize: 10, marginBottom: 10, color: "#475569" },
+  kpiRow: { flexDirection: "row", gap: 12, marginBottom: 10 },
+  kpi: {
+    border: "1 solid #e5e7eb",
+    borderRadius: 6,
+    padding: 8,
+    flexGrow: 1,
+  },
+  kpiLabel: { fontSize: 9, color: "#64748b" },
+  kpiVal: { fontSize: 12, marginTop: 2, fontWeight: 700 },
+  tableHead: {
+    flexDirection: "row",
+    backgroundColor: "#f8fafc",
+    borderTop: "1 solid #cbd5e1",
+    borderLeft: "1 solid #cbd5e1",
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    fontWeight: 700,
+  },
+  row: {
+    flexDirection: "row",
+    borderLeft: "1 solid #e2e8f0",
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
+  cTitle: { width: "31%", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cCat: { width: "16%", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cKitchen: { width: "16%", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cPrice: { width: "10%", textAlign: "right", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cQty: { width: "9%", textAlign: "right", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cRevenue: { width: "12%", textAlign: "right", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+  cAvg: { width: "10%", textAlign: "right", borderRight: "1 solid #cbd5e1", borderBottom: "1 solid #cbd5e1", padding: 5 },
+});
+
+const CafeAllMenuPdfDocument = ({ rows = [], periodLabel = "", totals = {} }) => (
+  <Document>
+    <Page size="A4" style={analyticsPdfStyles.page}>
+      <Text style={analyticsPdfStyles.title}>Аналитика блюд</Text>
+      <Text style={analyticsPdfStyles.sub}>{periodLabel || "Период не указан"}</Text>
+
+      <View style={analyticsPdfStyles.kpiRow}>
+        <View style={analyticsPdfStyles.kpi}>
+          <Text style={analyticsPdfStyles.kpiLabel}>Блюд в отчете</Text>
+          <Text style={analyticsPdfStyles.kpiVal}>{Math.round(totals.items || 0)}</Text>
+        </View>
+        <View style={analyticsPdfStyles.kpi}>
+          <Text style={analyticsPdfStyles.kpiLabel}>Порций</Text>
+          <Text style={analyticsPdfStyles.kpiVal}>{Math.round(totals.qty || 0)}</Text>
+        </View>
+        <View style={analyticsPdfStyles.kpi}>
+          <Text style={analyticsPdfStyles.kpiLabel}>Выручка</Text>
+          <Text style={analyticsPdfStyles.kpiVal}>{Math.round(totals.revenue || 0)} сом</Text>
+        </View>
+      </View>
+
+      <View style={analyticsPdfStyles.tableHead}>
+        <Text style={analyticsPdfStyles.cTitle}>Блюдо</Text>
+        <Text style={analyticsPdfStyles.cCat}>Категория</Text>
+        <Text style={analyticsPdfStyles.cKitchen}>Кухня</Text>
+        <Text style={analyticsPdfStyles.cPrice}>Цена</Text>
+        <Text style={analyticsPdfStyles.cQty}>Кол-во</Text>
+        <Text style={analyticsPdfStyles.cRevenue}>Выручка</Text>
+        <Text style={analyticsPdfStyles.cAvg}>Средняя</Text>
+      </View>
+
+      {rows.map((x, idx) => (
+        <View key={`${x.menu_item_id || "item"}_${idx}`} style={analyticsPdfStyles.row}>
+          <Text style={analyticsPdfStyles.cTitle}>{x.title || "—"}</Text>
+          <Text style={analyticsPdfStyles.cCat}>{x.category_title || "—"}</Text>
+          <Text style={analyticsPdfStyles.cKitchen}>{x.kitchen_title || "—"}</Text>
+          <Text style={analyticsPdfStyles.cPrice}>{Math.round(toNum(x.price))}</Text>
+          <Text style={analyticsPdfStyles.cQty}>{Math.round(toNum(x.qty))}</Text>
+          <Text style={analyticsPdfStyles.cRevenue}>{Math.round(toNum(x.revenue))}</Text>
+          <Text style={analyticsPdfStyles.cAvg}>{Math.round(toNum(x.avg_unit_price))}</Text>
+        </View>
+      ))}
+    </Page>
+  </Document>
+);
+
+registerPdfFonts();
 
 const isoDate = (d) => {
   const yyyy = d.getFullYear();
@@ -261,10 +348,22 @@ const normalizeRevenueInflowRows = (data) => {
 const normalizeRejectionRows = (data) => {
   const rows = apiListPayload(data);
   return rows.map((x, idx) => ({
-    _id: `${String(x.rejection_reason ?? x.reason ?? idx)}_${idx}`,
+    _id: String(x.id ?? `${String(x.rejection_reason ?? x.reason ?? idx)}_${idx}`),
     reason: String(x.rejection_reason ?? x.reason ?? x.title ?? "—").trim() || "—",
-    count: toNum(x.count ?? x.qty ?? x.items_count ?? x.rejected_count ?? x.lines),
-    last_at: x.rejected_at ?? x.last_rejected_at ?? x.last_at ?? null,
+    qty: toNum(x.qty ?? x.count ?? x.items_count ?? x.rejected_count ?? x.lines),
+    lost_revenue: toNum(
+      x.lost_revenue ?? x.lost_amount ?? x.revenue_lost ?? x.sum ?? x.amount
+    ),
+    employee_name:
+      String(
+        x.employee_name ??
+          x.waiter_name ??
+          x.user_name ??
+          x.created_by_name ??
+          x.employee ??
+          ""
+      ).trim() || "—",
+    created_at: x.created_at ?? x.rejected_at ?? x.last_rejected_at ?? x.last_at ?? null,
   }));
 };
 
@@ -372,6 +471,19 @@ const CafeAnalytics = () => {
     revenue: "0.00",
   });
   const [salesItems, setSalesItems] = useState([]);
+  const [allMenuItems, setAllMenuItems] = useState([]);
+  const [allMenuItemsLoading, setAllMenuItemsLoading] = useState(false);
+  const [menuAllHideZeroQty, setMenuAllHideZeroQty] = useState(false);
+  const [menuAllDateFrom, setMenuAllDateFrom] = useState(() => isoDate(addDays(new Date(), -13)));
+  const [menuAllDateTo, setMenuAllDateTo] = useState(() => isoDate(new Date()));
+  const [allMenuMeta, setAllMenuMeta] = useState({
+    date_from: "",
+    date_to: "",
+    basis: "paid_at",
+    offset: 0,
+    limit: 5000,
+    total_items: 0,
+  });
   const [salesCategories, setSalesCategories] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
@@ -414,6 +526,50 @@ const CafeAnalytics = () => {
     if (dateTo) p.date_to = dateTo;
     return p;
   }, [dateFrom, dateTo]);
+
+  const fetchAllMenuItems = useCallback(
+    async (from, to) => {
+      setAllMenuItemsLoading(true);
+      try {
+        const r = await api.get("/cafe/analytics/menu/all/", {
+          params: {
+            date_from: from || undefined,
+            date_to: to || undefined,
+            limit: 5000,
+          },
+        });
+        const payload = r?.data || {};
+        const rows = Array.isArray(payload?.rows)
+          ? payload.rows
+          : Array.isArray(listFrom(r))
+            ? listFrom(r)
+            : [];
+        setAllMenuItems(rows);
+        setAllMenuMeta({
+          date_from: payload?.date_from || from || "",
+          date_to: payload?.date_to || to || "",
+          basis: payload?.basis || "paid_at",
+          offset: Number(payload?.offset || 0),
+          limit: Number(payload?.limit || 5000),
+          total_items: Number(payload?.total_items || rows.length || 0),
+        });
+      } catch (e) {
+        console.error("CafeAnalytics fetch all menu items error:", e);
+        setAllMenuItems([]);
+        setAllMenuMeta({
+          date_from: from || "",
+          date_to: to || "",
+          basis: "paid_at",
+          offset: 0,
+          limit: 5000,
+          total_items: 0,
+        });
+      } finally {
+        setAllMenuItemsLoading(false);
+      }
+    },
+    []
+  );
 
   const fetchGuestsCount = useCallback(async () => {
     try {
@@ -649,7 +805,7 @@ const CafeAnalytics = () => {
     [revenueInflowRows]
   );
   const rejectionLinesTotal = useMemo(
-    () => sumBy(rejectionRows, "count"),
+    () => sumBy(rejectionRows, "qty"),
     [rejectionRows]
   );
   const expensesTotal = useMemo(() => toNum(expensesBlock?.total), [expensesBlock]);
@@ -664,6 +820,13 @@ const CafeAnalytics = () => {
     setModalKey(key);
     setStaffQ("");
     setStaffSort("revenue_desc");
+    if (key === "menu_all") {
+      const from = dateFrom || isoDate(addDays(new Date(), -13));
+      const to = dateTo || isoDate(new Date());
+      setMenuAllDateFrom(from);
+      setMenuAllDateTo(to);
+      fetchAllMenuItems(from, to);
+    }
     if (key === "export") {
       setExportReport("analytics");
       setExportFormat("excel");
@@ -684,6 +847,7 @@ const CafeAnalytics = () => {
     if (modalKey === "export") return "Экспорт отчета";
     if (modalKey === "payment_inflow") return "Оплаты по способу";
     if (modalKey === "rejections") return "Отказы по позициям";
+    if (modalKey === "menu_all") return "Все блюда";
     if (modalKey === "expenses") return "Операционные расходы";
     if (modalKey === "debts") return "Открытые долги";
     if (modalKey === "salary_waiters") return "Зарплата официантов (расчёт)";
@@ -767,6 +931,58 @@ const CafeAnalytics = () => {
       setExportLoading(false);
     }
   }, [exportReport, exportFormat, exportDateFrom, exportDateTo]);
+
+  const handleExportAllMenuPdf = useCallback(async () => {
+    const rawRows = Array.isArray(allMenuItems) ? allMenuItems : [];
+    const rows = menuAllHideZeroQty
+      ? rawRows.filter((x) => toNum(x?.qty) !== 0)
+      : rawRows;
+    const totals = {
+      items: rows.length,
+      qty: rows.reduce((a, x) => a + toNum(x?.qty), 0),
+      revenue: rows.reduce((a, x) => a + toNum(x?.revenue), 0),
+    };
+    const periodLabel = `Период: ${allMenuMeta?.date_from || dateFrom || "—"} — ${allMenuMeta?.date_to || dateTo || "—"}`;
+    try {
+      const blob = await pdf(
+        <CafeAllMenuPdfDocument rows={rows} periodLabel={periodLabel} totals={totals} />
+      ).toBlob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cafe_menu_all_${allMenuMeta?.date_from || dateFrom || "all"}_${allMenuMeta?.date_to || dateTo || "all"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("CafeAnalytics export menu PDF error:", e);
+    }
+  }, [allMenuItems, allMenuMeta, dateFrom, dateTo, menuAllHideZeroQty]);
+
+  const handleMenuAllApplyDates = useCallback(() => {
+    fetchAllMenuItems(menuAllDateFrom, menuAllDateTo);
+  }, [fetchAllMenuItems, menuAllDateFrom, menuAllDateTo]);
+
+  const handleMenuAllQuickRange = useCallback(
+    (kind) => {
+      const today = isoDate(new Date());
+      let from = today;
+      let to = today;
+      if (kind === "yesterday") {
+        from = isoDate(addDays(new Date(), -1));
+        to = from;
+      } else if (kind === "3days") {
+        from = isoDate(addDays(new Date(), -2));
+      } else if (kind === "week") {
+        from = isoDate(addDays(new Date(), -6));
+      }
+      setMenuAllDateFrom(from);
+      setMenuAllDateTo(to);
+      fetchAllMenuItems(from, to);
+    },
+    [fetchAllMenuItems]
+  );
 
   return (
     <section className="cafeAnalytics">
@@ -1010,7 +1226,17 @@ const CafeAnalytics = () => {
       <div className="cafeAnalytics__bottom">
         <div className="cafeAnalytics__card cafeAnalytics__card--full">
           <div className="cafeAnalytics__cardHead cafeAnalytics__cardHead--tight">
-            <div className="cafeAnalytics__cardTitle">Топ блюд по выручке</div>
+            <div className="cafeAnalytics__cardHeadActions">
+              <div className="cafeAnalytics__cardTitle">Топ блюд по выручке</div>
+              <button
+                type="button"
+                className="cafeAnalytics__btn cafeAnalytics__btn--sm"
+                onClick={() => openModal("menu_all")}
+                disabled={allMenuItemsLoading}
+              >
+                {allMenuItemsLoading ? "Загрузка..." : "Все блюда"}
+              </button>
+            </div>
           </div>
 
           <div className="cafeAnalytics__cardBody cafeAnalytics__cardBody--tight">
@@ -1117,6 +1343,18 @@ const CafeAnalytics = () => {
           guestsCount={guestsCount}
           cafeClients={cafeClients}
           salesItems={salesItems}
+          allMenuItems={allMenuItems}
+          allMenuItemsLoading={allMenuItemsLoading}
+          allMenuMeta={allMenuMeta}
+          onExportMenuAllPdf={handleExportAllMenuPdf}
+          menuAllHideZeroQty={menuAllHideZeroQty}
+          setMenuAllHideZeroQty={setMenuAllHideZeroQty}
+          menuAllDateFrom={menuAllDateFrom}
+          setMenuAllDateFrom={setMenuAllDateFrom}
+          menuAllDateTo={menuAllDateTo}
+          setMenuAllDateTo={setMenuAllDateTo}
+          onMenuAllApplyDates={handleMenuAllApplyDates}
+          onMenuAllQuickRange={handleMenuAllQuickRange}
           lowStock={lowStock}
           kitchenLoading={kitchenLoading}
           staffQ={staffQ}

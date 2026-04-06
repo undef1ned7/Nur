@@ -116,6 +116,16 @@
       z-index: 80;
       overflow: hidden;
       animation: combo-in 0.15s ease-out both;
+
+      &--portal {
+        position: fixed !important;
+        top: auto;
+        left: auto;
+        right: auto;
+        animation: none;
+        overflow: hidden;
+        z-index: 10060 !important;
+      }
     }
 
     &__list,

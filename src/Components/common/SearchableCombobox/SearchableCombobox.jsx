@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FaSearch, FaTimes, FaChevronDown } from "react-icons/fa";
 import "./SearchableCombobox.scss";
 
@@ -12,8 +13,12 @@ const SearchableCombobox = ({
   disabled = false,
   hideClear = false, // Скрыть кнопку очистки
   classNamePrefix = "searchableCombo", // Префикс для BEM классов
+  /** Рендер списка в document.body — нужно внутри модалок с overflow:hidden */
+  menuPortal = false,
 }) => {
   const rootRef = useRef(null);
+  const controlRef = useRef(null);
+  const dropdownRef = useRef(null);
   const inputRef = useRef(null);
 
   const opts = Array.isArray(options) ? options : [];
@@ -26,18 +31,20 @@ const SearchableCombobox = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [portalBox, setPortalBox] = useState(null);
 
   // Закрыть при фокусе вне компонента
   useEffect(() => {
     const handleDocumentMouseDown = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
+      const t = e.target;
+      if (rootRef.current?.contains(t)) return;
+      if (menuPortal && dropdownRef.current?.contains(t)) return;
+      setIsOpen(false);
     };
 
     document.addEventListener("mousedown", handleDocumentMouseDown);
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown);
-  }, []);
+  }, [menuPortal]);
 
   // Очистить запрос при закрытии
   useEffect(() => {
@@ -54,6 +61,35 @@ const SearchableCombobox = ({
       safeStr(opt?.label).toLowerCase().includes(searchQuery)
     );
   }, [opts, query]);
+
+  const updatePortalBox = () => {
+    const el = controlRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom - 16;
+    const maxListHeight = Math.min(280, Math.max(100, spaceBelow));
+    setPortalBox({
+      top: r.bottom + 8,
+      left: r.left,
+      width: r.width,
+      maxListHeight,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen || !menuPortal || disabled) {
+      setPortalBox(null);
+      return;
+    }
+    updatePortalBox();
+    const onReposition = () => updatePortalBox();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [isOpen, menuPortal, disabled, filteredOptions.length]);
 
   // Значение в инпуте
   const displayValue = isOpen ? query : selectedLabel;
@@ -121,9 +157,70 @@ const SearchableCombobox = ({
   const controlClass = `${baseClass}__control${isOpen ? ` ${baseClass}__control--open` : ""}`;
   const chevClass = `${baseClass}__chev${isOpen ? ` ${baseClass}__chev--up` : ""}`;
 
+  const dropdownInner = (
+    <>
+      {filteredOptions.length === 0 && (
+        <div className={`${baseClass}__empty`}>Ничего не найдено</div>
+      )}
+
+      {filteredOptions.length > 0 && (
+        <div
+          className={`${baseClass}__list`}
+          style={
+            menuPortal && portalBox
+              ? { maxHeight: portalBox.maxListHeight }
+              : undefined
+          }
+        >
+          {filteredOptions.map((opt) => {
+            const optValue = safeStr(opt?.value);
+            const optLabel = safeStr(opt?.label);
+            const isActive = optValue && optValue === safeStr(value);
+
+            return (
+              <button
+                key={`${optValue}-${optLabel}`}
+                type="button"
+                className={`${baseClass}__item${isActive ? ` ${baseClass}__item--active` : ""
+                  }`}
+                onClick={() => selectOption(optValue)}
+              >
+                {optLabel}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  const dropdownNode =
+    isOpen && !disabled ? (
+      menuPortal && portalBox ? (
+        <div
+          ref={dropdownRef}
+          className={`${baseClass}__dropdown ${baseClass}__dropdown--portal`}
+          style={{
+            position: "fixed",
+            top: portalBox.top,
+            left: portalBox.left,
+            width: portalBox.width,
+            zIndex: 10060,
+          }}
+          role="listbox"
+        >
+          {dropdownInner}
+        </div>
+      ) : !menuPortal ? (
+        <div className={`${baseClass}__dropdown`} role="listbox">
+          {dropdownInner}
+        </div>
+      ) : null
+    ) : null;
+
   return (
     <div ref={rootRef} className={rootClass} data-prefix={classNamePrefix}>
-      <div className={controlClass}>
+      <div ref={controlRef} className={controlClass}>
         <FaSearch className={`${baseClass}__icon`} aria-hidden="true" />
 
         <input
@@ -164,35 +261,9 @@ const SearchableCombobox = ({
         </div>
       </div>
 
-      {isOpen && !disabled && (
-        <div className={`${baseClass}__dropdown`} role="listbox">
-          {filteredOptions.length === 0 && (
-            <div className={`${baseClass}__empty`}>Ничего не найдено</div>
-          )}
-
-          {filteredOptions.length > 0 && (
-            <div className={`${baseClass}__list`}>
-              {filteredOptions.map((opt) => {
-                const optValue = safeStr(opt?.value);
-                const optLabel = safeStr(opt?.label);
-                const isActive = optValue && optValue === safeStr(value);
-
-                return (
-                  <button
-                    key={`${optValue}-${optLabel}`}
-                    type="button"
-                    className={`${baseClass}__item${isActive ? ` ${baseClass}__item--active` : ""
-                      }`}
-                    onClick={() => selectOption(optValue)}
-                  >
-                    {optLabel}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      {menuPortal && dropdownNode
+        ? createPortal(dropdownNode, document.body)
+        : dropdownNode}
     </div>
   );
 };
