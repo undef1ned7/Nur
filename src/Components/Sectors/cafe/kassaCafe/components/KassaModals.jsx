@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { FaPlus, FaTimes } from "react-icons/fa";
+import { FaCheck, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../../api";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
@@ -598,7 +598,7 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
                 return (
                   <div key={id || `cat-${idx}`} className="cafeKassa__catRow">
                     <input
-                      className="cafeKassa__input"
+                      className="cafeKassa__input cafeKassa__input--compact"
                       type="text"
                       value={editVal}
                       onChange={(e) => {
@@ -613,19 +613,23 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
                     />
                     <button
                       type="button"
-                      className="cafeKassa__btn cafeKassa__btn--secondary"
+                      className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
                       onClick={() => handleRename({ ...r, _editTitle: editVal })}
                       disabled={savingId === id}
+                      title="Сохранить"
+                      aria-label="Сохранить"
                     >
-                      Сохранить
+                      <FaCheck />
                     </button>
                     <button
                       type="button"
-                      className="cafeKassa__btn"
+                      className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
                       onClick={() => handleDelete(r)}
                       disabled={savingId === id}
+                      title="Удалить"
+                      aria-label="Удалить"
                     >
-                      Удалить
+                      <FaTrash />
                     </button>
                   </div>
                 );
