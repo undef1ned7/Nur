@@ -284,6 +284,8 @@ const Masters = () => {
   const [warehouseAgentEmployee, setWarehouseAgentEmployee] = useState(null);
   const [warehouseAgentCommonEnabled, setWarehouseAgentCommonEnabled] =
     useState(false);
+  const [warehouseAgentAssignedWarehouse, setWarehouseAgentAssignedWarehouse] =
+    useState("");
   const [warehouseAgentCommonWarehouse, setWarehouseAgentCommonWarehouse] =
     useState("");
   const [warehouseAgentSaving, setWarehouseAgentSaving] = useState(false);
@@ -797,6 +799,7 @@ const Masters = () => {
     if (!employee?.id) return;
     setWarehouseAgentEmployee(employee);
     setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentAssignedWarehouse("");
     setWarehouseAgentCommonWarehouse("");
     setWarehouseAgentError("");
     setWarehouseAgentModalOpen(true);
@@ -829,6 +832,7 @@ const Masters = () => {
     setWarehouseAgentModalOpen(false);
     setWarehouseAgentEmployee(null);
     setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentAssignedWarehouse("");
     setWarehouseAgentCommonWarehouse("");
     setWarehouseAgentError("");
   };
@@ -836,7 +840,10 @@ const Masters = () => {
   const submitWarehouseAgent = async (e) => {
     e?.preventDefault?.();
     if (!warehouseAgentEmployee?.id || warehouseAgentSaving) return;
-    if (warehouseAgentCommonEnabled && !warehouseAgentCommonWarehouse.trim()) {
+    const assignedWarehouse = warehouseAgentAssignedWarehouse.trim();
+    const commonWarehouse =
+      assignedWarehouse || warehouseAgentCommonWarehouse.trim();
+    if (warehouseAgentCommonEnabled && !commonWarehouse) {
       setWarehouseAgentError("Укажите UUID склада для общего прайса.");
       return;
     }
@@ -846,10 +853,11 @@ const Masters = () => {
     try {
       const payload = {
         user: warehouseAgentEmployee.id,
+        assigned_warehouse: assignedWarehouse || null,
       };
       if (warehouseAgentCommonEnabled) {
         payload.common_access_enabled = true;
-        payload.common_warehouse = warehouseAgentCommonWarehouse.trim();
+        payload.common_warehouse = commonWarehouse;
       }
       await createCompanyMembership(payload);
       setPageNotice("Сотрудник назначен агентом склада.");
@@ -862,6 +870,12 @@ const Masters = () => {
       setWarehouseAgentSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (warehouseAgentAssignedWarehouse && warehouseAgentCommonEnabled) {
+      setWarehouseAgentCommonWarehouse(warehouseAgentAssignedWarehouse);
+    }
+  }, [warehouseAgentAssignedWarehouse, warehouseAgentCommonEnabled]);
 
   /* ========= Small pager ========= */
   const Pager = ({ page, total, onChange }) => {
@@ -1367,6 +1381,33 @@ const Masters = () => {
 
                 <div className="barbermasters__field barbermasters__field--full">
                   <label className="barbermasters__label">
+                    Ограничить доступ одним складом
+                  </label>
+                  <select
+                    className="barbermasters__input"
+                    value={warehouseAgentAssignedWarehouse}
+                    onChange={(e) =>
+                      setWarehouseAgentAssignedWarehouse(e.target.value)
+                    }
+                    disabled={
+                      warehouseAgentSaving || warehouseAgentWarehousesLoading
+                    }
+                  >
+                    <option value="">
+                      {warehouseAgentWarehousesLoading
+                        ? "Загрузка складов…"
+                        : "Все склады компании"}
+                    </option>
+                    {warehouseAgentWarehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name || w.title || w.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="barbermasters__field barbermasters__field--full">
+                  <label className="barbermasters__label">
                     Доступ к складу
                   </label>
                   <div className="barbermasters__seg">
@@ -1401,12 +1442,17 @@ const Masters = () => {
                     </label>
                     <select
                       className="barbermasters__input"
-                      value={warehouseAgentCommonWarehouse}
+                      value={
+                        warehouseAgentAssignedWarehouse ||
+                        warehouseAgentCommonWarehouse
+                      }
                       onChange={(e) =>
                         setWarehouseAgentCommonWarehouse(e.target.value)
                       }
                       disabled={
-                        warehouseAgentSaving || warehouseAgentWarehousesLoading
+                        warehouseAgentSaving ||
+                        warehouseAgentWarehousesLoading ||
+                        Boolean(warehouseAgentAssignedWarehouse)
                       }
                     >
                       <option value="">

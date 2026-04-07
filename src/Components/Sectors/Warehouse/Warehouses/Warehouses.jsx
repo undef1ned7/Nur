@@ -32,7 +32,7 @@ const Warehouses = () => {
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   // Параметры запроса
@@ -73,14 +73,14 @@ const Warehouses = () => {
     (newPage) => {
       handlePageChangeBase(newPage);
     },
-    [handlePageChangeBase]
+    [handlePageChangeBase],
   );
 
   const handleOpenWarehouse = useCallback(
     (warehouse) => {
       navigate(`/crm/warehouse/stocks/${warehouse.id}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handleEditWarehouse = useCallback((warehouse) => {
@@ -103,7 +103,7 @@ const Warehouses = () => {
         throw error;
       }
     },
-    [dispatch, requestParams]
+    [dispatch, requestParams],
   );
 
   return (

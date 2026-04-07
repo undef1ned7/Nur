@@ -139,6 +139,7 @@ import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Moveme
 import WarehouseProducts from "../Components/Sectors/Warehouse/Products/Products";
 import WarehouseProductDetail from "../Components/Sectors/Warehouse/Products/WarehouseProductDetail";
 import WarehouseStocks from "../Components/Sectors/Warehouse/Stocks/Stocks";
+import AgentStocks from "../Components/Sectors/Warehouse/AgentStocks/AgentStocks";
 import AddWarehouseProductPage from "../Components/Sectors/Warehouse/Stocks/AddWarehouseProductPage";
 import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
@@ -566,7 +567,10 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("consulting/services", ConsultingServices),
 
   // Warehouse routes
-  createProtectedRoute("warehouse/warehouses", Warehouses),
+  createProtectedRoute(
+    "warehouse/warehouses",
+    profile?.role !== "owner" ? AgentStocks : Warehouses,
+  ),
   createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),
   <Route
@@ -610,6 +614,9 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
   createProtectedRoute("warehouse/stocks", WarehouseStocks),
   createProtectedRoute("warehouse/stocks/:warehouse_id", WarehouseStocks),
+  ...(profile?.role === "agent"
+    ? [createProtectedRoute("warehouse/agent-stocks", AgentStocks)]
+    : []),
   createProtectedRoute("warehouse/stocks/add-product", AddWarehouseProductPage),
   createProtectedRoute(
     "warehouse/stocks/add-product/:id",
