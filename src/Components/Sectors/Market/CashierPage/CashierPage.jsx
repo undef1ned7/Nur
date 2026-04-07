@@ -248,6 +248,22 @@ const CashierPage = () => {
   });
 
   const [mobileProductsList, setMobileProductsList] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(
+    () => window.innerWidth > 768,
+  );
+  const [desktopProductsWidth, setDesktopProductsWidth] = useState(() => {
+    try {
+      const raw = Number(localStorage.getItem("market_cashier_products_width_pct"));
+      if (Number.isFinite(raw)) return Math.min(80, Math.max(40, raw));
+    } catch {
+      /* ignore */
+    }
+    return 64;
+  });
+  const contentRef = React.useRef(null);
+  const isResizingRef = React.useRef(false);
+  const cartWidthPercent = 100 - desktopProductsWidth;
+  const isCompactCart = isDesktopLayout && cartWidthPercent <= 34;
   // Функция для показа AlertModal
   const showAlert = (type, title, message) => {
     setAlertModal({
@@ -261,6 +277,53 @@ const CashierPage = () => {
   const closeAlert = () => {
     setAlertModal((prev) => ({ ...prev, open: false }));
   };
+
+  const handleDesktopResizeStart = (e) => {
+    if (window.innerWidth <= 768) return;
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  useEffect(() => {
+    const onResize = () => setIsDesktopLayout(window.innerWidth > 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!isResizingRef.current || !contentRef.current) return;
+      const rect = contentRef.current.getBoundingClientRect();
+      if (!rect.width) return;
+      const relativeX = e.clientX - rect.left;
+      const nextPct = (relativeX / rect.width) * 100;
+      setDesktopProductsWidth(Math.min(80, Math.max(40, nextPct)));
+    };
+
+    const onUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(
+          "market_cashier_products_width_pct",
+          String(desktopProductsWidth),
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [desktopProductsWidth]);
 
   const handleProductCardClick = async (product, event) => {
     const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
@@ -1724,9 +1787,17 @@ const CashierPage = () => {
         </div>
       </div>
 
-      <div className="cashier-page__content">
+      <div className="cashier-page__content" ref={contentRef}>
         <div
           className={`cashier-page__products ${mobileProductsList ? "active" : ""} `}
+          style={
+            isDesktopLayout
+              ? {
+                  flex: "0 0 auto",
+                  width: `calc(${desktopProductsWidth}% - 12px)`,
+                }
+              : undefined
+          }
         >
           <div className="mobile-list-btn flex w-full justify-center py-2 md:hidden!">
             <Button
@@ -1921,7 +1992,25 @@ const CashierPage = () => {
         >
           Добавить товар
         </Button>
-        <div className="cashier-page__cart">
+        <div
+          className="cashier-page__splitter"
+          onMouseDown={handleDesktopResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панелей"
+        />
+        <div
+          className={`cashier-page__cart ${isCompactCart ? "cashier-page__cart--compact" : ""}`}
+          style={
+            isDesktopLayout
+              ? {
+                  flex: "0 0 auto",
+                  width: `calc(${100 - desktopProductsWidth}% - 12px)`,
+                  minWidth: 340,
+                }
+              : undefined
+          }
+        >
           <div className="cashier-page__cart-header">
             <h2 className="cashier-page__cart-title">Корзина</h2>
             <button

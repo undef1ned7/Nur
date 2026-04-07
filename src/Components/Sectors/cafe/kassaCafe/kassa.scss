@@ -99,6 +99,14 @@
     }
   }
 
+  &__input--compact {
+    min-width: 0;
+    height: 36px;
+    padding: 7px 10px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
   &__categoryFilter {
     min-width: 200px;
     max-width: 280px;
@@ -488,6 +496,13 @@
     &:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+
+    &--compact {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      font-size: 14px;
     }
   }
 
