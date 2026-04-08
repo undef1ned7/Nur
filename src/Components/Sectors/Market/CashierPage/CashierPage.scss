@@ -222,6 +222,42 @@
     color: #111827;
   }
 
+  &__product-favorite {
+    position: absolute;
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    z-index: 2;
+
+    &:hover:not(:disabled) {
+      color: #f59e0b;
+      border-color: #fcd34d;
+      background: #fffbeb;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &--active {
+      color: #f59e0b;
+      border-color: #fcd34d;
+      background: #fffbeb;
+    }
+  }
+
   &__product-name {
     font-size: 16px;
     font-weight: 600;

@@ -43,6 +43,39 @@ const BASIC_ACCESS_TYPES = [
 ];
 
 // Секторные permissions
+const MARKET_ACCESS_TYPES = [
+  {
+    value: "Интерфейс кассира",
+    label: "Интерфейс кассира",
+    backendKey: "can_view_cashier",
+  },
+  {
+    value: "Скидка в кассе",
+    label: "Скидка в кассе",
+    backendKey: "can_view_market_discount",
+  },
+  {
+    value: "Изменение цены в кассе",
+    label: "Изменение цены в кассе",
+    backendKey: "can_view_market_edit_price",
+  },
+  {
+    value: "Удаление позиций из корзины",
+    label: "Удаление позиций из корзины",
+    backendKey: "can_view_market_delete_cart_item",
+  },
+  {
+    value: "Смены",
+    label: "Смены",
+    backendKey: "can_view_shifts",
+  },
+  {
+    value: "Документы",
+    label: "Документы",
+    backendKey: "can_view_document",
+  },
+];
+
 const SECTOR_ACCESS_TYPES = {
   Барбершоп: [
     {
@@ -122,23 +155,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_cafe_inventory",
     },
   ],
-  Магазин: [
-    {
-      value: "Интерфейс кассира",
-      label: "Интерфейс кассира",
-      backendKey: "can_view_cashier",
-    },
-    {
-      value: "Смены",
-      label: "Смены",
-      backendKey: "can_view_shifts",
-    },
-    {
-      value: "Документы",
-      label: "Документы",
-      backendKey: "can_view_document",
-    },
-  ],
+  Магазин: MARKET_ACCESS_TYPES,
+  Маркет: MARKET_ACCESS_TYPES,
   "Строительная компания": [
     {
       value: "Аналитика",
@@ -338,6 +356,12 @@ const additionalServicesMapping = {
   },
 };
 
+const MARKET_CASHIER_SPECIAL_KEYS = new Set([
+  "can_view_market_discount",
+  "can_view_market_edit_price",
+  "can_view_market_delete_cart_item",
+]);
+
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
 
 const AccessList = ({
@@ -414,6 +438,7 @@ const AccessList = ({
         гостиница: "hostel",
         школа: "school",
         магазин: "market",
+        маркет: "market",
         кафе: "cafe",
         "Цветочный магазин": "market",
         производство: "production",
@@ -476,10 +501,16 @@ const AccessList = ({
       const sectorNameLower = sectorName.toLowerCase().trim();
       if (
         sectorNameLower === "магазин" ||
+        sectorNameLower === "маркет" ||
         sectorNameLower === "цветочный магазин" ||
         sectorNameLower.includes("магазин")
       ) {
         allMenuPermissions.add("can_view_cashier");
+        // Эти права не всегда присутствуют как отдельные menu items,
+        // но должны быть доступны в "Управление доступами" для Маркета.
+        allMenuPermissions.add("can_view_market_discount");
+        allMenuPermissions.add("can_view_market_edit_price");
+        allMenuPermissions.add("can_view_market_delete_cart_item");
       }
     }
 
@@ -678,7 +709,15 @@ const AccessList = ({
       (type) =>
         !BASIC_ACCESS_TYPES.some(
           (basic) => basic.backendKey === type.backendKey,
-        ) && !additionalServicesMapping[type.backendKey],
+        ) &&
+        !additionalServicesMapping[type.backendKey] &&
+        !MARKET_CASHIER_SPECIAL_KEYS.has(type.backendKey),
+    );
+  }, [availableAccessTypes]);
+
+  const marketCashierSpecialTypes = useMemo(() => {
+    return availableAccessTypes.filter((type) =>
+      MARKET_CASHIER_SPECIAL_KEYS.has(type.backendKey),
     );
   }, [availableAccessTypes]);
 
@@ -738,6 +777,14 @@ const AccessList = ({
       type.label.toLowerCase().includes(query),
     );
   }, [additionalServicesTypes, searchQuery]);
+
+  const filteredMarketCashierSpecial = useMemo(() => {
+    if (!searchQuery.trim()) return marketCashierSpecialTypes;
+    const query = searchQuery.toLowerCase();
+    return marketCashierSpecialTypes.filter((type) =>
+      type.label.toLowerCase().includes(query),
+    );
+  }, [marketCashierSpecialTypes, searchQuery]);
 
   const handleSave = () => {
     const payloadForBackend = {};
@@ -1015,6 +1062,124 @@ const AccessList = ({
                       : "white",
                     border: `1px solid ${
                       selectedAccess[accessType.backendKey] ? "#2196f3" : "#ddd"
+                    }`,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "white";
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!selectedAccess[accessType.backendKey]}
+                    onChange={() => toggleAccess(accessType.backendKey)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#333",
+                      userSelect: "none",
+                    }}
+                  >
+                    {accessType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Касса Маркета: специальные доступы */}
+        {filteredMarketCashierSpecial.length > 0 && (
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                paddingBottom: "8px",
+                borderBottom: "2px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Касса Маркета
+              </h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => handleSelectAll(filteredMarketCashierSpecial, true)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Выбрать все
+                </button>
+                <button
+                  onClick={() => handleSelectAll(filteredMarketCashierSpecial, false)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "8px",
+                maxHeight: "300px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "#fff7cc",
+                borderRadius: "6px",
+              }}
+            >
+              {filteredMarketCashierSpecial.map((accessType) => (
+                <label
+                  key={accessType.backendKey}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    background: selectedAccess[accessType.backendKey]
+                      ? "#ffe082"
+                      : "white",
+                    border: `1px solid ${
+                      selectedAccess[accessType.backendKey] ? "#ffb300" : "#ddd"
                     }`,
                     transition: "all 0.2s",
                   }}

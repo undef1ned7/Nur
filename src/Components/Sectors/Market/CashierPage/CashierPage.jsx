@@ -4,6 +4,7 @@ import {
   Minus,
   Plus,
   Search,
+  Star,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import "./CashierPage.scss";
 import CloseShiftPage from "./CloseShiftPage";
 import CustomerModal from "./components/CustomerModal";
 import DebtPaymentModal from "./components/DebtPaymentModal";
+import DeletionsLogModal from "./components/DeletionsLogModal";
 import MenuModal from "./components/MenuModal";
 import ReceiptsModal from "./components/ReceiptsModal";
 import OpenShiftPage from "./OpenShiftPage";
@@ -64,7 +66,7 @@ const CashierPage = () => {
   const { start: currentSale, loading: saleLoading } = useSale();
   const { shifts } = useShifts();
   const { list: cashBoxes } = useCash();
-  const { currentUser, userId } = useUser();
+  const { currentUser, profile, userId } = useUser();
   const [openShiftState, setOpenShiftState] = useState(null); // Локальное состояние для открытой смены
 
   // Функция для форматирования количества (убирает лишние нули)
@@ -230,6 +232,7 @@ const CashierPage = () => {
   const [showCloseShiftPage, setShowCloseShiftPage] = useState(false);
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
+  const [showDeletionsLogModal, setShowDeletionsLogModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -248,6 +251,26 @@ const CashierPage = () => {
   });
 
   const [mobileProductsList, setMobileProductsList] = useState(false);
+  const [favoriteOverrides, setFavoriteOverrides] = useState({});
+  const [favoriteLoadingMap, setFavoriteLoadingMap] = useState({});
+
+  const normalizeMgmtRole = (raw) => {
+    const l = String(raw || "").trim().toLowerCase();
+    if (["owner", "владелец"].includes(l)) return "owner";
+    if (["admin", "administrator", "админ", "администратор"].includes(l))
+      return "admin";
+    return l;
+  };
+  const permissionsSource = profile || currentUser || {};
+  const mgmtRole = normalizeMgmtRole(permissionsSource?.role);
+  const isPrivilegedRole = mgmtRole === "owner" || mgmtRole === "admin";
+  const canMarketDiscount =
+    isPrivilegedRole || permissionsSource?.can_view_market_discount === true;
+  const canMarketEditPrice =
+    isPrivilegedRole || permissionsSource?.can_view_market_edit_price === true;
+  const canMarketDeleteCartItem =
+    isPrivilegedRole ||
+    permissionsSource?.can_view_market_delete_cart_item === true;
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     () => window.innerWidth > 768,
   );
@@ -276,6 +299,44 @@ const CashierPage = () => {
 
   const closeAlert = () => {
     setAlertModal((prev) => ({ ...prev, open: false }));
+  };
+
+  const getProductFavorite = useCallback(
+    (product) => {
+      if (!product?.id) return false;
+      if (Object.prototype.hasOwnProperty.call(favoriteOverrides, product.id)) {
+        return Boolean(favoriteOverrides[product.id]);
+      }
+      return Boolean(product?.is_favorite);
+    },
+    [favoriteOverrides],
+  );
+
+  const toggleFavorite = async (product, e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const productId = product?.id;
+    if (!productId || favoriteLoadingMap[productId]) return;
+
+    const current = getProductFavorite(product);
+    const next = !current;
+    setFavoriteLoadingMap((prev) => ({ ...prev, [productId]: true }));
+    setFavoriteOverrides((prev) => ({ ...prev, [productId]: next }));
+
+    try {
+      await api.post(`/main/products/${productId}/favorite/`, {
+        is_favorite: next,
+      });
+    } catch (error) {
+      setFavoriteOverrides((prev) => ({ ...prev, [productId]: current }));
+      showAlert(
+        "error",
+        "Ошибка",
+        "Не удалось обновить избранное. Попробуйте еще раз.",
+      );
+    } finally {
+      setFavoriteLoadingMap((prev) => ({ ...prev, [productId]: false }));
+    }
   };
 
   const handleDesktopResizeStart = (e) => {
@@ -455,6 +516,7 @@ const CashierPage = () => {
         showMenuModal ||
         showCustomerModal ||
         showDebtModal ||
+        showDeletionsLogModal ||
         showReceiptsModal ||
         showCustomServiceModal ||
         showDiscountModal
@@ -850,6 +912,14 @@ const CashierPage = () => {
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
 
       if (newQuantity === 0) {
+        if (!canMarketDeleteCartItem) {
+          showAlert(
+            "warning",
+            "Нет доступа",
+            "У вас нет доступа на удаление позиций из корзины",
+          );
+          return;
+        }
         await dispatch(
           deleteProductInCart({
             id: currentSale.id,
@@ -908,6 +978,18 @@ const CashierPage = () => {
       );
 
       if (qtyNum === 0) {
+        if (!canMarketDeleteCartItem) {
+          showAlert(
+            "warning",
+            "Нет доступа",
+            "У вас нет доступа на удаление позиций из корзины",
+          );
+          setCartQuantities((prev) => ({
+            ...prev,
+            [cartItem.id]: formatQuantity(cartItem.quantity || 0),
+          }));
+          return;
+        }
         await removeCustomFromCart(cartItem);
         return;
       }
@@ -938,6 +1020,14 @@ const CashierPage = () => {
   const removeCustomFromCart = async (cartItem) => {
     if (!currentSale?.id) return;
     if (!cartItem?.itemId) return;
+    if (!canMarketDeleteCartItem) {
+      showAlert(
+        "warning",
+        "Нет доступа",
+        "У вас нет доступа на удаление позиций из корзины",
+      );
+      return;
+    }
 
     try {
       await dispatch(
@@ -1083,6 +1173,7 @@ const CashierPage = () => {
         showOpenShiftPage ||
         showCloseShiftPage ||
         showDebtModal ||
+        showDeletionsLogModal ||
         showReceiptsModal ||
         showCustomServiceModal ||
         showDiscountModal
@@ -1189,6 +1280,7 @@ const CashierPage = () => {
     showOpenShiftPage,
     showCloseShiftPage,
     showDebtModal,
+    showDeletionsLogModal,
     showReceiptsModal,
     showCustomServiceModal,
     showDiscountModal,
@@ -1313,6 +1405,14 @@ const CashierPage = () => {
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
 
       if (newQuantity === 0) {
+        if (!canMarketDeleteCartItem) {
+          showAlert(
+            "warning",
+            "Нет доступа",
+            "У вас нет доступа на удаление позиций из корзины",
+          );
+          return;
+        }
         // Удаляем товар из корзины
         await dispatch(
           deleteProductInCart({
@@ -1428,6 +1528,18 @@ const CashierPage = () => {
       }
 
       if (qtyNum === 0) {
+        if (!canMarketDeleteCartItem) {
+          showAlert(
+            "warning",
+            "Нет доступа",
+            "У вас нет доступа на удаление позиций из корзины",
+          );
+          setCartQuantities((prev) => ({
+            ...prev,
+            [item.id]: formatQuantity(item.quantity || 0),
+          }));
+          return;
+        }
         await removeFromCart(item);
       } else {
         // Обновляем количество
@@ -1459,6 +1571,14 @@ const CashierPage = () => {
 
   const removeFromCart = async (item) => {
     if (!currentSale?.id) return;
+    if (!canMarketDeleteCartItem) {
+      showAlert(
+        "warning",
+        "Нет доступа",
+        "У вас нет доступа на удаление позиций из корзины",
+      );
+      return;
+    }
 
     try {
       if (!item?.itemId) return;
@@ -1506,6 +1626,14 @@ const CashierPage = () => {
   // Без скидки по строке — цена не может быть ниже закупочной; при наличии скидки — можно.
   const patchCartItemPrice = async (item, value) => {
     if (!currentSale?.id) return;
+    if (!canMarketEditPrice) {
+      showAlert("warning", "Нет доступа", "У вас нет доступа на изменение цены");
+      setCartPrices((prev) => ({
+        ...prev,
+        [item.id]: formatPrice(item.price ?? 0),
+      }));
+      return;
+    }
     const cartItemId = item.itemId;
     const num = normalizePrice(parseFloat(value) || 0);
     const hasDiscount = parseFloat(item.discountTotal ?? 0) > 0;
@@ -1551,6 +1679,14 @@ const CashierPage = () => {
   const patchCartItemDiscount = async (item, value, options = {}) => {
     const { mode = "amount", displayValue } = options;
     if (!currentSale?.id) return;
+    if (!canMarketDiscount) {
+      showAlert("warning", "Нет доступа", "У вас нет доступа на применение скидки");
+      setCartDiscounts((prev) => ({
+        ...prev,
+        [item.id]: formatPrice(item.discountTotal ?? 0),
+      }));
+      return;
+    }
     const cartItemId = item.itemId;
     const lineTotal = (item.price || 0) * (item.quantity || 0);
     let num = Math.max(0, normalizePrice(parseFloat(value) || 0));
@@ -1609,6 +1745,8 @@ const CashierPage = () => {
       setShowDebtModal(true);
     } else if (action === "receipts") {
       setShowReceiptsModal(true);
+    } else if (action === "deletions") {
+      setShowDeletionsLogModal(true);
     }
   };
 
@@ -1640,10 +1778,17 @@ const CashierPage = () => {
             primaryImg?.image_url ??
             el.images[0]?.image_url ??
             "/images/placeholder.avif",
+          isFavorite: getProductFavorite(el),
         };
       })
-      .filter((el) => !!el.quantity || el.isCart);
-  }, [products, currentSale]);
+      .filter((el) => !!el.quantity || el.isCart)
+      .map((el, index) => ({ ...el, __orderIndex: index }))
+      .sort((a, b) => {
+        const favDelta = Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
+        if (favDelta !== 0) return favDelta;
+        return a.__orderIndex - b.__orderIndex;
+      });
+  }, [products, currentSale, getProductFavorite]);
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
   }
@@ -1918,6 +2063,28 @@ const CashierPage = () => {
                     }`}
                     onClick={(e) => handleProductCardClick(product, e)}
                   >
+                    <button
+                      type="button"
+                      className={`cashier-page__product-favorite ${
+                        product.isFavorite
+                          ? "cashier-page__product-favorite--active"
+                          : ""
+                      }`}
+                      onClick={(e) => toggleFavorite(product, e)}
+                      disabled={Boolean(favoriteLoadingMap[product.id])}
+                      title={
+                        product.isFavorite
+                          ? "Убрать из избранного"
+                          : "Добавить в избранное"
+                      }
+                      aria-label={
+                        product.isFavorite
+                          ? "Убрать из избранного"
+                          : "Добавить в избранное"
+                      }
+                    >
+                      <Star size={16} fill="currentColor" />
+                    </button>
                     {cartItem && (
                       <div className="cashier-page__product-badge">
                         {formatQuantity(product.cartQty || 0)}
@@ -2023,27 +2190,29 @@ const CashierPage = () => {
 
           {/* Кнопки для скидки и доп. услуг */}
           <div className="cashier-page__cart-actions">
-            <button
-              className="cashier-page__cart-action-btn"
-              onClick={() => {
-                // Инициализируем модалку текущими данными
-                if (currentSale?.order_discount_percent) {
-                  setDiscountMode("percent");
-                  setDiscountValue(
-                    String(currentSale.order_discount_percent || ""),
-                  );
-                } else {
-                  setDiscountMode("amount");
-                  setDiscountValue(
-                    String(currentSale?.order_discount_total || ""),
-                  );
-                }
-                setShowDiscountModal(true);
-              }}
-              title="Добавить общую скидку"
-            >
-              Скидка
-            </button>
+            {canMarketDiscount && (
+              <button
+                className="cashier-page__cart-action-btn"
+                onClick={() => {
+                  // Инициализируем модалку текущими данными
+                  if (currentSale?.order_discount_percent) {
+                    setDiscountMode("percent");
+                    setDiscountValue(
+                      String(currentSale.order_discount_percent || ""),
+                    );
+                  } else {
+                    setDiscountMode("amount");
+                    setDiscountValue(
+                      String(currentSale?.order_discount_total || ""),
+                    );
+                  }
+                  setShowDiscountModal(true);
+                }}
+                title="Добавить общую скидку"
+              >
+                Скидка
+              </button>
+            )}
             <button
               className="cashier-page__cart-action-btn"
               onClick={() => setShowCustomServiceModal(true)}
@@ -2066,6 +2235,7 @@ const CashierPage = () => {
                         {item.salePackage ? " (поштучно)" : ""}
                       </span>
                       <div className="cashier-page__cart-item-head-right">
+                        {canMarketDiscount && (
                         <div className="cashier-page__cart-item-discount-modes">
                           <button
                             type="button"
@@ -2168,6 +2338,7 @@ const CashierPage = () => {
                             %
                           </button>
                         </div>
+                        )}
                         <span className="cashier-page__cart-item-total">
                           {item.discountTotal > 0 ? (
                             <>
@@ -2214,42 +2385,53 @@ const CashierPage = () => {
                         <span className="cashier-page__cart-item-field-label">
                           Цена
                         </span>
-                        <input
-                          type="text"
-                          className="cashier-page__cart-item-price-input"
-                          value={
-                            cartPrices[item.id] ?? formatPrice(item.price ?? 0)
-                          }
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (
-                              v === "" ||
-                              v === "-" ||
-                              /^\d*\.?\d*$/.test(v)
-                            ) {
-                              setCartPrices((prev) => ({
-                                ...prev,
-                                [item.id]: v,
-                              }));
+                        {canMarketEditPrice ? (
+                          <input
+                            type="text"
+                            className="cashier-page__cart-item-price-input"
+                            value={
+                              cartPrices[item.id] ?? formatPrice(item.price ?? 0)
                             }
-                          }}
-                          onBlur={(e) => {
-                            const v = e.target.value;
-                            const num = parseFloat(v);
-                            if (v !== "" && !isNaN(num) && num !== item.price) {
-                              patchCartItemPrice(item, v);
-                            } else {
-                              setCartPrices((prev) => ({
-                                ...prev,
-                                [item.id]: formatPrice(item.price ?? 0),
-                              }));
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") e.target.blur();
-                          }}
-                        />
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (
+                                v === "" ||
+                                v === "-" ||
+                                /^\d*\.?\d*$/.test(v)
+                              ) {
+                                setCartPrices((prev) => ({
+                                  ...prev,
+                                  [item.id]: v,
+                                }));
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const v = e.target.value;
+                              const num = parseFloat(v);
+                              if (v !== "" && !isNaN(num) && num !== item.price) {
+                                patchCartItemPrice(item, v);
+                              } else {
+                                setCartPrices((prev) => ({
+                                  ...prev,
+                                  [item.id]: formatPrice(item.price ?? 0),
+                                }));
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.target.blur();
+                            }}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className="cashier-page__cart-item-price-input"
+                            value={formatPrice(item.price ?? 0)}
+                            readOnly
+                            disabled
+                          />
+                        )}
                       </label>
+                      {canMarketDiscount && (
                       <label className="cashier-page__cart-item-field">
                         <span className="cashier-page__cart-item-field-label">
                           Скидка
@@ -2320,6 +2502,7 @@ const CashierPage = () => {
                           }}
                         />
                       </label>
+                      )}
                       <div className="cashier-page__cart-item-controls">
                         <button
                           type="button"
@@ -2492,17 +2675,19 @@ const CashierPage = () => {
                           <Plus size={14} />
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        className="cashier-page__cart-item-remove"
-                        onClick={() => {
-                          if (item.isCustom) return removeCustomFromCart(item);
-                          return removeFromCart(item);
-                        }}
-                        title="Удалить"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {canMarketDeleteCartItem && (
+                        <button
+                          type="button"
+                          className="cashier-page__cart-item-remove"
+                          onClick={() => {
+                            if (item.isCustom) return removeCustomFromCart(item);
+                            return removeFromCart(item);
+                          }}
+                          title="Удалить"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2562,6 +2747,10 @@ const CashierPage = () => {
 
       {showReceiptsModal && (
         <ReceiptsModal onClose={() => setShowReceiptsModal(false)} />
+      )}
+
+      {showDeletionsLogModal && (
+        <DeletionsLogModal onClose={() => setShowDeletionsLogModal(false)} />
       )}
 
       {showCustomServiceModal && (
