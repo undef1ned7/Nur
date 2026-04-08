@@ -2369,8 +2369,6 @@ const MarketProductForm = ({
 
   // Состояние для отслеживания, была ли цена продажи изменена вручную
   const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
-  // Состояние для отслеживания, была ли наценка изменена вручную
-  const [isMarkupManuallyChanged, setIsMarkupManuallyChanged] = useState(false);
 
   // Автоматический расчет цены продажи на основе цены закупки и наценки
   useEffect(() => {
@@ -2406,7 +2404,6 @@ const MarketProductForm = ({
     handleChange(e);
   };
   const handleMarkupFieldChange = (e) => {
-    setIsMarkupManuallyChanged(true);
     if (itemType === "product") setIsPriceManuallyChanged(false);
     handleMarketDataChange("markup", e.target.value);
   };
@@ -2417,8 +2414,8 @@ const MarketProductForm = ({
     setIsPriceManuallyChanged(true);
     handleChange(e);
 
-    // Если пользователь сам НЕ трогал наценку, считаем её из цены закупки и цены продажи
-    if (itemType === "product" && !isMarkupManuallyChanged) {
+    // При ручном вводе цены продажи всегда пересчитываем наценку.
+    if (itemType === "product") {
       const purchasePrice = parseFloat(newItemData.purchase_price) || 0;
       const sellingPrice = parseFloat(value) || 0;
 
