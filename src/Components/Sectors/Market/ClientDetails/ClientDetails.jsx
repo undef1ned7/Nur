@@ -51,6 +51,7 @@ export default function MarketClientDetails() {
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
+  const [detailsView, setDetailsView] = useState(null);
 
   const [deals, setDeals] = useState([]);
   const [dealsLoading, setDealsLoading] = useState(false);
@@ -225,6 +226,63 @@ export default function MarketClientDetails() {
     }
     return { ...agg, amount: agg.sale };
   }, [deals]);
+
+  const detailRows = useMemo(() => {
+    if (!detailsView) return [];
+
+    const resolveType = (deal) => {
+      if (detailsView === "debt") return deal.kind === "debt";
+      if (detailsView === "prepayment") {
+        return deal.kind === "prepayment" || Number(deal.prepayment || 0) > 0;
+      }
+      return deal.kind === "sale";
+    };
+
+    return deals
+      .filter(resolveType)
+      .map((deal) => {
+        const date = toIsoDate10(deal.date || deal.created_at || deal.updated_at) || "—";
+        let amount = Number(deal.amount || 0);
+
+        if (detailsView === "debt") amount = Number(deal.remaining_debt || 0);
+        if (detailsView === "prepayment") {
+          amount =
+            deal.kind === "prepayment"
+              ? Number(deal.amount || 0)
+              : Number(deal.prepayment || 0);
+        }
+
+        return {
+          id: deal.id,
+          title: deal.title || "Без названия",
+          date,
+          amount,
+        };
+      })
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+  }, [deals, detailsView]);
+
+  const detailsMeta = useMemo(() => {
+    if (detailsView === "debt") {
+      return {
+        title: sectorName === "Строительная компания" ? "Сумма договора" : "Долг",
+        total:
+          sectorName === "Строительная компания"
+            ? Number(totals.sale || 0)
+            : Number(totals.debt || 0),
+      };
+    }
+    if (detailsView === "prepayment") {
+      return { title: sectorName === "Строительная компания" ? "Предоплата" : "Аванс", total: Number(totals.prepayment || 0) };
+    }
+    return {
+      title: sectorName === "Строительная компания" ? "Остаток долга" : "Продажа",
+      total:
+        sectorName === "Строительная компания"
+          ? Number(totals.debt || 0)
+          : Number(totals.sale || 0),
+    };
+  }, [detailsView, sectorName, totals.debt, totals.prepayment, totals.sale]);
 
   const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -439,7 +497,11 @@ export default function MarketClientDetails() {
           </div>
 
           <div className="client-details__stats debts-wrapper">
-            <div className="client-details__stat-card client-details__stat-card--red debts debts--red">
+            <button
+              type="button"
+              className="client-details__stat-card client-details__stat-card--red debts debts--red client-details__stat-card--clickable"
+              onClick={() => setDetailsView("debt")}
+            >
               <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Сумма договора"
@@ -451,9 +513,13 @@ export default function MarketClientDetails() {
                   : (totals.debt ?? 0).toFixed(2)}
                 <span className="client-details__stat-currency">сом</span>
               </div>
-            </div>
+            </button>
 
-            <div className="client-details__stat-card client-details__stat-card--green debts debts--green">
+            <button
+              type="button"
+              className="client-details__stat-card client-details__stat-card--green debts debts--green client-details__stat-card--clickable"
+              onClick={() => setDetailsView("prepayment")}
+            >
               <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Предоплата"
@@ -463,9 +529,13 @@ export default function MarketClientDetails() {
                 {(totals.prepayment ?? 0).toFixed(2)}
                 <span className="client-details__stat-currency">сом</span>
               </div>
-            </div>
+            </button>
 
-            <div className="client-details__stat-card client-details__stat-card--orange debts debts--orange">
+            <button
+              type="button"
+              className="client-details__stat-card client-details__stat-card--orange debts debts--orange client-details__stat-card--clickable"
+              onClick={() => setDetailsView("sale")}
+            >
               <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Остаток долга"
@@ -477,7 +547,7 @@ export default function MarketClientDetails() {
                   : (totals.sale ?? 0).toFixed(2)}
                 <span className="client-details__stat-currency">сом</span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -667,6 +737,38 @@ export default function MarketClientDetails() {
         clientId={client?.id}
         onClose={() => setShowReconciliation(false)}
       />
+
+      {detailsView && (
+        <div className="client-details__details-modal-overlay" onClick={() => setDetailsView(null)}>
+          <div className="client-details__details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="client-details__details-modal-header">
+              <h3 className="client-details__details-modal-title">{detailsMeta.title}</h3>
+              <button
+                type="button"
+                className="client-details__details-modal-close"
+                onClick={() => setDetailsView(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="client-details__details-modal-total">
+              Итого: <b>{detailsMeta.total.toFixed(2)} сом</b>
+            </div>
+            <div className="client-details__details-modal-list">
+              {detailRows.length === 0 && (
+                <div className="client-details__details-modal-empty">Нет данных по выбранной категории</div>
+              )}
+              {detailRows.map((row) => (
+                <div key={row.id} className="client-details__details-modal-row">
+                  <div className="client-details__details-modal-what">{row.title}</div>
+                  <div className="client-details__details-modal-when">{row.date}</div>
+                  <div className="client-details__details-modal-howmuch">{row.amount.toFixed(2)} сом</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <AlertModal
         open={alert.open}

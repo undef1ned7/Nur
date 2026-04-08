@@ -317,6 +317,18 @@
   }
 }
 
+.client-details__stat-card--clickable {
+  cursor: pointer;
+  text-align: left;
+  border: 2px solid transparent;
+  font-family: inherit;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.2);
+  }
+}
+
 .client-details__stat-title {
   font-size: 13px;
   font-weight: 600;
@@ -1787,6 +1799,101 @@
       transform: translateY(-1px);
     }
   }
+}
+
+/* ===== Details by Stat Modal ===== */
+.client-details__details-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.client-details__details-modal {
+  width: 720px;
+  max-width: 96vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.client-details__details-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.client-details__details-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.client-details__details-modal-close {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.client-details__details-modal-total {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.client-details__details-modal-list {
+  padding: 8px 14px 14px;
+  overflow: auto;
+}
+
+.client-details__details-modal-row {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 0.8fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.client-details__details-modal-what {
+  font-weight: 700;
+}
+
+.client-details__details-modal-when {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.client-details__details-modal-howmuch {
+  text-align: right;
+  font-weight: 800;
+}
+
+.client-details__details-modal-empty {
+  padding: 18px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 /* ===== Responsive Modal Styles ===== */
