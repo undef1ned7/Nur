@@ -47,12 +47,26 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
     },
   ];
   
-  const SECTOR_ACCESS_TYPES = {
-    Магазин: [
+  const MARKET_ACCESS_TYPES = [
       {
         value: "Интерфейс кассира",
         label: "Интерфейс кассира",
         backendKey: "can_view_cashier",
+      },
+      {
+        value: "Скидка в кассе",
+        label: "Скидка в кассе",
+        backendKey: "can_view_market_discount",
+      },
+      {
+        value: "Изменение цены в кассе",
+        label: "Изменение цены в кассе",
+        backendKey: "can_view_market_edit_price",
+      },
+      {
+        value: "Удаление позиций из корзины",
+        label: "Удаление позиций из корзины",
+        backendKey: "can_view_market_delete_cart_item",
       },
       {
         value: "Смены",
@@ -64,7 +78,11 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         label: "Документы",
         backendKey: "can_view_document",
       },
-    ],
+    ];
+
+  const SECTOR_ACCESS_TYPES = {
+    Магазин: MARKET_ACCESS_TYPES,
+    Маркет: MARKET_ACCESS_TYPES,
     Барбершоп: [
       {
         value: "Клиенты Барбершопа",

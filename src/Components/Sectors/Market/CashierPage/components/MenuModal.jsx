@@ -1,5 +1,5 @@
 import React from "react";
-import { X, DollarSign, Receipt, Calendar } from "lucide-react";
+import { X, DollarSign, Receipt, History } from "lucide-react";
 import "./MenuModal.scss";
 
 const MenuModal = ({ onClose, onAction }) => {
@@ -13,6 +13,11 @@ const MenuModal = ({ onClose, onAction }) => {
       id: "receipts",
       icon: Receipt,
       label: "Журнал чеков",
+    },
+    {
+      id: "deletions",
+      icon: History,
+      label: "Журнал удалений",
     },
   ];
 
