@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   useNavigate,
@@ -41,6 +41,7 @@ import { getEmployees } from "../../../../store/creators/departmentCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -229,7 +230,7 @@ const CreateSaleDocument = () => {
         : "SALE";
 
   const [productSearch, setProductSearch] = useState("");
-  const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
+  const debouncedProductSearch = useDebouncedValue(productSearch, 300);
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
   const [addingProduct, setAddingProduct] = useState(false);
 
@@ -287,7 +288,6 @@ const CreateSaleDocument = () => {
   // Путь к списку документов текущего типа (продажи, покупки и т.д.)
   const documentsListPath = `/crm/warehouse/documents/${(docType || "SALE").toLowerCase()}`;
 
-  const debounceTimerRef = useRef(null);
   const warehouseRef = useRef(warehouse);
 
   useEffect(() => {
@@ -604,21 +604,6 @@ const CreateSaleDocument = () => {
     }
   }, [docType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Debounce для поиска товаров
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      setDebouncedProductSearch(productSearch);
-    }, 300);
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [productSearch]);
-
   useEffect(() => {
     if (!warehouse) {
       setGroups([]);
@@ -715,7 +700,7 @@ const CreateSaleDocument = () => {
     });
   };
 
-  const loadProductsForGroup = async (groupKey, groupIdOrNull) => {
+  const loadProductsForGroup = useCallback(async (groupKey, groupIdOrNull) => {
     if (!warehouse) return;
     const requestWarehouse = warehouse;
     const key = String(groupKey);
@@ -782,7 +767,26 @@ const CreateSaleDocument = () => {
         },
       }));
     }
-  };
+  }, [warehouse, debouncedProductSearch, dispatch]);
+
+  // При изменении строки поиска обновляем уже раскрытые группы автоматически.
+  useEffect(() => {
+    if (!warehouse) return;
+    const expandedKeys = Array.from(expandedGroupIds || []);
+    expandedKeys.forEach((k) => {
+      const key = String(k);
+      const entry = groupProducts?.[key];
+      const isStale = (entry?.search || "") !== (debouncedProductSearch || "");
+      if (!isStale) return;
+      loadProductsForGroup(key, key === "all" ? null : key);
+    });
+  }, [
+    warehouse,
+    expandedGroupIds,
+    groupProducts,
+    debouncedProductSearch,
+    loadProductsForGroup,
+  ]);
 
   const renderGroupTree = (parentId, depth = 0) => {
     const key = parentId == null ? "root" : String(parentId);
@@ -1458,10 +1462,12 @@ const CreateSaleDocument = () => {
 
   // Определяем, требуется ли контрагент для текущего типа документа
   const isCounterpartyRequired = useMemo(() => {
-    return ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(
-      docType,
-    );
-  }, [docType]);
+    // Для SALE контрагент обязателен только при продаже в долг.
+    if (docType === "SALE") {
+      return paymentKind === "credit";
+    }
+    return ["SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
+  }, [docType, paymentKind]);
 
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
@@ -1971,7 +1977,7 @@ const CreateSaleDocument = () => {
         }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
-        ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
+        ...(clientId && { counterparty: clientId }),
         ...(isAgentFilterRelevant && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
@@ -2112,7 +2118,7 @@ const CreateSaleDocument = () => {
         }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
-        ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
+        ...(clientId && { counterparty: clientId }),
         ...(isAgentFilterRelevant && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
@@ -2936,7 +2942,7 @@ const CreateSaleDocument = () => {
                       className="create-sale-document__field-icon"
                     />
                     <div className="create-sale-document__field-inner">
-                      <label>Контрагент *</label>
+                      <label>Контрагент{isCounterpartyRequired ? " *" : ""}</label>
                       <SearchSelect
                         value={clientId}
                         onChange={(v) => setClientId(String(v || ""))}
@@ -3136,7 +3142,7 @@ const CreateSaleDocument = () => {
                       (acc, it) => acc + Number(it.quantity || 0),
                       0,
                     )}{" "}
-                    шт
+                    ед.
                   </span>
                 </div>
                 <div className="create-sale-document__summary-row">
