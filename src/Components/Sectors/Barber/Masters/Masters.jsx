@@ -292,7 +292,9 @@ const Masters = () => {
   const [warehouseAgentWarehousesLoading, setWarehouseAgentWarehousesLoading] =
     useState(false);
 
-  const isCafeSector = company?.sector?.name === "Кафе";
+  const sectorName = String(company?.sector?.name || "").trim();
+  const isCafeSector = sectorName === "Кафе";
+  const isMarketSector = sectorName === "Маркет" || sectorName === "Магазин";
 
   const copyToClipboard = async (text, key) => {
     if (!text) return;
@@ -1089,26 +1091,29 @@ const Masters = () => {
                   : u.role_display || "—";
               const cafeOpenDetail =
                 isCafeSector && u.role !== "owner";
+              const marketOpenDetail =
+                isMarketSector && u.role !== "owner";
+              const openDetail = cafeOpenDetail || marketOpenDetail;
               return (
                 <article key={u.id} className="barbermasters__card">
                   <div
                     className={`barbermasters__cardLeft${
-                      cafeOpenDetail ? " barbermasters__cardLeft--clickable" : ""
+                      openDetail ? " barbermasters__cardLeft--clickable" : ""
                     }`}
-                    role={cafeOpenDetail ? "button" : undefined}
-                    tabIndex={cafeOpenDetail ? 0 : undefined}
+                    role={openDetail ? "button" : undefined}
+                    tabIndex={openDetail ? 0 : undefined}
                     title={
-                      cafeOpenDetail
+                      openDetail
                         ? "Карточка сотрудника: зарплата, доступы, редактирование"
                         : undefined
                     }
                     onClick={
-                      cafeOpenDetail
+                      openDetail
                         ? () => navigate(`/crm/employ/${u.id}`)
                         : undefined
                     }
                     onKeyDown={
-                      cafeOpenDetail
+                      openDetail
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
