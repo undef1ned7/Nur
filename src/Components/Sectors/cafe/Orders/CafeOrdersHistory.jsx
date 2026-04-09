@@ -658,6 +658,12 @@ const CafeOrderHistory = () => {
                   : t?.number || "—";
 
               const items = Array.isArray(o.items) ? o.items : [];
+              const isFullyRefunded =
+                items.length > 0 &&
+                items.every((it) => {
+                  const qty = Math.max(0, Math.floor(Number(it?.quantity) || 0));
+                  return qty > 0 && itemNetQty(it) <= 0;
+                });
               const expanded = expandedOrders.has(String(o.id));
               const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
               const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
@@ -677,7 +683,12 @@ const CafeOrderHistory = () => {
                     <div className="cafeOrders__receiptTable">
                       {tableLabel === "С собой" ? "С собой" : `СТОЛ ${tableLabel}`}
                     </div>
-                    {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
+                    <div className="cafeOrders__receiptHeadMeta">
+                      {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
+                      {isFullyRefunded ? (
+                        <div className="cafeOrders__receiptRefundBadge">Возврат</div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="cafeOrders__receiptDivider" />

@@ -368,7 +368,15 @@ const normalizeRejectionRows = (data) => {
 };
 
 const normalizeExpensesBlock = (data) => {
-  if (!data) return { total: 0, count: 0, categories: [] };
+  if (!data)
+    return {
+      total: 0,
+      count: 0,
+      categories: [],
+      items: [],
+      expenses_by_day: [],
+      other_expenses_section: { items: [], expenses_by_day: [] },
+    };
   if (Array.isArray(data)) {
     const categories = data.map((x, idx) => ({
       _id: x.category ?? x.id ?? idx,
@@ -385,6 +393,9 @@ const normalizeExpensesBlock = (data) => {
       total: sumBy(categories, "amount"),
       count: categories.reduce((a, c) => a + toNum(c.count), 0) || categories.length,
       categories,
+      items: [],
+      expenses_by_day: [],
+      other_expenses_section: { items: [], expenses_by_day: [] },
     };
   }
   const total = toNum(
@@ -407,10 +418,102 @@ const normalizeExpensesBlock = (data) => {
     count: toNum(x.count ?? x.expenses_count ?? 1),
   }));
   const catSum = sumBy(categories, "amount");
+  const items = apiListPayload(data.items);
+  const expensesByDay = apiListPayload(data.expenses_by_day);
+  const otherSection =
+    data.other_expenses_section && typeof data.other_expenses_section === "object"
+      ? {
+          ...data.other_expenses_section,
+          items: apiListPayload(data.other_expenses_section.items),
+          expenses_by_day: apiListPayload(data.other_expenses_section.expenses_by_day),
+        }
+      : { items: [], expenses_by_day: [] };
+
   return {
     total: total || catSum,
     count: count || categories.reduce((a, c) => a + toNum(c.count), 0),
     categories,
+    items,
+    expenses_by_day: expensesByDay,
+    other_expenses_section: otherSection,
+  };
+};
+
+const normalizeFinanceList = (data, key) => {
+  if (!data || typeof data !== "object") return [];
+  if (Array.isArray(data[key])) return data[key];
+  return apiListPayload(data[key]);
+};
+
+const normalizeFinanceBlock = (data) => {
+  const payload = data && typeof data === "object" ? data : {};
+  const cards = payload.cards && typeof payload.cards === "object" ? payload.cards : payload;
+  const incomeBreakdown = normalizeFinanceList(payload, "income_breakdown");
+  const incomeItems = normalizeFinanceList(payload, "income_items");
+  const purchaseItems = normalizeFinanceList(payload, "purchase_items");
+  const refundItems = normalizeFinanceList(payload, "refund_items");
+  const refundsByMethod = normalizeFinanceList(payload, "refunds_by_method");
+  const otherExpensesSection =
+    payload.other_expenses_section && typeof payload.other_expenses_section === "object"
+      ? payload.other_expenses_section
+      : {};
+  const otherExpensesItems =
+    normalizeFinanceList(otherExpensesSection, "items").length > 0
+      ? normalizeFinanceList(otherExpensesSection, "items")
+      : normalizeFinanceList(payload, "other_expenses_items");
+  const expensesByDay =
+    normalizeFinanceList(otherExpensesSection, "expenses_by_day").length > 0
+      ? normalizeFinanceList(otherExpensesSection, "expenses_by_day")
+      : normalizeFinanceList(payload, "expenses_by_day");
+  const refundsTotal = toNum(
+    payload.refunds_total ??
+      cards.refunds_total ??
+      refundItems.reduce((a, x) => a + toNum(x?.amount ?? x?.refund_amount), 0)
+  );
+  const otherExpensesTotal = toNum(
+    cards.other_expenses_sum ??
+      cards.other_expenses_total ??
+      otherExpensesSection.total ??
+      otherExpensesSection.total_amount ??
+      otherExpensesItems.reduce((a, x) => a + toNum(x?.amount ?? x?.sum), 0)
+  );
+  const purchasesTotal = toNum(
+    cards.purchases_sum ??
+      cards.purchases_total ??
+      purchaseItems.reduce((a, x) => a + toNum(x?.amount ?? x?.sum), 0)
+  );
+  const cogsSold = toNum(cards.cogs_sold ?? cards.cogs ?? payload.cogs_sold);
+  const revenue = toNum(cards.revenue ?? payload.revenue);
+  const grossProfit = toNum(cards.gross_profit ?? payload.gross_profit);
+  const marginPercent = toNum(cards.margin_percent ?? payload.margin_percent);
+  const netProfit = toNum(
+    cards.net_profit ?? grossProfit - (otherExpensesTotal || 0)
+  );
+
+  return {
+    cards: {
+      revenue,
+      cogs_sold: cogsSold,
+      gross_profit: grossProfit,
+      margin_percent: marginPercent,
+      purchases_total: purchasesTotal,
+      purchases_count: toNum(cards.purchases_count),
+      other_expenses_total: otherExpensesTotal,
+      other_expenses_count: toNum(cards.other_expenses_count),
+      refunds_total: refundsTotal,
+      net_profit: netProfit,
+    },
+    income_breakdown: incomeBreakdown,
+    income_items: incomeItems,
+    purchase_items: purchaseItems,
+    refund_items: refundItems,
+    refunds_by_method: refundsByMethod,
+    refunds_total: refundsTotal,
+    other_expenses_section: {
+      items: otherExpensesItems,
+      expenses_by_day: expensesByDay,
+      total: otherExpensesTotal,
+    },
   };
 };
 
@@ -505,9 +608,31 @@ const CafeAnalytics = () => {
     total: 0,
     count: 0,
     categories: [],
+    items: [],
+    expenses_by_day: [],
+    other_expenses_section: { items: [], expenses_by_day: [] },
   });
   const [debtRows, setDebtRows] = useState([]);
   const [waiterSalaryRows, setWaiterSalaryRows] = useState([]);
+  const [financeBlock, setFinanceBlock] = useState({
+    cards: {
+      revenue: 0,
+      cogs_sold: 0,
+      gross_profit: 0,
+      margin_percent: 0,
+      purchases_total: 0,
+      other_expenses_total: 0,
+      refunds_total: 0,
+      net_profit: 0,
+    },
+    income_breakdown: [],
+    income_items: [],
+    purchase_items: [],
+    refund_items: [],
+    refunds_by_method: [],
+    refunds_total: 0,
+    other_expenses_section: { items: [], expenses_by_day: [], total: 0 },
+  });
 
   // modal
   const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters | payment_inflow | rejections | expenses | debts | salary_waiters
@@ -616,6 +741,18 @@ const CafeAnalytics = () => {
         ? Promise.resolve({ data: null })
         : api.get("/cafe/analytics/waiter-salary/", { params }).catch(() => ({ data: null }));
 
+      const financeReq = api
+        .get("/cafe/analytics/finance/", { params })
+        .catch(async () => {
+          try {
+            return await api.get("/cafe/analytics/unified/", {
+              params: { ...params, tab: "finance" },
+            });
+          } catch {
+            return { data: null };
+          }
+        });
+
       const [
         rSalesSummary,
         rSalesItems,
@@ -626,6 +763,7 @@ const CafeAnalytics = () => {
         rExpenses,
         rDebts,
         rSalary,
+        rFinance,
       ] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
@@ -635,9 +773,14 @@ const CafeAnalytics = () => {
         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
         api.get("/cafe/analytics/revenue-inflow/", { params }).catch(() => ({ data: null })),
         api.get("/cafe/analytics/rejections/", { params }).catch(() => ({ data: null })),
-        api.get("/cafe/analytics/expenses/summary/", { params }).catch(() => ({ data: null })),
+        api
+          .get("/cafe/analytics/expenses/summary/", {
+            params: { ...params, limit: 500 },
+          })
+          .catch(() => ({ data: null })),
         api.get("/cafe/analytics/debts/", { params }).catch(() => ({ data: null })),
         salaryReq,
+        financeReq,
       ]);
 
       setSalesSummary(rSalesSummary?.data || { orders_count: 0, items_qty: 0, revenue: "0.00" });
@@ -651,6 +794,7 @@ const CafeAnalytics = () => {
       setRejectionRows(normalizeRejectionRows(rRejections?.data));
       setExpensesBlock(normalizeExpensesBlock(rExpenses?.data));
       setDebtRows(normalizeDebtRows(rDebts?.data));
+      setFinanceBlock(normalizeFinanceBlock(rFinance?.data));
       setWaiterSalaryRows(
         hideKitchenStaffKpi ? [] : normalizeWaiterSalaryRows(rSalary?.data)
       );
@@ -670,8 +814,16 @@ const CafeAnalytics = () => {
       setLowStock([]);
       setRevenueInflowRows([]);
       setRejectionRows([]);
-      setExpensesBlock({ total: 0, count: 0, categories: [] });
+      setExpensesBlock({
+        total: 0,
+        count: 0,
+        categories: [],
+        items: [],
+        expenses_by_day: [],
+        other_expenses_section: { items: [], expenses_by_day: [] },
+      });
       setDebtRows([]);
+      setFinanceBlock(normalizeFinanceBlock(null));
       setWaiterSalaryRows([]);
     } finally {
       setLoading(false);
@@ -815,6 +967,10 @@ const CafeAnalytics = () => {
     () => sumBy(waiterSalaryRows, "total"),
     [waiterSalaryRows]
   );
+  const financeCards = useMemo(
+    () => financeBlock?.cards || {},
+    [financeBlock]
+  );
 
   const openModal = (key) => {
     setModalKey(key);
@@ -851,6 +1007,7 @@ const CafeAnalytics = () => {
     if (modalKey === "expenses") return "Операционные расходы";
     if (modalKey === "debts") return "Открытые долги";
     if (modalKey === "salary_waiters") return "Зарплата официантов (расчёт)";
+    if (modalKey === "finance") return "Финансы";
     return "";
   }, [modalKey]);
 
@@ -1171,6 +1328,25 @@ const CafeAnalytics = () => {
           <button
             className="cafeAnalytics__mini"
             type="button"
+            onClick={() => openModal("finance")}
+          >
+            <div className="cafeAnalytics__miniTop">
+              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
+                <FaCoins />
+              </div>
+              <div className="cafeAnalytics__miniLabel">Финансы</div>
+            </div>
+            <div className="cafeAnalytics__miniValue">
+              {fmtMoney(toNum(financeCards.net_profit))}
+            </div>
+            <div className="cafeAnalytics__miniMeta">
+              Чистая прибыль · маржа {toNum(financeCards.margin_percent).toFixed(1)}%
+            </div>
+          </button>
+
+          <button
+            className="cafeAnalytics__mini"
+            type="button"
             onClick={() => openModal("debts")}
           >
             <div className="cafeAnalytics__miniTop">
@@ -1383,6 +1559,7 @@ const CafeAnalytics = () => {
           expensesBlock={expensesBlock}
           debtRows={debtRows}
           waiterSalaryRows={waiterSalaryRows}
+          financeBlock={financeBlock}
         />
       </CafeAnalyticsModal>
     </section>

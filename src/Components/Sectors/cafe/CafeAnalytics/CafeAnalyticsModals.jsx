@@ -135,6 +135,16 @@ const CafeAnalyticsModalContent = ({
   expensesBlock = { total: 0, count: 0, categories: [] },
   debtRows = [],
   waiterSalaryRows = [],
+  financeBlock = {
+    cards: {},
+    income_breakdown: [],
+    income_items: [],
+    purchase_items: [],
+    refund_items: [],
+    refunds_by_method: [],
+    refunds_total: 0,
+    other_expenses_section: { items: [], expenses_by_day: [], total: 0 },
+  },
 }) => {
   const [expandedGuestId, setExpandedGuestId] = useState(null);
   const [salaryQ, setSalaryQ] = useState("");
@@ -195,7 +205,7 @@ const CafeAnalyticsModalContent = ({
 
         <div className="cafeAnalytics__modalBlock">
           <div className="cafeAnalytics__modalBlockTitle">Топ блюд по выручке</div>
-          <div className="cafeAnalytics__modalTableWrap">
+          <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
             <table className="cafeAnalytics__modalTable">
               <thead>
                 <tr>
@@ -332,7 +342,7 @@ const CafeAnalyticsModalContent = ({
               <FaDownload /> Экспорт PDF
             </button>
           </div>
-          <div className="cafeAnalytics__modalTableWrap">
+          <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
             <table className="cafeAnalytics__modalTable">
               <thead>
                 <tr>
@@ -502,7 +512,7 @@ const CafeAnalyticsModalContent = ({
       <div className="cafeAnalytics__modalContent">
         <div className="cafeAnalytics__modalBlock">
           <div className="cafeAnalytics__modalBlockTitle">Позиции ниже минимума</div>
-          <div className="cafeAnalytics__modalTableWrap">
+          <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
             <table className="cafeAnalytics__modalTable">
               <thead>
                 <tr>
@@ -778,7 +788,7 @@ const CafeAnalyticsModalContent = ({
         {cats.length > 0 && (
           <div className="cafeAnalytics__modalBlock">
             <div className="cafeAnalytics__modalBlockTitle">По категориям / статьям</div>
-            <div className="cafeAnalytics__modalTableWrap">
+            <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
               <table className="cafeAnalytics__modalTable">
                 <thead>
                   <tr>
@@ -1029,6 +1039,305 @@ const CafeAnalyticsModalContent = ({
             {exportLoading ? "Экспорт..." : "Скачать файл"}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (modalKey === "finance") {
+    const cards = financeBlock?.cards || {};
+    const incomeBreakdown = Array.isArray(financeBlock?.income_breakdown)
+      ? financeBlock.income_breakdown
+      : [];
+    const incomeItems = Array.isArray(financeBlock?.income_items)
+      ? financeBlock.income_items
+      : [];
+    const purchaseItems = Array.isArray(financeBlock?.purchase_items)
+      ? financeBlock.purchase_items
+      : [];
+    const refundItems = Array.isArray(financeBlock?.refund_items)
+      ? financeBlock.refund_items
+      : [];
+    const refundsByMethod = Array.isArray(financeBlock?.refunds_by_method)
+      ? financeBlock.refunds_by_method
+      : [];
+    const otherExpenses = financeBlock?.other_expenses_section || {};
+    const otherExpenseItems = Array.isArray(otherExpenses?.items)
+      ? otherExpenses.items
+      : [];
+    const expensesByDay = Array.isArray(otherExpenses?.expenses_by_day)
+      ? otherExpenses.expenses_by_day
+      : [];
+
+    return (
+      <div className="cafeAnalytics__modalContent">
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--4">
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Выручка</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(cards.revenue))}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">COGS проданного</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(cards.cogs_sold))}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Валовая прибыль</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(cards.gross_profit))}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Маржа</div>
+            <div className="cafeAnalytics__modalKVal">{toNum(cards.margin_percent).toFixed(2)}%</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Закупки</div>
+            <div className="cafeAnalytics__modalKVal">
+              {fmtMoney(toNum(cards.purchases_total))}
+              {toNum(cards.purchases_count) > 0 ? ` · ${fmtInt(cards.purchases_count)}` : ""}
+            </div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Прочие расходы</div>
+            <div className="cafeAnalytics__modalKVal">
+              {fmtMoney(toNum(cards.other_expenses_total))}
+              {toNum(cards.other_expenses_count) > 0
+                ? ` · ${fmtInt(cards.other_expenses_count)}`
+                : ""}
+            </div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Возвраты</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(cards.refunds_total))}</div>
+          </div>
+          <div className="cafeAnalytics__modalKpi">
+            <div className="cafeAnalytics__modalKLabel">Чистая прибыль</div>
+            <div className="cafeAnalytics__modalKVal">{fmtMoney(toNum(cards.net_profit))}</div>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">Доходы по методам</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Метод</th>
+                  <th>Сумма</th>
+                  <th>Операций</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incomeBreakdown.map((x, idx) => (
+                  <tr key={`${x.method || x.payment_method || "m"}_${idx}`}>
+                    <td className="cafeAnalytics__modalTdTitle">
+                      {x.method_label || x.label || x.payment_method_label || x.payment_method || x.method || "—"}
+                    </td>
+                    <td>{fmtMoney(toNum(x.total ?? x.amount ?? x.sum))}</td>
+                    <td>{fmtInt(toNum(x.count ?? x.orders_count ?? x.transactions ?? 0))}</td>
+                  </tr>
+                ))}
+                {!incomeBreakdown.length && (
+                  <tr>
+                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                      Нет данных за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">Прочие расходы (детали)</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Статья</th>
+                  <th>Сумма</th>
+                  <th>Дата</th>
+                </tr>
+              </thead>
+              <tbody>
+                {otherExpenseItems.map((x, idx) => (
+                  <tr key={`${x.id || x.expense_id || "e"}_${idx}`}>
+                    <td className="cafeAnalytics__modalTdTitle">{x.title || x.category || x.name || "—"}</td>
+                    <td>{fmtMoney(toNum(x.amount ?? x.sum ?? x.total))}</td>
+                    <td>{fmtDateTime(x.created_at || x.date)}</td>
+                  </tr>
+                ))}
+                {!otherExpenseItems.length && (
+                  <tr>
+                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                      Нет прочих расходов за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">Прочие расходы по дням</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expensesByDay.map((x, idx) => (
+                  <tr key={`${x.date || x.day || "d"}_${idx}`}>
+                    <td className="cafeAnalytics__modalTdTitle">{x.date || x.day || "—"}</td>
+                    <td>{fmtMoney(toNum(x.amount ?? x.sum ?? x.total))}</td>
+                  </tr>
+                ))}
+                {!expensesByDay.length && (
+                  <tr>
+                    <td colSpan={2} className="cafeAnalytics__modalEmpty">
+                      Нет данных по дням.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
+          <div className="cafeAnalytics__modalBlock">
+            <div className="cafeAnalytics__modalBlockTitle">Закупки</div>
+            <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
+              <table className="cafeAnalytics__modalTable">
+                <thead>
+                  <tr>
+                    <th>Позиция</th>
+                    <th>Сумма</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchaseItems.map((x, idx) => (
+                    <tr key={`${x.id || "p"}_${idx}`}>
+                      <td className="cafeAnalytics__modalTdTitle">{x.title || x.name || x.item || "—"}</td>
+                      <td>{fmtMoney(toNum(x.amount ?? x.sum ?? x.total))}</td>
+                      <td>{fmtDateTime(x.created_at || x.date)}</td>
+                    </tr>
+                  ))}
+                  {!purchaseItems.length && (
+                    <tr>
+                      <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                        Нет закупок за период.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="cafeAnalytics__modalBlock">
+            <div className="cafeAnalytics__modalBlockTitle">Возвраты</div>
+            <div className="cafeAnalytics__modalTableWrap">
+              <table className="cafeAnalytics__modalTable">
+                <thead>
+                  <tr>
+                    <th>Позиция</th>
+                    <th>Сумма</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {refundItems.map((x, idx) => (
+                    <tr key={`${x.id || "r"}_${idx}`}>
+                      <td className="cafeAnalytics__modalTdTitle">{x.title || x.name || x.item || "—"}</td>
+                      <td>{fmtMoney(toNum(x.amount ?? x.sum ?? x.total))}</td>
+                      <td>{fmtDateTime(x.refunded_at || x.created_at || x.date)}</td>
+                    </tr>
+                  ))}
+                  {!refundItems.length && (
+                    <tr>
+                      <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                        Нет возвратов за период.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {(incomeItems.length > 0 || refundsByMethod.length > 0) && (
+          <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
+            <div className="cafeAnalytics__modalBlock">
+              <div className="cafeAnalytics__modalBlockTitle">Приходы (операции)</div>
+              <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
+                <table className="cafeAnalytics__modalTable">
+                  <thead>
+                    <tr>
+                      <th>Источник</th>
+                      <th>Сумма</th>
+                      <th>Дата</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incomeItems.map((x, idx) => (
+                      <tr key={`${x.id || "i"}_${idx}`}>
+                        <td className="cafeAnalytics__modalTdTitle">
+                          {x.payment_method_label || x.title || x.name || x.payment_method || x.method || "—"}
+                        </td>
+                        <td>{fmtMoney(toNum(x.amount ?? x.total ?? x.sum))}</td>
+                        <td>{fmtDateTime(x.paid_at || x.created_at || x.date)}</td>
+                      </tr>
+                    ))}
+                    {!incomeItems.length && (
+                      <tr>
+                        <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                          Нет данных.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="cafeAnalytics__modalBlock">
+              <div className="cafeAnalytics__modalBlockTitle">Возвраты по способам</div>
+              <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
+                <table className="cafeAnalytics__modalTable">
+                  <thead>
+                    <tr>
+                      <th>Способ</th>
+                      <th>Сумма</th>
+                      <th>Операций</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {refundsByMethod.map((x, idx) => (
+                      <tr key={`${x.method || x.payment_method || "rm"}_${idx}`}>
+                        <td className="cafeAnalytics__modalTdTitle">
+                          {x.method_label || x.label || x.payment_method_label || x.payment_method || x.method || "—"}
+                        </td>
+                        <td>{fmtMoney(toNum(x.total ?? x.amount ?? x.sum))}</td>
+                        <td>{fmtInt(toNum(x.count ?? x.orders_count ?? x.transactions ?? 0))}</td>
+                      </tr>
+                    ))}
+                    {!refundsByMethod.length && (
+                      <tr>
+                        <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                          Нет данных.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

@@ -60,6 +60,7 @@ const Analytics = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [openProductTable, setOpenProductTable] = useState("topByRevenue");
   const [openFinanceTable, setOpenFinanceTable] = useState("expenseBreakdown");
+  const [salaryAnalyticsRows, setSalaryAnalyticsRows] = useState([]);
   /** Вкладка «Сотрудники»: раскрытый tr с product_names / sold_products */
   const [expandedUserPerformanceId, setExpandedUserPerformanceId] =
     useState(null);
@@ -229,9 +230,36 @@ const Analytics = () => {
 
         const response = await api.get("/main/analytics/market/", { params });
         setAnalyticsData(response.data);
+        if (tab === "finance") {
+          try {
+            const salaryParams = {
+              tab: "salary",
+              period_start: formatDateForAPI(period.from, false),
+              period_end: formatDateForAPI(period.to, false),
+            };
+            if (filters.branch) {
+              salaryParams.branch = filters.branch;
+              if (filters.include_global) salaryParams.include_global = "1";
+            }
+            const salaryResponse = await api.get("/main/analytics/market/", {
+              params: salaryParams,
+            });
+            setSalaryAnalyticsRows(
+              Array.isArray(salaryResponse?.data?.rows)
+                ? salaryResponse.data.rows
+                : [],
+            );
+          } catch (salaryErr) {
+            console.error("Ошибка при загрузке salary-аналитики:", salaryErr);
+            setSalaryAnalyticsRows([]);
+          }
+        } else {
+          setSalaryAnalyticsRows([]);
+        }
       } catch (err) {
         console.error("Ошибка при загрузке аналитики:", err);
         setError(err.response?.data?.detail || "Ошибка при загрузке данных");
+        setSalaryAnalyticsRows([]);
       } finally {
         setLoading(false);
       }
@@ -1013,6 +1041,7 @@ const Analytics = () => {
         incomeBreakdown: [],
         expenseItems: [],
         incomeItems: [],
+        salaryRows: [],
       };
     }
 
@@ -1055,8 +1084,9 @@ const Analytics = () => {
       incomeBreakdown: tables.income_breakdown || [],
       expenseItems: tables.expense_items || [],
       incomeItems: tables.income_items || [],
+      salaryRows: Array.isArray(salaryAnalyticsRows) ? salaryAnalyticsRows : [],
     };
-  }, [analyticsData, activeTab]);
+  }, [analyticsData, activeTab, salaryAnalyticsRows]);
 
   const formatCurrency = (num, decimals = 2) => {
     if (typeof num === "string") {
@@ -2593,6 +2623,52 @@ const Analytics = () => {
           </div>
 
           <div className="analytics-page__grid">
+            {renderFinanceAccordion(
+              "salaryRows",
+              "Зарплата сотрудников (маркет)",
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Сотрудник</th>
+                    <th>Схема</th>
+                    <th>Оклад/мес</th>
+                    <th>%</th>
+                    <th>Дней</th>
+                    <th>Оклад за период</th>
+                    <th>Продажи сотрудника</th>
+                    <th>Бонус %</th>
+                    <th>Итого</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.salaryRows.length > 0 ? (
+                    financeData.salaryRows.map((row, idx) => (
+                      <tr key={`${row.user_id || "user"}-${idx}`}>
+                        <td>{row.employee_label || "-"}</td>
+                        <td>{row.pay_scheme_label || row.pay_scheme || "-"}</td>
+                        <td>{formatCurrency(row.monthly_base_salary || 0, 2)}</td>
+                        <td>{formatCurrency(row.sales_percent || 0, 2)}</td>
+                        <td>{formatNumber(row.period_days || 0)}</td>
+                        <td>{formatCurrency(row.base_prorated || 0, 2)}</td>
+                        <td>{formatCurrency(row.employee_sales_period || 0, 2)}</td>
+                        <td>{formatCurrency(row.percent_bonus || 0, 2)}</td>
+                        <td>{formatCurrency(row.total || 0, 2)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>,
+            )}
+
             {renderFinanceAccordion(
               "expenseItems",
               "Расходы",

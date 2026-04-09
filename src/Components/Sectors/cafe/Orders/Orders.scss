@@ -176,6 +176,28 @@
     white-space: nowrap;
   }
 
+  &__receiptHeadMeta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  &__receiptRefundBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    white-space: nowrap;
+  }
+
   &__receiptDivider {
     height: 1px;
     background: #e5e7eb;

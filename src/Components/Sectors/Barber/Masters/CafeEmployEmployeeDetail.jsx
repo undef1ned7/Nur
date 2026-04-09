@@ -9,6 +9,7 @@ import { convertEmployeeAccessesToLabels } from "./employeeAccessLabels";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import EmployeeEditModal from "./modals/EmployeeEditModal";
 import CafeWaiterPayProfileModal from "./modals/CafeWaiterPayProfileModal";
+import MarketSaleEmployeePayProfileModal from "./modals/MarketSaleEmployeePayProfileModal";
 import { RoleSelect } from "./Masters";
 import "./Masters.scss";
 
@@ -159,7 +160,9 @@ const CafeEmployEmployeeDetail = () => {
   const [empForm, setEmpForm] = useState(emptyEmp);
   const [editingEmpId, setEditingEmpId] = useState(null);
 
-  const isCafe = company?.sector?.name === "Кафе";
+  const sectorName = String(company?.sector?.name || "").trim();
+  const isCafe = sectorName === "Кафе";
+  const isMarket = sectorName === "Маркет" || sectorName === "Магазин";
 
   const showBranchSelect = useMemo(() => {
     const tariffLower = String(tariff || "").toLowerCase();
@@ -333,7 +336,7 @@ const CafeEmployEmployeeDetail = () => {
     }
   };
 
-  if (!isCafe) {
+  if (!isCafe && !isMarket) {
     return <Navigate to="/crm/employ" replace />;
   }
 
@@ -418,7 +421,7 @@ const CafeEmployEmployeeDetail = () => {
                   className="barbermasters__btn barbermasters__btn--primary"
                   onClick={() => setSalaryOpen(true)}
                 >
-                  ☕ Зарплата официанта
+                  {isMarket ? "🛒 Зарплата сотрудника" : "☕ Зарплата официанта"}
                 </button>
               )}
               <button
@@ -444,12 +447,22 @@ const CafeEmployEmployeeDetail = () => {
             </div>
           </div>
 
-          <CafeWaiterPayProfileModal
-            open={salaryOpen}
-            employee={display}
-            onClose={() => setSalaryOpen(false)}
-            employeeDisplayName={fullName(display)}
-          />
+          {isCafe ? (
+            <CafeWaiterPayProfileModal
+              open={salaryOpen}
+              employee={display}
+              onClose={() => setSalaryOpen(false)}
+              employeeDisplayName={fullName(display)}
+            />
+          ) : null}
+          {isMarket ? (
+            <MarketSaleEmployeePayProfileModal
+              open={salaryOpen}
+              employee={display}
+              onClose={() => setSalaryOpen(false)}
+              employeeDisplayName={fullName(display)}
+            />
+          ) : null}
 
           <EmployeeAccessModal
             accessModalOpen={accessOpen}
