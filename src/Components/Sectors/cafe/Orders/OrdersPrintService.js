@@ -1,4 +1,19 @@
+import api from "../../../../api";
+
 const usbState = { dev: null, opening: null };
+
+const CAFE_WAITER_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function lookupWaiterIdInMap(idToLabel, id) {
+  if (!idToLabel || id == null) return "";
+  const key = String(id).trim();
+  if (!key) return "";
+  if (idToLabel instanceof Map) return String(idToLabel.get(key) ?? "").trim();
+  if (typeof idToLabel === "object")
+    return String(idToLabel[key] ?? idToLabel[String(key)] ?? "").trim();
+  return "";
+}
 
 const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
 const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
@@ -336,6 +351,70 @@ export async function checkPrinterConnection() {
   }
 }
 
+/** ФИО из объекта сотрудника (ответ /users/employees/:id/). */
+export function employeeToCafeWaiterLabel(emp) {
+  if (!emp || typeof emp !== "object") return "";
+  const name = [emp.last_name, emp.first_name].filter(Boolean).join(" ").trim();
+  if (name) return name;
+  return String(emp.full_name || emp.name || emp.email || "").trim();
+}
+
+const waiterLabelByIdCache = new Map();
+
+/**
+ * Подгрузить имя официанта по UUID (когда в заказе только waiter: "<uuid>").
+ * Результаты кешируются; при ошибке сети можно повторить печать.
+ */
+export async function fetchCafeWaiterLabelByEmployeeId(waiterId) {
+  const id = String(waiterId ?? "").trim();
+  if (!id || !CAFE_WAITER_UUID_RE.test(id)) return "";
+  if (waiterLabelByIdCache.has(id)) return waiterLabelByIdCache.get(id);
+  try {
+    const r = await api.get(`/users/employees/${encodeURIComponent(id)}/`);
+    const label = employeeToCafeWaiterLabel(r?.data) || "";
+    if (label) waiterLabelByIdCache.set(id, label);
+    return label;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Имя официанта для чека кафе.
+ * @param {object|null|undefined} order
+ * @param {Map<string,string>|Record<string,string>|null} [waiterIdToLabel] — id → подпись (список сотрудников)
+ */
+export function pickCafeOrderWaiterName(order, waiterIdToLabel = null) {
+  if (!order || typeof order !== "object") return "";
+  const fromLabel =
+    order.waiter_label ??
+    order.waiter_name ??
+    order.waiter_display ??
+    order.assigned_waiter_label ??
+    order.waiter_full_name;
+  const label = String(fromLabel ?? "").trim();
+  if (label) return label;
+
+  const w = order.waiter;
+  if (w != null && typeof w === "object") {
+    const name = [w.last_name, w.first_name].filter(Boolean).join(" ").trim();
+    if (name) return name;
+    const full = String(w.full_name || w.name || "").trim();
+    if (full) return full;
+    const email = String(w.email || "").trim();
+    if (email) return email;
+  }
+  if (w != null && typeof w === "string") {
+    const trimmed = w.trim();
+    if (!trimmed) return "";
+    const fromMap = lookupWaiterIdInMap(waiterIdToLabel, trimmed);
+    if (fromMap) return fromMap;
+    if (CAFE_WAITER_UUID_RE.test(trimmed)) return "";
+    return trimmed;
+  }
+  return "";
+}
+
 function buildPrettyReceiptFromJSON(payload) {
   const width = PRINT_WIDTH;
   const line = "-".repeat(width);
@@ -345,6 +424,7 @@ function buildPrettyReceiptFromJSON(payload) {
   const docNo = payload.doc_no ?? "";
   const dt = payload.created_at ?? "";
   const cashier = payload.cashier_name ?? "";
+  const waiter = String(payload.waiter_name ?? "").trim();
 
   const items = Array.isArray(payload.items) ? payload.items : [];
   const total = items.reduce(
@@ -366,6 +446,7 @@ function buildPrettyReceiptFromJSON(payload) {
 
   if (dt) chunks.push(enc(`Дата: ${dt}\n`));
   if (cashier) chunks.push(enc(`Кассир: ${cashier}\n`));
+  if (waiter) chunks.push(enc(`Официант: ${waiter}\n`));
   chunks.push(enc("\n"));
 
   if ('menu_title' in payload) {

@@ -12,7 +12,9 @@ import { useUser } from "../../../store/slices/userSlice";
 import api from "../../../api";
 import {
   checkPrinterConnection,
+  fetchCafeWaiterLabelByEmployeeId,
   parsePrinterBinding,
+  pickCafeOrderWaiterName,
   printOrderReceiptJSONViaUSB,
   printViaWiFiSimple,
   setActivePrinterByKey,
@@ -316,6 +318,7 @@ export default function CafeLayout() {
         doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: fullName(profile || {}),
+        waiter_name: pickCafeOrderWaiterName(orderDetail),
         discount: 0,
         tax: 0,
         paid_cash: 0,
@@ -364,7 +367,14 @@ export default function CafeLayout() {
           .then((r) => r?.data || null);
         if (!detail) return;
 
-        const payload = buildReceiptPayload(detail);
+        let waiterName = pickCafeOrderWaiterName(detail);
+        if (!waiterName) {
+          waiterName = await fetchCafeWaiterLabelByEmployeeId(detail?.waiter);
+        }
+        const payload = {
+          ...buildReceiptPayload(detail),
+          waiter_name: waiterName,
+        };
         const parsed = parsePrinterBinding(receiptBinding);
         if (parsed.kind === "ip") {
           await printViaWiFiSimple(payload, parsed.ip, parsed.port);
@@ -621,6 +631,13 @@ export default function CafeLayout() {
       const kitchenDocNo =
         tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
 
+      let kitchenWaiterName = pickCafeOrderWaiterName(detail);
+      if (!kitchenWaiterName) {
+        kitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
+          detail?.waiter,
+        );
+      }
+
       for (const [kid, kitItems] of groups.entries()) {
         const k = kitchensMap.get(String(kid));
         const label = kitchenLabel(k);
@@ -633,6 +650,7 @@ export default function CafeLayout() {
           doc_no: `${label} • ${kitchenDocNo}`,
           created_at: dt,
           cashier_name: cashier,
+          waiter_name: kitchenWaiterName,
           discount: 0,
           tax: 0,
           paid_cash: 0,
@@ -807,6 +825,13 @@ export default function CafeLayout() {
         const diffDocNo =
           tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
 
+        let diffKitchenWaiterName = pickCafeOrderWaiterName(detail);
+        if (!diffKitchenWaiterName) {
+          diffKitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
+            detail?.waiter,
+          );
+        }
+
         const printOne = async (kid, menuTitle, items) => {
           const k = kitchensMap.get(String(kid));
           const label = kitchenLabel(k);
@@ -819,6 +844,7 @@ export default function CafeLayout() {
             doc_no: `${label} | ${diffDocNo} | ИЗМЕНЕНИЕ`,
             created_at: dt,
             cashier_name: cashier,
+            waiter_name: diffKitchenWaiterName,
             discount: 0,
             tax: 0,
             paid_cash: 0,

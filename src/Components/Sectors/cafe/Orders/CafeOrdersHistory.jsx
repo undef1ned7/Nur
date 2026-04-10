@@ -14,7 +14,9 @@ import "./Orders.scss";
 import {
   attachUsbListenersOnce,
   checkPrinterConnection,
+  fetchCafeWaiterLabelByEmployeeId,
   parsePrinterBinding,
+  pickCafeOrderWaiterName,
   printOrderReceiptJSONViaUSB,
   printViaWiFiSimple,
   setActivePrinterByKey,
@@ -171,6 +173,16 @@ const CafeOrderHistory = () => {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [printingId, setPrintingId] = useState(null);
+
+  const waiterIdLabelMap = useMemo(() => {
+    const m = new Map();
+    for (const o of waiterOptions || []) {
+      if (o?.value == null || o.value === "") continue;
+      const lab = String(o.label || "").trim();
+      if (lab) m.set(String(o.value), lab);
+    }
+    return m;
+  }, [waiterOptions]);
 
   const [itemsEditOpen, setItemsEditOpen] = useState(false);
   const [itemsEditOrder, setItemsEditOrder] = useState(null);
@@ -548,6 +560,7 @@ const CafeOrderHistory = () => {
         doc_no: isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
+        waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
         discount: 0,
         tax: 0,
         paid_cash: 0,
@@ -562,7 +575,7 @@ const CafeOrderHistory = () => {
         })),
       };
     },
-    [formatReceiptDate, linePrice, tablesMap, userData]
+    [formatReceiptDate, linePrice, tablesMap, userData, waiterIdLabelMap]
   );
 
   const printOrder = useCallback(
@@ -572,7 +585,11 @@ const CafeOrderHistory = () => {
       setPrintingId(order.id);
       try {
         await checkPrinterConnection().catch(() => false);
-        const payload = buildPrintPayload(order);
+        let payload = buildPrintPayload(order);
+        if (!String(payload.waiter_name || "").trim()) {
+          const w = await fetchCafeWaiterLabelByEmployeeId(order?.waiter);
+          if (w) payload = { ...payload, waiter_name: w };
+        }
 
         const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
         if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
