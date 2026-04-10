@@ -1109,7 +1109,12 @@ const Masters = () => {
                     }
                     onClick={
                       openDetail
-                        ? () => navigate(`/crm/employ/${u.id}`)
+                        ? () =>
+                            navigate(
+                              marketOpenDetail
+                                ? `/crm/employ/market/${u.id}`
+                                : `/crm/employ/${u.id}`,
+                            )
                         : undefined
                     }
                     onKeyDown={
@@ -1117,7 +1122,11 @@ const Masters = () => {
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              navigate(`/crm/employ/${u.id}`);
+                              navigate(
+                                marketOpenDetail
+                                  ? `/crm/employ/market/${u.id}`
+                                  : `/crm/employ/${u.id}`,
+                              );
                             }
                           }
                         : undefined

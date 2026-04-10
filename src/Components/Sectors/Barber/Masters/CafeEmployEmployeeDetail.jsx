@@ -340,6 +340,10 @@ const CafeEmployEmployeeDetail = () => {
     return <Navigate to="/crm/employ" replace />;
   }
 
+  if (isMarket && employeeId) {
+    return <Navigate to={`/crm/employ/market/${employeeId}`} replace />;
+  }
+
   if (!employeeId) {
     return <Navigate to="/crm/employ" replace />;
   }

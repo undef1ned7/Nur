@@ -17,10 +17,12 @@ import "./Orders.scss";
 import {
   attachUsbListenersOnce,
   checkPrinterConnection,
+  fetchCafeWaiterLabelByEmployeeId,
+  parsePrinterBinding,
+  pickCafeOrderWaiterName,
   printOrderReceiptJSONViaUSB,
   setActivePrinterByKey,
   printViaWiFiSimple,
-  parsePrinterBinding,
 } from "./OrdersPrintService";
 
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
@@ -539,18 +541,29 @@ const Orders = () => {
     });
 
     // Обновляем локальное состояние только если есть изменения
-    setOrders(prev => {
-      // Проверяем, нужно ли обновлять
-      const prevIds = new Set(prev.map(o => String(o.id)));
-      const socketIds = new Set(socketOpenOrders.map(o => String(o.id)));
+    setOrders((prev) => {
+      const prevIds = new Set(prev.map((o) => String(o.id)));
+      const socketIds = new Set(socketOpenOrders.map((o) => String(o.id)));
 
-      // Если списки идентичны, не обновляем
-      if (prevIds.size === socketIds.size &&
-        [...prevIds].every(id => socketIds.has(id))) {
+      if (
+        prevIds.size === socketIds.size &&
+        [...prevIds].every((id) => socketIds.has(id))
+      ) {
         return prev;
       }
 
-      return socketOpenOrders;
+      const prevById = new Map(prev.map((o) => [String(o.id), o]));
+      return socketOpenOrders.map((so) => {
+        const p = prevById.get(String(so.id));
+        if (!p) return so;
+        const merged = { ...p, ...so };
+        const pItems = Array.isArray(p.items) ? p.items : [];
+        const sItems = Array.isArray(so.items) ? so.items : [];
+        if (pItems.length > 0 && sItems.length === 0) {
+          merged.items = pItems;
+        }
+        return merged;
+      });
     });
   }, [socketOrders?.orders])
 
@@ -610,6 +623,18 @@ const Orders = () => {
         .map((u) => ({ id: u.id, name: fullName(u) })),
     [employees]
   );
+
+  const waiterIdLabelMap = useMemo(() => {
+    const m = new Map();
+    for (const e of employees) {
+      if (e?.id == null) continue;
+      const label =
+        [e.last_name, e.first_name].filter(Boolean).join(" ").trim() ||
+        String(e.email || "").trim();
+      if (label) m.set(String(e.id), label);
+    }
+    return m;
+  }, [employees]);
   const kitchensMap = useMemo(() => {
     const m = new Map();
     (kitchens || []).forEach((k) => {
@@ -718,6 +743,7 @@ const Orders = () => {
         doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
+        waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
         discount: 0,
         tax: 0,
         paid_cash: 0,
@@ -730,7 +756,7 @@ const Orders = () => {
         })),
       };
     },
-    [getOrderTableLabel, userData]
+    [getOrderTableLabel, userData, waiterIdLabelMap]
   );
 
   const printOrder = useCallback(
@@ -741,7 +767,11 @@ const Orders = () => {
       setPrintingId(order.id);
       try {
         await checkPrinterConnection().catch(() => false);
-        const payload = buildPrintPayload(order);
+        let payload = buildPrintPayload(order);
+        if (!String(payload.waiter_name || "").trim()) {
+          const w = await fetchCafeWaiterLabelByEmployeeId(order?.waiter);
+          if (w) payload = { ...payload, waiter_name: w };
+        }
 
         // Receipt printer (cashier)
         const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
@@ -784,6 +814,7 @@ const Orders = () => {
           : `${kitchenLabel || "КУХНЯ"} • СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
+        waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
         discount: 0,
         tax: 0,
         paid_cash: 0,
@@ -797,7 +828,7 @@ const Orders = () => {
         })),
       };
     },
-    [getOrderTableLabel, userData]
+    [getOrderTableLabel, userData, waiterIdLabelMap]
   );
 
   const getKitchenPrinterKey = useCallback(
@@ -851,6 +882,13 @@ const Orders = () => {
 
         if (!groups.size) return;
 
+        let kitchenWaiterName = pickCafeOrderWaiterName(detail, waiterIdLabelMap);
+        if (!kitchenWaiterName) {
+          kitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
+            detail?.waiter,
+          );
+        }
+
         for (const [kitchenId, kitItems] of groups.entries()) {
           const k = kitchensMap.get(String(kitchenId));
           const kitchenLabel = k?.label || k?.title || k?.name || "Кухня";
@@ -862,12 +900,15 @@ const Orders = () => {
           //   continue;
           // }
 
-          const payload = buildKitchenTicketPayload({
-            order: detail,
-            kitchenId,
-            kitchenLabel,
-            items: kitItems,
-          }, 'КУХНЯ');
+          const payload = {
+            ...buildKitchenTicketPayload({
+              order: detail,
+              kitchenId,
+              kitchenLabel,
+              items: kitItems,
+            }, 'КУХНЯ'),
+            waiter_name: kitchenWaiterName,
+          };
 
           const parsed = parsePrinterBinding(printerKey);
           if (parsed.kind === "ip") {
@@ -889,7 +930,14 @@ const Orders = () => {
         releaseKitchenPrintLock(createdOrderId);
       }
     },
-    [buildKitchenTicketPayload, getKitchenPrinterKey, getMenuKitchenId, kitchensMap]
+    [
+      buildKitchenTicketPayload,
+      fetchCafeWaiterLabelByEmployeeId,
+      getKitchenPrinterKey,
+      getMenuKitchenId,
+      kitchensMap,
+      waiterIdLabelMap,
+    ]
   );
 
   /* ===== модалка create/edit ===== */
@@ -1207,9 +1255,10 @@ const Orders = () => {
         }
 
         setOrders((prev) => [...prev, res.data]);
-        console.log('OREDERS', res);
 
-        await autoPrintKitchenTickets(res?.data?.id);
+        // Печать на кухню не должна держать saving: иначе кнопки «Редактировать» / «Оплатить»
+        // у всех карточек остаются disabled, пока USB/Wi‑Fi не ответят.
+        void autoPrintKitchenTickets(res?.data?.id).catch(() => {});
       } else {
         const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;

@@ -2862,3 +2862,123 @@
     color: var(--muted, #6b7280);
   }
 }
+
+.marketEmployDetail {
+  &__kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+  }
+
+  &__kpi {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+  }
+
+  &__kpiLabel {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  &__kpiValue {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__analytics {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__head {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+  }
+
+  &__filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+
+  &__dateField {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    span {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      white-space: nowrap;
+    }
+  }
+
+  &__dateInput {
+    min-width: 168px !important;
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+  }
+
+  &__refreshBtn {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    margin-left: 2px;
+  }
+
+  &__tableWrap {
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 820px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eef2f7;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: #f8fafc;
+      font-weight: 700;
+      color: #334155;
+    }
+  }
+
+  &__empty {
+    text-align: center;
+    color: #6b7280;
+    padding: 14px 10px !important;
+  }
+}
