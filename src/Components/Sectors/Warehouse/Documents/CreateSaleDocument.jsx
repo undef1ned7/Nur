@@ -1469,6 +1469,10 @@ const CreateSaleDocument = () => {
     return ["SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
   }, [docType, paymentKind]);
 
+  // Агент и контрагент в продаже/возврате показываем всегда (раньше скрывались при оплате не в долг)
+  const showAgentCounterpartyFields =
+    isCounterpartyRequired || isAgentFilterRelevant;
+
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
     return ["SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"].includes(
@@ -2902,7 +2906,7 @@ const CreateSaleDocument = () => {
                   />
                 </div>
               )}
-              {isCounterpartyRequired && (
+              {showAgentCounterpartyFields && (
                 <>
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
                     <User

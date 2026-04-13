@@ -95,6 +95,8 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
 
   const firstDueDate =
     dealDetail?.first_due_date ?? installments[0]?.due_date ?? null;
+  const counterpartyName =
+    String(dealDetail?.client_full_name || "").trim() || "Неизвестный контрагент";
 
   useEffect(() => {
     setState((prev) => ({
@@ -625,7 +627,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                         addCashFlows({
                                             ...cashData,
                                             amount: paymentAmount.toFixed(2),
-                                            name: `оплата долга №${p.number}`,
+                                            name: `оплата долга: ${counterpartyName} №${p.number}`,
                                             source_cashbox_flow_id: p.number,
                                             source_business_operation_id:
                                             "Оплата долга",

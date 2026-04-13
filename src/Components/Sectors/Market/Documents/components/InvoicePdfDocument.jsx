@@ -337,8 +337,7 @@ function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
     doc.order_discount_total ??
       doc.discount_total ??
       doc.discount_amount ??
-      data?.discount_total ??
-      data?.totals?.discount_total ??
+      data?.order_discount_total ??
       0
   );
 
@@ -399,42 +398,94 @@ export default function InvoicePdfDocument({ data }) {
   // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const total = Number(it.line_total ?? it.total ?? qty * unit);
+        const toNum = (v) => {
+          const n = Number(String(v ?? "").replace(",", "."));
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const qty = toNum(it.qty || it.quantity || 0);
+        const unitBase = toNum(it.unit_price ?? it.price ?? 0);
+        const baseLineTotal = unitBase * qty;
+        const rowTotalRaw =
+          it.line_total != null && it.line_total !== ""
+            ? toNum(it.line_total)
+            : it.total != null && it.total !== ""
+              ? toNum(it.total)
+              : null;
 
         // Скидка только по товару (процент 0–100)
-        const lineDiscount = Number(it.discount_percent ?? it.discount ?? 0);
-        const itemDiscountPercent =
+        const lineDiscount = toNum(it.discount_percent ?? it.discount ?? 0);
+        const lineDiscountAmount = toNum(
+          it.line_discount ??
+            it.line_discount_total ??
+            it.discount_amount ??
+            it.discount_total ??
+            0
+        );
+        const discountFromRowTotal =
+          rowTotalRaw != null && baseLineTotal > 0 && rowTotalRaw < baseLineTotal
+            ? ((baseLineTotal - rowTotalRaw) / baseLineTotal) * 100
+            : 0;
+        const itemDiscountPercentRaw =
           it.effective_discount_percent != null &&
           it.effective_discount_percent !== ""
-            ? Number(it.effective_discount_percent)
+            ? toNum(it.effective_discount_percent)
             : lineDiscount > 0
               ? lineDiscount
+              : lineDiscountAmount > 0 && baseLineTotal > 0
+                ? (lineDiscountAmount / baseLineTotal) * 100
+              : discountFromRowTotal > 0
+                ? discountFromRowTotal
               : docDiscountPctForLines;
+        const itemDiscountPercent = Number.isFinite(itemDiscountPercentRaw)
+          ? itemDiscountPercentRaw
+          : 0;
 
         // Базовая цена без скидки — берём явное поле, иначе текущую цену
         let priceNoDiscount = Number(
           it.original_price ??
             it.price_before_discount ??
             it.price_without_discount ??
-            unit
+            unitBase
         );
         if (!priceNoDiscount) {
-          priceNoDiscount = unit;
+          priceNoDiscount = unitBase;
         }
+
+        const fallbackLineTotal = Math.max(
+          0,
+          baseLineTotal * (1 - Number(itemDiscountPercent || 0) / 100)
+        );
+        const rowTotal = Number(
+          rowTotalRaw != null && !Number.isNaN(rowTotalRaw)
+            ? rowTotalRaw
+            : fallbackLineTotal
+        );
+        const priceAfterDiscount =
+          qty > 0
+            ? rowTotal / qty
+            : priceNoDiscount * (1 - Number(itemDiscountPercent || 0) / 100);
+
+        console.log("item debug:", it.name_snapshot, {
+          qty,
+          unitBase,
+          baseLineTotal,
+          lineDiscountAmount,
+          discountFromRowTotal,
+          itemDiscountPercent,
+        });
 
         return {
           id: it.id,
-          name: it.name || it.product_name || "Товар",
+          name: it.name_snapshot || it.name || it.product_name || "Товар",
           qty,
-          unit_price: unit,
+          unit_price: priceAfterDiscount,
           price_no_discount: priceNoDiscount,
-            // В колонке «Скидка» отображаем только скидку по позиции.
-            discount: itemDiscountPercent,
-          total,
+          // В колонке «Скидка» отображаем только скидку по позиции.
+          discount: itemDiscountPercent,
+          total: rowTotal,
           unit: it.unit || "ШТ",
-          article: it.article || "",
+          article: it.article || it.barcode_snapshot || "",
         };
       })
     : [];

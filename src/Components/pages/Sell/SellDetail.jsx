@@ -696,7 +696,16 @@ const SellDetail = ({ onClose, id }) => {
                   {idx + 1}. {product.product_name ?? product.object_name}
                 </p>
                 <div>
-                  <p>{product.tax_total}</p>
+                  <p>
+                    Скидка:{" "}
+                    {Number(
+                      product.line_discount ??
+                        product.line_discount_total ??
+                        product.discount_amount ??
+                        product.discount_total ??
+                        0
+                    )}
+                  </p>
                   <p className="receipt__item-price">
                     {product.quantity} x {product.unit_price} ≡{" "}
                     {Number(

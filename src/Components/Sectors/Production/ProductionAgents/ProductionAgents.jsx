@@ -629,6 +629,117 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   );
 };
 
+const AgentClientsDebtModal = ({
+  onClose,
+  agent,
+  loading,
+  error,
+  clients,
+  totalClientDebt,
+  ownerDebt,
+}) => {
+  const formatMoney = (value) =>
+    `${Number(value || 0).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} сом`;
+
+  return (
+    <div className="add-modal">
+      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div
+        className="add-modal__content z-100!"
+        style={{ maxWidth: 980, width: "96%" }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="add-modal__header">
+          <h3>
+            Клиенты агента:{" "}
+            {`${agent?.last_name || ""} ${agent?.first_name || ""}`.trim() ||
+              "—"}
+          </h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">Клиентов</div>
+            <div className="text-lg font-semibold">{clients.length}</div>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <div className="text-xs text-amber-700">Долги клиентов агента</div>
+            <div className="text-lg font-semibold text-amber-800">
+              {formatMoney(totalClientDebt)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+            <div className="text-xs text-rose-700">Агент должен владельцу</div>
+            <div className="text-lg font-semibold text-rose-800">
+              {formatMoney(ownerDebt)}
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="add-modal__section">
+            Загрузка клиентов и долгов...
+          </div>
+        ) : error ? (
+          <div className="add-modal__section" style={{ color: "#b91c1c" }}>
+            {error}
+          </div>
+        ) : clients.length === 0 ? (
+          <div className="add-modal__section">У агента пока нет клиентов.</div>
+        ) : (
+          <DataContainer>
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 420, overflow: "auto" }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Клиент</th>
+                    <th>Телефон</th>
+                    <th>Долг</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map((c, idx) => (
+                    <tr key={c.id || idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Клиент">
+                        {c.full_name || c.fio || c.name || "—"}
+                      </td>
+                      <td data-label="Телефон">{c.phone || "—"}</td>
+                      <td data-label="Долг">{formatMoney(c.totalDebt || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+        )}
+
+        <div className="add-modal__footer">
+          <button className="add-modal__cancel" onClick={onClose}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---- UI ---- */
 
 const ProductionAgents = () => {
@@ -692,6 +803,12 @@ const ProductionAgents = () => {
     pending_count: 0,
     pending_qty: 0,
   });
+  const [showAgentClientsModal, setShowAgentClientsModal] = useState(false);
+  const [selectedAgentForClients, setSelectedAgentForClients] = useState(null);
+  const [agentClientsLoading, setAgentClientsLoading] = useState(false);
+  const [agentClientsError, setAgentClientsError] = useState("");
+  const [agentClientsData, setAgentClientsData] = useState([]);
+  const [selectedAgentOwnerDebt, setSelectedAgentOwnerDebt] = useState(0);
 
   const [search, setSearch] = useState("");
   // Debounce для поиска
@@ -1030,27 +1147,128 @@ const ProductionAgents = () => {
     paid: "Оплаченный",
     canceled: "Отмененный",
   };
+
+  const ownerAgents = useMemo(() => {
+    if (profile?.role !== "owner") return [];
+    const unique = new Map();
+    (Array.isArray(agents) ? agents : []).forEach((item) => {
+      const a = item?.agent;
+      if (!a?.id || unique.has(a.id)) return;
+      unique.set(a.id, a);
+    });
+    return Array.from(unique.values());
+  }, [agents, profile?.role]);
+
+  const resolveDebtFromDeals = (deals) => {
+    const list = Array.isArray(deals) ? deals : [];
+    return list.reduce((sum, deal) => {
+      const kind = String(deal?.kind || "").toLowerCase();
+      if (kind !== "debt") return sum;
+      const remaining = Number(deal?.remaining_debt);
+      if (Number.isFinite(remaining)) return sum + Math.max(remaining, 0);
+      const amount = Number(deal?.amount || 0);
+      const prepayment = Number(deal?.prepayment || 0);
+      return sum + Math.max(amount - prepayment, 0);
+    }, 0);
+  };
+
+  const openAgentClientsControl = useCallback(async (agent) => {
+    if (!agent?.id) return;
+    setSelectedAgentForClients(agent);
+    setShowAgentClientsModal(true);
+    setAgentClientsLoading(true);
+    setAgentClientsError("");
+    setAgentClientsData([]);
+    setSelectedAgentOwnerDebt(0);
+
+    try {
+      const [clientsRes, analyticsRes] = await Promise.all([
+        api.get("/main/clients/", { params: { salesperson: agent.id } }),
+        api.get(`/main/owners/agents/${agent.id}/analytics/`, {
+          params: { period: "month" },
+        }),
+      ]);
+
+      const clientsPayload = clientsRes?.data;
+      const rawClients = Array.isArray(clientsPayload)
+        ? clientsPayload
+        : clientsPayload?.results || [];
+
+      // Подстраховка: если API не применил salesperson фильтр, фильтруем локально.
+      const filteredClients = rawClients.filter((c) => {
+        const salespersonId =
+          c?.salesperson?.id ?? c?.salesperson_id ?? c?.salesperson ?? null;
+        return (
+          salespersonId == null || String(salespersonId) === String(agent.id)
+        );
+      });
+
+      const clientsWithDebts = await Promise.all(
+        filteredClients.map(async (client) => {
+          try {
+            const dealsRes = await api.get(`/main/clients/${client.id}/deals/`);
+            const dealsPayload = dealsRes?.data;
+            const deals = Array.isArray(dealsPayload)
+              ? dealsPayload
+              : dealsPayload?.results || [];
+            return { ...client, totalDebt: resolveDebtFromDeals(deals) };
+          } catch {
+            return { ...client, totalDebt: 0 };
+          }
+        }),
+      );
+
+      const summary = analyticsRes?.data?.summary || {};
+      const ownerDebt =
+        Number(
+          summary?.accounts_payable ??
+            summary?.agent_debt_to_owner ??
+            summary?.total_debt ??
+            0,
+        ) || 0;
+
+      setSelectedAgentOwnerDebt(ownerDebt);
+      setAgentClientsData(clientsWithDebts);
+    } catch (e) {
+      const errorMessage = validateResErrors(
+        e,
+        "Не удалось загрузить клиентов агента",
+      );
+      setAgentClientsError(errorMessage);
+    } finally {
+      setAgentClientsLoading(false);
+    }
+  }, []);
+
+  const selectedAgentClientsTotalDebt = useMemo(
+    () =>
+      (Array.isArray(agentClientsData) ? agentClientsData : []).reduce(
+        (sum, c) => sum + Number(c?.totalDebt || 0),
+        0,
+      ),
+    [agentClientsData],
+  );
+
   return (
     <div>
-      {/* Табы для сектора Пилорама */}
-      {company.sector.name === "Пилорама" && (
-        <div className="vitrina__header" style={{ margin: "15px 0" }}>
-          <div className="vitrina__tabs">
-            <span
-              className={`vitrina__tab ${activeTab === 0 ? "active" : ""}`}
-              onClick={() => setActiveTab(0)}
-              style={{
-                cursor: "pointer",
-                padding: "8px 16px",
-                border: "1px solid #ddd",
-                borderRadius: "4px 4px 0 0",
-                backgroundColor: activeTab === 0 ? "#ffd400" : "transparent",
-                color: activeTab === 0 ? "#000" : "#333",
-                marginRight: "4px",
-              }}
-            >
-              Товары агентов
-            </span>
+      <div className="vitrina__header" style={{ margin: "15px 0" }}>
+        <div className="vitrina__tabs">
+          <span
+            className={`vitrina__tab ${activeTab === 0 ? "active" : ""}`}
+            onClick={() => setActiveTab(0)}
+            style={{
+              cursor: "pointer",
+              padding: "8px 16px",
+              border: "1px solid #ddd",
+              borderRadius: "4px 4px 0 0",
+              backgroundColor: activeTab === 0 ? "#ffd400" : "transparent",
+              color: activeTab === 0 ? "#000" : "#333",
+              marginRight: "4px",
+            }}
+          >
+            Товары агентов
+          </span>
+          {company.sector.name === "Пилорама" && (
             <span
               className={`vitrina__tab ${activeTab === 1 ? "active" : ""}`}
               onClick={() => setActiveTab(1)}
@@ -1065,9 +1283,27 @@ const ProductionAgents = () => {
             >
               История продаж
             </span>
-          </div>
+          )}
+
+          {profile?.role === "owner" && (
+            <span
+              className={`vitrina__tab ${activeTab === 2 ? "active" : ""}`}
+              onClick={() => setActiveTab(2)}
+              style={{
+                cursor: "pointer",
+                padding: "8px 16px",
+                border: "1px solid #ddd",
+                borderRadius: "4px 4px 0 0",
+                backgroundColor: activeTab === 2 ? "#ffd400" : "transparent",
+                color: activeTab === 2 ? "#000" : "#333",
+                marginLeft: "4px",
+              }}
+            >
+              Агенты и клиенты
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
       {startInAgent && showStart ? (
         <SellStart show={showStart} setShow={setShowStart} />
@@ -1705,6 +1941,72 @@ const ProductionAgents = () => {
               </div>
             </div>
           )}
+
+          {profile?.role === "owner" && activeTab === 2 && (
+            <div className="warehouse-page">
+              <div className="warehouse-header">
+                <div className="warehouse-header__left">
+                  <div className="warehouse-header__icon">
+                    <div className="warehouse-header__icon-box">👥</div>
+                  </div>
+                  <div className="warehouse-header__title-section">
+                    <h1 className="warehouse-header__title">
+                      Агенты и клиенты
+                    </h1>
+                    <p className="warehouse-header__subtitle">
+                      Контроль клиентов и долгов по каждому агенту
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <DataContainer>
+                <div
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  style={{ marginTop: 8 }}
+                >
+                  {ownerAgents.length === 0 ? (
+                    <div className="warehouse-table__empty">
+                      Нет агентов для отображения
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(240px, 1fr))",
+                        gap: 12,
+                      }}
+                    >
+                      {ownerAgents.map((agent) => (
+                        <div
+                          key={agent.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div style={{ fontWeight: 600 }}>
+                            {`${agent.last_name || ""} ${agent.first_name || ""}`.trim() ||
+                              "Без имени"}
+                          </div>
+                          {agent?.track_number && (
+                            <div style={{ fontSize: 12, opacity: 0.75 }}>
+                              Машина: {agent.track_number}
+                            </div>
+                          )}
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{ marginTop: 10 }}
+                            onClick={() => openAgentClientsControl(agent)}
+                          >
+                            Клиенты и долги
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </DataContainer>
+            </div>
+          )}
         </>
       )}
 
@@ -1753,6 +2055,23 @@ const ProductionAgents = () => {
             setSelectedSaleId(null);
           }}
           saleId={selectedSaleId}
+        />
+      )}
+      {showAgentClientsModal && (
+        <AgentClientsDebtModal
+          onClose={() => {
+            setShowAgentClientsModal(false);
+            setSelectedAgentForClients(null);
+            setAgentClientsData([]);
+            setAgentClientsError("");
+            setSelectedAgentOwnerDebt(0);
+          }}
+          agent={selectedAgentForClients}
+          loading={agentClientsLoading}
+          error={agentClientsError}
+          clients={agentClientsData}
+          totalClientDebt={selectedAgentClientsTotalDebt}
+          ownerDebt={selectedAgentOwnerDebt}
         />
       )}
     </div>
