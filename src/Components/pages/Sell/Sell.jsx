@@ -195,6 +195,7 @@ const Sell = () => {
 
   const {
     isBuildingCompany,
+    isStartPlanCompany,
     filterField,
     count,
     totalPages,
@@ -203,6 +204,8 @@ const Sell = () => {
   } = useMemo(() => {
     const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
     const isBuildingCompany = sectorName === "строительная компания";
+    const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
+    const isStartPlanCompany = planName === "старт";
     const hidden = hiddenIds;
     const filterSell = (Array.isArray(history) ? history : []).filter(
       (item) =>
@@ -221,6 +224,7 @@ const Sell = () => {
     return {
       sectorName,
       isBuildingCompany,
+      isStartPlanCompany,
       filterSell,
       filterField,
       count,
@@ -616,12 +620,14 @@ const Sell = () => {
               </span>
             </div>
           </div>
-          <button
-            className="sell__header-btn "
-            onClick={() => navigate("start")}
-          >
-            Начать продажу
-          </button>
+          {!isStartPlanCompany && (
+            <button
+              className="sell__header-btn "
+              onClick={() => navigate("start")}
+            >
+              Начать продажу
+            </button>
+          )}
           {selectedIds.size > 0 ? (
             <SelectionActions pageItems={filterField} />
           ) : (
@@ -633,7 +639,7 @@ const Sell = () => {
                 >
                   <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
                 </button>
-              ) : (
+              ) : !isStartPlanCompany ? (
                 <>
                   <button
                     className="sell__header-btn"
@@ -642,7 +648,7 @@ const Sell = () => {
                     Прочие расходы
                   </button>
                 </>
-              )}
+              ) : null}
             </>
           )}
         </div>
@@ -708,6 +714,7 @@ const Sell = () => {
                         <th>Товар</th>
                         <th>Оплата</th>
                         <th>Сумма</th>
+                        <th>Скидка</th>
                         <th>Позиции</th>
                         <th>Дата</th>
                         <th>Клиент</th>
@@ -717,6 +724,7 @@ const Sell = () => {
                     <tbody>
                       {filterField.map((item, idx) => {
                         const itemsCount = getItemsCount(item);
+                        const discountTotal = Number(item.discount_total || 0);
                         const statusLabel =
                           kindTranslate[item.status] || item.status || "-";
                         const statusVariant = getStatusVariant(item.status);
@@ -765,6 +773,11 @@ const Sell = () => {
                               {translatePaymentMethod(item.payment_method)}
                             </td>
                             <td className="">{formatMoney(item.total)} сом</td>
+                            <td className="sellTable__money">
+                              {discountTotal > 0
+                                ? `-${formatMoney(discountTotal)} сом`
+                                : "0 сом"}
+                            </td>
                             <td className="sellTable__count">
                               {itemsCount !== null ? itemsCount : "—"}
                             </td>
@@ -798,6 +811,7 @@ const Sell = () => {
                 <div className="sell__cards">
                   {filterField.map((item, idx) => {
                     const itemsCount = getItemsCount(item);
+                    const discountTotal = Number(item.discount_total || 0);
                     const statusLabel =
                       kindTranslate[item.status] || item.status || "-";
                     const statusVariant = getStatusVariant(item.status);
@@ -868,6 +882,14 @@ const Sell = () => {
                               <div className="sellCard__kv">
                                 <span>Сумма</span>
                                 <b>{formatMoney(item.total)} сом</b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Скидка</span>
+                                <b>
+                                  {discountTotal > 0
+                                    ? `-${formatMoney(discountTotal)} сом`
+                                    : "0 сом"}
+                                </b>
                               </div>
                               <div className="sellCard__kv">
                                 <span>Документ</span>

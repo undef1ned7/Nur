@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, User, X, CheckCircle } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -57,6 +57,7 @@ const PaymentPage = ({
   const [selectedBank, setSelectedBank] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [printing, setPrinting] = useState(false);
+  const amountReceivedInputRef = useRef(null);
   const [alertModal, setAlertModal] = useState({
     open: false,
     type: "error",
@@ -581,6 +582,26 @@ const PaymentPage = ({
     }
   }, [paymentMethod, total]);
 
+  useEffect(() => {
+    if (!Array.isArray(cart) || cart.length === 0) return;
+    if (paymentMethod === "deferred") return;
+    if (showSuccessModal || showCustomerModal || alertModal.open) return;
+
+    const input = amountReceivedInputRef.current;
+    if (!input) return;
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }, [
+    cart,
+    paymentMethod,
+    showSuccessModal,
+    showCustomerModal,
+    alertModal.open,
+  ]);
+
   // Обработка нажатия Enter для закрытия модалки успеха
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -892,10 +913,12 @@ const PaymentPage = ({
               </h3>
               <div className="payment-page__amount-input-wrapper">
                 <input
+                  ref={amountReceivedInputRef}
                   type="text"
                   className="payment-page__amount-input"
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
               <div className="payment-page__quick-select">

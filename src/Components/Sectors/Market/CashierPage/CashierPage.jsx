@@ -224,6 +224,8 @@ const CashierPage = () => {
   const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
+  const cartQtyInputRefs = React.useRef(new Map()); // item.id -> input
+  const pendingQtyFocusRef = React.useRef(null); // { itemId?, productId?, salePackage? }
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
@@ -243,6 +245,9 @@ const CashierPage = () => {
     price: "",
     quantity: "1",
   });
+  const requestCartQuantityFocus = useCallback((target) => {
+    pendingQtyFocusRef.current = target || null;
+  }, []);
   const [alertModal, setAlertModal] = useState({
     open: false,
     type: "error",
@@ -648,6 +653,12 @@ const CashierPage = () => {
               : "Товар с таким штрих-кодом не найден";
           showAlert("error", "Ошибка сканирования", msg);
         } else {
+          if (scannedProduct?.id) {
+            requestCartQuantityFocus({
+              productId: scannedProduct.id,
+              salePackage: null,
+            });
+          }
           // Обновляем продажу после добавления товара
           await dispatch(
             startSale({ discount_total: 0, shift: openShiftId }),
@@ -902,6 +913,31 @@ const CashierPage = () => {
       }
     }
   }, [currentSale]);
+
+  useEffect(() => {
+    const pending = pendingQtyFocusRef.current;
+    if (!pending || !cart.length) return;
+
+    const targetItem =
+      cart.find((item) => pending.itemId && String(item.itemId) === String(pending.itemId)) ||
+      cart.find(
+        (item) =>
+          pending.productId &&
+          String(item.productId) === String(pending.productId) &&
+          String(item.salePackage ?? "") === String(pending.salePackage ?? ""),
+      );
+
+    if (!targetItem?.id) return;
+
+    const input = cartQtyInputRefs.current.get(String(targetItem.id));
+    if (!input) return;
+
+    pendingQtyFocusRef.current = null;
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }, [cart]);
 
   const updateCustomQuantityByDelta = async (cartItem, delta) => {
     if (!currentSale?.id) return;
@@ -1358,6 +1394,11 @@ const CashierPage = () => {
             quantity: newQuantity,
           }),
         );
+        requestCartQuantityFocus({
+          itemId: existingItem.id,
+          productId: product.id,
+          salePackage: salePackageId ?? null,
+        });
         // Обновляем продажу после успешного обновления
         // await refreshSale();
       } else {
@@ -1370,6 +1411,10 @@ const CashierPage = () => {
             ...(salePackageId ? { salePackageId } : {}),
           }),
         );
+        requestCartQuantityFocus({
+          productId: product.id,
+          salePackage: salePackageId ?? null,
+        });
         // Обновляем продажу после успешного добавления
         // cartOrderRef будет обновлен автоматически в useEffect при обновлении currentSale
         // await refreshSale();
@@ -2516,6 +2561,11 @@ const CashierPage = () => {
                           <Minus size={14} />
                         </button>
                         <input
+                          ref={(node) => {
+                            const key = String(item.id);
+                            if (node) cartQtyInputRefs.current.set(key, node);
+                            else cartQtyInputRefs.current.delete(key);
+                          }}
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
                           value={
@@ -2608,6 +2658,7 @@ const CashierPage = () => {
                               [item.id]: value,
                             }));
                           }}
+                          onFocus={(e) => e.target.select()}
                           onBlur={async (e) => {
                             const value = e.target.value;
                             const qtyNum = normalizeQuantity(
