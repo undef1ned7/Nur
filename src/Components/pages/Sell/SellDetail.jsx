@@ -251,17 +251,26 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const cashier = payload.cashier_name ?? "";
 
   const items = Array.isArray(payload.items) ? payload.items : [];
-  const discount = Number(payload.discount || 0);
-  const tax = Number(payload.tax || 0);
-  const paidCash = Number(payload.paid_cash || 0);
+  const discount = Number(payload.discount_total ?? payload.discount ?? 0);
+  const tax = Number(payload.tax_total ?? payload.tax ?? 0);
+  const paidCash = Number(payload.cash_received ?? payload.paid_cash ?? 0);
   const paidCard = Number(payload.paid_card || 0);
   const change = Number(payload.change || 0);
 
-  const subtotal = items.reduce(
-    (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
-    0
+  const subtotal = Number(
+    payload.subtotal ??
+      items.reduce(
+        (s, it) =>
+          s +
+          Number(
+            it.line_total ??
+              Number(it.qty ?? it.quantity ?? 0) *
+                Number(it.price ?? it.unit_price ?? 0)
+          ),
+        0
+      )
   );
-  const total = subtotal - discount + tax;
+  const total = Number(payload.total ?? subtotal - discount + tax);
 
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
@@ -279,13 +288,14 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(enc(divider + "\n"));
 
   for (const it of items) {
-    const name = String(it.name ?? "");
-    const qty = Number(it.qty || 0);
-    const price = Number(it.price || 0);
-    chunks.push(enc(name + "\n"));
-    chunks.push(
-      enc(lr(`${qty} x ${money(price)}`, money(qty * price), width) + "\n")
+    const name = String(
+      it.name_snapshot ?? it.name ?? it.product_name ?? it.object_name ?? ""
     );
+    const qty = Number(it.qty ?? it.quantity ?? 0);
+    const price = Number(it.price ?? it.unit_price ?? 0);
+    const lineTotal = Number(it.line_total ?? qty * price);
+    chunks.push(enc(name + "\n"));
+    chunks.push(enc(lr(`${qty} x ${money(price)}`, money(lineTotal), width) + "\n"));
   }
 
   chunks.push(enc(divider + "\n"));
@@ -686,10 +696,23 @@ const SellDetail = ({ onClose, id }) => {
                   {idx + 1}. {product.product_name ?? product.object_name}
                 </p>
                 <div>
-                  <p>{product.tax_total}</p>
+                  <p>
+                    Скидка:{" "}
+                    {Number(
+                      product.line_discount ??
+                        product.line_discount_total ??
+                        product.discount_amount ??
+                        product.discount_total ??
+                        0
+                    )}
+                  </p>
                   <p className="receipt__item-price">
                     {product.quantity} x {product.unit_price} ≡{" "}
-                    {product.quantity * product.unit_price}
+                    {Number(
+                      product.line_total ??
+                        Number(product.quantity || 0) *
+                          Number(product.unit_price || 0)
+                    )}
                   </p>
                 </div>
               </div>
@@ -697,13 +720,10 @@ const SellDetail = ({ onClose, id }) => {
 
             <div className="receipt__total">
               <b>ИТОГО</b>
-              <div
-                style={{ gap: "10px", display: "flex", alignItems: "center" }}
-              >
-                <p>Общая скидка {filterField?.discount_total} </p>
-                <p>Налог {filterField?.tax_total}</p>
-                <b>≡ {filterField?.total}</b>
-              </div>
+              <p>Промежуточный итог: {filterField?.subtotal ?? 0}</p>
+              <p>Общая скидка: -{filterField?.discount_total ?? 0}</p>
+              <p>Налог: {filterField?.tax_total ?? 0}</p>
+              <b>≡ {filterField?.total ?? 0}</b>
             </div>
 
             <div className="receipt__row">

@@ -17,7 +17,9 @@ const ProductRow = React.memo(
     onProductClick,
     enableDrag,
     onProductDragStart,
+    isOutOfStock,
   }) => {
+    const outOfStock = isOutOfStock?.(product) ?? false;
     return (
       <tr
         className="warehouse-table__row"
@@ -73,7 +75,9 @@ const ProductRow = React.memo(
         <td>{product.unit || "—"}</td>
         <td>{formatPrice(product.price)}</td>
         <td>{formatPrice(product.discount_percent || 0)}</td>
-        <td>{formatStock(product.quantity)}</td>
+        <td className={outOfStock ? "text-red-600 font-semibold" : ""}>
+          {formatStock(product.quantity)}
+        </td>
       </tr>
     );
   },
@@ -85,7 +89,8 @@ const ProductRow = React.memo(
       prevProps.rowNumber === nextProps.rowNumber &&
       prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url &&
       prevProps.enableDrag === nextProps.enableDrag &&
-      prevProps.onProductDragStart === nextProps.onProductDragStart
+      prevProps.onProductDragStart === nextProps.onProductDragStart &&
+      prevProps.isOutOfStock === nextProps.isOutOfStock
     );
   }
 );
@@ -106,6 +111,7 @@ const ProductTable = ({
   getRowNumber,
   enableDrag = false,
   onProductDragStart,
+  isOutOfStock,
 }) => {
   // Мемоизация вычислений для всех товаров (критическая оптимизация)
   const primaryImagesMap = useMemo(() => {
@@ -198,6 +204,7 @@ const ProductTable = ({
               onProductClick={onProductClick}
               enableDrag={enableDrag}
               onProductDragStart={onProductDragStart}
+              isOutOfStock={isOutOfStock}
             />
           ))}
         </tbody>
@@ -215,7 +222,8 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
     prevProps.getRowNumber !== nextProps.getRowNumber ||
     prevProps.enableDrag !== nextProps.enableDrag ||
-    prevProps.onProductDragStart !== nextProps.onProductDragStart
+    prevProps.onProductDragStart !== nextProps.onProductDragStart ||
+    prevProps.isOutOfStock !== nextProps.isOutOfStock
   ) {
     return false;
   }

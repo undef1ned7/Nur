@@ -223,3 +223,22 @@ export const fetchWarehouseProductsAsync = createAsyncThunk(
     }
   }
 );
+
+/**
+ * Остатки текущего агента склада
+ * GET /api/warehouse/agents/me/products/
+ * params: page, search, warehouse, product_group
+ */
+export const fetchAgentProductsAsync = createAsyncThunk(
+  "warehouseAgentProducts/fetchAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/warehouse/agents/me/products/", {
+        params,
+      });
+      return data;
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);

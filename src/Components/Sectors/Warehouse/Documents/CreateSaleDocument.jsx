@@ -973,7 +973,7 @@ const CreateSaleDocument = () => {
                               } ${isKeyboardActive ? "active" : ""}${
                                 isZeroQty
                                   ? " create-sale-document__group-product-item--zero-qty"
-                                  : ""
+                                  : " create-sale-document__group-product-item--in-stock"
                               }`}
                               onMouseEnter={() => {
                                 setActiveGroupKeyForKeyboard(gKey);
@@ -1468,6 +1468,10 @@ const CreateSaleDocument = () => {
     }
     return ["SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
   }, [docType, paymentKind]);
+
+  // Агент и контрагент в продаже/возврате показываем всегда (раньше скрывались при оплате не в долг)
+  const showAgentCounterpartyFields =
+    isCounterpartyRequired || isAgentFilterRelevant;
 
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
@@ -2625,7 +2629,7 @@ const CreateSaleDocument = () => {
                                         } ${isKeyboardActive ? "active" : ""}${
                                           isZeroQty
                                             ? " create-sale-document__group-product-item--zero-qty"
-                                            : ""
+                                            : " create-sale-document__group-product-item--in-stock"
                                         }`}
                                         onMouseEnter={() => {
                                           setActiveGroupKeyForKeyboard(key);
@@ -2902,7 +2906,7 @@ const CreateSaleDocument = () => {
                   />
                 </div>
               )}
-              {isCounterpartyRequired && (
+              {showAgentCounterpartyFields && (
                 <>
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
                     <User

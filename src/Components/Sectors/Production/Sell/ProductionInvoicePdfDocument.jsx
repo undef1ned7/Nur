@@ -286,50 +286,55 @@ export default function ProductionInvoicePdfDocument({ data }) {
   const buyer = data?.buyer || null;
   const agent = data?.agent || null;
 
-  const totals = data?.totals || {};
-  const total = Number(totals.total || 0);
-  const subtotal = Number(totals.subtotal ?? totals.amount ?? 0);
+  const total = Number(data?.totals?.total ?? data?.total ?? 0);
+  const subtotal = Number(
+    data?.totals?.subtotal ?? data?.totals?.amount ?? data?.subtotal ?? 0,
+  );
   const totalDiscount = Number(
-    totals.discount_total ?? totals.order_discount_total ?? data?.sale?.discount_total ?? 0,
+    data?.totals?.discount_total ??
+      data?.totals?.order_discount_total ??
+      data?.sale?.discount_total ??
+      data?.discount_total ??
+      0,
   );
 
-  const items = Array.isArray(data?.items)
-    ? data.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const lineTotal = Number(it.total ?? it.line_total ?? qty * unit);
-        const itemDiscountPercent = Number(
-          it.discount_percent ?? it.discount ?? 0,
-        );
-        const itemDiscountAmount = Number(
-          it.discount_total ?? it.line_discount ?? it.line_discount_total ?? 0,
-        );
+  const sourceItems = Array.isArray(data?.sale?.items)
+    ? data.sale.items
+    : Array.isArray(data?.items)
+      ? data.items
+      : [];
 
-        let priceNoDiscount = Number(
-          it.original_price ??
-            it.price_before_discount ??
-            it.price_without_discount ??
-            unit,
-        );
-        if (!priceNoDiscount) priceNoDiscount = unit;
+  const items = sourceItems.map((it) => {
+    const qty = Number(it.qty || it.quantity || 0);
+    const unit = Number(it.unit_price ?? it.price ?? 0);
+    const lineTotal = Number(it.line_total ?? it.total ?? qty * unit);
+    const itemDiscountAmount = Number(
+      it.line_discount ?? it.discount_total ?? it.line_discount_total ?? 0,
+    );
+    const baseLineTotal = unit * qty;
 
-        return {
-          id: it.id,
-          name: it.name || it.product_name || "Товар",
-          qty,
-          unit_price: unit,
-          price_no_discount: priceNoDiscount,
-          discount: itemDiscountPercent,
-          discount_amount: itemDiscountAmount,
-          total: lineTotal,
-          unit: it.unit || "ШТ",
-          article: it.article || "",
-        };
-      })
-    : [];
+    const itemDiscountPercent =
+      itemDiscountAmount > 0 && baseLineTotal > 0
+        ? (itemDiscountAmount / baseLineTotal) * 100
+        : 0;
 
-  const invoiceNumber = doc.number || "";
-  const invoiceDate = doc.datetime || doc.date || "";
+    return {
+      id: it.id,
+      name: it.name || it.product_name || "Товар",
+      qty,
+      unit_price: qty > 0 ? lineTotal / qty : unit,
+      price_no_discount: unit,
+      discount: itemDiscountPercent,
+      discount_amount: itemDiscountAmount,
+      total: lineTotal,
+      unit: it.unit || "ШТ",
+      article: it.article || "",
+    };
+  });
+
+  const invoiceNumber =
+    doc.number || data?.number || data?.id?.slice(0, 8) || "";
+  const invoiceDate = doc.datetime || doc.date || data?.created_at || "";
 
   const clientMetaLine1 = [
     renderInlineValue(
@@ -394,9 +399,7 @@ export default function ProductionInvoicePdfDocument({ data }) {
           }}
         >
           <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>
-              Поставщик:{" "}
-            </Text>
+            <Text style={{ fontSize: 8, fontWeight: "bold" }}>Поставщик: </Text>
             <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
             {seller.address && (
               <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
@@ -404,7 +407,9 @@ export default function ProductionInvoicePdfDocument({ data }) {
           </View>
 
           {!!sellerMetaLine && (
-            <Text style={{ fontSize: 7, marginLeft: 54 }}>{sellerMetaLine}</Text>
+            <Text style={{ fontSize: 7, marginLeft: 54 }}>
+              {sellerMetaLine}
+            </Text>
           )}
 
           <View style={{ flexDirection: "row", fontSize: 8 }}>
@@ -421,13 +426,19 @@ export default function ProductionInvoicePdfDocument({ data }) {
           </View>
 
           {!!clientMetaLine1 && (
-            <Text style={{ fontSize: 7, marginLeft: 58 }}>{clientMetaLine1}</Text>
+            <Text style={{ fontSize: 7, marginLeft: 58 }}>
+              {clientMetaLine1}
+            </Text>
           )}
           {!!clientMetaLine2 && (
-            <Text style={{ fontSize: 7, marginLeft: 58 }}>{clientMetaLine2}</Text>
+            <Text style={{ fontSize: 7, marginLeft: 58 }}>
+              {clientMetaLine2}
+            </Text>
           )}
           {!!clientMetaLine3 && (
-            <Text style={{ fontSize: 7, marginLeft: 58 }}>{clientMetaLine3}</Text>
+            <Text style={{ fontSize: 7, marginLeft: 58 }}>
+              {clientMetaLine3}
+            </Text>
           )}
 
           {(agentName || agentMetaLine) && (
@@ -439,7 +450,9 @@ export default function ProductionInvoicePdfDocument({ data }) {
                 <Text style={{ fontSize: 8 }}>{safe(agentName)}</Text>
               </View>
               {!!agentMetaLine && (
-                <Text style={{ fontSize: 7, marginLeft: 50 }}>{agentMetaLine}</Text>
+                <Text style={{ fontSize: 7, marginLeft: 50 }}>
+                  {agentMetaLine}
+                </Text>
               )}
             </>
           )}
@@ -500,7 +513,9 @@ export default function ProductionInvoicePdfDocument({ data }) {
                 <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
               </View>
               <View style={[s.tableCell, s.colPriceNoDiscount]}>
-                <Text style={{ textAlign: "right" }}>{n2(it.price_no_discount)}</Text>
+                <Text style={{ textAlign: "right" }}>
+                  {n2(it.price_no_discount)}
+                </Text>
               </View>
               <View style={[s.tableCell, s.colDiscount]}>
                 <Text style={{ textAlign: "right" }}>
@@ -535,7 +550,9 @@ export default function ProductionInvoicePdfDocument({ data }) {
             </View>
             <View style={[s.tableCell, s.colQty]}>
               <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                {fmtQty(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
+                {fmtQty(
+                  items.reduce((sum, it) => sum + Number(it.qty || 0), 0),
+                )}
               </Text>
             </View>
             <View style={[s.tableCell, s.colPriceNoDiscount]}>

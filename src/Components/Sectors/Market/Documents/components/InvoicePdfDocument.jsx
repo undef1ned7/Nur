@@ -324,56 +324,176 @@ function numToWords(num) {
   return result.trim();
 }
 
+function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
+  const rawPercent = Number(doc.discount_percent);
+  const percentProvided =
+    doc.discount_percent != null &&
+    doc.discount_percent !== "" &&
+    !Number.isNaN(rawPercent) &&
+    rawPercent >= 0 &&
+    rawPercent <= 100;
+
+  const explicitAmount = Number(
+    doc.order_discount_total ??
+      doc.discount_total ??
+      doc.discount_amount ??
+      data?.order_discount_total ??
+      0
+  );
+
+  let documentDiscountPercent = 0;
+  let documentDiscountAmount = 0;
+
+  if (percentProvided) {
+    documentDiscountPercent = rawPercent;
+    if (explicitAmount > 0) {
+      documentDiscountAmount = explicitAmount;
+    } else if (subtotal > 0) {
+      documentDiscountAmount = (subtotal * rawPercent) / 100;
+    }
+  } else if (explicitAmount > 0) {
+    documentDiscountAmount = explicitAmount;
+    if (subtotal > 0) {
+      documentDiscountPercent = (explicitAmount / subtotal) * 100;
+    }
+  }
+
+  const docPctRaw = Number(doc.discount_percent);
+  const hasLinesWithDocDiscount =
+    docPctRaw > 0 &&
+    Array.isArray(rawItems) &&
+    rawItems.some((item) => {
+      const dp = item.discount_percent;
+      return dp == 0 || !dp;
+    });
+
+  const baseShow = documentDiscountAmount > 0 || documentDiscountPercent > 0;
+  const showDocumentDiscountLine =
+    baseShow && (docPctRaw <= 0 || hasLinesWithDocDiscount);
+
+  return {
+    documentDiscountPercent,
+    documentDiscountAmount,
+    showDocumentDiscountLine,
+  };
+}
+
 export default function InvoicePdfDocument({ data }) {
   registerPdfFonts();
-  const doc = data?.document || {};
+  const doc = data?.document || data || {};
   const seller = data?.seller || {};
-  const buyer = data?.buyer || null;
+  const buyer =
+    data?.buyer ||
+    (data?.client_name
+      ? { name: data.client_name, full_name: data.client_name }
+      : null);
 
   const totals = data?.totals || {};
-  const subtotal = Number(totals.subtotal || 0);
-  const discountTotal = Number(totals.discount_total || 0);
-  const tax = Number(totals.tax_total || 0);
-  const total = Number(totals.total || 0);
+  const subtotal = Number(data?.subtotal ?? totals.subtotal ?? 0);
+  const discountTotal = Number(data?.discount_total ?? totals.discount_total ?? 0);
+  const tax = Number(data?.tax_total ?? totals.tax_total ?? 0);
+  const total = Number(data?.total ?? totals.total ?? 0);
+  const docDiscountPctForLines = Number(doc.discount_percent ?? 0);
 
   // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const total = Number(it.total ?? qty * unit);
+        const toNum = (v) => {
+          const n = Number(String(v ?? "").replace(",", "."));
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const qty = toNum(it.qty || it.quantity || 0);
+        const unitBase = toNum(it.unit_price ?? it.price ?? 0);
+        const baseLineTotal = unitBase * qty;
+        const rowTotalRaw =
+          it.line_total != null && it.line_total !== ""
+            ? toNum(it.line_total)
+            : it.total != null && it.total !== ""
+              ? toNum(it.total)
+              : null;
 
         // Скидка только по товару (процент 0–100)
-        const itemDiscountPercent = Number(it.discount_percent ?? it.discount ?? 0);
+        const lineDiscount = toNum(it.discount_percent ?? it.discount ?? 0);
+        const lineDiscountAmount = toNum(
+          it.line_discount ??
+            it.line_discount_total ??
+            it.discount_amount ??
+            it.discount_total ??
+            0
+        );
+        const discountFromRowTotal =
+          rowTotalRaw != null && baseLineTotal > 0 && rowTotalRaw < baseLineTotal
+            ? ((baseLineTotal - rowTotalRaw) / baseLineTotal) * 100
+            : 0;
+        const itemDiscountPercentRaw =
+          it.effective_discount_percent != null &&
+          it.effective_discount_percent !== ""
+            ? toNum(it.effective_discount_percent)
+            : lineDiscount > 0
+              ? lineDiscount
+              : lineDiscountAmount > 0 && baseLineTotal > 0
+                ? (lineDiscountAmount / baseLineTotal) * 100
+              : discountFromRowTotal > 0
+                ? discountFromRowTotal
+              : docDiscountPctForLines;
+        const itemDiscountPercent = Number.isFinite(itemDiscountPercentRaw)
+          ? itemDiscountPercentRaw
+          : 0;
 
         // Базовая цена без скидки — берём явное поле, иначе текущую цену
         let priceNoDiscount = Number(
           it.original_price ??
             it.price_before_discount ??
             it.price_without_discount ??
-            unit
+            unitBase
         );
         if (!priceNoDiscount) {
-          priceNoDiscount = unit;
+          priceNoDiscount = unitBase;
         }
+
+        const fallbackLineTotal = Math.max(
+          0,
+          baseLineTotal * (1 - Number(itemDiscountPercent || 0) / 100)
+        );
+        const rowTotal = Number(
+          rowTotalRaw != null && !Number.isNaN(rowTotalRaw)
+            ? rowTotalRaw
+            : fallbackLineTotal
+        );
+        const priceAfterDiscount =
+          qty > 0
+            ? rowTotal / qty
+            : priceNoDiscount * (1 - Number(itemDiscountPercent || 0) / 100);
+
+        console.log("item debug:", it.name_snapshot, {
+          qty,
+          unitBase,
+          baseLineTotal,
+          lineDiscountAmount,
+          discountFromRowTotal,
+          itemDiscountPercent,
+        });
 
         return {
           id: it.id,
-          name: it.name || it.product_name || "Товар",
+          name: it.name_snapshot || it.name || it.product_name || "Товар",
           qty,
-          unit_price: unit,
+          unit_price: priceAfterDiscount,
           price_no_discount: priceNoDiscount,
-            // В колонке «Скидка» отображаем только скидку по позиции.
-            discount: itemDiscountPercent,
-          total,
+          // В колонке «Скидка» отображаем только скидку по позиции.
+          discount: itemDiscountPercent,
+          total: rowTotal,
           unit: it.unit || "ШТ",
-          article: it.article || "",
+          article: it.article || it.barcode_snapshot || "",
         };
       })
     : [];
 
   const invoiceNumber = doc.number || "";
-  const invoiceDate = doc.datetime || doc.date || "";
+  const invoiceDate = doc.datetime || doc.date || data?.created_at || "";
+  const { documentDiscountPercent, documentDiscountAmount, showDocumentDiscountLine } =
+    resolveDocumentDiscount(doc, data, subtotal, data?.items);
 
   // Форматирование даты и времени для отображения
   function fmtDateTime(dt) {
@@ -560,6 +680,29 @@ export default function InvoicePdfDocument({ data }) {
 
         {/* Итоги */}
         <View style={s.totalsSection}>
+          <View style={s.totalRow}>
+            <Text style={s.totalLabel}>Подытог:</Text>
+            <Text style={s.totalValue}>{n2(subtotal)}</Text>
+          </View>
+          {showDocumentDiscountLine && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>
+                Скидка документа
+                {documentDiscountPercent > 0
+                  ? ` (${n2(documentDiscountPercent)}%)`
+                  : ""}:
+              </Text>
+              <Text style={s.totalValue}>
+                -{n2(documentDiscountAmount || discountTotal)}
+              </Text>
+            </View>
+          )}
+          {tax > 0 && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Налог:</Text>
+              <Text style={s.totalValue}>{n2(tax)}</Text>
+            </View>
+          )}
           <View style={[s.totalRow, s.totalBold]}>
             <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
             <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>

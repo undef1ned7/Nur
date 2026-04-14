@@ -1081,6 +1081,8 @@ const Agents = () => {
   const [newMembershipUserId, setNewMembershipUserId] = useState("");
   const [newMembershipCommonEnabled, setNewMembershipCommonEnabled] =
     useState(false);
+  const [newMembershipAssignedWarehouse, setNewMembershipAssignedWarehouse] =
+    useState("");
   const [newMembershipWarehouse, setNewMembershipWarehouse] = useState("");
   const [newMembershipBusy, setNewMembershipBusy] = useState(false);
   const [newMembershipError, setNewMembershipError] = useState("");
@@ -1369,14 +1371,18 @@ const Agents = () => {
     if (!request?.id || companyActionBusyId) return;
     setCompanyActionBusyId(request.id);
     try {
-      if (!warehouseId) {
+      const assignedWarehouse = request.assigned_warehouse || null;
+      const effectiveWarehouse = assignedWarehouse || warehouseId || null;
+      if (!effectiveWarehouse) {
         await patchCompanyAgentCommonAccess(request.id, {
           common_access_enabled: false,
+          assigned_warehouse: assignedWarehouse,
         });
       } else {
         await patchCompanyAgentCommonAccess(request.id, {
           common_access_enabled: true,
-          common_warehouse: warehouseId,
+          common_warehouse: effectiveWarehouse,
+          assigned_warehouse: assignedWarehouse,
         });
       }
       await loadCompanyRequests();
@@ -1394,7 +1400,9 @@ const Agents = () => {
 
   const handleCreateMembership = async () => {
     if (!newMembershipUserId.trim() || newMembershipBusy) return;
-    if (newMembershipCommonEnabled && !newMembershipWarehouse) {
+    const assignedWarehouse = newMembershipAssignedWarehouse || null;
+    const commonWarehouse = assignedWarehouse || newMembershipWarehouse || null;
+    if (newMembershipCommonEnabled && !commonWarehouse) {
       setNewMembershipError("Выберите склад для общего прайса.");
       return;
     }
@@ -1403,14 +1411,16 @@ const Agents = () => {
     try {
       const payload = {
         user: newMembershipUserId.trim(),
+        assigned_warehouse: assignedWarehouse,
       };
       if (newMembershipCommonEnabled) {
         payload.common_access_enabled = true;
-        payload.common_warehouse = newMembershipWarehouse;
+        payload.common_warehouse = commonWarehouse;
       }
       await createCompanyMembership(payload);
       setNewMembershipUserId("");
       setNewMembershipCommonEnabled(false);
+      setNewMembershipAssignedWarehouse("");
       setNewMembershipWarehouse("");
       await loadCompanyRequests();
     } catch (e) {
@@ -1424,6 +1434,12 @@ const Agents = () => {
       setNewMembershipBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (newMembershipAssignedWarehouse && newMembershipCommonEnabled) {
+      setNewMembershipWarehouse(newMembershipAssignedWarehouse);
+    }
+  }, [newMembershipAssignedWarehouse, newMembershipCommonEnabled]);
 
   return (
     <div className="warehouse-page agents-page">
@@ -2283,6 +2299,91 @@ const Agents = () => {
                       </div>
                     )}
                   </div> */}
+                  <div
+                    className="warehouse-search-section"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <div
+                      className="warehouse-search__info flex flex-wrap items-center gap-2"
+                      style={{ width: "100%" }}
+                    >
+                      <input
+                        type="text"
+                        className="warehouse-search__input"
+                        style={{ minWidth: 220 }}
+                        placeholder="UUID пользователя"
+                        value={newMembershipUserId}
+                        onChange={(e) => setNewMembershipUserId(e.target.value)}
+                        disabled={newMembershipBusy}
+                      />
+                      <select
+                        className="warehouse-search__input"
+                        style={{ minWidth: 260 }}
+                        value={newMembershipAssignedWarehouse}
+                        onChange={(e) =>
+                          setNewMembershipAssignedWarehouse(e.target.value)
+                        }
+                        disabled={newMembershipBusy}
+                      >
+                        <option value="">
+                          Ограничить доступ одним складом (не выбрано)
+                        </option>
+                        {Object.values(warehousesById || {}).map((w) => (
+                          <option value={w.id} key={w.id}>
+                            {w.name || w.title || shortId(w.id)}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newMembershipCommonEnabled}
+                          onChange={(e) =>
+                            setNewMembershipCommonEnabled(e.target.checked)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        Общий прайс
+                      </label>
+                      <select
+                        className="warehouse-search__input"
+                        style={{ minWidth: 220 }}
+                        value={
+                          newMembershipAssignedWarehouse
+                            ? newMembershipAssignedWarehouse
+                            : newMembershipWarehouse
+                        }
+                        onChange={(e) => setNewMembershipWarehouse(e.target.value)}
+                        disabled={
+                          newMembershipBusy ||
+                          !newMembershipCommonEnabled ||
+                          Boolean(newMembershipAssignedWarehouse)
+                        }
+                      >
+                        <option value="">Склад общего прайса</option>
+                        {Object.values(warehousesById || {}).map((w) => (
+                          <option value={w.id} key={w.id}>
+                            {w.name || w.title || shortId(w.id)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="agents-action-btn agents-action-btn--approve"
+                        onClick={handleCreateMembership}
+                        disabled={newMembershipBusy || !newMembershipUserId.trim()}
+                      >
+                        <Check size={16} />
+                        Назначить агентом
+                      </button>
+                    </div>
+                    {newMembershipError && (
+                      <div className="agents-error" style={{ marginTop: 8 }}>
+                        {newMembershipError}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="warehouse-table-container w-full">
                     <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <table className="warehouse-table w-full min-w-[900px]">
@@ -2291,6 +2392,7 @@ const Agents = () => {
                             <th>№</th>
                             <th>Агент</th>
                             <th>Email</th>
+                            <th>Склад</th>
                             <th>Общий прайс</th>
                             <th>Склад общего прайса</th>
                             <th>Создан</th>
@@ -2302,7 +2404,7 @@ const Agents = () => {
                           {companyRequestsLoading ? (
                             <tr>
                               <td
-                                colSpan={8}
+                                colSpan={9}
                                 className="warehouse-table__loading"
                               >
                                 Загрузка…
@@ -2311,7 +2413,7 @@ const Agents = () => {
                           ) : activeCompanyAgents.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={8}
+                                colSpan={9}
                                 className="warehouse-table__empty"
                               >
                                 Активных агентов нет
@@ -2323,6 +2425,13 @@ const Agents = () => {
                                 <td>{idx + 1}</td>
                                 <td>{r.user_display || shortId(r.user)}</td>
                                 <td>{r.user_email || "—"}</td>
+                                <td>
+                                  {r.assigned_warehouse
+                                    ? warehousesById?.[r.assigned_warehouse]
+                                        ?.name ||
+                                      shortId(r.assigned_warehouse)
+                                    : "Все склады"}
+                                </td>
                                 <td>
                                   <span
                                     className={`agents-badge ${
@@ -2340,14 +2449,21 @@ const Agents = () => {
                                   <select
                                     className="warehouse-search__input"
                                     style={{ minWidth: 220 }}
-                                    value={r.common_warehouse || ""}
+                                    value={
+                                      r.assigned_warehouse ||
+                                      r.common_warehouse ||
+                                      ""
+                                    }
                                     onChange={(e) =>
                                       handleCompanyCommonAccessChange(
                                         r,
                                         e.target.value || null,
                                       )
                                     }
-                                    disabled={companyActionBusyId === r.id}
+                                    disabled={
+                                      companyActionBusyId === r.id ||
+                                      Boolean(r.assigned_warehouse)
+                                    }
                                   >
                                     <option value="">Без общего доступа</option>
                                     {Object.values(warehousesById || {}).map(

@@ -52,7 +52,7 @@ import { validateResErrors } from "../../../../../tools/validateResErrors";
 export function buildReturnRowsFromArrays(
   transfers,
   returnsArr,
-  { agentId = "", query = "", group = true } = {}
+  { agentId = "", query = "", group = true } = {},
 ) {
   const tById = new Map((transfers || []).map((t) => [t.id, t]));
 
@@ -107,7 +107,7 @@ export function buildReturnRowsFromArrays(
           .includes(q) ||
         String(x.agent_name || "")
           .toLowerCase()
-          .includes(q)
+          .includes(q),
     );
   }
 
@@ -119,7 +119,7 @@ const PendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
 
   const { list: returns, loading: returnsLoading } = useSelector(
-    (state) => state.return || { list: [], loading: false }
+    (state) => state.return || { list: [], loading: false },
   );
   const { profile } = useUser();
   const [loading, setLoading] = useState(false);
@@ -156,7 +156,10 @@ const PendingModal = ({ onClose, onChanged }) => {
   };
 
   // ---------------- ФИЛЬТРАЦИЯ ТОЛЬКО PENDING ----------------
-  const filterReturns = useMemo(() => returns.filter((item) => item.status === "pending"), [returns]);
+  const filterReturns = useMemo(
+    () => returns.filter((item) => item.status === "pending"),
+    [returns],
+  );
   // -----------------------------------------------------------
 
   useEffect(() => {
@@ -164,8 +167,8 @@ const PendingModal = ({ onClose, onChanged }) => {
     // если владелец — тянем все передачи, иначе только по агенту
     dispatch(
       fetchTransfersAsync(
-        profile?.role === "owner" ? {} : { agent: profile?.id }
-      )
+        profile?.role === "owner" ? {} : { agent: profile?.id },
+      ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
@@ -178,7 +181,7 @@ const PendingModal = ({ onClose, onChanged }) => {
     try {
       // Принимаем все возвраты агента
       const promises = group.returns.map((returnItem) =>
-        dispatch(approveReturnAsync(returnItem.id)).unwrap()
+        dispatch(approveReturnAsync(returnItem.id)).unwrap(),
       );
       await Promise.all(promises);
 
@@ -193,8 +196,11 @@ const PendingModal = ({ onClose, onChanged }) => {
       setTimeout(() => {
         onClose?.();
       }, 1500);
-    } catch (error) {   
-      const errorMessage = validateResErrors(error, "Ошибка при принятии возвратов");
+    } catch (error) {
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при принятии возвратов",
+      );
       setAlertModal({
         open: true,
         type: "error",
@@ -210,7 +216,7 @@ const PendingModal = ({ onClose, onChanged }) => {
     setLoading(true);
     try {
       const data = await dispatch(
-        listAgentCartsAsync({ status: "submitted" })
+        listAgentCartsAsync({ status: "submitted" }),
       ).unwrap();
       const list = Array.isArray(data) ? data : data?.results || [];
       setRows(list);
@@ -271,8 +277,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         group.returns.some((item) =>
           String(item.product || "")
             .toLowerCase()
-            .includes(q)
-        )
+            .includes(q),
+        ),
     );
   }, [groupedReturns, searchQuery]);
 
@@ -326,7 +332,7 @@ const PendingModal = ({ onClose, onChanged }) => {
 
     if (selectedAgent) {
       filtered = filtered.filter(
-        (group) => String(group.agentId) === String(selectedAgent)
+        (group) => String(group.agentId) === String(selectedAgent),
       );
     }
 
@@ -339,12 +345,12 @@ const PendingModal = ({ onClose, onChanged }) => {
         const hasMatchingClient = group.carts.some((cart) =>
           String(cart?.client_name || cart?.client?.full_name || "")
             .toLowerCase()
-            .includes(q)
+            .includes(q),
         );
         const hasMatchingProduct = group.allItems.some((item) =>
           String(item?.product_name || item?.name || "")
             .toLowerCase()
-            .includes(q)
+            .includes(q),
         );
         return agentName.includes(q) || hasMatchingClient || hasMatchingProduct;
       });
@@ -361,7 +367,7 @@ const PendingModal = ({ onClose, onChanged }) => {
     try {
       // Одобряем все корзины агента
       const approvePromises = group.carts.map((cart) =>
-        dispatch(approveAgentCartAsync(cart.id)).unwrap()
+        dispatch(approveAgentCartAsync(cart.id)).unwrap(),
       );
       await Promise.all(approvePromises);
 
@@ -369,12 +375,12 @@ const PendingModal = ({ onClose, onChanged }) => {
       for (const item of group.allItems) {
         const productId = item.product;
         const quantityToDeduct = Number(
-          item.quantity_requested || item.total_quantity || 0
+          item.quantity_requested || item.total_quantity || 0,
         );
 
         if (!productId || quantityToDeduct <= 0) {
           console.warn(
-            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`
+            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`,
           );
           continue;
         }
@@ -382,7 +388,7 @@ const PendingModal = ({ onClose, onChanged }) => {
         try {
           // Получаем текущий товар для получения актуального количества
           const { data: currentProduct } = await api.get(
-            `/main/products/${productId}/`
+            `/main/products/${productId}/`,
           );
 
           const currentQuantity = Number(currentProduct?.quantity || 0);
@@ -395,12 +401,12 @@ const PendingModal = ({ onClose, onChanged }) => {
               updatedData: {
                 quantity: newQuantity,
               },
-            })
+            }),
           ).unwrap();
         } catch (productError) {
           console.error(
             `Ошибка при обновлении количества товара ${productId}:`,
-            productError
+            productError,
           );
           // Продолжаем обработку других товаров даже при ошибке
         }
@@ -424,8 +430,9 @@ const PendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзин: ${e?.message || "неизвестная ошибка"
-          }`,
+        message: `Ошибка при одобрении корзин: ${
+          e?.message || "неизвестная ошибка"
+        }`,
       });
     } finally {
       setActionLoadingId(null);
@@ -440,7 +447,7 @@ const PendingModal = ({ onClose, onChanged }) => {
     try {
       // Отклоняем все корзины агента
       const rejectPromises = group.carts.map((cart) =>
-        dispatch(rejectAgentCartAsync({ id: cart.id })).unwrap()
+        dispatch(rejectAgentCartAsync({ id: cart.id })).unwrap(),
       );
       await Promise.all(rejectPromises);
 
@@ -553,7 +560,10 @@ const PendingModal = ({ onClose, onChanged }) => {
                                   gap: "6px",
                                 }}
                               >
-                                <Package size={14} style={{ color: "#6b7280" }} />
+                                <Package
+                                  size={14}
+                                  style={{ color: "#6b7280" }}
+                                />
                                 {group.returns.length} возвратов
                               </div>
                             </td>
@@ -562,13 +572,13 @@ const PendingModal = ({ onClose, onChanged }) => {
                             <td data-label="Дата возврата">
                               {group.earliestDate
                                 ? group.earliestDate.toLocaleString("ru-RU", {
-                                  timeZone: "Asia/Bishkek",
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
+                                    timeZone: "Asia/Bishkek",
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
                                 : "—"}
                             </td>
                             <td
@@ -577,7 +587,9 @@ const PendingModal = ({ onClose, onChanged }) => {
                             >
                               <button
                                 className="pending-modal__btn pending-modal__btn--primary"
-                                onClick={() => handleAcceptReturn(group.agentId)}
+                                onClick={() =>
+                                  handleAcceptReturn(group.agentId)
+                                }
                                 disabled={acceptingReturn === group.agentId}
                                 title="Принять все возвраты агента"
                               >
@@ -602,40 +614,44 @@ const PendingModal = ({ onClose, onChanged }) => {
                                     </span>
                                   </div>
                                   <div className="pending-modal__items-grid">
-                                    {group.returns.map((returnItem, itemIdx) => (
-                                      <div
-                                        key={returnItem.id || itemIdx}
-                                        className="pending-modal__item-card"
-                                      >
-                                        <div className="pending-modal__item-name">
-                                          {returnItem.product ||
-                                            "Товар без названия"}
-                                        </div>
-                                        <div className="pending-modal__item-details">
-                                          <span className="pending-modal__item-quantity">
-                                            Количество:{" "}
-                                            <strong>{returnItem.qty || 0}</strong>
-                                          </span>
-                                          {returnItem.returned_at && (
-                                            <span className="pending-modal__item-price">
-                                              Дата:{" "}
+                                    {group.returns.map(
+                                      (returnItem, itemIdx) => (
+                                        <div
+                                          key={returnItem.id || itemIdx}
+                                          className="pending-modal__item-card"
+                                        >
+                                          <div className="pending-modal__item-name">
+                                            {returnItem.product ||
+                                              "Товар без названия"}
+                                          </div>
+                                          <div className="pending-modal__item-details">
+                                            <span className="pending-modal__item-quantity">
+                                              Количество:{" "}
                                               <strong>
-                                                {new Date(
-                                                  returnItem.returned_at
-                                                ).toLocaleString("ru-RU", {
-                                                  timeZone: "Asia/Bishkek",
-                                                  day: "2-digit",
-                                                  month: "2-digit",
-                                                  year: "numeric",
-                                                  hour: "2-digit",
-                                                  minute: "2-digit",
-                                                })}
+                                                {returnItem.qty || 0}
                                               </strong>
                                             </span>
-                                          )}
+                                            {returnItem.returned_at && (
+                                              <span className="pending-modal__item-price">
+                                                Дата:{" "}
+                                                <strong>
+                                                  {new Date(
+                                                    returnItem.returned_at,
+                                                  ).toLocaleString("ru-RU", {
+                                                    timeZone: "Asia/Bishkek",
+                                                    day: "2-digit",
+                                                    month: "2-digit",
+                                                    year: "numeric",
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                  })}
+                                                </strong>
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))}
+                                      ),
+                                    )}
                                   </div>
                                 </div>
                               </td>
@@ -711,10 +727,10 @@ const PendingModal = ({ onClose, onChanged }) => {
                           group.carts
                             .map(
                               (cart) =>
-                                cart?.client_name || cart?.client?.full_name
+                                cart?.client_name || cart?.client?.full_name,
                             )
-                            .filter(Boolean)
-                        )
+                            .filter(Boolean),
+                        ),
                       );
 
                       return (
@@ -769,7 +785,10 @@ const PendingModal = ({ onClose, onChanged }) => {
                                   gap: "6px",
                                 }}
                               >
-                                <Package size={14} style={{ color: "#6b7280" }} />
+                                <Package
+                                  size={14}
+                                  style={{ color: "#6b7280" }}
+                                />
                                 {group.allItems.length}
                               </div>
                             </td>
@@ -777,10 +796,7 @@ const PendingModal = ({ onClose, onChanged }) => {
                               data-label="Действия"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <div
-                                className="flex gap-2 items-center flex-wrap"
-
-                              >
+                              <div className="flex gap-2 items-center flex-wrap">
                                 <button
                                   className="pending-modal__btn pending-modal__btn--primary"
                                   onClick={() => handleApprove(group.agentId)}
@@ -846,9 +862,9 @@ const PendingModal = ({ onClose, onChanged }) => {
                                             <span className="pending-modal__item-price">
                                               Цена:{" "}
                                               <strong>
-                                                {Number(item.unit_price).toFixed(
-                                                  2
-                                                )}
+                                                {Number(
+                                                  item.unit_price,
+                                                ).toFixed(2)}
                                               </strong>
                                             </span>
                                           )}
@@ -900,8 +916,9 @@ const PendingModal = ({ onClose, onChanged }) => {
           {tabs.map((tab, index) => (
             <button
               key={index}
-              className={`pending-modal__tab ${index === activeTab ? "pending-modal__tab--active" : ""
-                }`}
+              className={`pending-modal__tab ${
+                index === activeTab ? "pending-modal__tab--active" : ""
+              }`}
               onClick={() => handleTabChange(index)}
             >
               {tab.label}
@@ -942,7 +959,6 @@ const PendingModal = ({ onClose, onChanged }) => {
         onClose={() => setAlertModal({ ...alertModal, open: false })}
       />
     </div>
-
   );
 };
 
@@ -951,10 +967,29 @@ const ProductionWarehouse = () => {
   const dispatch = useDispatch();
   const { list: products } = useProducts();
 
-
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAgentCartsModal, setShowAgentCartsModal] = useState(false);
   const [showTransferStatusModal, setShowTransferStatusModal] = useState(false);
+  const warehouseTotals = useMemo(() => {
+    const totals = (products || []).reduce(
+      (acc, product) => {
+        const quantity = Number(product?.quantity || 0);
+        const purchasePrice = Number(product?.purchase_price || 0);
+        const salePrice = Number(product?.price || 0);
+
+        acc.purchase += purchasePrice * quantity;
+        acc.sale += salePrice * quantity;
+        return acc;
+      },
+      { purchase: 0, sale: 0 },
+    );
+
+    return {
+      purchase: totals.purchase,
+      sale: totals.sale,
+      profit: totals.sale - totals.purchase,
+    };
+  }, [products]);
 
   const tabs = [
     {
@@ -978,13 +1013,34 @@ const ProductionWarehouse = () => {
   return (
     <section className="warehouseP sklad">
       <div className="vitrina__header" style={{ margin: "15px 0" }}>
+        {activeTab === 0 && (
+          <div
+            style={{
+              marginBottom: "12px",
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div className="vitrina__tab" style={{ cursor: "default" }}>
+              Закупка: {warehouseTotals.purchase.toFixed(2)} сом
+            </div>
+            <div className="vitrina__tab" style={{ cursor: "default" }}>
+              Продажная стоимость: {warehouseTotals.sale.toFixed(2)} сом
+            </div>
+            <div className="vitrina__tab" style={{ cursor: "default" }}>
+              Потенциальная прибыль: {warehouseTotals.profit.toFixed(2)} сом
+            </div>
+          </div>
+        )}
         <div className="vitrina__tabs flex-wrap px-0! md:w-full md:justify-center lg:justify-start">
           {tabs.map((tab, index) => {
             return (
               <span
                 key={index}
-                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
-                  } flex-1/2 md:flex-none`}
+                className={`vitrina__tab ${
+                  index === activeTab && "vitrina__tab--active"
+                } flex-1/2 md:flex-none`}
                 style={{ cursor: "pointer" }}
                 onClick={() => setActiveTab(index)}
               >
@@ -1054,7 +1110,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
     setLoading(true);
     try {
       const data = await dispatch(
-        listAgentCartsAsync({ status: "submitted" })
+        listAgentCartsAsync({ status: "submitted" }),
       ).unwrap();
       const list = Array.isArray(data) ? data : data?.results || [];
       setRows(list);
@@ -1085,12 +1141,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
       for (const item of cart.items) {
         const productId = item.product;
         const quantityToDeduct = Number(
-          item.quantity_requested || item.total_quantity || 0
+          item.quantity_requested || item.total_quantity || 0,
         );
 
         if (!productId || quantityToDeduct <= 0) {
           console.warn(
-            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`
+            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`,
           );
           continue;
         }
@@ -1098,7 +1154,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         try {
           // Получаем текущий товар для получения актуального количества
           const { data: currentProduct } = await api.get(
-            `/main/products/${productId}/`
+            `/main/products/${productId}/`,
           );
 
           const currentQuantity = Number(currentProduct?.quantity || 0);
@@ -1111,12 +1167,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
               updatedData: {
                 quantity: newQuantity,
               },
-            })
+            }),
           ).unwrap();
         } catch (productError) {
           console.error(
             `Ошибка при обновлении количества товара ${productId}:`,
-            productError
+            productError,
           );
           // Продолжаем обработку других товаров даже при ошибке
         }
@@ -1159,7 +1215,10 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
       });
       await load();
     } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при отклонении корзины");
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при отклонении корзины",
+      );
       setAlertModal({
         open: true,
         type: "error",
@@ -1175,29 +1234,34 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
   const [selectedAgent, setSelectedAgent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
-  const filteredRows = useMemo(() => (rows || []).filter((cart) => {
-    // agent filter by id if available
-    const agId = cart?.agent?.id || cart?.agent_id || "";
-    if (selectedAgent && String(agId) !== String(selectedAgent)) return false;
-    const agentName =
-      cart?.agent_name ||
-      [cart?.agent?.first_name, cart?.agent?.last_name]
-        .filter(Boolean)
-        .join(" ");
-    const clientName = cart?.client_name || cart?.client?.full_name || "";
-    const q = String(debouncedSearchQuery || "")
-      .toLowerCase()
-      .trim();
-    if (!q) return true;
-    return (
-      String(agentName || "")
-        .toLowerCase()
-        .includes(q) ||
-      String(clientName || "")
-        .toLowerCase()
-        .includes(q)
-    );
-  }), [selectedAgent, debouncedSearchQuery]);
+  const filteredRows = useMemo(
+    () =>
+      (rows || []).filter((cart) => {
+        // agent filter by id if available
+        const agId = cart?.agent?.id || cart?.agent_id || "";
+        if (selectedAgent && String(agId) !== String(selectedAgent))
+          return false;
+        const agentName =
+          cart?.agent_name ||
+          [cart?.agent?.first_name, cart?.agent?.last_name]
+            .filter(Boolean)
+            .join(" ");
+        const clientName = cart?.client_name || cart?.client?.full_name || "";
+        const q = String(debouncedSearchQuery || "")
+          .toLowerCase()
+          .trim();
+        if (!q) return true;
+        return (
+          String(agentName || "")
+            .toLowerCase()
+            .includes(q) ||
+          String(clientName || "")
+            .toLowerCase()
+            .includes(q)
+        );
+      }),
+    [selectedAgent, debouncedSearchQuery],
+  );
 
   return (
     <div className="add-modal accept">
@@ -1271,7 +1335,8 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
                       <td data-label="№">{idx + 1}</td>
                       <td data-label="Агент">
                         {cart?.agent_name ||
-                          `${cart?.agent?.first_name || ""} ${cart?.agent?.last_name || ""
+                          `${cart?.agent?.first_name || ""} ${
+                            cart?.agent?.last_name || ""
                           }`}
                       </td>
                       <td data-label="Клиент">
@@ -1311,7 +1376,6 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
               </table>
             </div>
           </DataContainer>
-
         )}
 
         <div className="add-modal__footer" style={{ marginTop: "15px" }}>

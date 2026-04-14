@@ -15,6 +15,7 @@ import {
   updateWarehouseCategoryAsync,
   deleteWarehouseCategoryAsync,
   bulkDeleteWarehouseCategoriesAsync,
+  fetchAgentProductsAsync,
 } from "../creators/warehouseCreators";
 
 const initialState = {
@@ -61,6 +62,14 @@ const initialState = {
   updateCategoryError: null,
   deletingCategory: false,
   deleteCategoryError: null,
+
+  // Warehouse agent products (my stocks)
+  agentProducts: [],
+  agentProductsCount: 0,
+  agentProductsNext: null,
+  agentProductsPrevious: null,
+  agentProductsLoading: false,
+  agentProductsError: null,
 };
 
 const warehouseSlice = createSlice({
@@ -324,6 +333,31 @@ const warehouseSlice = createSlice({
       .addCase(bulkDeleteWarehouseCategoriesAsync.rejected, (state, action) => {
         state.deletingCategory = false;
         state.deleteCategoryError = action.payload;
+      })
+
+      // Warehouse agent products
+      .addCase(fetchAgentProductsAsync.pending, (state) => {
+        state.agentProductsLoading = true;
+        state.agentProductsError = null;
+      })
+      .addCase(fetchAgentProductsAsync.fulfilled, (state, action) => {
+        state.agentProductsLoading = false;
+        const results = Array.isArray(action.payload?.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+            ? action.payload
+            : [];
+        state.agentProducts = results;
+        state.agentProductsCount =
+          typeof action.payload?.count === "number"
+            ? action.payload.count
+            : results.length;
+        state.agentProductsNext = action.payload?.next ?? null;
+        state.agentProductsPrevious = action.payload?.previous ?? null;
+      })
+      .addCase(fetchAgentProductsAsync.rejected, (state, action) => {
+        state.agentProductsLoading = false;
+        state.agentProductsError = action.payload;
       });
   },
 });

@@ -32,7 +32,6 @@ const ProductionSellDetail = ({
   const [returning, setReturning] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [error, setError] = useState("");
-
   const formatMoney = (value) => Number(value || 0).toFixed(2);
   const itemsDiscountTotal = Array.isArray(sale?.items)
     ? sale.items.reduce(
@@ -92,28 +91,31 @@ const ProductionSellDetail = ({
       setError("Возврат возможен только для оплаченных или долговых продаж.");
       return;
     }
-    confirm("Выполнить возврат? Статус продажи станет «Возвращена».", async (ok) => {
-      if (!ok) return;
-      setError("");
-      setReturning(true);
-      try {
-        if (useGlobalAccess) {
-          await getAllProductionSaleReturn(id);
-        } else {
-          await agentSaleReturn(id);
+    confirm(
+      "Выполнить возврат? Статус продажи станет «Возвращена».",
+      async (ok) => {
+        if (!ok) return;
+        setError("");
+        setReturning(true);
+        try {
+          if (useGlobalAccess) {
+            await getAllProductionSaleReturn(id);
+          } else {
+            await agentSaleReturn(id);
+          }
+          onReturnSuccess?.();
+          onClose();
+        } catch (err) {
+          const msg =
+            err?.response?.data?.detail ||
+            err?.message ||
+            "Не удалось выполнить возврат";
+          setError(msg);
+        } finally {
+          setReturning(false);
         }
-        onReturnSuccess?.();
-        onClose();
-      } catch (err) {
-        const msg =
-          err?.response?.data?.detail ||
-          err?.message ||
-          "Не удалось выполнить возврат";
-        setError(msg);
-      } finally {
-        setReturning(false);
-      }
-    });
+      },
+    );
   };
 
   const handleDownloadInvoice = async () => {
@@ -122,16 +124,44 @@ const ProductionSellDetail = ({
     setDownloadingInvoice(true);
     try {
       const invoiceData = await getAgentSaleInvoiceJson(id);
+      console.log("=== invoiceData ===", JSON.stringify(invoiceData, null, 2));
+      console.log("=== sale ===", JSON.stringify(sale, null, 2));
       if (!invoiceData) {
         throw new Error("Нет данных для генерации накладной");
       }
 
       const client = sale?.client || {};
       const userDisplayLooksLikeEmail =
-        typeof sale?.user_display === "string" && sale.user_display.includes("@");
+        typeof sale?.user_display === "string" &&
+        sale.user_display.includes("@");
+      // Build a lookup map from sale.items by id for discount data
+      const saleItemsMap = {};
+      if (Array.isArray(sale?.items)) {
+        sale.items.forEach((si) => {
+          if (si.id) saleItemsMap[si.id] = si;
+        });
+      }
+
+      // Merge discount fields from sale.items into invoiceData.items
+      const mergedItems = Array.isArray(invoiceData?.items)
+        ? invoiceData.items.map((item) => {
+            const saleItem = saleItemsMap[item.id];
+            return {
+              ...item,
+              line_discount: saleItem?.line_discount ?? item.line_discount ?? "0",
+              quantity: item.qty ?? saleItem?.quantity ?? item.quantity ?? "1",
+              line_total:
+                item.total != null
+                  ? Number(item.total)
+                  : saleItem?.line_total ??
+                    Number(item.unit_price) * Number(item.qty || 1),
+            };
+          })
+        : [];
 
       const productionInvoiceData = {
         ...invoiceData,
+        items: mergedItems,
         sale,
         seller: {
           ...invoiceData?.seller,
@@ -208,7 +238,8 @@ const ProductionSellDetail = ({
     }
   };
 
-  const canReturn = sale && ["paid", "debt"].includes((sale.status || "").toLowerCase());
+  const canReturn =
+    sale && ["paid", "debt"].includes((sale.status || "").toLowerCase());
 
   return (
     <div className="sellDetail add-modal">
@@ -259,9 +290,10 @@ const ProductionSellDetail = ({
                         const lineBase = qty * unitPrice;
                         const lineTotal = Math.max(0, lineBase - lineDiscount);
                         return (
-                      <p className="receipt__item-price">
-                            {qty} × {unitPrice.toFixed(2)} = {lineTotal.toFixed(2)} сом
-                      </p>
+                          <p className="receipt__item-price">
+                            {qty} × {unitPrice.toFixed(2)} ={" "}
+                            {lineTotal.toFixed(2)} сом
+                          </p>
                         );
                       })()}
                       {Number(
@@ -295,12 +327,8 @@ const ProductionSellDetail = ({
                     }}
                   >
                     {subtotal > 0 && <p>Подытог {formatMoney(subtotal)}</p>}
-                    {hasDiscount && (
-                      <p>Скидка {formatMoney(discountTotal)}</p>
-                    )}
-                    {hasTax && (
-                      <p>Налог {formatMoney(taxTotal)}</p>
-                    )}
+                    {hasDiscount && <p>Скидка {formatMoney(discountTotal)}</p>}
+                    {hasTax && <p>Налог {formatMoney(taxTotal)}</p>}
                     <b>{formatMoney(total)} сом</b>
                   </div>
                 </div>
