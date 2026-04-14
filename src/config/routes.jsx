@@ -161,6 +161,7 @@ import AgentAnalytics from "../Components/Sectors/Production/Analytics/AgentAnal
 import ProductionAnalytics from "../Components/Sectors/Production/Analytics/ProductionAnalytics";
 import ProductionSell from "../Components/Sectors/Production/Sell/ProductionSell";
 import ProductionSellStartPage from "../Components/Sectors/Production/Sell/ProductionSellStartPage";
+import ProductionFinishedGoodsAddPage from "../Components/Sectors/Production/FinishedGoods/ProductionFinishedGoodsAddPage";
 
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
@@ -644,6 +645,10 @@ export const crmRoutes = (profile) => [
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
+  createProtectedRoute(
+    "production/warehouse/add-product",
+    ProductionFinishedGoodsAddPage,
+  ),
   createProtectedRoute(
     "production/warehouse/:id",
     ProductionWarehouseProductDetail,

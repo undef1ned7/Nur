@@ -65,7 +65,11 @@ import "../../../Deposits/Sklad/Sklad.scss";
 import "./finishedGoods.scss";
 import noImage from "../../Market/Warehouse/components/placeholder.png";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
-import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import {
+  useAlert,
+  useConfirm,
+  useErrorModal,
+} from "../../../../hooks/useDialog";
 import usePlurize from "../../../../hooks/usePlurize";
 import useResize from "../../../../hooks/useResize";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -74,9 +78,14 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
    ============================================================ */
-const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
-  const error = useErrorModal()
-  const alert = useAlert()
+export const AddModal = ({
+  onClose,
+  onSaveSuccess,
+  selectCashBox,
+  isPage = false,
+}) => {
+  const error = useErrorModal();
+  const alert = useAlert();
   const dispatch = useDispatch();
   // Категории/бренды из product slice
   const { categories, brands } = useProducts();
@@ -85,14 +94,14 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   const materials = useSelector((s) => s.product?.itemsMake ?? []);
   const materialsLoading =
     useSelector(
-      (s) => s.product?.itemsMakeLoading ?? s.product?.loadingItemsMake
+      (s) => s.product?.itemsMakeLoading ?? s.product?.loadingItemsMake,
     ) ?? false;
 
   // Поставщики
   const { list: clients } = useClient();
   const suppliers = useMemo(
     () => (clients || []).filter((c) => c.type === "suppliers"),
-    [clients]
+    [clients],
   );
 
   // Форма товара
@@ -104,7 +113,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     price: "",
     quantity: "", // ВАЖНО: храним как строку для удобного двустороннего биндинга
     client: "",
-    purchase_price: '0',
+    purchase_price: "0",
     stock: false, // Акционный товар
   });
 
@@ -113,7 +122,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
   const handleImageChange = useCallback((idx, file) => {
     setImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, file } : it))
+      prev.map((it, i) => (i === idx ? { ...it, file } : it)),
     );
   }, []);
 
@@ -123,7 +132,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
   const handlePrimarySelect = useCallback((idx) => {
     setImages((prev) =>
-      prev.map((it, i) => ({ ...it, is_primary: i === idx }))
+      prev.map((it, i) => ({ ...it, is_primary: i === idx })),
     );
   }, []);
 
@@ -183,6 +192,31 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   const [debtMonths, setDebtMonths] = useState("");
   const [prepayment, setPrepayment] = useState("");
 
+  const getMaterialUnitPrice = useCallback(
+    (material) => Number(material?.purchase_price ?? material?.price ?? 0),
+    [],
+  );
+
+  // Себестоимость сырья на 1 единицу готового товара (по рецепту)
+  const recipeMaterialCostPerUnit = useMemo(() => {
+    return recipeItems.reduce((acc, recipeItem) => {
+      const material = (Array.isArray(materials) ? materials : []).find(
+        (m) => String(m.id) === String(recipeItem.materialId),
+      );
+      if (!material) return acc;
+      return (
+        acc +
+        Number(recipeItem.quantity || 0) *
+          Number(getMaterialUnitPrice(material))
+      );
+    }, 0);
+  }, [recipeItems, materials, getMaterialUnitPrice]);
+
+  // Итоговая закупочная цена за единицу: ручные расходы + сырьё по рецепту
+  const effectivePurchasePricePerUnit = useMemo(() => {
+    return Number(product.purchase_price || 0) + recipeMaterialCostPerUnit;
+  }, [product.purchase_price, recipeMaterialCostPerUnit]);
+
   // Карта выбранных материалов
   const recipeMap = useMemo(() => {
     const m = new Map();
@@ -199,7 +233,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   const filteredMaterials = useMemo(() => {
     // Фильтруем только материалы с валидными ID
     const list = (Array.isArray(materials) ? materials : []).filter(
-      (m) => m && m.id != null
+      (m) => m && m.id != null,
     );
     const q = materialQuery.trim().toLowerCase();
     if (!q) return list;
@@ -257,121 +291,151 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     setSupplier((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const createSupplier = useCallback(async (e) => {
-    e.preventDefault();
-    if (!supplier.full_name?.trim()) {
-      error("Укажите ФИО поставщика");
-      return;
-    }
-    try {
-      await dispatch(createClientAsync(supplier)).unwrap();
-      setShowSupplierForm(false);
-    } catch (err) {
-      error(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
-    }
-  }, [supplier]);
+  const createSupplier = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!supplier.full_name?.trim()) {
+        error("Укажите ФИО поставщика");
+        return;
+      }
+      try {
+        await dispatch(createClientAsync(supplier)).unwrap();
+        setShowSupplierForm(false);
+      } catch (err) {
+        error(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
+      }
+    },
+    [supplier],
+  );
 
   // Рецепт — выбор/изменение/удаление
-  // ВАЖНО: Добавление сырья ВСЕГДА разрешено, независимо от:
-  // - количества сырья на складе (даже если 0)
-  // - количества товара (можно добавить до указания количества)
-  // - недостаточности сырья (показывается предупреждение, но не блокируется)
-  const toggleRecipeItem = useCallback((materialId) => {
-    // Защита от отсутствия ID
-    if (materialId === null || materialId === undefined || materialId === "") {
-      return;
-    }
+  // ВАЖНО:
+  // - нельзя добавить сырьё, если остаток <= 0
+  // - если товар уже имеет количество, показываем предупреждение о нехватке, но добавление не блокируем
+  const toggleRecipeItem = useCallback(
+    (materialId) => {
+      // Защита от отсутствия ID
+      if (
+        materialId === null ||
+        materialId === undefined ||
+        materialId === ""
+      ) {
+        return;
+      }
 
-    // Всегда используем строковое представление для консистентности
-    const key = String(materialId);
-    const exists = recipeMap.has(key);
+      // Всегда используем строковое представление для консистентности
+      const key = String(materialId);
+      const exists = recipeMap.has(key);
 
-    if (exists) {
-      // Удаление из списка
-      setRecipeItems((prev) =>
-        prev.filter((it) => String(it.materialId) !== key)
-      );
-    } else {
-      // ДОБАВЛЕНИЕ: всегда разрешено
-      // ВАЖНО: quantity в recipeItems — это расход сырья НА 1 ЕДИНИЦУ товара (qty_per_unit),
-      // а общий расход считается как qty_per_unit × product.quantity.
-      // Поэтому по умолчанию ставим "1", а не product.quantity (иначе получится product.quantity²).
-      const perUnitQty = "1";
-      const material = (Array.isArray(materials) ? materials : []).find(
-        (m) => m && m.id != null && String(m.id) === key
-      );
+      if (exists) {
+        // Удаление из списка
+        setRecipeItems((prev) =>
+          prev.filter((it) => String(it.materialId) !== key),
+        );
+      } else {
+        // ДОБАВЛЕНИЕ: всегда разрешено
+        // ВАЖНО: quantity в recipeItems — это расход сырья НА 1 ЕДИНИЦУ товара (qty_per_unit),
+        // а общий расход считается как qty_per_unit × product.quantity.
+        // Поэтому по умолчанию ставим "1", а не product.quantity (иначе получится product.quantity²).
+        const perUnitQty = "1";
+        const material = (Array.isArray(materials) ? materials : []).find(
+          (m) => m && m.id != null && String(m.id) === key,
+        );
 
-      // Добавляем сырье (всегда разрешено, даже если материал не найден в списке)
-      // Сохраняем materialId как есть (может быть строкой или UUID), но при сравнении всегда используем строку
-      setRecipeItems((prev) => [...prev, { materialId, quantity: perUnitQty }]);
+        if (material && Number(material.quantity || 0) <= 0) {
+          error(
+            `Сырьё "${
+              material.name || material.title || `#${material.id}`
+            }" закончилось и не может быть добавлено.`,
+          );
+          return;
+        }
 
-      // Предупреждаем, если сырья может быть недостаточно (но НЕ блокируем добавление)
-      if (material) {
-        const availableQty = Number(material.quantity || 0);
-        const requestedQty = Number(perUnitQty || 0);
-        const units = Number(product.quantity || 0);
-        const totalNeeded = requestedQty * units;
+        // Добавляем сырье
+        // Сохраняем materialId как есть (может быть строкой или UUID), но при сравнении всегда используем строку
+        setRecipeItems((prev) => [
+          ...prev,
+          { materialId, quantity: perUnitQty },
+        ]);
 
-        // Показываем предупреждение только если:
-        // 1. Количество товара указано (units > 0)
-        // 2. Требуется больше, чем доступно
-        // Но добавление НЕ блокируется!
-        if (units > 0 && totalNeeded > availableQty) {
-          setTimeout(() => {
-            error(
-              `Внимание: может быть недостаточно сырья "${material.name || material.title || `#${material.id}`
-              }"!\n` +
-              `Доступно: ${availableQty}\n` +
-              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-              `Вы можете изменить количество сырья в списке выбранных материалов.`
-            );
-          }, 100);
+        // Предупреждаем, если сырья может быть недостаточно (но НЕ блокируем добавление)
+        if (material) {
+          const availableQty = Number(material.quantity || 0);
+          const requestedQty = Number(perUnitQty || 0);
+          const units = Number(product.quantity || 0);
+          const totalNeeded = requestedQty * units;
+
+          // Показываем предупреждение только если:
+          // 1. Количество товара указано (units > 0)
+          // 2. Требуется больше, чем доступно
+          // Но добавление НЕ блокируется!
+          if (units > 0 && totalNeeded > availableQty) {
+            setTimeout(() => {
+              error(
+                `Внимание: может быть недостаточно сырья "${
+                  material.name || material.title || `#${material.id}`
+                }"!\n` +
+                  `Доступно: ${availableQty}\n` +
+                  `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+                  `Вы можете изменить количество сырья в списке выбранных материалов.`,
+              );
+            }, 100);
+          }
         }
       }
-    }
-  }, [recipeMap]);
+    },
+    [recipeMap, materials, product.quantity, error],
+  );
 
-  const changeRecipeQty = useCallback((materialId, qty) => {
-    // Защита от отсутствия ID
-    if (materialId === null || materialId === undefined || materialId === "") {
-      return;
-    }
+  const changeRecipeQty = useCallback(
+    (materialId, qty) => {
+      // Защита от отсутствия ID
+      if (
+        materialId === null ||
+        materialId === undefined ||
+        materialId === ""
+      ) {
+        return;
+      }
 
-    const key = String(materialId);
-    const material = (Array.isArray(materials) ? materials : []).find(
-      (m) => m && m.id != null && String(m.id) === key
-    );
-
-    // Проверка доступного количества (только если указано количество товара)
-    const availableQty = Number(material?.quantity || 0);
-    const requestedQty = Number(qty || 0);
-    const units = Number(product.quantity || 0);
-    const totalNeeded = requestedQty * units;
-
-    // Блокируем только если количество товара указано и сырья действительно недостаточно
-    if (material && units > 0 && totalNeeded > availableQty) {
-      error(
-        `Недостаточно сырья "${material.name || material.title || `#${material.id}`
-        }"!\n` +
-        `Доступно: ${availableQty}\n` +
-        `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-        `Пожалуйста, уменьшите количество сырья или количество товара.`
+      const key = String(materialId);
+      const material = (Array.isArray(materials) ? materials : []).find(
+        (m) => m && m.id != null && String(m.id) === key,
       );
-      return;
-    }
 
-    // Разрешаем изменение, если количество товара не указано (пользователь может указать позже)
-    setRecipeItems((prev) =>
-      prev.map((it) =>
-        String(it.materialId) === key ? { ...it, quantity: qty } : it
-      )
-    );
-  }, [materials, product]);
+      // Проверка доступного количества (только если указано количество товара)
+      const availableQty = Number(material?.quantity || 0);
+      const requestedQty = Number(qty || 0);
+      const units = Number(product.quantity || 0);
+      const totalNeeded = requestedQty * units;
+
+      // Блокируем только если количество товара указано и сырья действительно недостаточно
+      if (material && units > 0 && totalNeeded > availableQty) {
+        error(
+          `Недостаточно сырья "${
+            material.name || material.title || `#${material.id}`
+          }"!\n` +
+            `Доступно: ${availableQty}\n` +
+            `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+            `Пожалуйста, уменьшите количество сырья или количество товара.`,
+        );
+        return;
+      }
+
+      // Разрешаем изменение, если количество товара не указано (пользователь может указать позже)
+      setRecipeItems((prev) =>
+        prev.map((it) =>
+          String(it.materialId) === key ? { ...it, quantity: qty } : it,
+        ),
+      );
+    },
+    [materials, product],
+  );
 
   const removeRecipeItem = useCallback((materialId) => {
     const key = String(materialId);
     setRecipeItems((prev) =>
-      prev.filter((it) => String(it.materialId) !== key)
+      prev.filter((it) => String(it.materialId) !== key),
     );
   }, []);
 
@@ -388,7 +452,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ["purchase_price", "Закупочная цена"],
     ];
     const missed = required.filter(
-      ([k]) => product[k] === "" || product[k] === null
+      ([k]) => product[k] === "" || product[k] === null,
     );
     if (missed.length) {
       error("Пожалуйста, заполните все обязательные поля.");
@@ -411,10 +475,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       }
       // ВАЖНО: мы покупаем у поставщика => все расчёты идут по закупочной цене
       const purchaseTotal =
-        Number(product.purchase_price || 0) * Number(product.quantity || 0);
+        effectivePurchasePricePerUnit * Number(product.quantity || 0);
       if (Number(prepayment) > purchaseTotal) {
         error(
-          `Предоплата не может быть больше суммы закупки (${purchaseTotal.toFixed(2)}).`
+          `Предоплата не может быть больше суммы закупки (${purchaseTotal.toFixed(2)}).`,
         );
         return false;
       }
@@ -429,7 +493,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (recipeItems.length > 0 && units > 0) {
       for (const recipeItem of recipeItems) {
         const material = (Array.isArray(materials) ? materials : []).find(
-          (m) => String(m.id) === String(recipeItem.materialId)
+          (m) => String(m.id) === String(recipeItem.materialId),
         );
 
         if (!material) {
@@ -443,10 +507,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
         if (totalNeeded > availableQty) {
           error(
-            `Недостаточно сырья "${material.name || material.title || `#${material.id}`
+            `Недостаточно сырья "${
+              material.name || material.title || `#${material.id}`
             }"!\n` +
-            `Доступно: ${availableQty}\n` +
-            `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
+              `Доступно: ${availableQty}\n` +
+              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`,
           );
           return false;
         }
@@ -454,7 +519,15 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     }
 
     return true;
-  }, [product, recipeItems, materials, dealStatus, debtMonths, prepayment]);
+  }, [
+    product,
+    recipeItems,
+    materials,
+    dealStatus,
+    debtMonths,
+    prepayment,
+    effectivePurchasePricePerUnit,
+  ]);
 
   // submit
   const handleSubmit = async () => {
@@ -463,8 +536,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     // рецепт для списания: [{id, qty_per_unit}]
     // API допускает не более 3 знаков после запятой — округляем, чтобы избежать 84072.79999999999
-    const roundTo3 = (v) =>
-      Math.round(Number(v) * 1000) / 1000;
+    const roundTo3 = (v) => Math.round(Number(v) * 1000) / 1000;
     const recipe = recipeItems
       .map((it) => ({
         id: String(it.materialId),
@@ -483,7 +555,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       if (product.client !== "" && dealStatus !== "Полная оплата") {
         // ВАЖНО: расчёт суммы для поставщика — по закупочной цене (а не по розничной)
         const purchaseTotal =
-          Number(product.purchase_price || 0) * Number(product.quantity || 0);
+          effectivePurchasePricePerUnit * Number(product.quantity || 0);
         const result = await dispatch(
           createDeal({
             clientId: product.client,
@@ -498,7 +570,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               dealStatus === "Долги" || dealStatus === "Предоплата"
                 ? Number(debtMonths)
                 : undefined,
-          })
+          }),
         ).unwrap();
       }
 
@@ -511,7 +583,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         price: Number(product.price || 0),
         quantity: Number(product.quantity || 0),
         client: product.client, // id поставщика
-        purchase_price: product.purchase_price,
+        purchase_price: roundTo3(effectivePurchasePricePerUnit),
         stock: Boolean(product.stock), // Акционный товар
         // Новый формат (см. docs/PRODUCTION_FINISHED_GOODS_RECIPE_AND_AUTO_CONSUMPTION_API.md)
         // Backend сам списывает/возвращает сырьё по дельте.
@@ -521,7 +593,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       };
 
       const created = await dispatch(createProductAsync(payload)).unwrap();
-      const purchaseTotal = Number(product?.purchase_price || 0) * Number(product?.quantity || 0);
+      const purchaseTotal =
+        effectivePurchasePricePerUnit * Number(product?.quantity || 0);
       const amountForCash =
         dealStatus === "Долги"
           ? 0
@@ -534,7 +607,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             ...cashData,
             amount: amountForCash.toFixed(2),
             source_cashbox_flow_id: created.id,
-          })
+          }),
         ).unwrap();
       }
 
@@ -560,26 +633,24 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         console.warn("Загрузка изображений не удалась:", e);
         // не блокируем основной флоу
       }
-      alert('Товар добавлен!', () => {
+      alert("Товар добавлен!", () => {
         onClose?.();
         setCreating(false);
         onSaveSuccess?.();
-      })
+      });
     } catch (err) {
       setCreating(false);
       setCreateError(err);
-      console.log('ERERERRR', err);
+      console.log("ERERERRR", err);
 
-      error(
-        validateResErrors(err, 'Ошибка при добавлении товара')
-      );
+      error(validateResErrors(err, "Ошибка при добавлении товара"));
     }
   };
 
   // актуализируем данные по кассе при изменениях
   useEffect(() => {
     const purchaseTotal =
-      Number(product.purchase_price || 0) * Number(product.quantity || 0);
+      effectivePurchasePricePerUnit * Number(product.quantity || 0);
     setCashData((prev) => ({
       ...prev,
       cashbox: selectCashBox,
@@ -587,23 +658,45 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       // по смыслу это закупка (расход) => сумма по закупочной цене
       amount: purchaseTotal ? purchaseTotal.toFixed(2) : "",
     }));
-  }, [product, selectCashBox]);
+  }, [product, selectCashBox, effectivePurchasePricePerUnit]);
 
   /* ------------------------ Верстка ------------------------ */
   return (
-    <div className="finished-goods-add-modal">
-      <div className="finished-goods-add-modal__overlay" onClick={onClose} />
-      <div className="finished-goods-add-modal__content">
+    <div
+      className={`finished-goods-add-modal${isPage ? " finished-goods-add-modal--page" : ""}`}
+    >
+      {!isPage && (
+        <div className="finished-goods-add-modal__overlay" onClick={onClose} />
+      )}
+      <div
+        className="finished-goods-add-modal__content"
+        style={
+          isPage
+            ? {
+                position: "static",
+                transform: "none",
+                width: "100%",
+                maxWidth: "1200px",
+                margin: "24px auto",
+              }
+            : undefined
+        }
+      >
         <div className="finished-goods-add-modal__header">
           <h3>Добавление товара</h3>
-          <button
-            className="finished-goods-add-modal__close-icon"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
+          {!isPage && (
+            <button
+              className="finished-goods-add-modal__close-icon"
+              onClick={onClose}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
-        <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => e.preventDefault()}
+        >
           {createError && (
             <p className="finished-goods-add-modal__error-message">
               Ошибка добавления: {createError.message || "ошибка"}
@@ -879,13 +972,20 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               name="purchase_price"
               className="finished-goods-add-modal__input"
               placeholder="110"
-              value={product.purchase_price}
+              value={effectivePurchasePricePerUnit.toFixed(2)}
               onChange={onProductChange}
               onWheel={(e) => e.currentTarget.blur()}
               min="0"
               step="0.01"
               required
             />
+            {recipeItems.length > 0 && (
+              <small style={{ opacity: 0.75 }}>
+                Сырьё по рецепту: {recipeMaterialCostPerUnit.toFixed(2)} |
+                Итоговая закупочная цена:{" "}
+                {effectivePurchasePricePerUnit.toFixed(2)}
+              </small>
+            )}
           </div>
 
           <div className="finished-goods-add-modal__section">
@@ -964,7 +1064,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     >
                       <span style={{ opacity: 0.8 }}>Фото #{idx + 1}</span>
                       <div
-                        style={{ display: "flex", alignItems: "center", gap: 10 }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
                       >
                         <label
                           style={{
@@ -1076,139 +1180,148 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                   padding: 8,
                 }}
               >
-                {
-                  filteredMaterials
-                    ?.map((m) => {
-                      try {
-                        const materialId = m.id;
-                        const materialKey = String(materialId);
-                        const checked = recipeMap.has(materialKey);
-                        const qty = recipeMap.get(materialKey) ?? "";
-                        const availableQty = Number(m.quantity || 0);
-                        const requestedQty = Number(qty || 0);
-                        const units = Number(product.quantity || 0);
-                        const totalNeeded = requestedQty * units;
-                        const isInsufficient =
-                          checked && totalNeeded > availableQty;
+                {filteredMaterials?.map((m) => {
+                  try {
+                    const materialId = m.id;
+                    const materialKey = String(materialId);
+                    const checked = recipeMap.has(materialKey);
+                    const qty = recipeMap.get(materialKey) ?? "";
+                    const availableQty = Number(m.quantity || 0);
+                    const requestedQty = Number(qty || 0);
+                    const units = Number(product.quantity || 0);
+                    const totalNeeded = requestedQty * units;
+                    const isInsufficient =
+                      checked && totalNeeded > availableQty;
+                    const isOutOfStock = availableQty <= 0;
 
-                        return (
-                          <div
-                            key={materialId}
-                            className="select-materials__item"
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              // Не переключать при клике по полю количества
-                              if (e.target.closest?.(".MuiTextField-root")) return;
-                              toggleRecipeItem(materialId);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                if (e.target.closest?.(".MuiTextField-root")) return;
-                                toggleRecipeItem(materialId);
-                              }
-                            }}
+                    return (
+                      <div
+                        key={materialId}
+                        className="select-materials__item"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          // Не переключать при клике по полю количества
+                          if (e.target.closest?.(".MuiTextField-root")) return;
+                          if (isOutOfStock && !checked) return;
+                          toggleRecipeItem(materialId);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (e.target.closest?.(".MuiTextField-root"))
+                              return;
+                            if (isOutOfStock && !checked) return;
+                            toggleRecipeItem(materialId);
+                          }
+                        }}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "auto 1fr 160px",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 4px",
+                          backgroundColor: isInsufficient
+                            ? "#ffebee"
+                            : "transparent",
+                          opacity: isOutOfStock && !checked ? 0.6 : 1,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Checkbox
+                          icon={
+                            <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
+                          }
+                          checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
+                          checked={checked}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (isOutOfStock && !checked) return;
+                            // Даём клику всплыть до строки — переключение через onClick строки
+                            // (на десктопе клик часто попадает по иконке, а не по input)
+                          }}
+                          sx={{
+                            color: "#000",
+                            "&.Mui-checked": { color: "#f9cf00" },
+                            pointerEvents: "auto",
+                          }}
+                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
+                          <p
+                            title={m.name || m.title || `#${materialId}`}
                             style={{
-                              display: "grid",
-                              gridTemplateColumns: "auto 1fr 160px",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "6px 4px",
-                              backgroundColor: isInsufficient
-                                ? "#ffebee"
-                                : "transparent",
-                              cursor: "pointer",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              margin: 0,
                             }}
                           >
-                            <Checkbox
-                              icon={
-                                <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
-                              }
-                              checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
-                              checked={checked}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                // Даём клику всплыть до строки — переключение через onClick строки
-                                // (на десктопе клик часто попадает по иконке, а не по input)
-                              }}
-                              sx={{
-                                color: "#000",
-                                "&.Mui-checked": { color: "#f9cf00" },
-                                pointerEvents: "auto",
-                              }}
-                            />
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 2,
-                              }}
-                            >
-                              <p
-                                title={m.name || m.title || `#${materialId}`}
+                            {m.name || m.title || `#${materialId}`}
+                          </p>
+                          <small
+                            style={{
+                              fontSize: "11px",
+                              opacity: 0.7,
+                              color: isInsufficient ? "#d32f2f" : "inherit",
+                            }}
+                          >
+                            Доступно: {availableQty}
+                            {isOutOfStock && !checked && (
+                              <span style={{ color: "#d32f2f" }}>
+                                {" "}
+                                | Нет остатка
+                              </span>
+                            )}
+                            {checked && units > 0 && (
+                              <span
                                 style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  margin: 0,
+                                  color: isInsufficient ? "#d32f2f" : "#666",
                                 }}
                               >
-                                {m.name || m.title || `#${materialId}`}
-                              </p>
-                              <small
-                                style={{
-                                  fontSize: "11px",
-                                  opacity: 0.7,
-                                  color: isInsufficient ? "#d32f2f" : "inherit",
-                                }}
-                              >
-                                Доступно: {availableQty}
-                                {checked && units > 0 && (
-                                  <span
-                                    style={{
-                                      color: isInsufficient ? "#d32f2f" : "#666",
-                                    }}
-                                  >
-                                    {" "}
-                                    | Нужно: {totalNeeded}
-                                    {isInsufficient && " ⚠️"}
-                                  </span>
-                                )}
-                              </small>
-                            </div>
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <TextField
-                                size="small"
-                                placeholder="Кол-во"
-                                type="number"
-                                inputProps={{
-                                  step: "0.0001",
-                                  min: "0",
-                                  max: units > 0 ? availableQty / units : undefined,
-                                  onWheel: (e) => e.currentTarget.blur(),
-                                }}
-                                disabled={!checked}
-                                value={qty}
-                                onChange={(e) =>
-                                  changeRecipeQty(materialId, e.target.value)
-                                }
-                                error={isInsufficient}
-                                helperText={
-                                  isInsufficient
-                                    ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
-                                    : ""
-                                }
-                              />
-                            </div>
-                          </div>
-                        );
-                      } catch (error) {
-                        // Пропускаем проблемный материал, но не блокируем остальные
-                        return null;
-                      }
-                    })
-                }
+                                {" "}
+                                | Нужно: {totalNeeded}
+                                {isInsufficient && " ⚠️"}
+                              </span>
+                            )}
+                          </small>
+                        </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <TextField
+                            size="small"
+                            placeholder="Кол-во"
+                            type="number"
+                            inputProps={{
+                              step: "0.0001",
+                              min: "0",
+                              max: units > 0 ? availableQty / units : undefined,
+                              onWheel: (e) => e.currentTarget.blur(),
+                            }}
+                            disabled={!checked}
+                            value={qty}
+                            onChange={(e) =>
+                              changeRecipeQty(materialId, e.target.value)
+                            }
+                            error={isInsufficient}
+                            helperText={
+                              isInsufficient
+                                ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
+                                : ""
+                            }
+                          />
+                        </div>
+                      </div>
+                    );
+                  } catch (error) {
+                    // Пропускаем проблемный материал, но не блокируем остальные
+                    return null;
+                  }
+                })}
                 {(!filteredMaterials || filteredMaterials.length === 0) &&
                   !materialsLoading && (
                     <div style={{ padding: 8, opacity: 0.7 }}>
@@ -1225,7 +1338,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               >
                 {recipeItems.map((it) => {
                   const mat = (Array.isArray(materials) ? materials : []).find(
-                    (m) => String(m.id) === String(it.materialId)
+                    (m) => String(m.id) === String(it.materialId),
                   );
                   const availableQty = Number(mat?.quantity || 0);
                   const requestedQty = Number(it.quantity || 0);
@@ -1360,7 +1473,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );
@@ -1371,10 +1483,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
    ============================================================ */
 const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   const dispatch = useDispatch();
-  const alert = useAlert()
-  const confirm = useConfirm()
+  const alert = useAlert();
+  const confirm = useConfirm();
   const { updating, updateError, deleting, deleteError } = useSelector(
-    (state) => state.product
+    (state) => state.product,
   );
 
   const { brands, categories } = useProducts();
@@ -1450,11 +1562,14 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
         } catch (error) {
           console.error("Ошибка удаления изображения:", error);
-          const errorMessage = validateResErrors(error, "Ошибка удаления изображения");
+          const errorMessage = validateResErrors(
+            error,
+            "Ошибка удаления изображения",
+          );
           alert(errorMessage, null, true);
         }
       }
-    })
+    });
   };
 
   const handleSetPrimaryExisting = async (imageId) => {
@@ -1467,11 +1582,14 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
         prev.map((img) => ({
           ...img,
           is_primary: img.id === imageId,
-        }))
+        })),
       );
     } catch (error) {
       console.error("Ошибка установки главного изображения:", error);
-      const errorMessage = validateResErrors(error, "Ошибка установки главного изображения");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка установки главного изображения",
+      );
       alert(errorMessage);
     }
   };
@@ -1479,23 +1597,23 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   // Обработчики для новых изображений
   const handleNewImageChange = (idx, file) => {
     setNewImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, file } : it))
+      prev.map((it, i) => (i === idx ? { ...it, file } : it)),
     );
   };
 
   const handleNewImageAltChange = (idx, alt) => {
     setNewImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, alt } : it))
+      prev.map((it, i) => (i === idx ? { ...it, alt } : it)),
     );
   };
 
   const handleNewPrimarySelect = (idx) => {
     setNewImages((prev) =>
-      prev.map((it, i) => ({ ...it, is_primary: i === idx }))
+      prev.map((it, i) => ({ ...it, is_primary: i === idx })),
     );
     // Также снимаем главное с существующих
     setExistingImages((prev) =>
-      prev.map((it) => ({ ...it, is_primary: false }))
+      prev.map((it) => ({ ...it, is_primary: false })),
     );
   };
 
@@ -1534,7 +1652,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
       };
 
       await dispatch(
-        updateProductAsync({ productId: item.id, updatedData: dataToSave })
+        updateProductAsync({ productId: item.id, updatedData: dataToSave }),
       ).unwrap();
 
       // Загрузка новых изображений
@@ -1552,35 +1670,47 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           });
         if (uploads.length) await Promise.allSettled(uploads);
       } catch (e) {
-        const errorMessage = validateResErrors(e, "Загрузка новых изображений не удалась");
+        const errorMessage = validateResErrors(
+          e,
+          "Загрузка новых изображений не удалась",
+        );
         alert(errorMessage, true);
         // не блокируем основной флоу
       }
-      alert('Товар отредактирован!', () => {
+      alert("Товар отредактирован!", () => {
         onClose();
         onSaveSuccess?.();
-      })
+      });
     } catch (err) {
-      const errorMessage = validateResErrors(err, "Ошибка при обновлении товара");
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при обновлении товара",
+      );
       alert(errorMessage, true);
     }
   };
 
   const handleDelete = useCallback(async () => {
-    confirm(`Вы уверены, что хотите удалить товар "${item?.name}"?`, async (result) => {
-      if (result) {
-        try {
-          await dispatch(deleteProductAsync(item.id)).unwrap();
-          alert('Удалено!', () => {
-            onClose();
-            onDeleteConfirm?.();
-          })
-        } catch (err) {
-          const errorMessage = validateResErrors(err, "Ошибка при удалении товара");
-          alert(errorMessage, null, true);
+    confirm(
+      `Вы уверены, что хотите удалить товар "${item?.name}"?`,
+      async (result) => {
+        if (result) {
+          try {
+            await dispatch(deleteProductAsync(item.id)).unwrap();
+            alert("Удалено!", () => {
+              onClose();
+              onDeleteConfirm?.();
+            });
+          } catch (err) {
+            const errorMessage = validateResErrors(
+              err,
+              "Ошибка при удалении товара",
+            );
+            alert(errorMessage, null, true);
+          }
         }
-      }
-    })
+      },
+    );
   }, [item]);
 
   useEffect(() => {
@@ -1968,7 +2098,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
                             onChange={(e) =>
                               handleNewImageChange(
                                 idx,
-                                e.target.files?.[0] || null
+                                e.target.files?.[0] || null,
                               )
                             }
                             accept="image/*"
@@ -2046,9 +2176,9 @@ const TransferProductModal = ({
   // materials: products = [],
   materialsLoading = false,
 }) => {
-  const { plurizeWithNumber } = usePlurize()
-  const alert = useAlert()
-  const error = useErrorModal()
+  const { plurizeWithNumber } = usePlurize();
+  const alert = useAlert();
+  const error = useErrorModal();
   // const { list: clients } = useClient();
   const { employees } = useDepartments();
   const { creating, createError } = useSelector((state) => state.transfer);
@@ -2090,8 +2220,8 @@ const TransferProductModal = ({
   const updateProductQuantity = (productId, quantity) => {
     setSelectedProducts((prev) =>
       prev.map((p) =>
-        p.id === productId ? { ...p, qty_transferred: quantity } : p
-      )
+        p.id === productId ? { ...p, qty_transferred: quantity } : p,
+      ),
     );
   };
   const dispatch = useDispatch();
@@ -2103,7 +2233,7 @@ const TransferProductModal = ({
 
   useEffect(() => {
     dispatch(fetchProductsAsync({ search: debouncedSearchQuery }));
-  }, [debouncedSearchQuery])
+  }, [debouncedSearchQuery]);
   // Проверяем, что товар существует и есть в наличии
   if (!item) {
     return (
@@ -2147,13 +2277,13 @@ const TransferProductModal = ({
     for (const product of selectedProducts) {
       if (!product.qty_transferred || Number(product.qty_transferred) <= 0) {
         setValidationError(
-          `Введите корректное количество для товара "${product.name}"`
+          `Введите корректное количество для товара "${product.name}"`,
         );
         return false;
       }
       if (Number(product.qty_transferred) > Number(product.quantity)) {
         setValidationError(
-          `Недостаточно товара "${product.name}". Доступно: ${product.quantity}`
+          `Недостаточно товара "${product.name}". Доступно: ${product.quantity}`,
         );
         return false;
       }
@@ -2177,15 +2307,21 @@ const TransferProductModal = ({
         createBulkTransferAsync({
           agent: state.agent,
           items: items,
-        })
+        }),
       ).unwrap();
 
-      alert(`Успешно передано ${plurizeWithNumber(selectedProducts.length, 'products')} агенту!`, () => {
-        onChanged?.();
-        onClose();
-      });
+      alert(
+        `Успешно передано ${plurizeWithNumber(selectedProducts.length, "products")} агенту!`,
+        () => {
+          onChanged?.();
+          onClose();
+        },
+      );
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при создании передачи");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при создании передачи",
+      );
       alert(errorMessage, true);
     }
   };
@@ -2271,11 +2407,12 @@ const TransferProductModal = ({
                   </div>
                   <button
                     type="button"
-                    className={`finished-goods-modal__add-product-btn ${selectedProducts.find((p) => p.id === product.id) ||
+                    className={`finished-goods-modal__add-product-btn ${
+                      selectedProducts.find((p) => p.id === product.id) ||
                       product.quantity <= 0
-                      ? "finished-goods-modal__add-product-btn--disabled"
-                      : ""
-                      }`}
+                        ? "finished-goods-modal__add-product-btn--disabled"
+                        : ""
+                    }`}
                     onClick={() => addProductToTransfer(product)}
                     disabled={
                       selectedProducts.find((p) => p.id === product.id) ||
@@ -2344,9 +2481,9 @@ const TransferProductModal = ({
 // export default TransferProductModal;
 
 const AcceptProductModal = ({ onClose, onChanged, item }) => {
-  const alert = useAlert()
+  const alert = useAlert();
   const { acceptingInline, acceptInlineError } = useSelector(
-    (state) => state.acceptance
+    (state) => state.acceptance,
   );
   const { employees } = useDepartments();
   const { list: cashBoxes } = useCash();
@@ -2423,7 +2560,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
           agent_id: state.agent_id,
           product_id: state.product_id,
           qty: Number(state.qty),
-        })
+        }),
       ).unwrap();
 
       // Обновляем количество товара на складе
@@ -2434,7 +2571,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
             quantity:
               Number(item.quantity) + Number(result.qty_remaining_after),
           },
-        })
+        }),
       ).unwrap();
 
       // Добавляем приход в кассу
@@ -2450,18 +2587,21 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
             company?.subscription_plan?.name === "Старт"
               ? "approved"
               : "pending",
-        })
+        }),
       ).unwrap();
 
       alert(
-        `Приёмка успешно создана!\nАгент: ${result.agent}\nТовар: ${result.product}\nПринято: ${result.qty_accept}\nОстаток: ${result.qty_remaining_after}`, () => {
+        `Приёмка успешно создана!\nАгент: ${result.agent}\nТовар: ${result.product}\nПринято: ${result.qty_accept}\nОстаток: ${result.qty_remaining_after}`,
+        () => {
           onChanged?.();
           onClose();
-        }
+        },
       );
-
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при создании приёмки");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при создании приёмки",
+      );
       alert(errorMessage, true);
     }
   };
@@ -2581,7 +2721,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
 const ReturnProductModal = ({ onClose, onChanged, item }) => {
   const alert = useAlert();
   const { creating, createError } = useSelector(
-    (state) => state.return || { creating: false, createError: null }
+    (state) => state.return || { creating: false, createError: null },
   );
   const [state, setState] = useState({
     subreal: item?.id || "",
@@ -2644,16 +2784,18 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         createReturnAsync({
           subreal: state.subreal,
           qty: Number(state.qty),
-        })
+        }),
       ).unwrap();
       alert(`Возврат успешно создан!\nКоличество: ${state.qty}`, () => {
         onChanged?.();
         onClose();
       });
-
     } catch (error) {
       console.error("Return creation failed:", error);
-      const errorMessage = validateResErrors(error, "Ошибка при создании возврата");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при создании возврата",
+      );
       alert(errorMessage, true);
     }
   };
@@ -2748,13 +2890,13 @@ const FinishedGoods = ({ products, onChanged }) => {
   const { loading, error } = useProducts();
   const { list: cashBoxes } = useCash();
 
-  const [showAdd, setShowAdd] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
 
   // состояние для редактирования
   const [showEdit, setShowEdit] = useState(false);
   const [showMarriageModal, setShowMarriageModal] = useState(false);
-  const [showTransferProductModal, setShowTransferProductModal] = useState(false);
+  const [showTransferProductModal, setShowTransferProductModal] =
+    useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   const [showAcceptProductModal, setShowAcceptProductModal] = useState(false);
@@ -2767,14 +2909,16 @@ const FinishedGoods = ({ products, onChanged }) => {
 
   const [search, setSearch] = useState("");
   // Debounce для поиска
-  const debouncedSearch = useDebouncedValue(search, 400)
+  const debouncedSearch = useDebouncedValue(search, 400);
   const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
-    dispatch(fetchProductsAsync({
-      search: debouncedSearch
-    }))
-  }, [debouncedSearch])
+    dispatch(
+      fetchProductsAsync({
+        search: debouncedSearch,
+      }),
+    );
+  }, [debouncedSearch]);
 
   // Фильтр по дате
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD
@@ -2792,9 +2936,9 @@ const FinishedGoods = ({ products, onChanged }) => {
   const [viewMode, setViewMode] = useState(getInitialViewMode);
   const { isMobile } = useResize(({ isMobile }) => {
     if (isMobile) {
-      setViewMode('cards')
+      setViewMode("cards");
     } else {
-      setViewMode(getInitialViewMode())
+      setViewMode(getInitialViewMode());
     }
   });
   // Сохраняем режим просмотра в localStorage
@@ -2806,9 +2950,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     }
   }, [viewMode]);
 
-
   useEffect(() => {
-
     dispatch(fetchCategoriesAsync());
     dispatch(getCashBoxes());
     dispatch(getItemsMake()); // сырьё для модалки
@@ -2827,12 +2969,6 @@ const FinishedGoods = ({ products, onChanged }) => {
       }
     }
   }, [cashBoxes, selectCashBox]);
-
-  const onSaveSuccess = useCallback(() => {
-    setShowAdd(false);
-    dispatch(fetchProductsAsync());
-    dispatch(getItemsMake());
-  }, []);
 
   const onEditSaved = useCallback(() => {
     setShowEdit(false);
@@ -2882,7 +3018,7 @@ const FinishedGoods = ({ products, onChanged }) => {
       const okCat =
         !categoryFilter ||
         String(p.category_id || p.category)?.toLowerCase() ===
-        String(categoryFilter).toLowerCase();
+          String(categoryFilter).toLowerCase();
       // фильтр по дате
       const created = safeDate(p.created_at);
       if (!created) return false;
@@ -2896,7 +3032,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     // filteredProducts = filteredProducts.filter((p) => p.qty_on_agent > 0);
 
     return filteredProducts.sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      (a, b) => new Date(b.created_at) - new Date(a.created_at),
     );
   }, [products, debouncedSearch, categoryFilter, dateFrom, dateTo]);
 
@@ -2913,19 +3049,25 @@ const FinishedGoods = ({ products, onChanged }) => {
   }, []);
 
   // get image URL with fallback
-  const getImageUrl = useCallback((image) => {
-    if (!image) return noImage;
-    // Поддержка разных форматов URL изображений
-    const url = image.image_url || image.image || image.url || image.preview;
-    if (!url || url === "null" || url === "undefined") return noImage;
-    // Если URL относительный, добавляем базовый URL API
-    if (url.startsWith("/")) {
+  const getImageUrl = useCallback(
+    (image) => {
+      if (!image) return noImage;
+      // Поддержка разных форматов URL изображений
+      const url = image.image_url || image.image || image.url || image.preview;
+      if (!url || url === "null" || url === "undefined") return noImage;
+      // Если URL относительный, добавляем базовый URL API
+      if (url.startsWith("/")) {
+        return url;
+      }
       return url;
-    }
-    return url;
-  }, [noImage]);
+    },
+    [noImage],
+  );
 
-  const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
+  const formatPrice = useCallback(
+    (price) => parseFloat(price || 0).toFixed(2),
+    [],
+  );
 
   return (
     <div className="warehouse-page">
@@ -2945,7 +3087,7 @@ const FinishedGoods = ({ products, onChanged }) => {
         <div className="flex gap-3 flex-wrap flex-1 justify-end md:w-full md:justify-center lg:justify-end">
           <button
             className="warehouse-header__create-btn"
-            onClick={() => setShowAdd(true)}
+            onClick={() => navigate("/crm/production/warehouse/add-product")}
           >
             <Plus size={16} />
             Добавить товар
@@ -3013,41 +3155,40 @@ const FinishedGoods = ({ products, onChanged }) => {
           </div>
 
           {/* View toggle */}
-          {
-            !isMobile && (
-              <div className="ml-auto justify-center flex flex-1 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+          {!isMobile && (
+            <div className="ml-auto justify-center flex flex-1 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                  viewMode === "table"
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                >
-                  <Table2 size={16} />
-                  Таблица
-                </button>
+                }`}
+              >
+                <Table2 size={16} />
+                Таблица
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => setViewMode("cards")}
-                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                  viewMode === "cards"
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                >
-                  <LayoutGrid size={16} />
-                  Карточки
-                </button>
-              </div>
-            )
-          }
+                }`}
+              >
+                <LayoutGrid size={16} />
+                Карточки
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Products */}
       <DataContainer>
-
         <div className="warehouse-table-container w-full">
           {/* ===== TABLE ===== */}
           {viewMode === "table" && (
@@ -3096,7 +3237,6 @@ const FinishedGoods = ({ products, onChanged }) => {
                           className="warehouse-table__row"
                           onClick={() =>
                             navigate(`/crm/production/warehouse/${item.id}`)
-
                           }
                         >
                           <td>
@@ -3134,7 +3274,9 @@ const FinishedGoods = ({ products, onChanged }) => {
                                 className="finished-goods__detailLink"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(`/crm/production/warehouse/${item.id}`);
+                                  navigate(
+                                    `/crm/production/warehouse/${item.id}`,
+                                  );
                                 }}
                                 title="Открыть детальную страницу"
                               >
@@ -3158,7 +3300,9 @@ const FinishedGoods = ({ products, onChanged }) => {
                             >
                               <div>На складе: {item.quantity || 0}</div>
                               {item.qty_on_agent > 0 && (
-                                <div style={{ fontSize: "12px", color: "#666" }}>
+                                <div
+                                  style={{ fontSize: "12px", color: "#666" }}
+                                >
                                   У агентов: {item.qty_on_agent}
                                 </div>
                               )}
@@ -3182,9 +3326,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                                   color: "white",
                                 }}
                                 type="button"
-                                onClick={() =>
-                                  openEdit(item)
-                                }
+                                onClick={() => openEdit(item)}
                               >
                                 Редактировать
                               </button>
@@ -3260,7 +3402,9 @@ const FinishedGoods = ({ products, onChanged }) => {
                       <div
                         key={item.id}
                         className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
-                        onClick={() => navigate(`/crm/production/warehouse/${item.id}`)}
+                        onClick={() =>
+                          navigate(`/crm/production/warehouse/${item.id}`)
+                        }
                       >
                         <div className="flex items-start gap-3">
                           <img
@@ -3399,15 +3543,6 @@ const FinishedGoods = ({ products, onChanged }) => {
           )}
         </div>
       </DataContainer>
-
-
-      {showAdd && (
-        <AddModal
-          onClose={() => setShowAdd(false)}
-          onSaveSuccess={onSaveSuccess}
-          selectCashBox={selectCashBox}
-        />
-      )}
 
       {showEdit && selectedItem && (
         <EditModal

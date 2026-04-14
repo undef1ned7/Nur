@@ -1051,6 +1051,16 @@
   }
 }
 
+/* Page mode for add-product route (no modal behavior) */
+.finished-goods-add-modal--page {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  padding: 0;
+  animation: none;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1099,6 +1109,15 @@
     border-radius: 20px 20px 0 0;
     animation: slideUpMobile 0.3s ease-out;
   }
+}
+
+.finished-goods-add-modal--page .finished-goods-add-modal__content {
+  position: static;
+  max-width: 100%;
+  max-height: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  animation: none;
 }
 
 @keyframes slideUp {
