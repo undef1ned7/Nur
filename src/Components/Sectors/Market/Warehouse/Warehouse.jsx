@@ -197,6 +197,10 @@ const Warehouse = () => {
     navigate("/crm/sklad/add-product");
   }, [navigate]);
 
+  const handleGoodsReceipt = useCallback(() => {
+    navigate("/crm/sklad/receipt");
+  }, [navigate]);
+
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);
   }, []);
@@ -209,7 +213,10 @@ const Warehouse = () => {
 
   return (
     <div className="warehouse-page">
-      <WarehouseHeader onCreateProduct={handleCreateProduct} />
+      <WarehouseHeader
+        onCreateProduct={handleCreateProduct}
+        onGoodsReceipt={handleGoodsReceipt}
+      />
 
       <SearchSection
         searchTerm={searchTerm}
