@@ -195,6 +195,7 @@ const Sell = () => {
 
   const {
     isBuildingCompany,
+    isMarketCompany,
     isStartPlanCompany,
     filterField,
     count,
@@ -204,6 +205,7 @@ const Sell = () => {
   } = useMemo(() => {
     const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
     const isBuildingCompany = sectorName === "строительная компания";
+    const isMarketCompany = sectorName === "магазин";
     const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
     const isStartPlanCompany = planName === "старт";
     const hidden = hiddenIds;
@@ -224,6 +226,7 @@ const Sell = () => {
     return {
       sectorName,
       isBuildingCompany,
+      isMarketCompany,
       isStartPlanCompany,
       filterSell,
       filterField,
@@ -620,7 +623,7 @@ const Sell = () => {
               </span>
             </div>
           </div>
-          {!isStartPlanCompany && (
+          {!isStartPlanCompany && !isMarketCompany && (
             <button
               className="sell__header-btn "
               onClick={() => navigate("start")}
@@ -639,7 +642,7 @@ const Sell = () => {
                 >
                   <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
                 </button>
-              ) : !isStartPlanCompany ? (
+              ) : !isStartPlanCompany && !isMarketCompany ? (
                 <>
                   <button
                     className="sell__header-btn"

@@ -88,6 +88,7 @@ import SchoolDocuments from "../Components/Sectors/School/Documents/Documents";
 import MarketBar from "../Components/Sectors/Market/Bar/Bar";
 import MarketWarehouse from "../Components/Sectors/Market/Warehouse/Warehouse";
 import MarketProductDetail from "../Components/Sectors/Market/Warehouse/components/ProductDetail";
+import MarketSupplierReceiptPage from "../Components/Sectors/Market/Warehouse/SupplierReceiptPage";
 import MarketCashierPage from "../Components/Sectors/Market/CashierPage/CashierPage";
 import MarketCategories from "../Components/Sectors/Market/Categories/Categories";
 import MarketClients from "../Components/Sectors/Market/Clients/Clients";
@@ -408,6 +409,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("sklad/add-product", AddProductPage),
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
+  createProtectedRoute("sklad/receipt", MarketSupplierReceiptPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
   createProtectedRoute("sell", Sell),
@@ -470,6 +472,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/bar", MarketBar),
   createProtectedRoute("sklad", MarketWarehouse),
   createProtectedRoute("sklad/:id", MarketProductDetail),
+  createProtectedRoute("sklad/receipt", MarketSupplierReceiptPage),
   createProtectedRoute("market/cashier", MarketCashierPage),
   createProtectedRoute("market/categories", MarketCategories),
   createProtectedRoute("clients", MarketClients),

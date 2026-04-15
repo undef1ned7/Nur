@@ -381,6 +381,9 @@ function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
 export default function InvoicePdfDocument({ data }) {
   registerPdfFonts();
   const doc = data?.document || data || {};
+  const docType = String(
+    data?.doc_type ?? doc?.doc_type ?? doc?.type ?? "",
+  ).toLowerCase();
   const seller = data?.seller || {};
   const buyer =
     data?.buyer ||
@@ -492,6 +495,10 @@ export default function InvoicePdfDocument({ data }) {
 
   const invoiceNumber = doc.number || "";
   const invoiceDate = doc.datetime || doc.date || data?.created_at || "";
+  const invoiceTitle =
+    docType.includes("purchase") || docType.includes("receipt")
+      ? "Приходная накладная"
+      : "Расходная накладная";
   const { documentDiscountPercent, documentDiscountAmount, showDocumentDiscountLine } =
     resolveDocumentDiscount(doc, data, subtotal, data?.items);
 
@@ -520,7 +527,7 @@ export default function InvoicePdfDocument({ data }) {
         {/* Заголовок */}
         <View style={s.header}>
           <Text style={s.title}>
-            Расходная накладная № {invoiceNumber || "—"} от{" "}
+            {invoiceTitle} № {invoiceNumber || "—"} от{" "}
             {fmtDate(invoiceDate)}
           </Text>
         </View>

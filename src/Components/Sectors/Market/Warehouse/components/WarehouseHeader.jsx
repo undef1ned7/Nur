@@ -1,12 +1,13 @@
 import React from "react";
-import { Plus } from "lucide-react";
+import { Box, Plus } from "lucide-react";
 import "./WarehouseHeader.scss";
 
 /**
  * Компонент заголовка склада
  * @param {Function} onCreateProduct - Обработчик создания товара
+ * @param {Function} onGoodsReceipt - Обработчик перехода на прием товара
  */
-const WarehouseHeader = ({ onCreateProduct }) => {
+const WarehouseHeader = ({ onCreateProduct, onGoodsReceipt }) => {
   return (
     <div className="warehouse-header">
       <div className="warehouse-header__left">
@@ -20,13 +21,24 @@ const WarehouseHeader = ({ onCreateProduct }) => {
           </p>
         </div>
       </div>
-      <button
-        className="warehouse-header__create-btn"
-        onClick={onCreateProduct}
-      >
-        <Plus size={16} />
-        Создать товар
-      </button>
+      <div className="warehouse-header__actions">
+        <button
+          className="warehouse-header__receipt-btn"
+          onClick={onGoodsReceipt}
+          type="button"
+        >
+          <Box size={16} />
+          Прием товара
+        </button>
+        <button
+          className="warehouse-header__create-btn"
+          onClick={onCreateProduct}
+          type="button"
+        >
+          <Plus size={16} />
+          Создать товар
+        </button>
+      </div>
     </div>
   );
 };

@@ -30,6 +30,13 @@
   margin-bottom: 24px;
   gap: 16px;
 
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
   &__left {
     display: flex;
     align-items: flex-start;
@@ -68,19 +75,29 @@
     margin: 0;
   }
 
+  &__receipt-btn,
   &__create-btn {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 12px 20px;
-    background: #f7d74f;
-    color: #000;
     border: none;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+  }
+
+  &__receipt-btn {
+    background: #ffffff;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  &__create-btn {
+    background: #f7d74f;
+    color: #000;
   }
 }
 
@@ -1181,6 +1198,13 @@
     flex-direction: column;
     align-items: flex-start;
 
+    &__actions {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__receipt-btn,
     &__create-btn {
       width: 100%;
       justify-content: center;

@@ -46,6 +46,13 @@ ChartJS.register(
   Filler,
 );
 
+const translateLowStockStatus = (status) => {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "critical") return "Критично";
+  if (normalized === "low") return "Низкий";
+  return String(status || "Низкий").trim() || "Низкий";
+};
+
 const Analytics = () => {
   const dispatch = useDispatch();
   const { company, currentUser } = useUser();
@@ -609,7 +616,7 @@ const Analytics = () => {
           name: item.name,
           stock: item.qty || 0,
           minimum: item.min || 0,
-          status: item.status === "critical" ? "Критично" : "Низкий",
+          status: translateLowStockStatus(item.status),
           statusType: item.status || "low",
         })) || [],
     };
@@ -930,7 +937,11 @@ const Analytics = () => {
       topByQuantity: tables.top_by_quantity || [],
       categories: tables.categories || [],
       brands: tables.brands || [],
-      lowStockProducts: tables.low_stock_products || [],
+      lowStockProducts:
+        (tables.low_stock_products || []).map((item) => ({
+          ...item,
+          status: translateLowStockStatus(item.status),
+        })) || [],
     };
   }, [analyticsData, activeTab]);
 

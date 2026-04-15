@@ -1750,7 +1750,7 @@ const Settings = () => {
                   </div>
                 ))}
 
-                {/* {isMarketSector && (
+                {isMarketSector && (
                   <div
                     className="settings__form-group"
                     style={{ marginTop: "15px" }}
@@ -1782,7 +1782,7 @@ const Settings = () => {
                       </button>
                     </div>
                   </div>
-                )} */}
+                )}
               </div>
             )}
 
