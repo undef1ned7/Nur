@@ -1349,6 +1349,7 @@ const Settings = () => {
     current: false,
     new: false,
     repeat: false,
+    cashier: false,
   });
 
   // --- Данные компании
@@ -1361,6 +1362,7 @@ const Settings = () => {
     bik: company?.bik || "",
     address: company?.address || "",
     phones_howcase: company?.phones_howcase || "",
+    cashier_password: company?.cashier_password || "",
   });
 
   useEffect(() => {
@@ -1373,6 +1375,7 @@ const Settings = () => {
       bik: company?.bik || "",
       address: company?.address || "",
       phones_howcase: company?.phones_howcase || "",
+      cashier_password: company?.cashier_password || "",
     });
   }, [company]);
 
@@ -1407,7 +1410,11 @@ const Settings = () => {
 
     setSaving(true);
     try {
-      await dispatch(updateUserCompanyName(companyState)).unwrap();
+      const payload = { ...companyState };
+      if (!String(payload.cashier_password || "").trim()) {
+        delete payload.cashier_password;
+      }
+      await dispatch(updateUserCompanyName(payload)).unwrap();
       showAlert("success", "Данные компании успешно сохранены");
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка при сохранении данных компании");
@@ -1460,6 +1467,7 @@ const Settings = () => {
       bik: company?.bik || "",
       address: company?.address || "",
       phones_howcase: company?.phones_howcase || "",
+      cashier_password: company?.cashier_password || "",
     });
   };
 
@@ -1741,6 +1749,40 @@ const Settings = () => {
                     </div>
                   </div>
                 ))}
+
+                {/* {isMarketSector && (
+                  <div
+                    className="settings__form-group"
+                    style={{ marginTop: "15px" }}
+                  >
+                    <label
+                      className="settings__label"
+                      htmlFor="cashier_password"
+                    >
+                      Пароль кассира для удаления из корзины
+                    </label>
+                    <div className="settings__input-wrapper">
+                      <input
+                        id="cashier_password"
+                        name="cashier_password"
+                        type={showPassword.cashier ? "text" : "password"}
+                        className="settings__input"
+                        placeholder="Введите новый пароль кассира"
+                        value={companyState.cashier_password ?? ""}
+                        onChange={handleCompanyChange}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        className="settings__password-toggle"
+                        onClick={() => togglePasswordVisibility("cashier")}
+                        aria-label="Показать/скрыть пароль кассира"
+                      >
+                        {showPassword.cashier ? "🙈" : "👁️"}
+                      </button>
+                    </div>
+                  </div>
+                )} */}
               </div>
             )}
 

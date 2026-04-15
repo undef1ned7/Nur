@@ -636,6 +636,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
+  const [showMobileCart, setShowMobileCart] = useState(false);
   const [agents, setAgents] = useState([]);
   const [customItem, setCustomItem] = useState({
     name: "",
@@ -2132,8 +2133,24 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     setSelectedBank("");
     setDebtInitialPayment("");
     setFirstPaymentDate(getTodayIsoDate());
+    setShowMobileCart(false);
     setShowPaymentModal(true);
   };
+
+  useEffect(() => {
+    if (currentItems.length === 0) {
+      setShowMobileCart(false);
+    }
+  }, [currentItems.length]);
+
+  useEffect(() => {
+    if (!showMobileCart) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showMobileCart]);
 
   const handleCatalogProductAdd = async (product) => {
     if (isPilorama) {
@@ -2201,7 +2218,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
   if (useMainProductsList) {
     return (
-      <div className="cashier-page sellstart-cashier">
+      <div
+        className={`cashier-page sellstart-cashier${
+          showMobileCart ? " sellstart-cashier--cart-open" : ""
+        }`}
+      >
         <div className="cashier-page__header">
           <div className="cashier-page__header-left">
             <button
@@ -2275,9 +2296,17 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
             </div>
           </div>
 
-          <div className="cashier-page__cart">
+          <div className="cashier-page__cart sellstart-cashier__cart-panel">
             <div className="cashier-page__cart-header">
               <h2 className="cashier-page__cart-title">Корзина</h2>
+              <button
+                type="button"
+                className="sellstart-cashier__mobile-cart-close"
+                onClick={() => setShowMobileCart(false)}
+                aria-label="Закрыть корзину"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             <div className="cashier-page__cart-actions sellstart-cashier__cart-actions">
@@ -2649,6 +2678,30 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
             </div>
           </div>
         </div>
+
+        {showMobileCart && (
+          <button
+            type="button"
+            className="sellstart-cashier__mobile-cart-backdrop"
+            onClick={() => setShowMobileCart(false)}
+            aria-label="Закрыть корзину"
+          />
+        )}
+
+        {currentItems.length > 0 && !showPaymentModal && (
+          <button
+            type="button"
+            className="sellstart-cashier__mobile-cart-toggle"
+            onClick={() => setShowMobileCart(true)}
+          >
+            <span className="sellstart-cashier__mobile-cart-label">
+              Корзина · {currentItems.length}
+            </span>
+            <span className="sellstart-cashier__mobile-cart-total">
+              {formatSom(displayTotal)} сом
+            </span>
+          </button>
+        )}
 
         {showPaymentModal && (
           <UniversalModal
