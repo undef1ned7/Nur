@@ -1478,11 +1478,13 @@
   &__grid {
     display: grid;
     grid-template-columns: 150px 1fr;
+    grid-template-areas: "preview fields";
     gap: 14px;
     align-items: start;
   }
 
   &__preview {
+    grid-area: preview;
     width: 150px;
     height: 150px;
     border-radius: 14px;
@@ -1510,22 +1512,31 @@
   }
 
   &__fields {
+    grid-area: fields;
     min-width: 0;
   }
 
   &__fieldsGrid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
     align-items: end;
+
+    > * {
+      min-width: 0;
+    }
   }
 
   &__row2 {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 1fr 220px;
+    grid-template-columns: minmax(0, 1fr) 220px;
     gap: 12px;
     align-items: end;
+
+    > * {
+      min-width: 0;
+    }
   }
 
   &__active {
@@ -1552,6 +1563,29 @@
     padding: 6px 10px;
     font-size: 12px;
     white-space: nowrap;
+  }
+
+  @media (max-width: 1220px) {
+    &__grid {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "preview"
+        "fields";
+      gap: 12px;
+    }
+
+    &__preview {
+      width: 140px;
+      height: 140px;
+    }
+
+    &__fieldsGrid {
+      grid-template-columns: 1fr;
+    }
+
+    &__row2 {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 860px) {
@@ -1670,6 +1704,188 @@
     &__row2 {
       grid-template-columns: 1fr;
       gap: 10px;
+    }
+  }
+}
+
+/* ===== Блок CAFE-MENU-ITEM-PAGE ===== */
+.cafeMenuItemPage {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  &__headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__titleBlock {
+    display: grid;
+    gap: 4px;
+  }
+
+  &__tabs {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  &__tab {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.15s ease;
+
+    &--active {
+      background: #f7d617;
+      color: #111827;
+    }
+  }
+
+  &__card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  }
+
+  &__description {
+    display: grid;
+    gap: 16px;
+  }
+
+  &__ingredientsHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__sectionTitle {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__ingCompactField {
+    min-width: 0;
+  }
+
+  &__ingredientMetrics {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px dashed #dbe2ea;
+  }
+
+  &__ingredientMetric {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+
+    &--wide {
+      grid-column: span 2;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.25;
+    }
+
+    strong {
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--text);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .cafeMenu__ingRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+
+    > * {
+      min-width: 0;
+    }
+  }
+
+  .cafeMenu__ingCol--trash {
+    grid-column: 1 / -1;
+    justify-items: end;
+    align-self: auto;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .cafeMenuItemPage {
+    &__header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__headerLeft {
+      align-items: flex-start;
+    }
+
+    &__tabs {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    &__tab {
+      width: 100%;
+      text-align: center;
+      padding: 10px 12px;
+    }
+
+    &__card {
+      padding: 12px;
+    }
+
+    &__ingredientMetrics {
+      grid-column: 1;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: 10px;
+    }
+
+    &__ingredientMetric {
+      &--wide {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .cafeMenu__ingRow {
+      grid-template-columns: 1fr;
+    }
+
+    .cafeMenu__ingCol--trash {
+      justify-items: stretch;
+      padding-left: 0;
     }
   }
 }

@@ -106,6 +106,7 @@ import CafeDocuments from "../Components/Sectors/cafe/Documents/Documents";
 import CafeCookRoute from "../Components/Sectors/cafe/Cook/CafeCookRoute";
 import CafeInventory from "../Components/Sectors/cafe/Inventory/CafeInventory";
 import CafeMenu from "../Components/Sectors/cafe/Menu/Menu";
+import CafeMenuItemPage from "../Components/Sectors/cafe/Menu/CafeMenuItemPage";
 import CafeOrders from "../Components/Sectors/cafe/Orders/Orders";
 import CafePayroll from "../Components/Sectors/cafe/Payroll/Payroll";
 import CafePurchasing from "../Components/Sectors/cafe/Purchasing/Purchasing";
@@ -537,6 +538,8 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("documents", CafeDocuments),
       createProtectedRoute("cook", CafeCookRoute),
       createProtectedRoute("inventory", CafeInventory),
+      createProtectedRoute("menu/item/new", CafeMenuItemPage),
+      createProtectedRoute("menu/item/:id", CafeMenuItemPage),
       createProtectedRoute("menu", CafeMenu),
       <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
         {[
