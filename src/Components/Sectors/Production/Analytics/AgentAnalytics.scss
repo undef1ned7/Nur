@@ -410,6 +410,10 @@
       box-shadow: 0 2px 8px rgba(247, 215, 79, 0.3);
     }
 
+    &--clickable {
+      cursor: pointer;
+    }
+
     h3 {
       margin: 0 0 4px 0;
       font-size: 14px;
@@ -838,6 +842,61 @@
       background: #10b981;
       color: white;
     }
+  }
+
+  &__modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 1000;
+  }
+
+  &__modal {
+    width: min(1100px, 100%);
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e5e7eb;
+
+    h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #111827;
+    }
+
+    button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 22px;
+      line-height: 1;
+      color: #374151;
+    }
+  }
+
+  &__modal-body {
+    padding: 16px 20px;
+    overflow: auto;
   }
 }
 .chart-container {

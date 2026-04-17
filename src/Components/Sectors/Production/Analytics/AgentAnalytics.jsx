@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
+import api from "../../../../api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,7 +18,6 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
   ArrowLeft,
   TrendingUp,
-  Users,
   ShoppingCart,
   DollarSign,
   Package,
@@ -25,6 +25,8 @@ import {
   BarChart3,
   ArrowLeftRight,
   Clock,
+  Percent,
+  AlertTriangle,
 } from "lucide-react";
 import { fetchAgentAnalytics } from "../../../../store/creators/analyticsCreators";
 import "./AgentAnalytics.scss";
@@ -45,7 +47,20 @@ const AgentAnalytics = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { agentId } = useParams();
-  const [period, setPeriod] = useState("month"); // day, week, month, year
+  const [period, setPeriod] = useState("month"); // day, week, month, custom (API)
+  const [dateForDay, setDateForDay] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [dateFromCustom, setDateFromCustom] = useState("");
+  const [dateToCustom, setDateToCustom] = useState("");
+  const [cardDetailsModal, setCardDetailsModal] = useState({
+    open: false,
+    cardKey: "",
+    title: "",
+    loading: false,
+    error: "",
+    rows: [],
+  });
 
   // Получаем данные из Redux store
   const {
@@ -54,14 +69,140 @@ const AgentAnalytics = () => {
     error: analyticsError,
   } = useSelector((state) => state.analytics.agentAnalytics);
 
+  const analyticsQueryParams = useMemo(() => {
+    const base = { agentId, period };
+    if (period === "day") {
+      return { ...base, date: dateForDay || undefined };
+    }
+    if (period === "custom") {
+      return {
+        ...base,
+        date_from: dateFromCustom || undefined,
+        date_to: dateToCustom || undefined,
+      };
+    }
+    return base;
+  }, [
+    agentId,
+    period,
+    dateForDay,
+    dateFromCustom,
+    dateToCustom,
+  ]);
+
   // Загрузка данных
   useEffect(() => {
-    dispatch(fetchAgentAnalytics({ agentId, period }));
-  }, [agentId, period, dispatch]);
+    dispatch(fetchAgentAnalytics(analyticsQueryParams));
+  }, [analyticsQueryParams, dispatch]);
 
   const fetchData = () => {
-    dispatch(fetchAgentAnalytics({ agentId, period }));
+    dispatch(fetchAgentAnalytics(analyticsQueryParams));
   };
+
+  const buildCardDetailsParams = (cardKey) => {
+    const params = {
+      card: cardKey,
+      limit: 200,
+      offset: 0,
+      period,
+      ...(agentId ? { agent_id: agentId } : {}),
+    };
+    if (period === "day") {
+      params.date = dateForDay || new Date().toISOString().slice(0, 10);
+    } else if (period === "custom") {
+      if (dateFromCustom) params.date_from = dateFromCustom;
+      if (dateToCustom) params.date_to = dateToCustom;
+    }
+    return params;
+  };
+
+  const openCardDetails = async (cardKey, title) => {
+    setCardDetailsModal({
+      open: true,
+      cardKey,
+      title,
+      loading: true,
+      error: "",
+      rows: [],
+    });
+
+    try {
+      const response = await api.get("/main/analytics/cards/details/", {
+        params: buildCardDetailsParams(cardKey),
+      });
+      const payload = response?.data;
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload?.rows)
+            ? payload.rows
+            : [];
+
+      setCardDetailsModal((prev) => ({
+        ...prev,
+        loading: false,
+        rows,
+      }));
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Не удалось загрузить детализацию";
+      setCardDetailsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+      }));
+    }
+  };
+
+  const closeCardDetails = () => {
+    setCardDetailsModal({
+      open: false,
+      cardKey: "",
+      title: "",
+      loading: false,
+      error: "",
+      rows: [],
+    });
+  };
+
+  const formatDetailsValue = (value, column) => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (
+      column === "discounts_total" ||
+      column === "sales_amount" ||
+      column === "amount"
+    ) {
+      const n =
+        typeof value === "string" ? parseFloat(value) : Number(value);
+      if (Number.isNaN(n)) return String(value);
+      return n.toLocaleString("ru-RU", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (typeof value === "number") return value.toLocaleString("ru-RU");
+    return String(value);
+  };
+
+  const cardDetailsColumnLabel = (column) => {
+    const byCard = {
+      discounts_total: {
+        user: "Кто дал скидку",
+        client: "Кому",
+        sales_count: "Продаж",
+        discounts_total: "Сумма скидок",
+      },
+    };
+    return byCard[cardDetailsModal.cardKey]?.[column] ?? column;
+  };
+
+  const detailColumns =
+    cardDetailsModal.rows.length > 0
+      ? Object.keys(cardDetailsModal.rows[0] || {})
+      : [];
 
   // Получаем информацию об агенте из данных аналитики
   const selectedAgent = useMemo(() => {
@@ -94,21 +235,30 @@ const AgentAnalytics = () => {
         totalTransfers: 0,
         totalAcceptances: 0,
         totalQuantityTransferred: 0,
+        defectiveItems: 0,
         totalSalesAmount: 0,
         totalSalesCount: 0,
+        totalDiscounts: 0,
         totalProductsOnHand: 0,
         totalProductsValue: 0,
       };
     }
 
     const summary = analyticsData.summary;
+    const discountsRaw = summary.discounts_total;
+    const totalDiscounts =
+      typeof discountsRaw === "string"
+        ? parseFloat(discountsRaw) || 0
+        : Number(discountsRaw) || 0;
 
     return {
       totalTransfers: summary.transfers_count || 0,
       totalAcceptances: summary.acceptances_count || 0,
       totalQuantityTransferred: summary.items_transferred || 0,
+      defectiveItems: Number(summary.defective_items) || 0,
       totalSalesAmount: summary.sales_amount || 0,
       totalSalesCount: summary.sales_count || 0,
+      totalDiscounts,
       totalProductsOnHand: summary.items_on_hand_qty || 0,
       totalProductsValue: summary.items_on_hand_amount || 0,
     };
@@ -786,8 +936,35 @@ const AgentAnalytics = () => {
             <option value="day">День</option>
             <option value="week">Неделя</option>
             <option value="month">Месяц</option>
-            <option value="year">Год</option>
+            <option value="custom">Произвольный период</option>
           </select>
+          {period === "day" && (
+            <input
+              type="date"
+              className="agent-analytics__period-select"
+              value={dateForDay}
+              onChange={(e) => setDateForDay(e.target.value)}
+              title="Дата для периода «день»"
+            />
+          )}
+          {period === "custom" && (
+            <>
+              <input
+                type="date"
+                className="agent-analytics__period-select"
+                value={dateFromCustom}
+                onChange={(e) => setDateFromCustom(e.target.value)}
+                title="С даты"
+              />
+              <input
+                type="date"
+                className="agent-analytics__period-select"
+                value={dateToCustom}
+                onChange={(e) => setDateToCustom(e.target.value)}
+                title="По дату"
+              />
+            </>
+          )}
           <button
             className="agent-analytics__refresh-btn"
             onClick={fetchData}
@@ -800,7 +977,18 @@ const AgentAnalytics = () => {
 
       {/* Метрики */}
       <div className="agent-analytics__metrics">
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("transfers_count", "Передач")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("transfers_count", "Передач");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
             <Package size={24} />
           </div>
@@ -809,7 +997,18 @@ const AgentAnalytics = () => {
             <p>{metrics.totalTransfers}</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("acceptances_count", "Приёмок")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("acceptances_count", "Приёмок");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
             <ShoppingCart size={24} />
           </div>
@@ -818,7 +1017,20 @@ const AgentAnalytics = () => {
             <p>{metrics.totalAcceptances}</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("items_transferred", "Товаров передано")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("items_transferred", "Товаров передано");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
             <TrendingUp size={24} />
           </div>
@@ -827,7 +1039,40 @@ const AgentAnalytics = () => {
             <p>{metrics.totalQuantityTransferred.toLocaleString()}</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("defective_items", "Брак (принятые возвраты)")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("defective_items", "Брак (принятые возвраты)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3>Брак за период</h3>
+            <p>{metrics.defectiveItems.toLocaleString()}</p>
+          </div>
+        </div>
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("sales_count", "Продаж")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("sales_count", "Продаж");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
             <DollarSign size={24} />
           </div>
@@ -836,7 +1081,18 @@ const AgentAnalytics = () => {
             <p>{metrics.totalSalesCount}</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("sales_amount", "Сумма продаж")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("sales_amount", "Сумма продаж");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
             <DollarSign size={24} />
           </div>
@@ -845,7 +1101,44 @@ const AgentAnalytics = () => {
             <p>{metrics.totalSalesAmount.toLocaleString()} сом</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("discounts_total", "Сумма скидок")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("discounts_total", "Сумма скидок");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <Percent size={24} />
+          </div>
+          <div>
+            <h3>Сумма скидок</h3>
+            <p>
+              {metrics.totalDiscounts.toLocaleString("ru-RU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              сом
+            </p>
+          </div>
+        </div>
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("items_on_hand_qty", "Товаров на руках")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("items_on_hand_qty", "Товаров на руках");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
             <Package size={24} />
           </div>
@@ -854,7 +1147,20 @@ const AgentAnalytics = () => {
             <p>{metrics.totalProductsOnHand.toLocaleString()}</p>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("items_on_hand_amount", "Стоимость товаров")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("items_on_hand_amount", "Стоимость товаров");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
             <DollarSign size={24} />
           </div>
@@ -1028,6 +1334,60 @@ const AgentAnalytics = () => {
             </div>
           </div>
         </>
+      )}
+
+      {cardDetailsModal.open && (
+        <div className="agent-analytics__modal-backdrop" onClick={closeCardDetails}>
+          <div
+            className="agent-analytics__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="agent-analytics__modal-header">
+              <h3>Детализация: {cardDetailsModal.title}</h3>
+              <button type="button" onClick={closeCardDetails}>
+                ×
+              </button>
+            </div>
+
+            <div className="agent-analytics__modal-body">
+              {cardDetailsModal.loading && <p>Загрузка...</p>}
+              {!cardDetailsModal.loading && cardDetailsModal.error && (
+                <p>{cardDetailsModal.error}</p>
+              )}
+              {!cardDetailsModal.loading &&
+                !cardDetailsModal.error &&
+                cardDetailsModal.rows.length === 0 && <p>Нет данных</p>}
+              {!cardDetailsModal.loading &&
+                !cardDetailsModal.error &&
+                cardDetailsModal.rows.length > 0 && (
+                  <div className="agent-analytics__table">
+                    <table>
+                      <thead>
+                        <tr>
+                          {detailColumns.map((column) => (
+                            <th key={column}>
+                              {cardDetailsColumnLabel(column)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cardDetailsModal.rows.map((row, idx) => (
+                          <tr key={idx}>
+                            {detailColumns.map((column) => (
+                              <td key={`${idx}-${column}`}>
+                                {formatDetailsValue(row?.[column], column)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

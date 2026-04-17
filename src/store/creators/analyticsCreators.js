@@ -19,9 +19,21 @@ export const fetchOrderAnalytics = createAsyncThunk(
 
 export const fetchAgentAnalytics = createAsyncThunk(
   "orderAnalytics/fetchAgentAnalytics",
-  async ({ agentId, period = "month" }, { rejectWithValue }) => {
+  async (payload = {}, { rejectWithValue }) => {
+    const {
+      agentId,
+      period = "month",
+      date,
+      date_from,
+      date_to,
+    } = payload || {};
     try {
-      const data = await getAgentAnalytics(agentId, period);
+      const data = await getAgentAnalytics(agentId, {
+        period,
+        date,
+        date_from,
+        date_to,
+      });
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
