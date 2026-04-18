@@ -226,6 +226,20 @@ export const createReturnApi = async (returnData) => {
   }
 };
 
+/** Создание возврата от лица текущего агента (POST /main/agents/me/returns/) */
+export const createAgentMeReturnApi = async (returnData) => {
+  try {
+    const response = await api.post("main/agents/me/returns/", returnData);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Agent Return Error Data:", error.response.data);
+      console.error("Create Agent Return Error Status:", error.response.status);
+      return Promise.reject(error.response.data);
+    }
+  }
+};
+
 export const getReturnApi = async (returnId) => {
   try {
     const response = await api.get(`main/returns/${returnId}/`);
@@ -247,6 +261,19 @@ export const approveReturnApi = async (returnId) => {
     if (error.response) {
       console.error("Approve Return Error Data:", error.response.data);
       console.error("Approve Return Error Status:", error.response.status);
+      return Promise.reject(error.response.data);
+    }
+  }
+};
+
+export const rejectReturnApi = async (returnId) => {
+  try {
+    const response = await api.post(`main/returns/${returnId}/reject/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Return Error Data:", error.response.data);
+      console.error("Reject Return Error Status:", error.response.status);
       return Promise.reject(error.response.data);
     }
   }

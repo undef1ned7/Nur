@@ -130,9 +130,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
-    if (company?.subscription_plan?.name == "Старт") return false;
     return userProfile.can_view_cashier === true;
-  }, [userProfile, company]);
+  }, [userProfile]);
 
   // const fetchProfile = async () => {
   //   try {

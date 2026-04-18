@@ -759,6 +759,15 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
       return;
     }
+    if (isPilorama) {
+      dispatch(
+        getAgentCart({
+          order_discount_total: discountTotal,
+          ...(selectedAgent ? { agent: selectedAgent } : {}),
+        }),
+      );
+      return;
+    }
     dispatch(startSaleInAgent(discountTotal));
     dispatch(getAgentCart({ order_discount_total: discountTotal }));
   }, 600);
@@ -1938,7 +1947,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   };
 
   const handleMarketPosPayment = async () => {
-    if (!start?.id) return;
+    if (isPilorama) {
+      if (!agentCart.currentCart?.id) return;
+    } else if (!start?.id) {
+      return;
+    }
     if (!cashData.cashbox) {
       setAlert({
         open: true,
@@ -2025,15 +2038,31 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
             ? totalNumber
             : null;
 
-      const result = await run(
-        productCheckout({
-          id: start.id,
-          bool: receiptWithCheck,
-          clientId: clientId || null,
-          payment_method: paymentMethodApi,
-          cash_received: cashReceivedValue,
-        }),
-      );
+      let result;
+      if (isPilorama) {
+        result = await run(
+          checkoutAgentCart({
+            cartId: agentCart.currentCart.id,
+            print_receipt: receiptWithCheck,
+            client_id: clientId || null,
+            agent: selectedAgent || undefined,
+            payment_method: paymentMethodApi,
+            ...(cashReceivedValue != null
+              ? { cash_received: cashReceivedValue }
+              : {}),
+          }),
+        );
+      } else {
+        result = await run(
+          productCheckout({
+            id: start.id,
+            bool: receiptWithCheck,
+            clientId: clientId || null,
+            payment_method: paymentMethodApi,
+            cash_received: cashReceivedValue,
+          }),
+        );
+      }
 
       if (paymentMethod === "debt" && clientId) {
         const initialPaid = Math.max(0, initialPaymentNumber || 0);
@@ -2103,9 +2132,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       setShowPaymentModal(false);
       setShow(false);
 
-      if (receiptWithCheck && (result?.sale_id || start?.id)) {
+      const saleIdForReceipt =
+        result?.sale_id || result?.id || (!isPilorama ? start?.id : null);
+      if (receiptWithCheck && saleIdForReceipt) {
         try {
-          const resp = await run(getProductCheckout(result?.sale_id || start?.id));
+          const resp = await run(getProductCheckout(saleIdForReceipt));
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
           console.error("Печать чека не удалась:", e);

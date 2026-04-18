@@ -86,7 +86,17 @@ export const addCustomItemToAgentCart = createAsyncThunk(
 export const checkoutAgentCart = createAsyncThunk(
   "agentCart/checkout",
   async (
-    { cartId, print_receipt = false, client_id, client, department_id, agent },
+    {
+      cartId,
+      print_receipt = false,
+      client_id,
+      client,
+      department_id,
+      agent,
+      payment_method = "transfer",
+      cash_received,
+      cashbox_id,
+    },
     { rejectWithValue }
   ) => {
     try {
@@ -96,7 +106,11 @@ export const checkoutAgentCart = createAsyncThunk(
         ...(client && { client }),
         ...(department_id && { department_id }),
         ...(agent && { agent }),
-        payment_method: "transfer",
+        payment_method,
+        ...(cash_received != null && cash_received !== ""
+          ? { cash_received }
+          : {}),
+        ...(cashbox_id && { cashbox_id }),
       });
       return data;
     } catch (error) {

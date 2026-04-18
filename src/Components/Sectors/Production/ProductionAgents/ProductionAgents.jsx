@@ -22,6 +22,9 @@ import {
   createReturnAsync,
   fetchTransfersAsync,
   createAcceptanceAsync,
+  fetchReturnsAsync,
+  approveReturnAsync,
+  rejectReturnAsync,
 } from "../../../../store/creators/transferCreators";
 // import { useClient } from "../../../../store/slices/ClientSlice";
 // import { useDepartments } from "../../../../store/slices/departmentSlice";
@@ -41,34 +44,124 @@ import {
 } from "../../../../store/creators/saleThunk";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
-import { useAlert } from "@/hooks/useDialog";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  getAgentSalesList,
+  getAgentSaleDetail,
+  agentSaleReturn,
+  getAllProductionSaleReturn,
+} from "../../../../api/agentSales";
+import ProductionAgentRequestCartsTab from "./ProductionAgentRequestCartsTab";
 
 // Компонент для детального просмотра продажи
-const SaleDetailModal = ({ onClose, saleId }) => {
+const SaleDetailModal = ({
+  onClose,
+  saleId,
+  useAgentSalesApi,
+  onSaleReturned,
+}) => {
   const alert = useAlert();
+  const confirmDialog = useConfirm();
   const dispatch = useDispatch();
   const { historyDetail: saleDetail } = useSale();
+  const [agentDetail, setAgentDetail] = useState(null);
+  const [agentDetailLoading, setAgentDetailLoading] = useState(false);
+  const [saleReturning, setSaleReturning] = useState(false);
 
   useEffect(() => {
-    if (saleId) {
-      dispatch(historySellProductDetail(saleId));
+    if (!saleId) return;
+    let cancelled = false;
+    if (useAgentSalesApi) {
+      setAgentDetailLoading(true);
+      (async () => {
+        try {
+          const data = await getAgentSaleDetail(saleId);
+          if (!cancelled) setAgentDetail(data);
+        } catch (err) {
+          if (!cancelled) {
+            setAgentDetail(null);
+            const msg = validateResErrors(err, "Ошибка загрузки продажи");
+            alert(msg, true);
+          }
+        } finally {
+          if (!cancelled) setAgentDetailLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [saleId, dispatch]);
+    dispatch(historySellProductDetail(saleId));
+    setAgentDetail(null);
+    return () => {
+      cancelled = true;
+    };
+  }, [saleId, dispatch, useAgentSalesApi, alert]);
+
+  const detail = useAgentSalesApi ? agentDetail : saleDetail;
 
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
+    debt: "Долг",
     canceled: "Отмененный",
   };
+
+  const saleStatus = String(detail?.status || "").toLowerCase();
+  const canReturnSale =
+    saleStatus === "paid" || saleStatus === "debt";
+
+  const handleReturnSale = useCallback(() => {
+    if (!saleId) return;
+    const st = String(detail?.status || "").toLowerCase();
+    if (st !== "paid" && st !== "debt") {
+      alert(
+        "Возврат возможен только для оплаченных или долговых продаж.",
+        true,
+      );
+      return;
+    }
+    confirmDialog(
+      "Выполнить возврат продажи? Статус станет «Отменён»; товар вернётся на основной склад (обычная продажа) или снова у агента (агентская продажа).",
+      async (ok) => {
+        if (!ok) return;
+        setSaleReturning(true);
+        try {
+          if (useAgentSalesApi) {
+            await agentSaleReturn(saleId);
+            const data = await getAgentSaleDetail(saleId);
+            setAgentDetail(data);
+          } else {
+            await getAllProductionSaleReturn(saleId);
+            await dispatch(historySellProductDetail(saleId)).unwrap();
+          }
+          onSaleReturned?.();
+          alert("Возврат выполнен");
+        } catch (err) {
+          alert(validateResErrors(err, "Не удалось выполнить возврат"), true);
+        } finally {
+          setSaleReturning(false);
+        }
+      },
+    );
+  }, [
+    saleId,
+    detail?.status,
+    useAgentSalesApi,
+    confirmDialog,
+    dispatch,
+    onSaleReturned,
+    alert,
+  ]);
 
   const handlePrintReceipt = async () => {
     try {
       const pdfBlob = await dispatch(
-        getProductCheckout(saleDetail?.id),
+        getProductCheckout(detail?.id),
       ).unwrap();
       const url = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
@@ -85,7 +178,7 @@ const SaleDetailModal = ({ onClose, saleId }) => {
   const handlePrintInvoice = async () => {
     try {
       const pdfInvoiceBlob = await dispatch(
-        getProductInvoice(saleDetail?.id),
+        getProductInvoice(detail?.id),
       ).unwrap();
       const url1 = window.URL.createObjectURL(pdfInvoiceBlob);
       const link1 = document.createElement("a");
@@ -102,6 +195,21 @@ const SaleDetailModal = ({ onClose, saleId }) => {
     }
   };
 
+  if (useAgentSalesApi && agentDetailLoading) {
+    return (
+      <div className="sellDetail add-modal">
+        <div className="add-modal__overlay" onClick={onClose} />
+        <div className="add-modal__content" style={{ width: "500px" }}>
+          <div className="add-modal__header">
+            <h3>Детали продажи</h3>
+            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          </div>
+          <p className="add-modal__section">Загрузка…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sellDetail add-modal">
       <div className="add-modal__overlay" onClick={onClose} />
@@ -113,21 +221,21 @@ const SaleDetailModal = ({ onClose, saleId }) => {
         <div className="sellDetail__content">
           <div className="sell__box">
             <p className="receipt__title">
-              Клиент: {saleDetail?.client_name || "—"}
+              Клиент: {detail?.client_name || "—"}
             </p>
             <p className="receipt__title">
               Статус:{" "}
-              {kindTranslate[saleDetail?.status] || saleDetail?.status || "—"}
+              {kindTranslate[detail?.status] || detail?.status || "—"}
             </p>
             <p className="receipt__title">
               Дата:{" "}
-              {saleDetail?.created_at
-                ? new Date(saleDetail.created_at).toLocaleString()
+              {detail?.created_at
+                ? new Date(detail.created_at).toLocaleString()
                 : "—"}
             </p>
           </div>
           <div className="receipt">
-            {saleDetail?.items?.map((product, idx) => (
+            {detail?.items?.map((product, idx) => (
               <div className="receipt__item" key={idx}>
                 <p className="receipt__item-name">
                   {idx + 1}.{" "}
@@ -147,12 +255,23 @@ const SaleDetailModal = ({ onClose, saleId }) => {
               <div
                 style={{ gap: "10px", display: "flex", alignItems: "center" }}
               >
-                <p>Общая скидка {saleDetail?.discount_total || 0}</p>
-                <p>Налог {saleDetail?.tax_total || 0}</p>
-                <b>≡ {saleDetail?.total || 0}</b>
+                <p>Общая скидка {detail?.discount_total || 0}</p>
+                <p>Налог {detail?.tax_total || 0}</p>
+                <b>≡ {detail?.total || 0}</b>
               </div>
             </div>
             <div className="receipt__row">
+              {canReturnSale && (
+                <button
+                  type="button"
+                  className="receipt__row-btn"
+                  style={{ background: "#b45309", color: "#fff" }}
+                  onClick={handleReturnSale}
+                  disabled={saleReturning}
+                >
+                  {saleReturning ? "Возврат…" : "Вернуть продажу"}
+                </button>
+              )}
               <button className="receipt__row-btn" onClick={handlePrintReceipt}>
                 Чек
               </button>
@@ -478,35 +597,24 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     (state) => state.return || { creating: false, createError: null },
   );
   const [state, setState] = useState({
-    subreal: item?.subreals?.[0]?.id || "",
+    subreal: "",
     qty: "",
   });
   const [validationError, setValidationError] = useState("");
 
   const dispatch = useDispatch();
 
-  // useEffect(() => {
-  // dispatch(fetchClientsAsync());
-  // dispatch(getEmployees());
-  // }, [dispatch]);
+  const subrealOptions = useMemo(
+    () =>
+      (Array.isArray(item?.subreals) ? item.subreals : []).filter((sr) => sr?.id),
+    [item?.subreals],
+  );
 
-  // Проверяем, что товар существует и есть передачи
-  if (!item || !item.subreals || item.subreals.length === 0) {
-    return (
-      <div className="add-modal">
-        <div className="add-modal__overlay" onClick={onClose} />
-        <div className="add-modal__content" style={{ height: "auto" }}>
-          <div className="add-modal__header">
-            <h3>Ошибка</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
-          </div>
-          <p className="add-modal__error-message">
-            Товар не найден или нет передач для возврата
-          </p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const first = subrealOptions[0]?.id || "";
+    setState((prev) => ({ ...prev, subreal: first, qty: "" }));
+    setValidationError("");
+  }, [item, subrealOptions]);
 
   const pendingReturnQty = Number(item?._pending_return_qty || 0) || 0;
   const effectiveOnHand = Math.max(
@@ -527,6 +635,23 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     }
     return true;
   }, [state]);
+
+  if (!item || !item.subreals || item.subreals.length === 0) {
+    return (
+      <div className="add-modal">
+        <div className="add-modal__overlay" onClick={onClose} />
+        <div className="add-modal__content" style={{ height: "auto" }}>
+          <div className="add-modal__header">
+            <h3>Ошибка</h3>
+            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          </div>
+          <p className="add-modal__error-message">
+            Товар не найден или нет передач для возврата
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -591,6 +716,30 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
               )}
             </p>
           </div>
+          {subrealOptions.length > 1 && (
+            <div className="add-modal__section">
+              <label htmlFor="return-subreal">Партия (передача) *</label>
+              <select
+                id="return-subreal"
+                name="subreal"
+                className="debt__input"
+                style={{ marginTop: 8, width: "100%" }}
+                value={state.subreal}
+                onChange={onChange}
+                required
+              >
+                {subrealOptions.map((sr) => (
+                  <option key={sr.id} value={sr.id}>
+                    {sr.created_at
+                      ? new Date(sr.created_at).toLocaleDateString()
+                      : "—"}{" "}
+                    · перед. {sr.qty_transferred ?? "—"}, прин.{" "}
+                    {sr.qty_accepted ?? "—"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="add-modal__section">
             <label>Количество для возврата *</label>
             <input
@@ -624,6 +773,150 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
             {creating ? "Возврат..." : "Вернуть"}
           </button>
         </form>
+      </div>
+    </div>
+  );
+};
+
+const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
+  const alert = useAlert();
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await dispatch(
+        fetchReturnsAsync({ status: "pending" }),
+      ).unwrap();
+      setRows(Array.isArray(data) ? data : data?.results || []);
+    } catch (e) {
+      alert(validateResErrors(e, "Не удалось загрузить возвраты"), true);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+    // `alert` из useAlert() нестабилен между рендерами — не добавлять в deps, иначе бесконечный refetch
+  }, [dispatch]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const approve = async (id) => {
+    try {
+      await dispatch(approveReturnAsync(id)).unwrap();
+      onChanged?.();
+      await load();
+      alert("Возврат принят на склад");
+    } catch (e) {
+      alert(validateResErrors(e, "Ошибка подтверждения"), true);
+    }
+  };
+
+  const reject = async (id) => {
+    try {
+      await dispatch(rejectReturnAsync(id)).unwrap();
+      onChanged?.();
+      await load();
+      alert("Возврат отклонён");
+    } catch (e) {
+      alert(validateResErrors(e, "Ошибка отклонения"), true);
+    }
+  };
+
+  return (
+    <div className="add-modal accept">
+      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div
+        className="add-modal__content z-100!"
+        role="dialog"
+        aria-modal="true"
+        style={{ maxWidth: 720, width: "100%" }}
+      >
+        <div className="add-modal__header">
+          <h3>Возвраты агентов (ожидают приёма)</h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+        {loading ? (
+          <div className="add-modal__section">Загрузка…</div>
+        ) : rows.length === 0 ? (
+          <div className="add-modal__section">Нет заявок в статусе pending.</div>
+        ) : (
+          <DataContainer>
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 440, overflow: "auto" }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Агент / товар</th>
+                    <th>Кол-во</th>
+                    <th>Дата</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, idx) => (
+                    <tr key={r.id || idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Товар">
+                        <div>{r?.product_name || r?.product || "—"}</div>
+                        <div style={{ fontSize: 12, opacity: 0.75 }}>
+                          {r?.returned_by_name ||
+                            r?.agent_name ||
+                            r?.returned_by ||
+                            ""}
+                        </div>
+                      </td>
+                      <td data-label="Кол-во">{r?.qty ?? "—"}</td>
+                      <td data-label="Дата">
+                        {r?.returned_at
+                          ? new Date(r.returned_at).toLocaleString()
+                          : r?.created_at
+                            ? new Date(r.created_at).toLocaleString()
+                            : "—"}
+                      </td>
+                      <td data-label="Действия">
+                        <button
+                          type="button"
+                          className="add-modal__save"
+                          style={{ marginRight: 8 }}
+                          onClick={() => approve(r.id)}
+                        >
+                          Принять
+                        </button>
+                        <button
+                          type="button"
+                          className="add-modal__cancel"
+                          onClick={() => reject(r.id)}
+                        >
+                          Отклонить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+        )}
+        <div className="add-modal__footer">
+          <button type="button" className="add-modal__cancel" onClick={onClose}>
+            Закрыть
+          </button>
+          <button
+            type="button"
+            className="add-modal__save"
+            onClick={load}
+            disabled={loading}
+          >
+            Обновить
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -745,7 +1038,11 @@ const AgentClientsDebtModal = ({
 const ProductionAgents = () => {
   const alert = useAlert();
   const dispatch = useDispatch();
-  const { profile } = useUser();
+  const { profile, company } = useUser();
+  const isPiloramaSector = company?.sector?.name === "Пилорама";
+  const TAB_REQUESTS = 2;
+  const tabOwnerAgents =
+    profile?.role === "owner" ? (isPiloramaSector ? 3 : 2) : null;
   const { list: transfers } = useSelector(
     (state) => state.transfer || { list: [] },
   );
@@ -773,6 +1070,8 @@ const ProductionAgents = () => {
   const [salesHistoryLoading, setSalesHistoryLoading] = useState(false);
   const [showSaleDetail, setShowSaleDetail] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
+  const [saleDetailUsesAgentApi, setSaleDetailUsesAgentApi] = useState(false);
+  const [showOwnerReturnsModal, setShowOwnerReturnsModal] = useState(false);
 
   // const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -950,7 +1249,6 @@ const ProductionAgents = () => {
     setShowTransferProductModal(true);
     setItemId1(item);
   };
-  const { company } = useUser();
   const handleOpen2 = (item) => {
     setShowAcceptProductModal(true);
     setItemId2(item);
@@ -1010,8 +1308,17 @@ const ProductionAgents = () => {
   const loadSalesHistory = useCallback(async () => {
     setSalesHistoryLoading(true);
     try {
-      const result = await dispatch(historySellProduct({})).unwrap();
-      setSalesHistory(result);
+      if (profile?.role === "agent") {
+        const data = await getAgentSalesList({ page: 1 });
+        const list = Array.isArray(data) ? data : data?.results || [];
+        setSalesHistory(list);
+      } else {
+        const result = await dispatch(historySellProduct({})).unwrap();
+        const list = Array.isArray(result)
+          ? result
+          : result?.results || [];
+        setSalesHistory(list);
+      }
     } catch (error) {
       const errorMessage = validateResErrors(
         error,
@@ -1021,20 +1328,27 @@ const ProductionAgents = () => {
     } finally {
       setSalesHistoryLoading(false);
     }
-  }, []);
+  }, [dispatch, profile?.role]);
 
   useEffect(() => {
-    if (activeTab === 1 && company.sector.name === "Пилорама") {
+    if (activeTab === 1 && isPiloramaSector) {
       loadSalesHistory();
     }
-  }, [activeTab, company.sector.name]);
+  }, [activeTab, isPiloramaSector, loadSalesHistory]);
 
   // Функция для открытия детального просмотра продажи
-  const handleShowSaleDetail = useCallback((saleId) => {
-    setSelectedSaleId(saleId);
-    setShowSaleDetail(true);
-    dispatch(historySellProductDetail(saleId));
-  }, []);
+  const handleShowSaleDetail = useCallback(
+    (saleId) => {
+      setSelectedSaleId(saleId);
+      const useAgent = profile?.role === "agent";
+      setSaleDetailUsesAgentApi(useAgent);
+      setShowSaleDetail(true);
+      if (!useAgent) {
+        dispatch(historySellProductDetail(saleId));
+      }
+    },
+    [dispatch, profile?.role],
+  );
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const pendingReturnQtyBySubrealId = useMemo(() => {
@@ -1268,7 +1582,7 @@ const ProductionAgents = () => {
           >
             Товары агентов
           </span>
-          {company.sector.name === "Пилорама" && (
+          {isPiloramaSector && (
             <span
               className={`vitrina__tab ${activeTab === 1 ? "active" : ""}`}
               onClick={() => setActiveTab(1)}
@@ -1285,17 +1599,37 @@ const ProductionAgents = () => {
             </span>
           )}
 
-          {profile?.role === "owner" && (
+          {isPiloramaSector && (
             <span
-              className={`vitrina__tab ${activeTab === 2 ? "active" : ""}`}
-              onClick={() => setActiveTab(2)}
+              className={`vitrina__tab ${activeTab === TAB_REQUESTS ? "active" : ""}`}
+              onClick={() => setActiveTab(TAB_REQUESTS)}
               style={{
                 cursor: "pointer",
                 padding: "8px 16px",
                 border: "1px solid #ddd",
                 borderRadius: "4px 4px 0 0",
-                backgroundColor: activeTab === 2 ? "#ffd400" : "transparent",
-                color: activeTab === 2 ? "#000" : "#333",
+                backgroundColor:
+                  activeTab === TAB_REQUESTS ? "#ffd400" : "transparent",
+                color: activeTab === TAB_REQUESTS ? "#000" : "#333",
+                marginLeft: "4px",
+              }}
+            >
+              Заявки на товар
+            </span>
+          )}
+
+          {profile?.role === "owner" && tabOwnerAgents != null && (
+            <span
+              className={`vitrina__tab ${activeTab === tabOwnerAgents ? "active" : ""}`}
+              onClick={() => setActiveTab(tabOwnerAgents)}
+              style={{
+                cursor: "pointer",
+                padding: "8px 16px",
+                border: "1px solid #ddd",
+                borderRadius: "4px 4px 0 0",
+                backgroundColor:
+                  activeTab === tabOwnerAgents ? "#ffd400" : "transparent",
+                color: activeTab === tabOwnerAgents ? "#000" : "#333",
                 marginLeft: "4px",
               }}
             >
@@ -1309,8 +1643,8 @@ const ProductionAgents = () => {
         <SellStart show={showStart} setShow={setShowStart} />
       ) : (
         <>
-          {/* Первый таб - Товары агентов */}
-          {(!company.sector.name === "Пилорама" || activeTab === 0) && (
+          {/* Первый таб - Товары агентов (только при activeTab === 0; иначе контент «наезжает» под другими вкладками) */}
+          {activeTab === 0 && (
             <div className="warehouse-page">
               {/* Header */}
               <div className="warehouse-header">
@@ -1364,13 +1698,23 @@ const ProductionAgents = () => {
                 </button> */}
                     </div>
                   ) : (
-                    <button
-                      className="warehouse-header__create-btn"
-                      onClick={() => setShowPendingModal(true)}
-                    >
-                      <Plus size={16} />
-                      Все передачи
-                    </button>
+                    <div className="flex gap-2 flex-wrap justify-center">
+                      <button
+                        className="warehouse-header__create-btn"
+                        onClick={() => setShowPendingModal(true)}
+                      >
+                        <Plus size={16} />
+                        Все передачи
+                      </button>
+                      <button
+                        type="button"
+                        className="warehouse-header__create-btn"
+                        style={{ background: "#64748b" }}
+                        onClick={() => setShowOwnerReturnsModal(true)}
+                      >
+                        Возвраты агентов
+                      </button>
+                    </div>
                   )}
 
                   {company.sector.name === "Пилорама" && (
@@ -1829,7 +2173,7 @@ const ProductionAgents = () => {
           )}
 
           {/* Второй таб - История продаж */}
-          {company.sector.name === "Пилорама" && activeTab === 1 && (
+          {isPiloramaSector && activeTab === 1 && (
             <div className="warehouse-page">
               {/* Header */}
               <div className="warehouse-header">
@@ -1942,7 +2286,13 @@ const ProductionAgents = () => {
             </div>
           )}
 
-          {profile?.role === "owner" && activeTab === 2 && (
+          {isPiloramaSector && activeTab === TAB_REQUESTS && (
+            <ProductionAgentRequestCartsTab />
+          )}
+
+          {profile?.role === "owner" &&
+            tabOwnerAgents != null &&
+            activeTab === tabOwnerAgents && (
             <div className="warehouse-page">
               <div className="warehouse-header">
                 <div className="warehouse-header__left">
@@ -2053,8 +2403,20 @@ const ProductionAgents = () => {
           onClose={() => {
             setShowSaleDetail(false);
             setSelectedSaleId(null);
+            setSaleDetailUsesAgentApi(false);
           }}
           saleId={selectedSaleId}
+          useAgentSalesApi={saleDetailUsesAgentApi}
+          onSaleReturned={loadSalesHistory}
+        />
+      )}
+      {showOwnerReturnsModal && (
+        <OwnerReturnsQueueModal
+          onClose={() => setShowOwnerReturnsModal(false)}
+          onChanged={() => {
+            refreshProductsList();
+            refreshTransfers();
+          }}
         />
       )}
       {showAgentClientsModal && (

@@ -12,13 +12,29 @@ export const getOrderAnalytics = async (params = {}) => {
   return response.data;
 };
 
-export const getAgentAnalytics = async (agentId, period = "month") => {
+/**
+ * @param {string|undefined} agentId - UUID агента (owner) или undefined для /agents/me/
+ * @param {string|object} periodOrParams - краткая строка period ИЛИ объект { period, date, date_from, date_to }
+ */
+export const getAgentAnalytics = async (agentId, periodOrParams = "month") => {
   const endpoint = agentId
     ? `/main/owners/agents/${agentId}/analytics/`
     : `/main/agents/me/analytics/`;
 
+  const params =
+    typeof periodOrParams === "string"
+      ? { period: periodOrParams }
+      : {
+          period: periodOrParams.period ?? "month",
+          ...(periodOrParams.date ? { date: periodOrParams.date } : {}),
+          ...(periodOrParams.date_from
+            ? { date_from: periodOrParams.date_from }
+            : {}),
+          ...(periodOrParams.date_to ? { date_to: periodOrParams.date_to } : {}),
+        };
+
   const response = await api.get(endpoint, {
-    params: { period },
+    params,
   });
 
   return response.data;
