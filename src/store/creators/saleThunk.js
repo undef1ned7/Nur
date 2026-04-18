@@ -205,6 +205,7 @@ export const historySellProduct = createAsyncThunk(
     try {
       const { data } = await api.get(`/main/pos/sales/`, {
         params: {
+          ...params,
           page: params.page || 1,
           search: params.search || "",
         },
@@ -255,6 +256,7 @@ export const historySellObjects = createAsyncThunk(
     try {
       const { data } = await api.get(`/main/object-sales/`, {
         params: {
+          ...params,
           page: params.page || 1,
           search: params.search || "",
         },

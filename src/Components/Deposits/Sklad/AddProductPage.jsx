@@ -95,6 +95,7 @@ const AddProductPage = () => {
   const [marketData, setMarketData] = useState({
     code: "",
     article: "",
+    hotkeyGroup: "",
     unit: "шт",
     isWeightProduct: false,
     isFractionalService: false,
@@ -326,6 +327,7 @@ const AddProductPage = () => {
           setMarketData({
             code: product.code || "",
             article: product.article || "",
+            hotkeyGroup: product.hotkey_group || "",
             unit: product.unit || "шт",
             isWeightProduct: product.is_weight || false,
             isFractionalService: product.is_weight || false,
@@ -437,6 +439,7 @@ const AddProductPage = () => {
       setMarketData({
         code: product.code || "",
         article: product.article || "",
+        hotkeyGroup: product.hotkey_group || "",
         unit: product.unit || "шт",
         isWeightProduct: product.is_weight || false,
         isFractionalService: product.is_weight || false,

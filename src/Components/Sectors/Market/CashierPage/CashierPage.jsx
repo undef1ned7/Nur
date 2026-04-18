@@ -42,6 +42,7 @@ import CloseShiftPage from "./CloseShiftPage";
 import CustomerModal from "./components/CustomerModal";
 import DebtPaymentModal from "./components/DebtPaymentModal";
 import DeletionsLogModal from "./components/DeletionsLogModal";
+import HotkeyProductsModal from "./components/HotkeyProductsModal";
 import MenuModal from "./components/MenuModal";
 import ReceiptsModal from "./components/ReceiptsModal";
 import OpenShiftPage from "./OpenShiftPage";
@@ -50,6 +51,27 @@ import ShiftPage from "./ShiftPage";
 import { Button } from "@mui/material";
 import sleep from "../../../../../tools/sleep";
 import { useAlert } from "../../../../hooks/useDialog";
+
+const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
+
+const normalizeHotkeyGroup = (value) => {
+  const normalized = String(value || "").trim().toUpperCase();
+  return HOTKEY_GROUP_PATTERN.test(normalized) ? normalized : "";
+};
+
+const normalizeCompactProductsResponse = (data) => {
+  const rawList = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data)
+      ? data
+      : [];
+
+  return rawList.map((item) => ({
+    ...item,
+    images: Array.isArray(item?.images) ? item.images : [],
+    packages: Array.isArray(item?.packages) ? item.packages : [],
+  }));
+};
 
 const CashierPage = () => {
   const alert = useAlert();
@@ -207,6 +229,7 @@ const CashierPage = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
+  const receiptUserParam = String(searchParams.get("user") || "").trim();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -238,6 +261,11 @@ const CashierPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showHotkeyProductsModal, setShowHotkeyProductsModal] = useState(false);
+  const [hotkeyProductsGroup, setHotkeyProductsGroup] = useState("");
+  const [hotkeyProducts, setHotkeyProducts] = useState([]);
+  const [hotkeyProductsLoading, setHotkeyProductsLoading] = useState(false);
+  const [hotkeyProductsError, setHotkeyProductsError] = useState("");
   const [discountValue, setDiscountValue] = useState("");
   const [discountMode, setDiscountMode] = useState("amount"); // "amount" | "percent"
   const [customService, setCustomService] = useState({
@@ -258,6 +286,7 @@ const CashierPage = () => {
   const [mobileProductsList, setMobileProductsList] = useState(false);
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
   const [favoriteLoadingMap, setFavoriteLoadingMap] = useState({});
+  const hotkeyProductsRequestIdRef = React.useRef(0);
 
   const normalizeMgmtRole = (raw) => {
     const l = String(raw || "").trim().toLowerCase();
@@ -269,6 +298,7 @@ const CashierPage = () => {
   const permissionsSource = profile || currentUser || {};
   const mgmtRole = normalizeMgmtRole(permissionsSource?.role);
   const isPrivilegedRole = mgmtRole === "owner" || mgmtRole === "admin";
+  const currentMarketUserId = String(profile?.id || currentUser?.id || userId || "").trim();
   const canMarketDiscount =
     isPrivilegedRole || permissionsSource?.can_view_market_discount === true;
   const canMarketEditPrice =
@@ -276,9 +306,24 @@ const CashierPage = () => {
   const canMarketDeleteCartItem =
     isPrivilegedRole ||
     permissionsSource?.can_view_market_delete_cart_item === true;
+  const effectiveReceiptUserParam =
+    receiptUserParam || (!isPrivilegedRole ? currentMarketUserId : "");
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     () => window.innerWidth > 768,
   );
+
+  useEffect(() => {
+    if (isPrivilegedRole || !currentMarketUserId || receiptUserParam) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("user", currentMarketUserId);
+    setSearchParams(params, { replace: true });
+  }, [
+    currentMarketUserId,
+    isPrivilegedRole,
+    receiptUserParam,
+    searchParams,
+    setSearchParams,
+  ]);
   const [desktopProductsWidth, setDesktopProductsWidth] = useState(() => {
     try {
       const raw = Number(localStorage.getItem("market_cashier_products_width_pct"));
@@ -499,6 +544,82 @@ const CashierPage = () => {
     }
   };
 
+  const openHotkeyProductsModal = useCallback(async (group) => {
+    const normalizedGroup = normalizeHotkeyGroup(group);
+    if (!normalizedGroup) return;
+
+    const requestId = hotkeyProductsRequestIdRef.current + 1;
+    hotkeyProductsRequestIdRef.current = requestId;
+
+    setHotkeyProductsGroup(normalizedGroup);
+    setShowHotkeyProductsModal(true);
+    setHotkeyProducts([]);
+    setHotkeyProductsError("");
+    setHotkeyProductsLoading(true);
+
+    try {
+      const { data } = await api.get("/main/products/list/", {
+        params: { group: normalizedGroup },
+      });
+
+      if (hotkeyProductsRequestIdRef.current !== requestId) return;
+      setHotkeyProducts(normalizeCompactProductsResponse(data));
+    } catch (error) {
+      if (hotkeyProductsRequestIdRef.current !== requestId) return;
+      console.error("Ошибка при загрузке hotkey-товаров:", error);
+      setHotkeyProducts([]);
+      setHotkeyProductsError("Не удалось загрузить товары для выбранной клавиши");
+    } finally {
+      if (hotkeyProductsRequestIdRef.current === requestId) {
+        setHotkeyProductsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleHotkeyGroupKeydown = (event) => {
+      const group = normalizeHotkeyGroup(event.key);
+      if (!group) return;
+
+      if (
+        showPaymentPage ||
+        showShiftPage ||
+        showOpenShiftPage ||
+        showCloseShiftPage ||
+        showMenuModal ||
+        showCustomerModal ||
+        showDebtModal ||
+        showDeletionsLogModal ||
+        showReceiptsModal ||
+        showCustomServiceModal ||
+        showDiscountModal
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      void openHotkeyProductsModal(group);
+    };
+
+    window.addEventListener("keydown", handleHotkeyGroupKeydown, true);
+    return () =>
+      window.removeEventListener("keydown", handleHotkeyGroupKeydown, true);
+  }, [
+    openHotkeyProductsModal,
+    showCloseShiftPage,
+    showCustomServiceModal,
+    showCustomerModal,
+    showDebtModal,
+    showDeletionsLogModal,
+    showDiscountModal,
+    showMenuModal,
+    showOpenShiftPage,
+    showPaymentPage,
+    showReceiptsModal,
+    showShiftPage,
+  ]);
+
   // Автодобавление товара по сканеру штрих-кода
   // Отслеживаем сканирование напрямую для автоматического создания продажи
   const [scannedBarcode, setScannedBarcode] = useState("");
@@ -523,6 +644,7 @@ const CashierPage = () => {
         showDebtModal ||
         showDeletionsLogModal ||
         showReceiptsModal ||
+        showHotkeyProductsModal ||
         showCustomServiceModal ||
         showDiscountModal
       ) {
@@ -1211,6 +1333,7 @@ const CashierPage = () => {
         showDebtModal ||
         showDeletionsLogModal ||
         showReceiptsModal ||
+        showHotkeyProductsModal ||
         showCustomServiceModal ||
         showDiscountModal
       ) {
@@ -1318,6 +1441,7 @@ const CashierPage = () => {
     showDebtModal,
     showDeletionsLogModal,
     showReceiptsModal,
+    showHotkeyProductsModal,
     showCustomServiceModal,
     showDiscountModal,
   ]);
@@ -1834,6 +1958,67 @@ const CashierPage = () => {
         return a.__orderIndex - b.__orderIndex;
       });
   }, [products, currentSale, getProductFavorite]);
+
+  const hotkeyFilteredProducts = useMemo(() => {
+    const items = currentSale?.items || [];
+    const enrichedProducts = hotkeyProducts.map((product) => {
+      const fallbackProduct = products.find((item) => item.id === product.id);
+      return fallbackProduct
+        ? {
+            ...fallbackProduct,
+            ...product,
+            images:
+              Array.isArray(product?.images) && product.images.length > 0
+                ? product.images
+                : Array.isArray(fallbackProduct?.images)
+                  ? fallbackProduct.images
+                  : [],
+            packages:
+              Array.isArray(product?.packages) && product.packages.length > 0
+                ? product.packages
+                : Array.isArray(fallbackProduct?.packages)
+                  ? fallbackProduct.packages
+                  : [],
+          }
+        : {
+            ...product,
+            images: Array.isArray(product?.images) ? product.images : [],
+            packages: Array.isArray(product?.packages) ? product.packages : [],
+          };
+    });
+
+    return enrichedProducts
+      .map((mergedProduct, index) => {
+        const qty = parseFloat(mergedProduct.quantity);
+        const cartQty = calcTotalConsumeForProduct(
+          items,
+          mergedProduct.id,
+          enrichedProducts,
+        );
+        const primaryImg = mergedProduct.images.find((item) => item.is_primary);
+
+        return {
+          ...mergedProduct,
+          quantity: qty,
+          isCart: !!cartQty,
+          cartQty,
+          img:
+            mergedProduct.primary_image_url ??
+            primaryImg?.image_url ??
+            mergedProduct.images[0]?.image_url ??
+            "/images/placeholder.avif",
+          isFavorite: getProductFavorite(mergedProduct),
+          __orderIndex: index,
+        };
+      })
+      .filter((product) => !!product.quantity || product.isCart)
+      .sort((a, b) => {
+        const favDelta =
+          Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
+        if (favDelta !== 0) return favDelta;
+        return a.__orderIndex - b.__orderIndex;
+      });
+  }, [currentSale, getProductFavorite, hotkeyProducts, products]);
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
   }
@@ -2797,7 +2982,23 @@ const CashierPage = () => {
       )}
 
       {showReceiptsModal && (
-        <ReceiptsModal onClose={() => setShowReceiptsModal(false)} />
+        <ReceiptsModal
+          onClose={() => setShowReceiptsModal(false)}
+          userFilter={effectiveReceiptUserParam}
+        />
+      )}
+
+      {showHotkeyProductsModal && (
+        <HotkeyProductsModal
+          hotkeyGroup={hotkeyProductsGroup}
+          products={hotkeyFilteredProducts}
+          loading={hotkeyProductsLoading}
+          error={hotkeyProductsError}
+          onClose={() => setShowHotkeyProductsModal(false)}
+          onSelectGroup={openHotkeyProductsModal}
+          onAddProduct={addToCart}
+          onAddProductPiece={addToCartWithPackage}
+        />
       )}
 
       {showDeletionsLogModal && (

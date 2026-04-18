@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./Warehouse.scss";
+import api from "../../../../api";
 import FilterModal from "./components/FilterModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import WarehouseHeader from "./components/WarehouseHeader";
@@ -38,6 +39,8 @@ const Warehouse = () => {
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
+  const [suppliers, setSuppliers] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -55,6 +58,34 @@ const Warehouse = () => {
 
   // Загрузка справочников
   const { brands, categories } = useWarehouseReferences();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSuppliers = async () => {
+      try {
+        setSuppliersLoading(true);
+        const res = await api.get("/main/clients/", {
+          params: { type: "suppliers", page_size: 500 },
+        });
+        const nextSuppliers = res?.data?.results || res?.data || [];
+        if (!mounted) return;
+        setSuppliers(Array.isArray(nextSuppliers) ? nextSuppliers : []);
+      } catch (error) {
+        if (!mounted) return;
+        console.error("Ошибка при загрузке поставщиков склада:", error);
+        setSuppliers([]);
+      } finally {
+        if (mounted) setSuppliersLoading(false);
+      }
+    };
+
+    void loadSuppliers();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
@@ -281,6 +312,8 @@ const Warehouse = () => {
             onResetFilters={handleResetFilters}
             brands={brands}
             categories={categories}
+            suppliers={suppliers}
+            suppliersLoading={suppliersLoading}
           />
         </ReactPortal>
       )}

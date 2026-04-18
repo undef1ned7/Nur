@@ -169,6 +169,10 @@ export const buildProductPayload = ({
     expiration_date: marketData.expiryDate || null,
     client: client || null,
     plu: pluValue,
+    hotkey_group:
+      String(marketData.hotkeyGroup || "")
+        .trim()
+        .toUpperCase() || null,
     description: marketData.description || "",
     characteristics: hasCharacteristics ? characteristics : null,
     kind: kindValue,

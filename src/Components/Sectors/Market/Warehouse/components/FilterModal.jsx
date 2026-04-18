@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { X } from "lucide-react";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import "../Warehouse.scss";
 
 const FilterModal = ({
@@ -9,6 +10,8 @@ const FilterModal = ({
   onResetFilters,
   brands = [],
   categories = [],
+  suppliers = [],
+  suppliersLoading = false,
 }) => {
   const [filters, setFilters] = useState(() => ({
     itemTypes: {
@@ -19,6 +22,7 @@ const FilterModal = ({
     preset: currentFilters.preset || "",
     category: currentFilters.category || "",
     brand: currentFilters.brand || "",
+    supplier: currentFilters.supplier || "",
     price: {
       type: currentFilters.price_type || "базовая",
       condition: currentFilters.price_condition || "больше",
@@ -42,6 +46,25 @@ const FilterModal = ({
       value: currentFilters.sellability_value || "0",
     },
   }));
+
+  const supplierOptions = useMemo(
+    () =>
+      (Array.isArray(suppliers) ? suppliers : [])
+        .map((supplier) => ({
+          value: String(supplier.id || ""),
+          label:
+            String(
+              supplier.full_name ||
+                supplier.name ||
+                supplier.company_name ||
+                supplier.phone ||
+                supplier.email ||
+                "Без названия",
+            ).trim() || "Без названия",
+        }))
+        .filter((option) => option.value && option.label),
+    [suppliers],
+  );
 
   const handleItemTypeChange = (type) => {
     setFilters((prev) => ({
@@ -81,6 +104,7 @@ const FilterModal = ({
     if (filters.preset) cleanedFilters.preset = filters.preset;
     if (filters.category) cleanedFilters.category = filters.category;
     if (filters.brand) cleanedFilters.brand = filters.brand;
+    if (filters.supplier) cleanedFilters.supplier = filters.supplier;
 
     if (filters.price.value && filters.price.value !== "0") {
       cleanedFilters.price_type = filters.price.type;
@@ -123,6 +147,7 @@ const FilterModal = ({
       preset: "",
       category: "",
       brand: "",
+      supplier: "",
       price: {
         type: "базовая",
         condition: "больше",
@@ -268,6 +293,23 @@ const FilterModal = ({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="warehouse-filter-modal__section">
+            <label className="warehouse-filter-modal__label">Поставщик</label>
+            <SearchableCombobox
+              value={String(filters.supplier || "")}
+              onChange={(value) =>
+                setFilters((prev) => ({ ...prev, supplier: String(value || "") }))
+              }
+              options={supplierOptions}
+              placeholder={
+                suppliersLoading
+                  ? "Загрузка поставщиков..."
+                  : "Выберите поставщика"
+              }
+              classNamePrefix="searchableCombo"
+            />
           </div>
 
           {/* Цена */}
