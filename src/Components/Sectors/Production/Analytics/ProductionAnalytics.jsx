@@ -14,6 +14,9 @@ import {
   Wallet,
   Receipt,
   Percent,
+  AlertTriangle,
+  PiggyBank,
+  PieChart,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -33,6 +36,17 @@ import { setProductionAnalyticsFilters } from "../../../../store/slices/analytic
 import { useUser } from "../../../../store/slices/userSlice";
 import AgentAnalytics from "./AgentAnalytics";
 import "./AgentAnalytics.scss";
+import {
+  CARD_DETAILS_PAGE_SIZE,
+  INITIAL_CARD_DETAILS_META,
+  CARD_DETAILS_USES_PERIOD,
+  parseCardDetailsRows,
+  getDisplayDetailColumns,
+  formatTotalsValue,
+  formatDetailsCell,
+  CARD_DETAILS_COLUMN_LABELS,
+  TOTALS_VALUE_LABELS,
+} from "./analyticsCardDetailsShared";
 
 ChartJS.register(
   CategoryScale,
@@ -66,6 +80,7 @@ const ProductionAnalytics = () => {
     loading: false,
     error: "",
     rows: [],
+    meta: { ...INITIAL_CARD_DETAILS_META },
   });
 
   // Локальные состояния для фильтров (синхронизируются с Redux)
@@ -133,54 +148,78 @@ const ProductionAnalytics = () => {
     });
   };
 
-  const buildCardDetailsParams = (cardKey) => {
+  /** Доли и проценты из summary (например gross_margin_percent). */
+  const formatPercent = (value) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = typeof value === "string" ? parseFloat(value) : Number(value);
+    if (Number.isNaN(n)) return "—";
+    return `${n.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}%`;
+  };
+
+  const buildCardDetailsParams = (cardKey, offset = 0) => {
     const params = {
       card: cardKey,
-      limit: 200,
-      offset: 0,
-      period,
-      group_by: groupBy,
+      limit: CARD_DETAILS_PAGE_SIZE,
+      offset,
     };
-    if (period === "day") {
-      params.date = date || new Date().toISOString().slice(0, 10);
-    } else {
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
+    const branchUuid = profile?.branch ?? profile?.branch_id;
+    if (branchUuid) params.branch = branchUuid;
+    if (CARD_DETAILS_USES_PERIOD.has(cardKey)) {
+      params.period = period;
+      if (period === "day") {
+        params.date = date || new Date().toISOString().slice(0, 10);
+      } else {
+        if (dateFrom) params.date_from = dateFrom;
+        if (dateTo) params.date_to = dateTo;
+      }
     }
     return params;
   };
 
-  const openCardDetails = async (cardKey, title) => {
-    setCardDetailsModal({
+  const loadCardDetailsPage = async (cardKey, title, offset) => {
+    setCardDetailsModal((prev) => ({
+      ...prev,
       open: true,
       cardKey,
       title,
       loading: true,
       error: "",
-      rows: [],
-    });
-
+      ...(offset === 0
+        ? { rows: [], meta: { ...INITIAL_CARD_DETAILS_META } }
+        : {}),
+    }));
     try {
-      const response = await api.get("/main/analytics/cards/details/", {
-        params: buildCardDetailsParams(cardKey),
+      const { data } = await api.get("/main/analytics/cards/details/", {
+        params: buildCardDetailsParams(cardKey, offset),
       });
-      const payload = response?.data;
-      const rows = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.results)
-          ? payload.results
-          : Array.isArray(payload?.rows)
-            ? payload.rows
-            : [];
+      const rows = parseCardDetailsRows(data);
       setCardDetailsModal((prev) => ({
         ...prev,
         loading: false,
         rows,
+        meta: {
+          count: typeof data?.count === "number" ? data.count : rows.length,
+          offset: typeof data?.offset === "number" ? data.offset : offset,
+          limit:
+            typeof data?.limit === "number"
+              ? data.limit
+              : CARD_DETAILS_PAGE_SIZE,
+          branch_id: data?.branch_id ?? null,
+          totals:
+            data?.totals && typeof data.totals === "object" ? data.totals : {},
+          period: data?.period ?? null,
+        },
       }));
     } catch (err) {
       const message =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
+        (typeof err?.response?.data?.card === "string"
+          ? err.response.data.card
+          : null) ||
         "Не удалось загрузить детализацию";
       setCardDetailsModal((prev) => ({
         ...prev,
@@ -188,6 +227,24 @@ const ProductionAnalytics = () => {
         error: message,
       }));
     }
+  };
+
+  const openCardDetails = (cardKey, title) => {
+    void loadCardDetailsPage(cardKey, title, 0);
+  };
+
+  const goCardDetailsPrev = () => {
+    const { cardKey, title, meta } = cardDetailsModal;
+    const nextOffset = Math.max(0, meta.offset - meta.limit);
+    if (nextOffset === meta.offset) return;
+    void loadCardDetailsPage(cardKey, title, nextOffset);
+  };
+
+  const goCardDetailsNext = () => {
+    const { cardKey, title, meta } = cardDetailsModal;
+    const nextOffset = meta.offset + meta.limit;
+    if (nextOffset >= meta.count) return;
+    void loadCardDetailsPage(cardKey, title, nextOffset);
   };
 
   const closeCardDetails = () => {
@@ -198,39 +255,12 @@ const ProductionAnalytics = () => {
       loading: false,
       error: "",
       rows: [],
+      meta: { ...INITIAL_CARD_DETAILS_META },
     });
   };
 
-  const formatDetailsValue = (value, column) => {
-    if (value === null || value === undefined || value === "") return "—";
-    if (
-      column === "discounts_total" ||
-      column === "sales_amount" ||
-      column === "amount"
-    ) {
-      const n =
-        typeof value === "string" ? parseFloat(value) : Number(value);
-      if (Number.isNaN(n)) return String(value);
-      return n.toLocaleString("ru-RU", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-    if (typeof value === "number") return value.toLocaleString("ru-RU");
-    return String(value);
-  };
-
-  const cardDetailsColumnLabel = (column) => {
-    const byCard = {
-      discounts_total: {
-        user: "Кто дал скидку",
-        client: "Кому",
-        sales_count: "Продаж",
-        discounts_total: "Сумма скидок",
-      },
-    };
-    return byCard[cardDetailsModal.cardKey]?.[column] ?? column;
-  };
+  const cardDetailsColumnLabel = (column) =>
+    CARD_DETAILS_COLUMN_LABELS[cardDetailsModal.cardKey]?.[column] ?? column;
 
   // Загрузка данных через Redux (параметры по Owner Analytics API)
   const fetchData = () => {
@@ -597,10 +627,10 @@ const ProductionAnalytics = () => {
 
   const summary = analyticsData?.summary || {};
   const charts = analyticsData?.charts || {};
-  const detailColumns =
-    cardDetailsModal.rows.length > 0
-      ? Object.keys(cardDetailsModal.rows[0] || {})
-      : [];
+  const detailColumns = getDisplayDetailColumns(
+    cardDetailsModal.cardKey,
+    cardDetailsModal.rows,
+  );
 
   return (
     <div className="agent-analytics">
@@ -1030,7 +1060,9 @@ const ProductionAnalytics = () => {
           <div>
             <h3>Пользователей</h3>
             <p>{formatNumber(summary.users_count || 0)}</p>
-            <span style={{ fontSize: 12, color: "#6b7280" }}>Участвующих</span>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Компания, снимок (не от периода)
+            </span>
           </div>
         </div>
 
@@ -1062,11 +1094,11 @@ const ProductionAnalytics = () => {
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() => openCardDetails("acceptances_count", "Принято")}
+          onClick={() => openCardDetails("acceptances_count", "Приёмки")}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              openCardDetails("acceptances_count", "Принято");
+              openCardDetails("acceptances_count", "Приёмки");
             }
           }}
         >
@@ -1086,11 +1118,13 @@ const ProductionAnalytics = () => {
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() => openCardDetails("items_transferred", "Товаров")}
+          onClick={() =>
+            openCardDetails("items_transferred", "Товаров перемещено")
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              openCardDetails("items_transferred", "Товаров");
+              openCardDetails("items_transferred", "Товаров перемещено");
             }
           }}
         >
@@ -1102,6 +1136,32 @@ const ProductionAnalytics = () => {
             <p>{formatNumber(summary.items_transferred || 0)}</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
               Перемещено единиц
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("defective_items", "Брак (принятые возвраты)")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("defective_items", "Брак (принятые возвраты)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3>Брак (возвраты)</h3>
+            <p>{formatNumber(summary.defective_items || 0)}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Принятые возвраты, qty за период
             </span>
           </div>
         </div>
@@ -1147,7 +1207,57 @@ const ProductionAnalytics = () => {
             <h3>Сумма продаж</h3>
             <p>{formatMoney(summary.sales_amount || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Общая выручка
+              Σ total по оплаченным продажам за период
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("revenue", "Выручка по строкам")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("revenue", "Выручка по строкам");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h3>Выручка (по строкам)</h3>
+            <p>{formatMoney(summary.revenue || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Σ(q×цена − скидка строки), оплаченные продажи
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("cost_of_goods_sold", "Себестоимость продаж")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("cost_of_goods_sold", "Себестоимость продаж");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <PiggyBank size={24} />
+          </div>
+          <div>
+            <h3>Себестоимость продаж</h3>
+            <p>{formatMoney(summary.cost_of_goods_sold || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Σ(q×закупка строки) за период
             </span>
           </div>
         </div>
@@ -1171,7 +1281,33 @@ const ProductionAnalytics = () => {
             <h3>Валовая прибыль</h3>
             <p>{formatMoney(summary.gross_profit || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Выручка − себестоимость
+              Выручка (по строкам) − себестоимость
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() =>
+            openCardDetails("gross_margin_percent", "Валовая маржа")
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("gross_margin_percent", "Валовая маржа");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <PieChart size={24} />
+          </div>
+          <div>
+            <h3>Валовая маржа</h3>
+            <p>{formatPercent(summary.gross_margin_percent)}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              При положительной выручке: прибыль / выручка × 100
             </span>
           </div>
         </div>
@@ -1204,7 +1340,9 @@ const ProductionAnalytics = () => {
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() => openCardDetails("stock_purchase_value", "Склад (закуп)")}
+          onClick={() =>
+            openCardDetails("stock_purchase_value", "Склад (закуп)")
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -1219,7 +1357,7 @@ const ProductionAnalytics = () => {
             <h3>Склад (закуп)</h3>
             <p>{formatMoney(summary.stock_purchase_value || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Остатки склада по закупочной цене
+              Снимок: Σ(q×закуп), без услуг, компания + филиал
             </span>
           </div>
         </div>
@@ -1228,7 +1366,9 @@ const ProductionAnalytics = () => {
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() => openCardDetails("stock_retail_value", "Склад (розница)")}
+          onClick={() =>
+            openCardDetails("stock_retail_value", "Склад (розница)")
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -1243,7 +1383,7 @@ const ProductionAnalytics = () => {
             <h3>Склад (розница)</h3>
             <p>{formatMoney(summary.stock_retail_value || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Остатки склада по розничной цене
+              Снимок: Σ(q×розница), без услуг
             </span>
           </div>
         </div>
@@ -1252,7 +1392,9 @@ const ProductionAnalytics = () => {
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() => openCardDetails("raw_material_value", "Стоимость сырья")}
+          onClick={() =>
+            openCardDetails("raw_material_value", "Стоимость сырья")
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -1267,7 +1409,7 @@ const ProductionAnalytics = () => {
             <h3>Стоимость сырья</h3>
             <p>{formatMoney(summary.raw_material_value || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Остатки сырья по текущей цене
+              Снимок: сырьё (ItemMake), компания + филиал
             </span>
           </div>
         </div>
@@ -1291,7 +1433,7 @@ const ProductionAnalytics = () => {
             <h3>Стоимость склада</h3>
             <p>{formatMoney(summary.stock_value || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Старое поле (совместимость)
+              Закупочная оценка (как «Склад закуп»), без услуг
             </span>
           </div>
         </div>
@@ -1315,7 +1457,20 @@ const ProductionAnalytics = () => {
             <h3>Дебиторская</h3>
             <p>{formatMoney(summary.accounts_receivable || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Долги клиентов
+              Сделки в долг + продажи в долг (POS)
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                color: "#9ca3af",
+                display: "block",
+                marginTop: 6,
+                lineHeight: 1.35,
+              }}
+            >
+              Сделки:{" "}
+              {formatMoney(summary.accounts_receivable_client_deals || 0)} ·
+              POS: {formatMoney(summary.accounts_receivable_pos_sales || 0)}
             </span>
           </div>
         </div>
@@ -1363,7 +1518,7 @@ const ProductionAnalytics = () => {
             <h3>Общий долг</h3>
             <p>{formatMoney(summary.total_debt || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Непогашенные долги
+              Только рассрочка CRM (сделки), без POS-долга
             </span>
           </div>
         </div>
@@ -1391,32 +1546,90 @@ const ProductionAnalytics = () => {
       </div>
 
       {cardDetailsModal.open && (
-        <div className="agent-analytics__modal-backdrop" onClick={closeCardDetails}>
+        <div
+          className="agent-analytics__modal-backdrop"
+          onClick={closeCardDetails}
+        >
           <div
             className="agent-analytics__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="agent-analytics__modal-header">
-              <h3>Детализация: {cardDetailsModal.title}</h3>
+            <div
+              className="agent-analytics__modal-header"
+              style={{ alignItems: "flex-start" }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3>Детализация: {cardDetailsModal.title}</h3>
+                {cardDetailsModal.meta.period && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                      margin: "8px 0 0 0",
+                    }}
+                  >
+                    Период: {cardDetailsModal.meta.period.date_from} —{" "}
+                    {cardDetailsModal.meta.period.date_to}
+                    {cardDetailsModal.meta.period.type
+                      ? ` (${cardDetailsModal.meta.period.type})`
+                      : ""}
+                  </p>
+                )}
+                {cardDetailsModal.meta.totals &&
+                  Object.keys(cardDetailsModal.meta.totals).length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 13,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px 16px",
+                        color: "#374151",
+                      }}
+                    >
+                      {Object.entries(cardDetailsModal.meta.totals).map(
+                        ([k, v]) => (
+                          <span key={k}>
+                            <strong>{TOTALS_VALUE_LABELS[k] ?? k}:</strong>{" "}
+                            {formatTotalsValue(k, v)}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  )}
+              </div>
               <button type="button" onClick={closeCardDetails}>
                 ×
               </button>
             </div>
             <div className="agent-analytics__modal-body">
-              {cardDetailsModal.loading && <p>Загрузка...</p>}
+              {cardDetailsModal.loading &&
+                cardDetailsModal.rows.length === 0 && <p>Загрузка...</p>}
+              {cardDetailsModal.loading && cardDetailsModal.rows.length > 0 && (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#6b7280",
+                    marginTop: 0,
+                    marginBottom: 8,
+                  }}
+                >
+                  Обновление…
+                </p>
+              )}
               {!cardDetailsModal.loading && cardDetailsModal.error && (
                 <p>{cardDetailsModal.error}</p>
               )}
               {!cardDetailsModal.loading &&
                 !cardDetailsModal.error &&
                 cardDetailsModal.rows.length === 0 && <p>Нет данных</p>}
-              {!cardDetailsModal.loading &&
-                !cardDetailsModal.error &&
-                cardDetailsModal.rows.length > 0 && (
+              {cardDetailsModal.rows.length > 0 && (
+                <>
                   <div className="agent-analytics__table">
                     <table>
                       <thead>
                         <tr>
+                          <th key="__rowNum">№</th>
                           {detailColumns.map((column) => (
                             <th key={column}>
                               {cardDetailsColumnLabel(column)}
@@ -1427,9 +1640,12 @@ const ProductionAnalytics = () => {
                       <tbody>
                         {cardDetailsModal.rows.map((row, idx) => (
                           <tr key={idx}>
+                            <td key={`${idx}-__num`}>
+                              {cardDetailsModal.meta.offset + idx + 1}
+                            </td>
                             {detailColumns.map((column) => (
                               <td key={`${idx}-${column}`}>
-                                {formatDetailsValue(row?.[column], column)}
+                                {formatDetailsCell(row?.[column], column)}
                               </td>
                             ))}
                           </tr>
@@ -1437,7 +1653,83 @@ const ProductionAnalytics = () => {
                       </tbody>
                     </table>
                   </div>
-                )}
+                  {(cardDetailsModal.meta.offset > 0 ||
+                    cardDetailsModal.meta.offset +
+                      cardDetailsModal.rows.length <
+                      cardDetailsModal.meta.count) && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 12,
+                        marginTop: 12,
+                        fontSize: 13,
+                        color: "#374151",
+                      }}
+                    >
+                      <span>
+                        Всего записей: {cardDetailsModal.meta.count}. Показано{" "}
+                        {cardDetailsModal.meta.offset + 1}—
+                        {Math.min(
+                          cardDetailsModal.meta.offset +
+                            cardDetailsModal.rows.length,
+                          cardDetailsModal.meta.count,
+                        )}
+                      </span>
+                      <span style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          disabled={
+                            cardDetailsModal.loading ||
+                            cardDetailsModal.meta.offset === 0
+                          }
+                          onClick={goCardDetailsPrev}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #d1d5db",
+                            background: "#fff",
+                            cursor:
+                              cardDetailsModal.loading ||
+                              cardDetailsModal.meta.offset === 0
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          Назад
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            cardDetailsModal.loading ||
+                            cardDetailsModal.meta.offset +
+                              cardDetailsModal.meta.limit >=
+                              cardDetailsModal.meta.count
+                          }
+                          onClick={goCardDetailsNext}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #d1d5db",
+                            background: "#fff",
+                            cursor:
+                              cardDetailsModal.loading ||
+                              cardDetailsModal.meta.offset +
+                                cardDetailsModal.meta.limit >=
+                                cardDetailsModal.meta.count
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          Вперёд
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

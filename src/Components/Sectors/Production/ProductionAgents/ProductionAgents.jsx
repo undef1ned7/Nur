@@ -1,4 +1,4 @@
-import { Plus, Search, LayoutGrid, Table2 } from "lucide-react";
+import { Plus, Search, LayoutGrid, Table2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch } from "react-redux";
 
@@ -13,8 +13,6 @@ import {
 // import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 
 import { useProducts } from "../../../../store/slices/productSlice";
-
-import { X } from "lucide-react";
 import { useSelector } from "react-redux";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -112,8 +110,7 @@ const SaleDetailModal = ({
   };
 
   const saleStatus = String(detail?.status || "").toLowerCase();
-  const canReturnSale =
-    saleStatus === "paid" || saleStatus === "debt";
+  const canReturnSale = saleStatus === "paid" || saleStatus === "debt";
 
   const handleReturnSale = useCallback(() => {
     if (!saleId) return;
@@ -160,9 +157,7 @@ const SaleDetailModal = ({
 
   const handlePrintReceipt = async () => {
     try {
-      const pdfBlob = await dispatch(
-        getProductCheckout(detail?.id),
-      ).unwrap();
+      const pdfBlob = await dispatch(getProductCheckout(detail?.id)).unwrap();
       const url = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = url;
@@ -224,8 +219,7 @@ const SaleDetailModal = ({
               Клиент: {detail?.client_name || "—"}
             </p>
             <p className="receipt__title">
-              Статус:{" "}
-              {kindTranslate[detail?.status] || detail?.status || "—"}
+              Статус: {kindTranslate[detail?.status] || detail?.status || "—"}
             </p>
             <p className="receipt__title">
               Дата:{" "}
@@ -591,14 +585,52 @@ const MyReturnsModal = ({
   );
 };
 
+/** Доступно к возврату по одной передаче (партии), с учётом уже созданных pending-возвратов. */
+const getSubrealAvailableForReturn = (sr, item) => {
+  const accepted = Number(sr?.qty_accepted ?? 0) || 0;
+  const returned = Number(sr?.qty_returned ?? 0) || 0;
+  const pendMap = item?._pending_by_subreal;
+  const pending =
+    pendMap && sr?.id != null
+      ? Number(pendMap[sr.id] ?? pendMap[String(sr.id)] ?? 0) || 0
+      : 0;
+  return Math.max(0, accepted - returned - pending);
+};
+
+/**
+ * Распределяет количество возврата по партиям FIFO (по дате передачи).
+ * Один запрос API — одна партия; так можно вернуть за раз суммарно весь остаток (несколько вызовов подряд).
+ */
+const buildAgentReturnFifoPlan = (item, totalQty) => {
+  const subreals = Array.isArray(item?.subreals) ? [...item.subreals] : [];
+  subreals.sort((a, b) => {
+    const ta = a?.created_at ? new Date(a.created_at).getTime() : 0;
+    const tb = b?.created_at ? new Date(b.created_at).getTime() : 0;
+    return ta - tb;
+  });
+  let remaining = totalQty;
+  const plan = [];
+  for (const sr of subreals) {
+    if (!sr?.id || remaining <= 0) continue;
+    const avail = getSubrealAvailableForReturn(sr, item);
+    if (avail <= 0) continue;
+    const take = Math.min(avail, remaining);
+    plan.push({ subreal: sr.id, qty: take });
+    remaining -= take;
+  }
+  return { plan, remaining };
+};
+
 const ReturnProductModal = ({ onClose, onChanged, item }) => {
   const alert = useAlert();
   const { creating, createError } = useSelector(
     (state) => state.return || { creating: false, createError: null },
   );
+  /** auto — распределение FIFO по партиям; manual — одна выбранная передача (как раньше) */
+  const [returnMode, setReturnMode] = useState("auto");
   const [state, setState] = useState({
-    subreal: "",
     qty: "",
+    subreal: "",
   });
   const [validationError, setValidationError] = useState("");
 
@@ -606,13 +638,16 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
   const subrealOptions = useMemo(
     () =>
-      (Array.isArray(item?.subreals) ? item.subreals : []).filter((sr) => sr?.id),
+      (Array.isArray(item?.subreals) ? item.subreals : []).filter(
+        (sr) => sr?.id,
+      ),
     [item?.subreals],
   );
 
   useEffect(() => {
     const first = subrealOptions[0]?.id || "";
-    setState((prev) => ({ ...prev, subreal: first, qty: "" }));
+    setState((prev) => ({ ...prev, qty: "", subreal: first }));
+    setReturnMode("auto");
     setValidationError("");
   }, [item, subrealOptions]);
 
@@ -622,11 +657,43 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     Number(item?.qty_on_hand || 0) - pendingReturnQty,
   );
 
+  const selectedSubreal = useMemo(
+    () => subrealOptions.find((sr) => String(sr.id) === String(state.subreal)),
+    [subrealOptions, state.subreal],
+  );
+
+  const maxQtyManual = selectedSubreal
+    ? getSubrealAvailableForReturn(selectedSubreal, item)
+    : 0;
+
+  const maxQtyForInput =
+    returnMode === "auto"
+      ? effectiveOnHand
+      : Math.min(effectiveOnHand, maxQtyManual);
+
   const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
     setValidationError("");
   }, []);
+
+  const onModeChange = useCallback((mode) => {
+    setReturnMode(mode);
+    setValidationError("");
+  }, []);
+
+  const fillMaxQty = useCallback(() => {
+    if (maxQtyForInput <= 0) return;
+    setState((p) => ({ ...p, qty: String(maxQtyForInput) }));
+    setValidationError("");
+  }, [maxQtyForInput]);
+
+  const fillHalfQty = useCallback(() => {
+    if (maxQtyForInput <= 0) return;
+    const half = Math.max(1, Math.floor(maxQtyForInput / 2));
+    setState((p) => ({ ...p, qty: String(half) }));
+    setValidationError("");
+  }, [maxQtyForInput]);
 
   const validateForm = useCallback(() => {
     if (!state.qty || Number(state.qty) <= 0) {
@@ -638,16 +705,40 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
   if (!item || !item.subreals || item.subreals.length === 0) {
     return (
-      <div className="add-modal">
-        <div className="add-modal__overlay" onClick={onClose} />
-        <div className="add-modal__content" style={{ height: "auto" }}>
-          <div className="add-modal__header">
-            <h3>Ошибка</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+      <div className="add-modal return-product-modal">
+        <div className="add-modal__overlay z-100!" onClick={onClose} />
+        <div className="add-modal__content z-100!" style={{ height: "auto" }}>
+          <div className="return-product-modal__header-inner">
+            <div className="return-product-modal__title-row">
+              <h3 className="return-product-modal__title">
+                <Undo2 size={22} strokeWidth={2} aria-hidden />
+                Возврат товара
+              </h3>
+              <button
+                type="button"
+                className="return-product-modal__close"
+                onClick={onClose}
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
-          <p className="add-modal__error-message">
-            Товар не найден или нет передач для возврата
-          </p>
+          <div className="return-product-modal__empty">
+            Товар не найден или нет передач для возврата. Обновите список и
+            попробуйте снова.
+          </div>
+          <div className="return-product-modal__body" style={{ paddingTop: 0 }}>
+            <div className="return-product-modal__footer">
+              <button
+                type="button"
+                className="return-product-modal__btn return-product-modal__btn--secondary"
+                onClick={onClose}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -660,15 +751,65 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
       return;
     }
 
-    try {
-      await dispatch(
-        createReturnAsync({
-          subreal: state.subreal,
-          qty: Number(state.qty),
-        }),
-      ).unwrap();
+    const qty = Number(state.qty);
+    if (qty > effectiveOnHand) {
+      setValidationError(
+        `Нельзя вернуть больше доступного: ${effectiveOnHand}`,
+      );
+      return;
+    }
 
-      alert(`Возврат успешно создан!\nКоличество: ${state.qty}`, () => {
+    try {
+      if (returnMode === "manual") {
+        if (!state.subreal) {
+          setValidationError("Выберите партию (передачу)");
+          return;
+        }
+        if (qty > maxQtyManual) {
+          setValidationError(
+            `По выбранной партии можно вернуть не более ${maxQtyManual}`,
+          );
+          return;
+        }
+        if (maxQtyManual <= 0) {
+          setValidationError("По выбранной партии нет доступного остатка");
+          return;
+        }
+        await dispatch(
+          createReturnAsync({
+            subreal: state.subreal,
+            qty,
+          }),
+        ).unwrap();
+        alert(`Возврат успешно создан.\nКоличество: ${qty}`, () => {
+          onChanged?.();
+          onClose();
+        });
+        return;
+      }
+
+      const { plan, remaining } = buildAgentReturnFifoPlan(item, qty);
+      if (remaining > 0 || plan.length === 0) {
+        setValidationError(
+          "Не удалось распределить возврат по партиям. Обновите список или проверьте остатки по передачам.",
+        );
+        return;
+      }
+
+      for (const row of plan) {
+        await dispatch(
+          createReturnAsync({
+            subreal: row.subreal,
+            qty: row.qty,
+          }),
+        ).unwrap();
+      }
+
+      const detail =
+        plan.length > 1
+          ? `Создано операций: ${plan.length}. Всего единиц: ${qty}`
+          : `Количество: ${qty}`;
+      alert(`Возврат успешно создан.\n${detail}`, () => {
         onChanged?.();
         onClose();
       });
@@ -682,48 +823,133 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   };
 
   return (
-    <div className="add-modal">
+    <div className="add-modal return-product-modal">
       <div className="add-modal__overlay z-100!" onClick={onClose} />
-      <div className="add-modal__content z-100!" style={{ height: "auto" }}>
-        <div className="add-modal__header">
-          <h3>Вернуть товар</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+      <div
+        className="add-modal__content z-100! !overflow-auto"
+        style={{ height: "auto" }}
+      >
+        <div className="return-product-modal__header-inner">
+          <div className="return-product-modal__title-row">
+            <h3 className="return-product-modal__title">
+              <Undo2 size={22} strokeWidth={2} aria-hidden />
+              Возврат на склад
+            </h3>
+            <button
+              type="button"
+              className="return-product-modal__close"
+              onClick={onClose}
+              aria-label="Закрыть"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <p className="return-product-modal__product-name">
+            {item?.product_name || item?.name || "—"}
+          </p>
+          <div className="return-product-modal__stats">
+            <div className="return-product-modal__stat return-product-modal__stat--muted">
+              <div className="return-product-modal__stat-label">На руках</div>
+              <div className="return-product-modal__stat-value">
+                {item?.qty_on_hand ?? 0}
+              </div>
+            </div>
+            <div className="return-product-modal__stat return-product-modal__stat--ok">
+              <div className="return-product-modal__stat-label">
+                Доступно к возврату
+              </div>
+              <div className="return-product-modal__stat-value">
+                {effectiveOnHand}
+              </div>
+            </div>
+            <div
+              className={`return-product-modal__stat ${pendingReturnQty > 0 ? "return-product-modal__stat--warn" : ""}`}
+            >
+              <div className="return-product-modal__stat-label">
+                В ожидании приёма
+              </div>
+              <div className="return-product-modal__stat-value">
+                {pendingReturnQty}
+              </div>
+            </div>
+          </div>
         </div>
 
         {createError && (
-          <p className="add-modal__error-message">
-            Ошибка создания возврата: {createError?.message || "ошибка"}
-          </p>
+          <div
+            className="return-product-modal__alert return-product-modal__alert--api"
+            role="alert"
+          >
+            {createError?.message || "Ошибка создания возврата"}
+          </div>
         )}
 
         {validationError && (
-          <p className="add-modal__error-message">{validationError}</p>
+          <div
+            className="return-product-modal__alert return-product-modal__alert--error"
+            role="alert"
+          >
+            {validationError}
+          </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="add-modal__section">
-            <h4>Товар: {item?.product_name || item?.name}</h4>
-            <p style={{ opacity: 0.7, margin: "5px 0" }}>
-              Текущее количество у агента:{" "}
-              <strong>{item?.qty_on_hand || 0}</strong>
-            </p>
-            <p style={{ opacity: 0.7, margin: "5px 0" }}>
-              Доступно для возврата: <strong>{effectiveOnHand}</strong>
-              {pendingReturnQty > 0 && (
-                <span style={{ marginLeft: 8, color: "#6b7280" }}>
-                  (в ожидании приёма: {pendingReturnQty})
-                </span>
-              )}
-            </p>
+        <form onSubmit={handleSubmit} className="return-product-modal__body">
+          <div className="return-product-modal__section-label">
+            Как списать партии
           </div>
-          {subrealOptions.length > 1 && (
-            <div className="add-modal__section">
-              <label htmlFor="return-subreal">Партия (передача) *</label>
+          <div className="return-product-modal__modes">
+            <label
+              className={`return-product-modal__mode ${returnMode === "auto" ? "return-product-modal__mode--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="return-mode"
+                checked={returnMode === "auto"}
+                onChange={() => onModeChange("auto")}
+              />
+              <div className="return-product-modal__mode-text">
+                <div className="return-product-modal__mode-title">
+                  Авто (FIFO)
+                </div>
+                <div className="return-product-modal__mode-desc">
+                  Сначала более ранние передачи. Несколько операций, если партий
+                  несколько — удобно вернуть всё доступное одним вводом числа.
+                </div>
+              </div>
+            </label>
+            <label
+              className={`return-product-modal__mode ${returnMode === "manual" ? "return-product-modal__mode--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="return-mode"
+                checked={returnMode === "manual"}
+                onChange={() => onModeChange("manual")}
+              />
+              <div className="return-product-modal__mode-text">
+                <div className="return-product-modal__mode-title">
+                  Конкретная партия
+                </div>
+                <div className="return-product-modal__mode-desc">
+                  Выберите одну передачу вручную — как раньше. Лимит по
+                  выбранной строке.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {returnMode === "manual" && subrealOptions.length > 1 && (
+            <div style={{ marginTop: 16 }}>
+              <label
+                className="return-product-modal__field-label"
+                htmlFor="return-subreal"
+              >
+                Партия (передача)
+              </label>
               <select
                 id="return-subreal"
                 name="subreal"
-                className="debt__input"
-                style={{ marginTop: 8, width: "100%" }}
+                className="return-product-modal__select"
                 value={state.subreal}
                 onChange={onChange}
                 required
@@ -731,47 +957,102 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
                 {subrealOptions.map((sr) => (
                   <option key={sr.id} value={sr.id}>
                     {sr.created_at
-                      ? new Date(sr.created_at).toLocaleDateString()
+                      ? new Date(sr.created_at).toLocaleDateString("ru-RU")
                       : "—"}{" "}
-                    · перед. {sr.qty_transferred ?? "—"}, прин.{" "}
-                    {sr.qty_accepted ?? "—"}
+                    · пр. {sr.qty_transferred ?? "—"}, прин.{" "}
+                    {sr.qty_accepted ?? "—"}, возвр. {sr.qty_returned ?? "—"}
+                    {getSubrealAvailableForReturn(sr, item) > 0
+                      ? ` · свободно ${getSubrealAvailableForReturn(sr, item)}`
+                      : ""}
                   </option>
                 ))}
               </select>
             </div>
           )}
-          <div className="add-modal__section">
-            <label>Количество для возврата *</label>
+
+          {returnMode === "auto" && (
+            <div className="return-product-modal__hint return-product-modal__hint--info">
+              Количество распределится по партиям автоматически. При
+              необходимости будет выполнено несколько запросов подряд.
+            </div>
+          )}
+          {returnMode === "manual" && subrealOptions.length === 1 && (
+            <div className="return-product-modal__hint return-product-modal__hint--neutral">
+              У товара одна партия — возврат только с неё (не больше{" "}
+              {maxQtyManual} шт.).
+            </div>
+          )}
+
+          <div className="return-product-modal__section-label">
+            Количество, шт.
+          </div>
+          <div className="return-product-modal__qty-row">
             <input
-              style={{ marginTop: 15, width: "100%" }}
               type="number"
               name="qty"
-              placeholder="Количество"
-              className="debt__input"
+              id="return-qty"
+              placeholder="0"
+              className="return-product-modal__qty-input"
               value={state.qty}
               onChange={onChange}
               min={1}
-              max={effectiveOnHand}
+              max={maxQtyForInput > 0 ? maxQtyForInput : 1}
               step={1}
               required
+              disabled={maxQtyForInput <= 0}
+              autoComplete="off"
             />
-            <small style={{ opacity: 0.7, marginTop: 5, display: "block" }}>
-              Максимум: {effectiveOnHand}
-            </small>
+            <div className="return-product-modal__qty-actions">
+              <button
+                type="button"
+                className="return-product-modal__qty-chip"
+                onClick={fillHalfQty}
+                disabled={maxQtyForInput <= 0}
+              >
+                Половина
+              </button>
+              <button
+                type="button"
+                className="return-product-modal__qty-chip"
+                onClick={fillMaxQty}
+                disabled={maxQtyForInput <= 0}
+              >
+                Макс.
+              </button>
+            </div>
           </div>
+          <p className="return-product-modal__qty-hint">
+            Можно не больше{" "}
+            <strong style={{ color: "#0f172a" }}>{maxQtyForInput}</strong>
+            {returnMode === "manual" && subrealOptions.length > 0 && (
+              <>
+                {" "}
+                (по партии: {maxQtyManual}, всего у товара: {effectiveOnHand})
+              </>
+            )}
+            {returnMode === "auto" && (
+              <> за одно подтверждение (авто-разбивка)</>
+            )}
+            .
+          </p>
 
-          <button
-            style={{
-              marginTop: 15,
-              width: "100%",
-              justifyContent: "center",
-            }}
-            className="btn edit-btn"
-            type="submit"
-            disabled={creating}
-          >
-            {creating ? "Возврат..." : "Вернуть"}
-          </button>
+          <div className="return-product-modal__footer">
+            <button
+              type="button"
+              className="return-product-modal__btn return-product-modal__btn--secondary"
+              onClick={onClose}
+              disabled={creating}
+            >
+              Отмена
+            </button>
+            <button
+              className="return-product-modal__btn return-product-modal__btn--primary"
+              type="submit"
+              disabled={creating || maxQtyForInput <= 0}
+            >
+              {creating ? "Отправка…" : "Оформить возврат"}
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -842,7 +1123,9 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
         {loading ? (
           <div className="add-modal__section">Загрузка…</div>
         ) : rows.length === 0 ? (
-          <div className="add-modal__section">Нет заявок в статусе pending.</div>
+          <div className="add-modal__section">
+            Нет заявок в статусе pending.
+          </div>
         ) : (
           <DataContainer>
             <div
@@ -1255,9 +1538,20 @@ const ProductionAgents = () => {
   };
   const handleOpen3 = (item) => {
     setShowReturnProductModal(true);
-    // прокидываем количество, которое уже в "ожидает приёма" (чтобы вычиталось из доступного)
     const pendingQty = getPendingReturnQtyForItem(item);
-    setItemId3({ ...item, _pending_return_qty: pendingQty });
+    const pendingBySubreal = {};
+    for (const sr of item?.subreals || []) {
+      const sid = sr?.id;
+      if (sid) {
+        pendingBySubreal[sid] =
+          pendingReturnQtyBySubrealId.get(String(sid)) || 0;
+      }
+    }
+    setItemId3({
+      ...item,
+      _pending_return_qty: pendingQty,
+      _pending_by_subreal: pendingBySubreal,
+    });
   };
 
   const onEditDeleted = () => {
@@ -1314,9 +1608,7 @@ const ProductionAgents = () => {
         setSalesHistory(list);
       } else {
         const result = await dispatch(historySellProduct({})).unwrap();
-        const list = Array.isArray(result)
-          ? result
-          : result?.results || [];
+        const list = Array.isArray(result) ? result : result?.results || [];
         setSalesHistory(list);
       }
     } catch (error) {
@@ -2293,70 +2585,70 @@ const ProductionAgents = () => {
           {profile?.role === "owner" &&
             tabOwnerAgents != null &&
             activeTab === tabOwnerAgents && (
-            <div className="warehouse-page">
-              <div className="warehouse-header">
-                <div className="warehouse-header__left">
-                  <div className="warehouse-header__icon">
-                    <div className="warehouse-header__icon-box">👥</div>
-                  </div>
-                  <div className="warehouse-header__title-section">
-                    <h1 className="warehouse-header__title">
-                      Агенты и клиенты
-                    </h1>
-                    <p className="warehouse-header__subtitle">
-                      Контроль клиентов и долгов по каждому агенту
-                    </p>
+              <div className="warehouse-page">
+                <div className="warehouse-header">
+                  <div className="warehouse-header__left">
+                    <div className="warehouse-header__icon">
+                      <div className="warehouse-header__icon-box">👥</div>
+                    </div>
+                    <div className="warehouse-header__title-section">
+                      <h1 className="warehouse-header__title">
+                        Агенты и клиенты
+                      </h1>
+                      <p className="warehouse-header__subtitle">
+                        Контроль клиентов и долгов по каждому агенту
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <DataContainer>
-                <div
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                  style={{ marginTop: 8 }}
-                >
-                  {ownerAgents.length === 0 ? (
-                    <div className="warehouse-table__empty">
-                      Нет агентов для отображения
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(240px, 1fr))",
-                        gap: 12,
-                      }}
-                    >
-                      {ownerAgents.map((agent) => (
-                        <div
-                          key={agent.id}
-                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                        >
-                          <div style={{ fontWeight: 600 }}>
-                            {`${agent.last_name || ""} ${agent.first_name || ""}`.trim() ||
-                              "Без имени"}
-                          </div>
-                          {agent?.track_number && (
-                            <div style={{ fontSize: 12, opacity: 0.75 }}>
-                              Машина: {agent.track_number}
-                            </div>
-                          )}
-                          <button
-                            className="warehouse-header__create-btn"
-                            style={{ marginTop: 10 }}
-                            onClick={() => openAgentClientsControl(agent)}
+                <DataContainer>
+                  <div
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    style={{ marginTop: 8 }}
+                  >
+                    {ownerAgents.length === 0 ? (
+                      <div className="warehouse-table__empty">
+                        Нет агентов для отображения
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(240px, 1fr))",
+                          gap: 12,
+                        }}
+                      >
+                        {ownerAgents.map((agent) => (
+                          <div
+                            key={agent.id}
+                            className="rounded-xl border border-slate-200 bg-slate-50 p-3"
                           >
-                            Клиенты и долги
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </DataContainer>
-            </div>
-          )}
+                            <div style={{ fontWeight: 600 }}>
+                              {`${agent.last_name || ""} ${agent.first_name || ""}`.trim() ||
+                                "Без имени"}
+                            </div>
+                            {agent?.track_number && (
+                              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                                Машина: {agent.track_number}
+                              </div>
+                            )}
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{ marginTop: 10 }}
+                              onClick={() => openAgentClientsControl(agent)}
+                            >
+                              Клиенты и долги
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DataContainer>
+              </div>
+            )}
         </>
       )}
 
