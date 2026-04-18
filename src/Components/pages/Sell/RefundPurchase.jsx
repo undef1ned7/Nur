@@ -1,39 +1,53 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { X } from "lucide-react";
-// import { updateSellProduct } from "../../../store/creators/productCreators";
-
-// кассы
 import {
-  useCash,
-  getCashBoxes,
-  addCashFlows,
-} from "../../../store/slices/cashSlice";
-import {
-  updateSellProduct,
   historySellProductDetail,
+  returnSale,
 } from "../../../store/creators/saleThunk";
-import { updateProductAsync } from "../../../store/creators/productCreators";
 import { useUser } from "../../../store/slices/userSlice";
-import api from "../../../api";
+
+const extractApiError = (errorLike) => {
+  const value =
+    errorLike?.data?.detail ??
+    errorLike?.data?.message ??
+    errorLike?.data ??
+    errorLike?.message;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => extractApiError(item)).join(", ");
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value)
+      .flatMap((item) => (Array.isArray(item) ? item : [item]))
+      .map((item) => extractApiError(item))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return String(value || "Не удалось выполнить возврат. Попробуйте ещё раз.");
+};
 
 const RefundPurchase = ({ onClose, onChanged, item }) => {
   const dispatch = useDispatch();
-  const { list: cashBoxes } = useCash();
-  const { company } = useUser();
+  const { profile } = useUser();
 
-  const [selectCashBox, setSelectCashBox] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [saleData, setSaleData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [quantities, setQuantities] = useState({});
+
+  const isAgent = String(profile?.role || "")
+    .trim()
+    .toLowerCase() === "agent";
 
   useEffect(() => {
-    // подгружаем кассы при открытии модалки
-    dispatch(getCashBoxes());
-  }, [dispatch]);
+    setQuantities({});
+    setError("");
+  }, [item?.id]);
 
-  // Загружаем полные данные о продаже при открытии модалки
   useEffect(() => {
     const loadSaleData = async () => {
       if (!item?.id) {
@@ -61,144 +75,143 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
     loadSaleData();
   }, [dispatch, item?.id]);
 
-  // Автоматически выбираем первую кассу по индексу
-  useEffect(() => {
-    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
-      const firstCashBox = cashBoxes[0];
-      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
-      if (firstCashBoxId) {
-        setSelectCashBox(firstCashBoxId);
-      }
-    }
-  }, [cashBoxes, selectCashBox]);
-
-  // Используем загруженные данные или переданный item
   const currentItem = saleData || item;
-  const name = currentItem?.name ?? currentItem?.product_name ?? "Товар";
-  const qty = currentItem?.quantity ?? currentItem?.qty ?? null;
-  const sum = currentItem?.total ?? currentItem?.amount ?? null;
 
-  const validate = () => {
+  const saleItems = useMemo(() => {
+    if (!Array.isArray(currentItem?.items)) return [];
+    return currentItem.items.map((saleItem, index) => {
+      const maxQuantity = Number(saleItem?.quantity ?? saleItem?.qty ?? 0) || 0;
+      return {
+        id: saleItem?.id ?? saleItem?.sale_item_id ?? `sale-item-${index}`,
+        name:
+          saleItem?.name_snapshot ??
+          saleItem?.name ??
+          saleItem?.product_name ??
+          saleItem?.display_name ??
+          saleItem?.object_name ??
+          `Позиция ${index + 1}`,
+        quantity: maxQuantity,
+        unitPrice: Number(saleItem?.unit_price ?? saleItem?.price ?? 0) || 0,
+        total:
+          Number(
+            saleItem?.line_total ??
+              saleItem?.total ??
+              maxQuantity * (Number(saleItem?.unit_price ?? saleItem?.price ?? 0) || 0),
+          ) || 0,
+        unit: saleItem?.unit ?? saleItem?.unit_name ?? "шт",
+      };
+    });
+  }, [currentItem]);
+
+  const partialItems = useMemo(() => {
+    return saleItems
+      .map((saleItem) => {
+        const rawValue = String(quantities[saleItem.id] ?? "").trim().replace(",", ".");
+        if (!rawValue) return null;
+        const quantity = Number(rawValue);
+        if (!Number.isFinite(quantity) || quantity <= 0) return null;
+        return {
+          sale_item_id: saleItem.id,
+          quantity,
+        };
+      })
+      .filter(Boolean);
+  }, [quantities, saleItems]);
+
+  const partialCount = partialItems.length;
+  const isReturnableStatus = ["paid", "debt"].includes(
+    String(currentItem?.status || "").trim().toLowerCase(),
+  );
+
+  const formatMoney = (value) =>
+    Number(value || 0).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const validateCommon = useCallback(() => {
     if (!currentItem?.id) return "Не найден идентификатор продажи.";
-    // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
-    // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
-    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
-      return "Касса не выбрана. Создайте кассу в разделе «Кассы».";
-    }
-    if (Array.isArray(cashBoxes) && cashBoxes.length === 0) {
-      return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
+    if (!isReturnableStatus) {
+      return "Возврат возможен только для оплаченных или долговых продаж.";
     }
     return "";
-  };
+  }, [currentItem?.id, isReturnableStatus]);
 
-  const onConfirm = useCallback(async () => {
-    const err = validate();
-    if (err) {
-      setError(err);
-      return;
+  const validatePartial = useCallback(() => {
+    const commonError = validateCommon();
+    if (commonError) return commonError;
+    if (partialItems.length === 0) {
+      return "Укажите количество хотя бы для одной позиции.";
     }
 
-    // Дополнительная проверка кассы перед выполнением операции
-    if (!selectCashBox) {
-      setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
-      return;
-    }
-
-    setError("");
-    setSubmitting(true);
-    try {
-      // 1. Обновляем статус продажи на "canceled"
-      await dispatch(
-        updateSellProduct({
-          id: currentItem.id,
-          updatedData: {
-            status: "canceled",
-            // cashbox: selectCashBox, // <-- переименуй, если бэк ждёт другое поле
-          },
-        })
-      ).unwrap();
-
-      // 2. Возвращаем товары на склад
-      if (
-        currentItem.items &&
-        Array.isArray(currentItem.items) &&
-        currentItem.items.length > 0
-      ) {
-        for (const saleItem of currentItem.items) {
-          const productId = saleItem.product;
-          const returnQuantity = Number(saleItem.quantity) || 0;
-
-          if (!productId || returnQuantity <= 0) {
-            console.warn(
-              `Пропущен товар: productId=${productId}, quantity=${returnQuantity}`
-            );
-            continue;
-          }
-
-          try {
-            // Получаем текущий товар для получения актуального количества
-            const { data: currentProduct } = await api.get(
-              `/main/products/${productId}/`
-            );
-
-            const currentQuantity = Number(currentProduct?.quantity || 0);
-            const newQuantity = currentQuantity + returnQuantity;
-
-            // Обновляем количество товара на складе
-            await dispatch(
-              updateProductAsync({
-                productId,
-                updatedData: {
-                  quantity: newQuantity,
-                },
-              })
-            ).unwrap();
-          } catch (productError) {
-            console.error(
-              `Ошибка при возврате товара ${productId} на склад:`,
-              productError
-            );
-            // Продолжаем обработку других товаров даже при ошибке
-          }
-        }
+    for (const partialItem of partialItems) {
+      const sourceItem = saleItems.find(
+        (saleItem) => String(saleItem.id) === String(partialItem.sale_item_id),
+      );
+      if (!sourceItem) return "Одна из позиций чека не найдена.";
+      if (partialItem.quantity > sourceItem.quantity) {
+        return `Для "${sourceItem.name}" нельзя вернуть больше ${sourceItem.quantity}.`;
       }
-
-      // 3. Создаем расход в кассе
-      await dispatch(
-        addCashFlows({
-          cashbox: selectCashBox,
-          type: "expense",
-          name: `Возврат товаров: ${currentItem?.client_name ||
-            new Date(currentItem.created_at).toLocaleDateString()
-            }`,
-          source_cashbox_flow_id: currentItem.id,
-          source_business_operation_id: "Продажа",
-          amount: currentItem.total,
-          status:
-            company?.subscription_plan?.name === "Старт"
-              ? "approved"
-              : "pending",
-        })
-      ).unwrap();
-
-      onChanged?.();
-      onClose?.();
-    } catch (e) {
-      console.error(e);
-      setError("Не удалось выполнить возврат. Попробуйте ещё раз.");
-    } finally {
-      setSubmitting(false);
+      if (isAgent && !Number.isInteger(partialItem.quantity)) {
+        return "Для агентских продаж количество возврата должно быть целым.";
+      }
     }
-  }, [dispatch, currentItem, selectCashBox, company, onChanged, onClose]);
+
+    return "";
+  }, [isAgent, partialItems, saleItems, validateCommon]);
+
+  const performReturn = useCallback(
+    async (itemsForReturn) => {
+      setError("");
+      setSubmitting(true);
+      try {
+        const payload = itemsForReturn?.length
+          ? { saleId: currentItem.id, items: itemsForReturn }
+          : { saleId: currentItem.id };
+        const returnedSale = await dispatch(returnSale(payload)).unwrap();
+        onChanged?.(returnedSale);
+        if (!onChanged) onClose?.();
+      } catch (e) {
+        setError(extractApiError(e));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [currentItem?.id, dispatch, onChanged, onClose],
+  );
+
+  const onConfirmFull = useCallback(async () => {
+    const validationError = validateCommon();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    await performReturn();
+  }, [performReturn, validateCommon]);
+
+  const onConfirmPartial = useCallback(async () => {
+    const validationError = validatePartial();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    await performReturn(partialItems);
+  }, [partialItems, performReturn, validatePartial]);
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onClose?.();
-      if (e.key === "Enter") onConfirm();
+      if (e.key === "Enter") {
+        if (partialCount > 0) {
+          onConfirmPartial();
+        } else {
+          onConfirmFull();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onConfirm]);
+  }, [onClose, onConfirmFull, onConfirmPartial, partialCount]);
 
   return (
     <div
@@ -209,57 +222,101 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
     >
       <div className="add-modal__overlay" onClick={onClose} />
 
-      <div className="add-modal__content" style={{ maxWidth: 520 }}>
+      <div className="add-modal__content sellReturn__modal">
         <div className="add-modal__header">
-          <h3 id="refund-title">Подтверждение возврата</h3>
+          <h3 id="refund-title">Возврат продажи</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
-        <div style={{ paddingTop: 6 }}>
+        <div className="sellReturn">
           {loading ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
+            <div className="sellReturn__loading">
               <p>Загрузка данных о продаже...</p>
             </div>
           ) : (
             <>
-              <p style={{ lineHeight: 1.5, opacity: 0.9 }}>
-                Вы уверены, что хотите оформить <b>возврат</b> по позиции?
+              <p className="sellReturn__lead">
+                Для полной отмены нажмите <b>Вернуть весь чек</b>. Если нужен
+                частичный возврат, укажите количество только в нужных позициях.
               </p>
 
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: "10px 12px",
-                  border: "1px solid var(--c-border, #e5e7eb)",
-                  borderRadius: 8,
-                  // background: "var(--c-bg-soft, #0b0f14)",
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>
-                  {currentItem?.client_name || "Нет имени"}
+              <div className="sellReturn__summary">
+                <div className="sellReturn__summaryMain">
+                  <div className="sellReturn__summaryTitle">
+                    {currentItem?.client_name || "Без клиента"}
+                  </div>
+                  <div className="sellReturn__summaryMeta">
+                    Чек #{String(currentItem?.id || "").slice(0, 8) || "—"}
+                  </div>
                 </div>
-                {qty != null && (
-                  <div style={{ marginTop: 4 }}>
-                    Количество: <b>{qty}</b>
+                <div className="sellReturn__summaryGrid">
+                  <div className="sellReturn__summaryItem">
+                    <span>Статус</span>
+                    <b>{currentItem?.status || "—"}</b>
                   </div>
-                )}
-                {sum != null && (
-                  <div style={{ marginTop: 4 }}>
-                    Сумма: <b>{sum}</b>
+                  <div className="sellReturn__summaryItem">
+                    <span>Сумма</span>
+                    <b>{formatMoney(currentItem?.total || currentItem?.amount)} сом</b>
                   </div>
-                )}
-                {/* <div style={{ marginTop: 8, fontSize: 13, opacity: 0.8 }}>
-                  Статус продажи будет изменён на <b>canceled</b>.
-                </div> */}
+                  <div className="sellReturn__summaryItem">
+                    <span>Позиций</span>
+                    <b>{saleItems.length}</b>
+                  </div>
+                </div>
               </div>
-              {/* касса автоматически выбирается - скрыто от пользователя */}
 
-              {error && (
-                <div style={{ marginTop: 12, color: "#c0392b", fontSize: 14 }}>
-                  {error}
+              {saleItems.length > 0 && (
+                <div className="sellReturn__items">
+                  <div className="sellReturn__itemsHead">
+                    <span>Позиция</span>
+                    <span>Макс. возврат</span>
+                    <span>Вернуть</span>
+                  </div>
+
+                  {saleItems.map((saleItem) => (
+                    <div key={saleItem.id} className="sellReturn__itemRow">
+                      <div className="sellReturn__itemInfo">
+                        <div className="sellReturn__itemName">{saleItem.name}</div>
+                        <div className="sellReturn__itemMeta">
+                          {formatMoney(saleItem.unitPrice)} сом x {saleItem.quantity}
+                        </div>
+                      </div>
+                      <div className="sellReturn__itemAvailable">
+                        {saleItem.quantity} {saleItem.unit}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        max={saleItem.quantity}
+                        step={isAgent ? "1" : "0.001"}
+                        inputMode="decimal"
+                        className="sellReturn__qtyInput"
+                        value={quantities[saleItem.id] ?? ""}
+                        onChange={(e) =>
+                          setQuantities((prev) => ({
+                            ...prev,
+                            [saleItem.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+
+              {isAgent && saleItems.length > 0 && (
+                <div className="sellReturn__hint">
+                  Для агентских продаж частичный возврат доступен только целым
+                  количеством.
+                </div>
+              )}
+
+              {error && (
+                <div className="sellReturn__error">{error}</div>
+              )}
+
+              <div className="sellReturn__actions">
                 <button
                   type="button"
                   className="btn"
@@ -272,17 +329,32 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
 
                 <button
                   type="button"
-                  className="btn danger-btn"
-                  onClick={onConfirm}
-                  disabled={submitting || loading}
+                  className="btn"
+                  onClick={onConfirmFull}
+                  disabled={submitting || loading || !isReturnableStatus}
                   style={{ flex: 1, justifyContent: "center" }}
-                  title="Изменить статус на canceled"
                 >
-                  {submitting ? "Оформляем..." : "Подтвердить возврат"}
+                  {submitting && partialCount === 0
+                    ? "Оформляем..."
+                    : "Вернуть весь чек"}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn danger-btn"
+                  onClick={onConfirmPartial}
+                  disabled={
+                    submitting || loading || !isReturnableStatus || partialCount === 0
+                  }
+                  style={{ flex: 1, justifyContent: "center" }}
+                >
+                  {submitting && partialCount > 0
+                    ? "Оформляем..."
+                    : `Частичный возврат${partialCount > 0 ? ` (${partialCount})` : ""}`}
                 </button>
               </div>
 
-              <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+              <div className="sellReturn__hint">
                 Подсказка: Enter — подтвердить, Esc — закрыть.
               </div>
             </>

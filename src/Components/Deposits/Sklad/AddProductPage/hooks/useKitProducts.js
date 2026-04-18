@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { productSearchHaystackLower } from "../../../../../../tools/productBarcode";
 
 /**
  * Хук для управления товарами в комплекте
@@ -17,10 +18,9 @@ export const useKitProducts = (products = []) => {
     if (!kitSearchTerm.trim()) {
       return [];
     }
+    const q = kitSearchTerm.toLowerCase();
     return products
-      .filter((p) =>
-        p.name?.toLowerCase().includes(kitSearchTerm.toLowerCase())
-      )
+      .filter((p) => productSearchHaystackLower(p).includes(q))
       .slice(0, 10);
   }, [kitSearchTerm, products]);
 

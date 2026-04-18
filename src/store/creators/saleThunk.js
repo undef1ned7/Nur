@@ -280,6 +280,26 @@ export const historySellProductDetail = createAsyncThunk(
   },
 );
 
+export const returnSale = createAsyncThunk(
+  "products/returnSale",
+  async ({ saleId, items }, { rejectWithValue, getState }) => {
+    try {
+      const role = String(getState()?.user?.profile?.role || "")
+        .trim()
+        .toLowerCase();
+      const endpoint =
+        role === "agent"
+          ? `/main/agents/me/sales/${saleId}/return/`
+          : `/main/pos/sales/${saleId}/return/`;
+      const payload = Array.isArray(items) && items.length > 0 ? { items } : {};
+      const { data } = await api.post(endpoint, payload);
+      return data;
+    } catch (error) {
+      return rejectWithValue(plainAxiosError(error));
+    }
+  },
+);
+
 export const historySellObjectDetail = createAsyncThunk(
   "products/historySellObjectDetail",
   async (id, { rejectWithValue }) => {

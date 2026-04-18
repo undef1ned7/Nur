@@ -277,6 +277,17 @@ const ProductDetail = () => {
                   {product.barcode || "—"}
                 </span>
               </div>
+              {Array.isArray(product.alternate_barcodes) &&
+              product.alternate_barcodes.length > 0 ? (
+                <div className="product-detail__detail-item">
+                  <span className="product-detail__detail-label">
+                    Доп. штрихкоды:
+                  </span>
+                  <span className="product-detail__detail-value">
+                    {product.alternate_barcodes.filter(Boolean).join(", ")}
+                  </span>
+                </div>
+              ) : null}
               <div className="product-detail__detail-item">
                 <span className="product-detail__detail-label">Артикул:</span>
                 <span className="product-detail__detail-value">

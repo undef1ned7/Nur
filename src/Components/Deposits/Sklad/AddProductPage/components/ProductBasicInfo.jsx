@@ -77,6 +77,25 @@ const ProductBasicInfo = ({
           )}
         </div>
 
+        <div className="market-product-form__form-group col-span-full">
+          <label className="market-product-form__label">
+            Дополнительные штрихкоды
+          </label>
+          <textarea
+            className="market-product-form__input market-product-form__textarea"
+            rows={3}
+            placeholder="По одному коду в строке (или через запятую)"
+            value={marketData.alternateBarcodesText ?? ""}
+            onChange={(e) =>
+              handleMarketDataChange("alternateBarcodesText", e.target.value)
+            }
+          />
+          <p className="market-product-form__hint">
+            Учитываются при поиске на складе и сканировании на кассе. Не должны
+            совпадать с основным штрихкодом.
+          </p>
+        </div>
+
         <div className="market-product-form__form-group col-span-full xl:col-span-1">
           <label className="market-product-form__label">Артикул</label>
           <input

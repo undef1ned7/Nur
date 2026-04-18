@@ -1,13 +1,20 @@
 import React from "react";
-import { Box, Plus } from "lucide-react";
+import { Box, ClipboardList, Plus } from "lucide-react";
 import "./WarehouseHeader.scss";
 
 /**
  * Компонент заголовка склада
  * @param {Function} onCreateProduct - Обработчик создания товара
  * @param {Function} onGoodsReceipt - Обработчик перехода на прием товара
+ * @param {Function} onInventory - Обработчик открытия инвентаризации
+ * @param {number} selectedCount - Количество выбранных товаров (для подписи кнопки)
  */
-const WarehouseHeader = ({ onCreateProduct, onGoodsReceipt }) => {
+const WarehouseHeader = ({
+  onCreateProduct,
+  onGoodsReceipt,
+  onInventory,
+  selectedCount = 0,
+}) => {
   return (
     <div className="warehouse-header">
       <div className="warehouse-header__left">
@@ -22,6 +29,19 @@ const WarehouseHeader = ({ onCreateProduct, onGoodsReceipt }) => {
         </div>
       </div>
       <div className="warehouse-header__actions">
+        <button
+          className="warehouse-header__inventory-btn"
+          onClick={onInventory}
+          type="button"
+          title={
+            selectedCount > 0
+              ? "Открыть документы: инвентаризация с выбранными товарами"
+              : "Открыть раздел актов инвентаризации (Документы)"
+          }
+        >
+          <ClipboardList size={16} />
+          Инвентаризация{selectedCount > 0 ? ` (${selectedCount})` : ""}
+        </button>
         <button
           className="warehouse-header__receipt-btn"
           onClick={onGoodsReceipt}

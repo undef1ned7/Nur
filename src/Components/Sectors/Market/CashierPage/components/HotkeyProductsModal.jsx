@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { productSearchHaystackLower } from "../../../../../../tools/productBarcode";
 import "./HotkeyProductsModal.scss";
 
 const HOTKEY_GROUPS = Array.from({ length: 12 }, (_, index) => `F${index + 1}`);
@@ -61,16 +62,7 @@ const HotkeyProductsModal = ({
     if (!query) return products;
 
     return products.filter((product) => {
-      const haystack = [
-        product?.name,
-        product?.barcode,
-        product?.article,
-        product?.code,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
+      const haystack = productSearchHaystackLower(product);
       return haystack.includes(query);
     });
   }, [products, searchTerm]);

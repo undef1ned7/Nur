@@ -443,6 +443,14 @@ const Sell = () => {
     return paymentMethodTranslate[lowerMethod] || method;
   };
 
+  const canReturnSale = (sale) => {
+    if (!isMarketCompany) return false;
+    const status = String(sale?.status || "")
+      .trim()
+      .toLowerCase();
+    return status === "paid" || status === "debt";
+  };
+
   const handleAddCashbox = async () => {
     try {
       dispatch(addCashFlows({ ...newCashbox, cashbox: selectCashBox1 }));
@@ -841,7 +849,7 @@ const Sell = () => {
                               className="sellTable__actions"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {company?.sector?.name === "Магазин" && (
+                              {canReturnSale(item) && (
                                 <button
                                   type="button"
                                   className="sellTable__refund"
@@ -956,7 +964,7 @@ const Sell = () => {
                             className="sellCard__actions"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {company?.sector?.name === "Магазин" && (
+                            {canReturnSale(item) && (
                               <button
                                 type="button"
                                 className="sellCard__refund"
@@ -1021,8 +1029,10 @@ const Sell = () => {
         <RefundPurchase
           item={itemId}
           onClose={() => setShowRefundModal(false)}
-          onChanged={() => {
-            hideSaleId(itemId?.id);
+          onChanged={(updatedSale) => {
+            if (String(updatedSale?.status || "").toLowerCase() === "canceled") {
+              hideSaleId(updatedSale?.id || itemId?.id);
+            }
             setShowRefundModal(false);
             dispatch(
               historySellProduct({

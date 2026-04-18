@@ -118,6 +118,7 @@ const AddProductPage = () => {
     packagings: [], // Список упаковок
     stock: false, // Акционный товар (поле stock в API)
     promotionRules: [], // Ступени скидки → promotion_rules_input
+    alternateBarcodesText: "",
   });
 
   // Для поиска товаров в комплекте - используем хук
@@ -357,6 +358,9 @@ const AddProductPage = () => {
             promotionRules: utils.normalizePromotionRulesFromApi(
               product.promotion_rules || [],
             ),
+            alternateBarcodesText: Array.isArray(product.alternate_barcodes)
+              ? product.alternate_barcodes.filter(Boolean).join("\n")
+              : "",
           });
 
           // Загружаем изображения используя хук
@@ -469,6 +473,9 @@ const AddProductPage = () => {
         promotionRules: utils.normalizePromotionRulesFromApi(
           product.promotion_rules || [],
         ),
+        alternateBarcodesText: Array.isArray(product.alternate_barcodes)
+          ? product.alternate_barcodes.filter(Boolean).join("\n")
+          : "",
       });
 
       // Загружаем изображения (копируем ссылки, но не файлы); для нового товара не храним id для удаления

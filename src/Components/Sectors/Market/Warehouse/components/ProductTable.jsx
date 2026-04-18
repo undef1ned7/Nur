@@ -126,9 +126,10 @@ const ProductTable = ({
     return products.map((_, index) => getRowNumber(index, products.length));
   }, [products, getRowNumber]);
 
-  const isSelected = useCallback((id) => {
-    return selectedRows.has(id);
-  }, [selectedRows]);
+  const isSelected = useCallback(
+    (id) => selectedRows.has(String(id)),
+    [selectedRows],
+  );
 
   // Показываем старые данные во время загрузки (оптимистичное обновление)
   // Только если данных нет вообще - показываем загрузку

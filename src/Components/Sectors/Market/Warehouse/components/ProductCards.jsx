@@ -154,7 +154,7 @@ const ProductCards = ({
     return products.map((product, index) => ({
       product,
       primaryImage: getPrimaryImage(product),
-      isSelected: selectedRows.has(product.id),
+      isSelected: selectedRows.has(String(product.id)),
       rowNumber: getRowNumber(index, products.length),
     }));
   }, [products, selectedRows, selectedRowsSize, getRowNumber]);

@@ -2745,10 +2745,22 @@
   }
 }
 
-/* Cafe: employee detail (/crm/employ/:id) — без «карточки», в линию со страницей сотрудников */
+/* Cafe/Market employee detail — на всю рабочую ширину только для detail-страниц */
+.barbermasters.cafeEmployDetail {
+  width: calc(100% + (var(--content-inline-padding, 20px) * 2));
+  max-width: none;
+  margin-inline: calc(var(--content-inline-padding, 20px) * -1);
+  padding: 0 20px 24px;
+
+  @media (max-width: 900px) {
+    width: 100%;
+    margin-inline: 0;
+  }
+}
+
 .cafeEmployDetail {
   padding: 0 20px 24px;
-  max-width: 960px;
+  max-width: none;
 
   .barbermasters__top {
     padding: 16px 0 12px;
