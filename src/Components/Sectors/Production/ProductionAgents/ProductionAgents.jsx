@@ -797,7 +797,8 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, alert]);
+    // `alert` из useAlert() нестабилен между рендерами — не добавлять в deps, иначе бесконечный refetch
+  }, [dispatch]);
 
   useEffect(() => {
     load();
@@ -1642,8 +1643,8 @@ const ProductionAgents = () => {
         <SellStart show={showStart} setShow={setShowStart} />
       ) : (
         <>
-          {/* Первый таб - Товары агентов */}
-          {(!isPiloramaSector || activeTab === 0) && (
+          {/* Первый таб - Товары агентов (только при activeTab === 0; иначе контент «наезжает» под другими вкладками) */}
+          {activeTab === 0 && (
             <div className="warehouse-page">
               {/* Header */}
               <div className="warehouse-header">
