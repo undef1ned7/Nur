@@ -798,23 +798,6 @@ const PaymentPage = ({
         <div className="payment-page__right">
           {/* Итоговая информация */}
           <div className="payment-page__summary">
-            <div className="payment-page__summary-item">
-              <span className="payment-page__summary-label">СУБТОТАЛ</span>
-              <span className="payment-page__summary-value">
-                {(
-                  parseFloat(sale?.subtotal || 0) ||
-                  cart.reduce(
-                    (sum, item) =>
-                      sum + (item.price || 0) * (item.quantity || 0),
-                    0
-                  )
-                ).toLocaleString("ru-RU", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                сом
-              </span>
-            </div>
             {(parseFloat(sale?.order_discount_total || 0) || 0) > 0 && (
               <div className="payment-page__summary-item">
                 <span className="payment-page__summary-label">СКИДКА</span>

@@ -53,6 +53,12 @@ const translateLowStockStatus = (status) => {
   return String(status || "Низкий").trim() || "Низкий";
 };
 
+const normalizeLowStockStatusType = (status) => {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "critical" || normalized === "критично") return "critical";
+  return "low";
+};
+
 const Analytics = () => {
   const dispatch = useDispatch();
   const { company, currentUser } = useUser();
@@ -308,6 +314,21 @@ const Analytics = () => {
   const toggleFinanceTable = (key) => {
     setOpenFinanceTable((prev) => (prev === key ? null : key));
   };
+
+  const openProductAnchorSection = React.useCallback((key) => {
+    const anchorId = `products-section-${key}`;
+    setOpenProductTable(key);
+
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${anchorId}`);
+      window.setTimeout(() => {
+        const target = document.getElementById(anchorId);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 80);
+    }
+  }, []);
 
   // Форматирование числа с разделителями
   const formatNumber = (num) => {
@@ -617,7 +638,7 @@ const Analytics = () => {
           stock: item.qty || 0,
           minimum: item.min || 0,
           status: translateLowStockStatus(item.status),
-          statusType: item.status || "low",
+          statusType: normalizeLowStockStatusType(item.status),
         })) || [],
     };
   }, [analyticsData, activeTab]);
@@ -904,6 +925,7 @@ const Analytics = () => {
             value: "0",
             icon: Package,
             color: "#f7d617",
+            anchorKey: "lowStockProducts",
           },
         ],
         topByRevenue: [],
@@ -931,6 +953,7 @@ const Analytics = () => {
           value: formatNumber(cards.low_stock_count || 0),
           icon: Package,
           color: "#f7d617",
+          anchorKey: "lowStockProducts",
         },
       ],
       topByRevenue: tables.top_by_revenue || [],
@@ -941,6 +964,7 @@ const Analytics = () => {
         (tables.low_stock_products || []).map((item) => ({
           ...item,
           status: translateLowStockStatus(item.status),
+          statusType: normalizeLowStockStatusType(item.status),
         })) || [],
     };
   }, [analyticsData, activeTab]);
@@ -1112,7 +1136,10 @@ const Analytics = () => {
   const renderProductsAccordion = (key, title, tableContent) => {
     const isOpen = openProductTable === key;
     return (
-      <div className="analytics-page__table-card analytics-page__accordion">
+      <div
+        id={`products-section-${key}`}
+        className="analytics-page__table-card analytics-page__accordion"
+      >
         <button
           type="button"
           className="analytics-page__accordion-header"
@@ -2109,8 +2136,31 @@ const Analytics = () => {
           <div className="analytics-page__kpis">
             {productsData.kpis.map((kpi, index) => {
               const Icon = kpi.icon;
+              const isInteractive = Boolean(kpi.anchorKey);
               return (
-                <div key={index} className="analytics-page__kpi-card">
+                <div
+                  key={index}
+                  className={`analytics-page__kpi-card ${
+                    isInteractive ? "analytics-page__kpi-card--interactive" : ""
+                  }`}
+                  role={isInteractive ? "button" : undefined}
+                  tabIndex={isInteractive ? 0 : undefined}
+                  onClick={
+                    isInteractive
+                      ? () => openProductAnchorSection(kpi.anchorKey)
+                      : undefined
+                  }
+                  onKeyDown={
+                    isInteractive
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openProductAnchorSection(kpi.anchorKey);
+                          }
+                        }
+                      : undefined
+                  }
+                >
                   <div className="analytics-page__kpi-header">
                     <span className="analytics-page__kpi-title">
                       {kpi.title}
@@ -2301,7 +2351,13 @@ const Analytics = () => {
                       <td>{row.quantity}</td>
                       <td>{formatCurrency(row.price, 0)}</td>
                       <td>{formatCurrency(row.purchase_price, 0)}</td>
-                      <td>{row.status}</td>
+                      <td>
+                        <span
+                          className={`analytics-page__status analytics-page__status--${row.statusType}`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 ) : (
