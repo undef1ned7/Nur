@@ -30,6 +30,17 @@ import {
 } from "lucide-react";
 import { fetchAgentAnalytics } from "../../../../store/creators/analyticsCreators";
 import "./AgentAnalytics.scss";
+import {
+  CARD_DETAILS_PAGE_SIZE,
+  INITIAL_CARD_DETAILS_META,
+  CARD_DETAILS_USES_PERIOD,
+  parseCardDetailsRows,
+  getDisplayDetailColumns,
+  formatTotalsValue,
+  formatDetailsCell,
+  CARD_DETAILS_COLUMN_LABELS,
+  TOTALS_VALUE_LABELS,
+} from "./analyticsCardDetailsShared";
 
 ChartJS.register(
   CategoryScale,
@@ -60,6 +71,7 @@ const AgentAnalytics = () => {
     loading: false,
     error: "",
     rows: [],
+    meta: { ...INITIAL_CARD_DETAILS_META },
   });
 
   // Получаем данные из Redux store
@@ -99,55 +111,66 @@ const AgentAnalytics = () => {
     dispatch(fetchAgentAnalytics(analyticsQueryParams));
   };
 
-  const buildCardDetailsParams = (cardKey) => {
+  const buildCardDetailsParams = (cardKey, offset = 0) => {
     const params = {
       card: cardKey,
-      limit: 200,
-      offset: 0,
-      period,
+      limit: CARD_DETAILS_PAGE_SIZE,
+      offset,
       ...(agentId ? { agent_id: agentId } : {}),
     };
-    if (period === "day") {
-      params.date = dateForDay || new Date().toISOString().slice(0, 10);
-    } else if (period === "custom") {
-      if (dateFromCustom) params.date_from = dateFromCustom;
-      if (dateToCustom) params.date_to = dateToCustom;
+    if (CARD_DETAILS_USES_PERIOD.has(cardKey)) {
+      params.period = period;
+      if (period === "day") {
+        params.date = dateForDay || new Date().toISOString().slice(0, 10);
+      } else if (period === "custom") {
+        if (dateFromCustom) params.date_from = dateFromCustom;
+        if (dateToCustom) params.date_to = dateToCustom;
+      }
     }
     return params;
   };
 
-  const openCardDetails = async (cardKey, title) => {
-    setCardDetailsModal({
+  const loadCardDetailsPage = async (cardKey, title, offset) => {
+    setCardDetailsModal((prev) => ({
+      ...prev,
       open: true,
       cardKey,
       title,
       loading: true,
       error: "",
-      rows: [],
-    });
-
+      ...(offset === 0
+        ? { rows: [], meta: { ...INITIAL_CARD_DETAILS_META } }
+        : {}),
+    }));
     try {
-      const response = await api.get("/main/analytics/cards/details/", {
-        params: buildCardDetailsParams(cardKey),
+      const { data } = await api.get("/main/analytics/cards/details/", {
+        params: buildCardDetailsParams(cardKey, offset),
       });
-      const payload = response?.data;
-      const rows = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.results)
-          ? payload.results
-          : Array.isArray(payload?.rows)
-            ? payload.rows
-            : [];
-
+      const rows = parseCardDetailsRows(data);
       setCardDetailsModal((prev) => ({
         ...prev,
         loading: false,
         rows,
+        meta: {
+          count: typeof data?.count === "number" ? data.count : rows.length,
+          offset: typeof data?.offset === "number" ? data.offset : offset,
+          limit:
+            typeof data?.limit === "number"
+              ? data.limit
+              : CARD_DETAILS_PAGE_SIZE,
+          branch_id: data?.branch_id ?? null,
+          totals:
+            data?.totals && typeof data.totals === "object" ? data.totals : {},
+          period: data?.period ?? null,
+        },
       }));
     } catch (err) {
       const message =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
+        (typeof err?.response?.data?.card === "string"
+          ? err.response.data.card
+          : null) ||
         "Не удалось загрузить детализацию";
       setCardDetailsModal((prev) => ({
         ...prev,
@@ -155,6 +178,24 @@ const AgentAnalytics = () => {
         error: message,
       }));
     }
+  };
+
+  const openCardDetails = (cardKey, title) => {
+    void loadCardDetailsPage(cardKey, title, 0);
+  };
+
+  const goCardDetailsPrev = () => {
+    const { cardKey, title, meta } = cardDetailsModal;
+    const nextOffset = Math.max(0, meta.offset - meta.limit);
+    if (nextOffset === meta.offset) return;
+    void loadCardDetailsPage(cardKey, title, nextOffset);
+  };
+
+  const goCardDetailsNext = () => {
+    const { cardKey, title, meta } = cardDetailsModal;
+    const nextOffset = meta.offset + meta.limit;
+    if (nextOffset >= meta.count) return;
+    void loadCardDetailsPage(cardKey, title, nextOffset);
   };
 
   const closeCardDetails = () => {
@@ -165,44 +206,12 @@ const AgentAnalytics = () => {
       loading: false,
       error: "",
       rows: [],
+      meta: { ...INITIAL_CARD_DETAILS_META },
     });
   };
 
-  const formatDetailsValue = (value, column) => {
-    if (value === null || value === undefined || value === "") return "—";
-    if (
-      column === "discounts_total" ||
-      column === "sales_amount" ||
-      column === "amount"
-    ) {
-      const n =
-        typeof value === "string" ? parseFloat(value) : Number(value);
-      if (Number.isNaN(n)) return String(value);
-      return n.toLocaleString("ru-RU", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-    if (typeof value === "number") return value.toLocaleString("ru-RU");
-    return String(value);
-  };
-
-  const cardDetailsColumnLabel = (column) => {
-    const byCard = {
-      discounts_total: {
-        user: "Кто дал скидку",
-        client: "Кому",
-        sales_count: "Продаж",
-        discounts_total: "Сумма скидок",
-      },
-    };
-    return byCard[cardDetailsModal.cardKey]?.[column] ?? column;
-  };
-
-  const detailColumns =
-    cardDetailsModal.rows.length > 0
-      ? Object.keys(cardDetailsModal.rows[0] || {})
-      : [];
+  const cardDetailsColumnLabel = (column) =>
+    CARD_DETAILS_COLUMN_LABELS[cardDetailsModal.cardKey]?.[column] ?? column;
 
   // Получаем информацию об агенте из данных аналитики
   const selectedAgent = useMemo(() => {
@@ -901,6 +910,11 @@ const AgentAnalytics = () => {
     );
   }
 
+  const detailColumns = getDisplayDetailColumns(
+    cardDetailsModal.cardKey,
+    cardDetailsModal.rows,
+  );
+
   return (
     <div className="agent-analytics">
       <div className="agent-analytics__header">
@@ -1348,22 +1362,72 @@ const AgentAnalytics = () => {
                 ×
               </button>
             </div>
-
             <div className="agent-analytics__modal-body">
-              {cardDetailsModal.loading && <p>Загрузка...</p>}
+              {cardDetailsModal.meta.period && (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#6b7280",
+                    marginTop: 0,
+                    marginBottom: 12,
+                  }}
+                >
+                  Период: {cardDetailsModal.meta.period.date_from} —{" "}
+                  {cardDetailsModal.meta.period.date_to}
+                  {cardDetailsModal.meta.period.type
+                    ? ` (${cardDetailsModal.meta.period.type})`
+                    : ""}
+                </p>
+              )}
+              {cardDetailsModal.loading &&
+                cardDetailsModal.rows.length === 0 && <p>Загрузка...</p>}
+              {cardDetailsModal.loading &&
+                cardDetailsModal.rows.length > 0 && (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                      marginTop: 0,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Обновление…
+                  </p>
+                )}
               {!cardDetailsModal.loading && cardDetailsModal.error && (
                 <p>{cardDetailsModal.error}</p>
               )}
               {!cardDetailsModal.loading &&
                 !cardDetailsModal.error &&
                 cardDetailsModal.rows.length === 0 && <p>Нет данных</p>}
-              {!cardDetailsModal.loading &&
-                !cardDetailsModal.error &&
-                cardDetailsModal.rows.length > 0 && (
+              {cardDetailsModal.rows.length > 0 && (
+                <>
+                  {cardDetailsModal.meta.totals &&
+                    Object.keys(cardDetailsModal.meta.totals).length > 0 && (
+                      <div
+                        style={{
+                          marginBottom: 12,
+                          fontSize: 13,
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "12px 20px",
+                        }}
+                      >
+                        {Object.entries(cardDetailsModal.meta.totals).map(
+                          ([k, v]) => (
+                            <span key={k}>
+                              <strong>{TOTALS_VALUE_LABELS[k] ?? k}:</strong>{" "}
+                              {formatTotalsValue(k, v)}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    )}
                   <div className="agent-analytics__table">
                     <table>
                       <thead>
                         <tr>
+                          <th key="__rowNum">№</th>
                           {detailColumns.map((column) => (
                             <th key={column}>
                               {cardDetailsColumnLabel(column)}
@@ -1374,9 +1438,12 @@ const AgentAnalytics = () => {
                       <tbody>
                         {cardDetailsModal.rows.map((row, idx) => (
                           <tr key={idx}>
+                            <td key={`${idx}-__num`}>
+                              {cardDetailsModal.meta.offset + idx + 1}
+                            </td>
                             {detailColumns.map((column) => (
                               <td key={`${idx}-${column}`}>
-                                {formatDetailsValue(row?.[column], column)}
+                                {formatDetailsCell(row?.[column], column)}
                               </td>
                             ))}
                           </tr>
@@ -1384,7 +1451,83 @@ const AgentAnalytics = () => {
                       </tbody>
                     </table>
                   </div>
-                )}
+                  {(cardDetailsModal.meta.offset > 0 ||
+                    cardDetailsModal.meta.offset +
+                      cardDetailsModal.rows.length <
+                      cardDetailsModal.meta.count) && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 12,
+                        marginTop: 12,
+                        fontSize: 13,
+                        color: "#374151",
+                      }}
+                    >
+                      <span>
+                        Всего записей: {cardDetailsModal.meta.count}. Показано{" "}
+                        {cardDetailsModal.meta.offset + 1}—
+                        {Math.min(
+                          cardDetailsModal.meta.offset +
+                            cardDetailsModal.rows.length,
+                          cardDetailsModal.meta.count,
+                        )}
+                      </span>
+                      <span style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          disabled={
+                            cardDetailsModal.loading ||
+                            cardDetailsModal.meta.offset === 0
+                          }
+                          onClick={goCardDetailsPrev}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #d1d5db",
+                            background: "#fff",
+                            cursor:
+                              cardDetailsModal.loading ||
+                              cardDetailsModal.meta.offset === 0
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          Назад
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            cardDetailsModal.loading ||
+                            cardDetailsModal.meta.offset +
+                              cardDetailsModal.meta.limit >=
+                              cardDetailsModal.meta.count
+                          }
+                          onClick={goCardDetailsNext}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #d1d5db",
+                            background: "#fff",
+                            cursor:
+                              cardDetailsModal.loading ||
+                              cardDetailsModal.meta.offset +
+                                cardDetailsModal.meta.limit >=
+                                cardDetailsModal.meta.count
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          Вперёд
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
