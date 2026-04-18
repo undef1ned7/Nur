@@ -18,6 +18,8 @@ import {
   createReturnApi,
   getReturnApi,
   approveReturnApi,
+  rejectReturnApi,
+  createAgentMeReturnApi,
 } from "../../api/transfers";
 import api from "../../api";
 
@@ -210,8 +212,12 @@ export const fetchReturnsAsync = createAsyncThunk(
 
 export const createReturnAsync = createAsyncThunk(
   "returns/create",
-  async (data, { rejectWithValue }) => {
+  async (data, { rejectWithValue, getState }) => {
     try {
+      const role = getState()?.user?.profile?.role;
+      if (role === "agent") {
+        return await createAgentMeReturnApi(data);
+      }
       return await createReturnApi(data);
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
@@ -235,6 +241,17 @@ export const approveReturnAsync = createAsyncThunk(
   async (returnId, { rejectWithValue }) => {
     try {
       return await approveReturnApi(returnId);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+export const rejectReturnAsync = createAsyncThunk(
+  "returns/reject",
+  async (returnId, { rejectWithValue }) => {
+    try {
+      return await rejectReturnApi(returnId);
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
     }

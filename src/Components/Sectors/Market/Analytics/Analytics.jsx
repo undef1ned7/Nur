@@ -241,7 +241,10 @@ const Analytics = () => {
           if (filters.cashier) params.cashier = filters.cashier;
         }
 
-        const response = await api.get("/main/analytics/market/", { params });
+        const response = await api.get("/main/analytics/market/", {
+          params,
+          timeout: 3000,
+        });
         setAnalyticsData(response.data);
         if (tab === "finance") {
           try {
@@ -256,6 +259,7 @@ const Analytics = () => {
             }
             const salaryResponse = await api.get("/main/analytics/market/", {
               params: salaryParams,
+              timeout: 3000,
             });
             setSalaryAnalyticsRows(
               Array.isArray(salaryResponse?.data?.rows)

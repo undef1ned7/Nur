@@ -13,6 +13,7 @@ import {
   Warehouse,
   Wallet,
   Receipt,
+  Percent,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -26,6 +27,7 @@ import {
   Legend,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
+import api from "../../../../api";
 import { fetchProductionAnalytics } from "../../../../store/creators/analyticsCreators";
 import { setProductionAnalyticsFilters } from "../../../../store/slices/analyticsSlice";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -57,6 +59,14 @@ const ProductionAnalytics = () => {
   );
 
   const [showFilters, setShowFilters] = useState(false);
+  const [cardDetailsModal, setCardDetailsModal] = useState({
+    open: false,
+    cardKey: "",
+    title: "",
+    loading: false,
+    error: "",
+    rows: [],
+  });
 
   // Локальные состояния для фильтров (синхронизируются с Redux)
   const [period, setPeriod] = useState(filters.period || "month");
@@ -121,6 +131,105 @@ const ProductionAnalytics = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
+
+  const buildCardDetailsParams = (cardKey) => {
+    const params = {
+      card: cardKey,
+      limit: 200,
+      offset: 0,
+      period,
+      group_by: groupBy,
+    };
+    if (period === "day") {
+      params.date = date || new Date().toISOString().slice(0, 10);
+    } else {
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+    }
+    return params;
+  };
+
+  const openCardDetails = async (cardKey, title) => {
+    setCardDetailsModal({
+      open: true,
+      cardKey,
+      title,
+      loading: true,
+      error: "",
+      rows: [],
+    });
+
+    try {
+      const response = await api.get("/main/analytics/cards/details/", {
+        params: buildCardDetailsParams(cardKey),
+      });
+      const payload = response?.data;
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload?.rows)
+            ? payload.rows
+            : [];
+      setCardDetailsModal((prev) => ({
+        ...prev,
+        loading: false,
+        rows,
+      }));
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Не удалось загрузить детализацию";
+      setCardDetailsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+      }));
+    }
+  };
+
+  const closeCardDetails = () => {
+    setCardDetailsModal({
+      open: false,
+      cardKey: "",
+      title: "",
+      loading: false,
+      error: "",
+      rows: [],
+    });
+  };
+
+  const formatDetailsValue = (value, column) => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (
+      column === "discounts_total" ||
+      column === "sales_amount" ||
+      column === "amount"
+    ) {
+      const n =
+        typeof value === "string" ? parseFloat(value) : Number(value);
+      if (Number.isNaN(n)) return String(value);
+      return n.toLocaleString("ru-RU", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (typeof value === "number") return value.toLocaleString("ru-RU");
+    return String(value);
+  };
+
+  const cardDetailsColumnLabel = (column) => {
+    const byCard = {
+      discounts_total: {
+        user: "Кто дал скидку",
+        client: "Кому",
+        sales_count: "Продаж",
+        discounts_total: "Сумма скидок",
+      },
+    };
+    return byCard[cardDetailsModal.cardKey]?.[column] ?? column;
   };
 
   // Загрузка данных через Redux (параметры по Owner Analytics API)
@@ -383,7 +492,7 @@ const ProductionAnalytics = () => {
     dispatch(
       setProductionAnalyticsFilters({
         period: newPeriod,
-        date: newPeriod === "day" ? (date || today) : "",
+        date: newPeriod === "day" ? date || today : "",
         date_from: dateFrom,
         date_to: dateTo,
         group_by: groupBy,
@@ -488,6 +597,10 @@ const ProductionAnalytics = () => {
 
   const summary = analyticsData?.summary || {};
   const charts = analyticsData?.charts || {};
+  const detailColumns =
+    cardDetailsModal.rows.length > 0
+      ? Object.keys(cardDetailsModal.rows[0] || {})
+      : [];
 
   return (
     <div className="agent-analytics">
@@ -699,7 +812,8 @@ const ProductionAnalytics = () => {
                           group_by: groupBy,
                         }),
                       );
-                      if (v && dateTo) dispatch(fetchProductionAnalytics(params));
+                      if (v && dateTo)
+                        dispatch(fetchProductionAnalytics(params));
                     }}
                     style={{
                       width: "100%",
@@ -745,7 +859,8 @@ const ProductionAnalytics = () => {
                           group_by: groupBy,
                         }),
                       );
-                      if (dateFrom && v) dispatch(fetchProductionAnalytics(params));
+                      if (dateFrom && v)
+                        dispatch(fetchProductionAnalytics(params));
                     }}
                     style={{
                       width: "100%",
@@ -897,7 +1012,18 @@ const ProductionAnalytics = () => {
       )}
       {/* Верхние карточки-метрики */}
       <div className="agent-analytics__metrics">
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("users_count", "Пользователей")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("users_count", "Пользователей");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
             <Users size={24} />
           </div>
@@ -908,7 +1034,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("transfers_count", "Перемещений")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("transfers_count", "Перемещений");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
             <ArrowLeftRight size={24} />
           </div>
@@ -921,7 +1058,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("acceptances_count", "Принято")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("acceptances_count", "Принято");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
             <Package size={24} />
           </div>
@@ -934,7 +1082,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("items_transferred", "Товаров")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("items_transferred", "Товаров");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
             <Package size={24} />
           </div>
@@ -947,7 +1106,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("sales_count", "Продаж")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("sales_count", "Продаж");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
             <ShoppingCart size={24} />
           </div>
@@ -958,7 +1128,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("sales_amount", "Сумма продаж")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("sales_amount", "Сумма продаж");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
             <DollarSign size={24} />
           </div>
@@ -971,7 +1152,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("gross_profit", "Валовая прибыль")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("gross_profit", "Валовая прибыль");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
             <TrendingUp size={24} />
           </div>
@@ -983,7 +1175,115 @@ const ProductionAnalytics = () => {
             </span>
           </div>
         </div>
-        <div className="agent-analytics__metric-card">
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("discounts_total", "Сумма скидок")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("discounts_total", "Сумма скидок");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <Percent size={24} />
+          </div>
+          <div>
+            <h3>Сумма скидок</h3>
+            <p>{formatMoney(summary.discounts_total || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              По оплаченным продажам за период
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("stock_purchase_value", "Склад (закуп)")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("stock_purchase_value", "Склад (закуп)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
+            <Warehouse size={24} />
+          </div>
+          <div>
+            <h3>Склад (закуп)</h3>
+            <p>{formatMoney(summary.stock_purchase_value || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Остатки склада по закупочной цене
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("stock_retail_value", "Склад (розница)")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("stock_retail_value", "Склад (розница)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <DollarSign size={24} />
+          </div>
+          <div>
+            <h3>Склад (розница)</h3>
+            <p>{formatMoney(summary.stock_retail_value || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Остатки склада по розничной цене
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("raw_material_value", "Стоимость сырья")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("raw_material_value", "Стоимость сырья");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <Package size={24} />
+          </div>
+          <div>
+            <h3>Стоимость сырья</h3>
+            <p>{formatMoney(summary.raw_material_value || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Остатки сырья по текущей цене
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("stock_value", "Стоимость склада")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("stock_value", "Стоимость склада");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
             <Warehouse size={24} />
           </div>
@@ -991,12 +1291,23 @@ const ProductionAnalytics = () => {
             <h3>Стоимость склада</h3>
             <p>{formatMoney(summary.stock_value || 0)} сом</p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Остатки × закупочная цена
+              Старое поле (совместимость)
             </span>
           </div>
         </div>
-      
-        <div className="agent-analytics__metric-card">
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("accounts_receivable", "Дебиторская")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("accounts_receivable", "Дебиторская");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
             <Receipt size={24} />
           </div>
@@ -1009,7 +1320,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("accounts_payable", "Кредиторская")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("accounts_payable", "Кредиторская");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
             <Wallet size={24} />
           </div>
@@ -1022,7 +1344,18 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div className="agent-analytics__metric-card">
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("total_debt", "Общий долг")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("total_debt", "Общий долг");
+            }
+          }}
+        >
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
             <Wallet size={24} />
           </div>
@@ -1056,6 +1389,59 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
+
+      {cardDetailsModal.open && (
+        <div className="agent-analytics__modal-backdrop" onClick={closeCardDetails}>
+          <div
+            className="agent-analytics__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="agent-analytics__modal-header">
+              <h3>Детализация: {cardDetailsModal.title}</h3>
+              <button type="button" onClick={closeCardDetails}>
+                ×
+              </button>
+            </div>
+            <div className="agent-analytics__modal-body">
+              {cardDetailsModal.loading && <p>Загрузка...</p>}
+              {!cardDetailsModal.loading && cardDetailsModal.error && (
+                <p>{cardDetailsModal.error}</p>
+              )}
+              {!cardDetailsModal.loading &&
+                !cardDetailsModal.error &&
+                cardDetailsModal.rows.length === 0 && <p>Нет данных</p>}
+              {!cardDetailsModal.loading &&
+                !cardDetailsModal.error &&
+                cardDetailsModal.rows.length > 0 && (
+                  <div className="agent-analytics__table">
+                    <table>
+                      <thead>
+                        <tr>
+                          {detailColumns.map((column) => (
+                            <th key={column}>
+                              {cardDetailsColumnLabel(column)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cardDetailsModal.rows.map((row, idx) => (
+                          <tr key={idx}>
+                            {detailColumns.map((column) => (
+                              <td key={`${idx}-${column}`}>
+                                {formatDetailsValue(row?.[column], column)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Продажи по датам */}
       <div className="agent-analytics__section">
         <h2 className="agent-analytics__section-title">
@@ -1200,7 +1586,13 @@ const ProductionAnalytics = () => {
       <div className="agent-analytics__section">
         <div className="agent-analytics__table-card">
           <h3 className="agent-analytics__table-title">
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
               <Receipt size={20} />
               Статьи расходов
             </span>

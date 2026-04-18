@@ -12,11 +12,17 @@ const plainAxiosError = (error) => ({
 
 export const startSaleInAgent = createAsyncThunk(
   "sale/startInAgent",
-  async (discount_total, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/main/agents/me/cart/start/", {
-        order_discount_total: discount_total,
-      });
+      const body =
+        payload != null && typeof payload === "object" && !Array.isArray(payload)
+          ? {
+              order_discount_total:
+                payload.order_discount_total ?? payload.discount_total ?? "0.00",
+              ...(payload.agent ? { agent: payload.agent } : {}),
+            }
+          : { order_discount_total: payload ?? "0.00" };
+      const { data } = await api.post("/main/agents/me/cart/start/", body);
       return data;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
@@ -26,11 +32,19 @@ export const startSaleInAgent = createAsyncThunk(
 
 export const manualFillingInAgent = createAsyncThunk(
   "sale/manualFillingInAgent",
-  async ({ id, productId, quantity, discount_total }, { rejectWithValue }) => {
+  async (
+    { id, productId, quantity, discount_total, agent },
+    { rejectWithValue }
+  ) => {
     try {
       const { data: response } = await api.post(
         `/main/agents/me/carts/${id}/add-item/`,
-        { product_id: productId, quantity, discount_total }
+        {
+          product_id: productId,
+          quantity,
+          discount_total,
+          ...(agent ? { agent } : {}),
+        }
       );
       return response;
     } catch (error) {
@@ -70,12 +84,28 @@ export const doSearchInAgent = createAsyncThunk(
 
 export const productCheckoutInAgent = createAsyncThunk(
   "products/productCheckoutInAgent",
-  async ({ id, bool, clientId }, { rejectWithValue }) => {
+  async (
+    {
+      id,
+      bool,
+      clientId,
+      payment_method = "transfer",
+      cash_received,
+      cashbox_id,
+      agent,
+    },
+    { rejectWithValue }
+  ) => {
     try {
       const { data } = await api.post(`/main/agents/me/carts/${id}/checkout/`, {
         print_receipt: bool,
-        client_id: clientId,
-        payment_method: "transfer",
+        ...(clientId && { client_id: clientId }),
+        payment_method,
+        ...(cash_received != null && cash_received !== ""
+          ? { cash_received }
+          : {}),
+        ...(cashbox_id && { cashbox_id }),
+        ...(agent && { agent }),
       });
       return data;
     } catch (error) {
