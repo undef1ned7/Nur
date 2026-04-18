@@ -483,6 +483,150 @@
   }
 }
 
+.client-details__supplier-products {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.client-details__supplier-products-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.client-details__supplier-products-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.client-details__supplier-products-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  width: min(100%, 620px);
+
+  .client-details__filter-input {
+    flex: 1 1 280px;
+    min-width: 220px;
+  }
+}
+
+.client-details__supplier-products-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.client-details__supplier-products-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+
+  b {
+    color: var(--text);
+  }
+}
+
+.client-details__supplier-products-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.client-details__supplier-products-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  th {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #f8fafc;
+  }
+
+  td {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  tbody tr:hover {
+    background: #fffbeb;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.client-details__supplier-products-cards {
+  display: none;
+  gap: 12px;
+}
+
+.client-details__supplier-product-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+}
+
+.client-details__supplier-product-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.client-details__supplier-product-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 120px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+
+  span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  strong {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* ===== Deals List ===== */
 .client-details__deals {
   background: var(--surface);
@@ -817,6 +961,10 @@
     padding: 16px;
   }
 
+  .client-details__supplier-products {
+    padding: 16px;
+  }
+
   .client-details__title {
     font-size: 20px;
   }
@@ -846,6 +994,29 @@
   .client-details__filters-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .client-details__supplier-products-head {
+    align-items: stretch;
+  }
+
+  .client-details__supplier-products-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .client-details__supplier-products-table-wrap {
+    display: none;
+  }
+
+  .client-details__supplier-products-cards {
+    display: grid;
+  }
+
+  .client-details__supplier-product-meta {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .client-details__quick-filters {
@@ -891,6 +1062,7 @@
   }
 
   .client-details__panel,
+  .client-details__supplier-products,
   .client-details__filters,
   .client-details__deals {
     padding: 14px;
@@ -935,6 +1107,7 @@
   }
 
   .client-details__panel,
+  .client-details__supplier-products,
   .client-details__filters,
   .client-details__deals {
     padding: 12px;
@@ -991,6 +1164,7 @@
   }
 
   .client-details__panel,
+  .client-details__supplier-products,
   .client-details__filters,
   .client-details__deals {
     padding: 10px;

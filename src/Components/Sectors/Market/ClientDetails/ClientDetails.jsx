@@ -1,5 +1,5 @@
 // ClientDetails.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useLocation,
   useNavigate,
@@ -57,6 +57,10 @@ export default function MarketClientDetails() {
   const [dealsLoading, setDealsLoading] = useState(false);
   const [dealsErr, setDealsErr] = useState("");
   const [clientErr, setClientErr] = useState("");
+  const [supplierProducts, setSupplierProducts] = useState([]);
+  const [supplierProductsLoading, setSupplierProductsLoading] = useState(false);
+  const [supplierProductsErr, setSupplierProductsErr] = useState("");
+  const [supplierProductSearch, setSupplierProductSearch] = useState("");
 
   const [alert, setAlert] = useState({
     open: false,
@@ -111,9 +115,47 @@ export default function MarketClientDetails() {
     }
   };
 
+  const loadSupplierProducts = useCallback(async (supplierId) => {
+    const normalizedSupplierId = String(supplierId || "").trim();
+    if (!normalizedSupplierId) {
+      setSupplierProducts([]);
+      return;
+    }
+
+    try {
+      setSupplierProductsLoading(true);
+      setSupplierProductsErr("");
+      const res = await api.get(
+        `/main/suppliers/${encodeURIComponent(normalizedSupplierId)}/products/`,
+      );
+      const nextProducts = Array.isArray(listFrom(res)) ? listFrom(res) : [];
+      setSupplierProducts(nextProducts);
+    } catch (e) {
+      console.error(e);
+      setSupplierProducts([]);
+      setSupplierProductsErr(
+        msgFromError(e, "Не удалось загрузить товары поставщика"),
+      );
+    } finally {
+      setSupplierProductsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (client?.id) loadDeals(client.id);
   }, [client?.id]);
+
+  useEffect(() => {
+    const isSupplier = String(client?.type || "").toLowerCase() === "suppliers";
+    setSupplierProductSearch("");
+    if (!isSupplier || !client?.id) {
+      setSupplierProducts([]);
+      setSupplierProductsErr("");
+      setSupplierProductsLoading(false);
+      return;
+    }
+    void loadSupplierProducts(client.id);
+  }, [client?.id, client?.type, loadSupplierProducts]);
 
   const persistClient = (next) => {
     if (!next) return;
@@ -354,6 +396,32 @@ export default function MarketClientDetails() {
   };
 
   const clientTypeLabel = typeLabel(client?.type);
+  const isSupplierClient =
+    String(client?.type || "").toLowerCase() === "suppliers";
+
+  const filteredSupplierProducts = useMemo(() => {
+    const query = String(supplierProductSearch || "")
+      .trim()
+      .toLowerCase();
+    if (!query) return supplierProducts;
+    return supplierProducts.filter((product) => {
+      const haystack = [
+        product?.name,
+        product?.title,
+        product?.code,
+        product?.article,
+        product?.barcode,
+      ]
+        .map((value) => String(value || "").toLowerCase())
+        .join(" ");
+      return haystack.includes(query);
+    });
+  }, [supplierProductSearch, supplierProducts]);
+
+  const supplierProductsCountLabel = useMemo(
+    () => filteredSupplierProducts.length,
+    [filteredSupplierProducts.length],
+  );
 
   return (
     <div className="client-details">
@@ -552,6 +620,8 @@ export default function MarketClientDetails() {
         </div>
       </div>
 
+  
+
       {/* Filters Panel */}
       <div className="client-details__filters filters panel">
         <div className="client-details__filters-grid">
@@ -701,7 +771,135 @@ export default function MarketClientDetails() {
           })()
         ))}
       </div>
+      {isSupplierClient && company?.sector?.name === "Магазин" && (
+        <div className="client-details__supplier-products panel">
+          <div className="client-details__supplier-products-head">
+            <div>
+              <h3 className="client-details__deals-title">
+                Товары поставщика
+              </h3>
+              <div className="client-details__supplier-products-subtitle">
+                Список товаров, которые этот поставщик привозит
+              </div>
+            </div>
 
+            <div className="client-details__supplier-products-actions">
+              <input
+                type="text"
+                className="client-details__filter-input"
+                placeholder="Поиск по названию, коду, артикулу, штрихкоду"
+                value={supplierProductSearch}
+                onChange={(e) => setSupplierProductSearch(e.target.value)}
+              />
+              <button
+                type="button"
+                className="client-details__btn client-details__btn--secondary"
+                onClick={() => loadSupplierProducts(client?.id)}
+                disabled={!client?.id || supplierProductsLoading}
+              >
+                {supplierProductsLoading ? "Обновляем..." : "Обновить товары"}
+              </button>
+            </div>
+          </div>
+
+          <div className="client-details__supplier-products-summary">
+            <div className="client-details__supplier-products-chip">
+              Всего товаров: <b>{supplierProducts.length}</b>
+            </div>
+            <div className="client-details__supplier-products-chip">
+              Показано: <b>{supplierProductsCountLabel}</b>
+            </div>
+          </div>
+
+          {supplierProductsErr && (
+            <div className="client-details__alert alert alert--error">
+              {supplierProductsErr}
+            </div>
+          )}
+
+          {supplierProductsLoading ? (
+            <div className="client-details__deals-loading muted">Загрузка…</div>
+          ) : filteredSupplierProducts.length === 0 ? (
+            <div className="client-details__deals-empty muted">
+              {supplierProductSearch.trim()
+                ? "По вашему запросу товары не найдены"
+                : "У этого поставщика пока нет товаров"}
+            </div>
+          ) : (
+            <>
+              <div className="client-details__supplier-products-table-wrap">
+                <table className="client-details__supplier-products-table">
+                  <thead>
+                    <tr>
+                      <th>Товар</th>
+                      <th>Код</th>
+                      <th>Артикул</th>
+                      <th>Штрихкод</th>
+                      <th>Остаток</th>
+                      <th>Ед. изм.</th>
+                      <th>Закупочная цена</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSupplierProducts.map((product) => (
+                      <tr key={product?.id || product?.code || product?.barcode}>
+                        <td>
+                          {product?.name || product?.title || "Без названия"}
+                        </td>
+                        <td>{product?.code || "—"}</td>
+                        <td>{product?.article || "—"}</td>
+                        <td>{product?.barcode || "—"}</td>
+                        <td>{product?.quantity ?? 0}</td>
+                        <td>{product?.unit || "—"}</td>
+                        <td>
+                          {product?.purchase_price ?? product?.price ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="client-details__supplier-products-cards">
+                {filteredSupplierProducts.map((product) => (
+                  <div
+                    key={`card-${product?.id || product?.code || product?.barcode}`}
+                    className="client-details__supplier-product-card"
+                  >
+                    <div className="client-details__supplier-product-name">
+                      {product?.name || product?.title || "Без названия"}
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Код</span>
+                      <strong>{product?.code || "—"}</strong>
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Артикул</span>
+                      <strong>{product?.article || "—"}</strong>
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Штрихкод</span>
+                      <strong>{product?.barcode || "—"}</strong>
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Остаток</span>
+                      <strong>{product?.quantity ?? 0}</strong>
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Ед. изм.</span>
+                      <strong>{product?.unit || "—"}</strong>
+                    </div>
+                    <div className="client-details__supplier-product-meta">
+                      <span>Закупочная цена</span>
+                      <strong>{product?.purchase_price ?? product?.price ?? "—"}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {showDebtModal && (
         <DebtModal
           id={selectedRowId}
