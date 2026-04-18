@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 
 import api from "../../../../api";
+import { productSearchHaystackLower } from "../../../../../tools/productBarcode";
 import "./ClientDetails.scss";
 
 import { useUser } from "../../../../store/slices/userSlice";
@@ -405,15 +406,7 @@ export default function MarketClientDetails() {
       .toLowerCase();
     if (!query) return supplierProducts;
     return supplierProducts.filter((product) => {
-      const haystack = [
-        product?.name,
-        product?.title,
-        product?.code,
-        product?.article,
-        product?.barcode,
-      ]
-        .map((value) => String(value || "").toLowerCase())
-        .join(" ");
+      const haystack = productSearchHaystackLower(product);
       return haystack.includes(query);
     });
   }, [supplierProductSearch, supplierProducts]);

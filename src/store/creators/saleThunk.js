@@ -205,6 +205,7 @@ export const historySellProduct = createAsyncThunk(
     try {
       const { data } = await api.get(`/main/pos/sales/`, {
         params: {
+          ...params,
           page: params.page || 1,
           search: params.search || "",
         },
@@ -255,6 +256,7 @@ export const historySellObjects = createAsyncThunk(
     try {
       const { data } = await api.get(`/main/object-sales/`, {
         params: {
+          ...params,
           page: params.page || 1,
           search: params.search || "",
         },
@@ -274,6 +276,26 @@ export const historySellProductDetail = createAsyncThunk(
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
+    }
+  },
+);
+
+export const returnSale = createAsyncThunk(
+  "products/returnSale",
+  async ({ saleId, items }, { rejectWithValue, getState }) => {
+    try {
+      const role = String(getState()?.user?.profile?.role || "")
+        .trim()
+        .toLowerCase();
+      const endpoint =
+        role === "agent"
+          ? `/main/agents/me/sales/${saleId}/return/`
+          : `/main/pos/sales/${saleId}/return/`;
+      const payload = Array.isArray(items) && items.length > 0 ? { items } : {};
+      const { data } = await api.post(endpoint, payload);
+      return data;
+    } catch (error) {
+      return rejectWithValue(plainAxiosError(error));
     }
   },
 );

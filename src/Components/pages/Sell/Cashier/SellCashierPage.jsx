@@ -26,6 +26,7 @@ import {
 import { fetchShiftsAsync } from "@/store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "@/store/slices/cashSlice";
 import api from "@/api";
+import { productMatchesBarcode } from "../../../../../tools/productBarcode";
 import { useClient } from "@/store/slices/ClientSlice";
 import { useProducts } from "@/store/slices/productSlice";
 import { useSale } from "@/store/slices/saleSlice";
@@ -429,8 +430,8 @@ const SellCashierPage = () => {
 
         // Проверяем наличие товара ПЕРЕД добавлением в корзину
         // Ищем товар в списке продуктов по штрих-коду
-        const scannedProduct = products.find(
-          (p) => p.barcode === barcode || p.barcode?.toString() === barcode,
+        const scannedProduct = products.find((p) =>
+          productMatchesBarcode(p, barcode),
         );
 
         if (scannedProduct) {

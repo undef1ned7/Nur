@@ -177,7 +177,7 @@ const Analytics = () => {
   };
 
   // Маппинг внутренних названий вкладок на названия для API
-  // API поддерживает: sales|stock|cashboxes|shifts|products|users|finance
+  // API поддерживает: sales|stock|cashboxes|shifts|products|suppliers|users|finance
   const mapTabToAPI = (tab) => {
     const tabMap = {
       sales: "sales",
@@ -185,6 +185,7 @@ const Analytics = () => {
       cashiers: "cashboxes", // "cashiers" -> "cashboxes" для API
       shifts: "shifts",
       products: "products",
+      suppliers: "suppliers",
       users: "users",
       finance: "finance",
     };
@@ -218,7 +219,7 @@ const Analytics = () => {
         }
 
         // Добавляем фильтры в зависимости от вкладки
-        if (tab === "sales" || tab === "cashiers") {
+        if (tab === "sales" || tab === "cashiers" || tab === "suppliers") {
           if (filters.cashbox) params.cashbox = filters.cashbox;
           if (filters.shift) params.shift = filters.shift;
           if (filters.cashier) params.cashier = filters.cashier;
@@ -918,6 +919,13 @@ const Analytics = () => {
       return {
         kpis: [
           {
+            title: "Общее кол-во товаров",
+            value: "0",
+            icon: Package,
+            color: "#f7d617",
+            subtitle: "В каталоге",
+          },
+          {
             title: "Стоимость остатков",
             value: "0",
             currency: "сом",
@@ -930,6 +938,20 @@ const Analytics = () => {
             icon: Package,
             color: "#f7d617",
             anchorKey: "lowStockProducts",
+          },
+          {
+            title: "Отклоненные товары",
+            value: "0",
+            icon: X,
+            color: "#f7d617",
+            subtitle: "rejected_products_count",
+          },
+          {
+            title: "Продажи без товара",
+            value: "0",
+            icon: HelpCircle,
+            color: "#f7d617",
+            subtitle: "sales_lines_missing_product_count",
           },
         ],
         topByRevenue: [],
@@ -946,6 +968,13 @@ const Analytics = () => {
     return {
       kpis: [
         {
+          title: "Общее кол-во товаров",
+          value: formatNumber(cards.catalog_products_count || 0),
+          icon: Package,
+          color: "#f7d617",
+          subtitle: "В каталоге",
+        },
+        {
           title: "Стоимость остатков",
           value: formatNumber(cards.stock_value || "0"),
           currency: "сом",
@@ -959,6 +988,20 @@ const Analytics = () => {
           color: "#f7d617",
           anchorKey: "lowStockProducts",
         },
+        {
+          title: "Отклоненные товары",
+          value: formatNumber(cards.rejected_products_count || 0),
+          icon: X,
+          color: "#f7d617",
+          subtitle: "rejected_products_count",
+        },
+        {
+          title: "Продажи без товара",
+          value: formatNumber(cards.sales_lines_missing_product_count || 0),
+          icon: HelpCircle,
+          color: "#f7d617",
+          subtitle: "sales_lines_missing_product_count",
+        },
       ],
       topByRevenue: tables.top_by_revenue || [],
       topByQuantity: tables.top_by_quantity || [],
@@ -970,6 +1013,96 @@ const Analytics = () => {
           status: translateLowStockStatus(item.status),
           statusType: normalizeLowStockStatusType(item.status),
         })) || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  const suppliersData = useMemo(() => {
+    if (!analyticsData || activeTab !== "suppliers") {
+      return {
+        kpis: [
+          {
+            title: "Поставщиков",
+            value: "0",
+            icon: Users,
+            color: "#f7d617",
+          },
+          {
+            title: "Стоимость остатков",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Продано за период",
+            value: "0",
+            icon: ShoppingCart,
+            color: "#f7d617",
+          },
+          {
+            title: "Выручка за период",
+            value: "0",
+            currency: "сом",
+            icon: TrendingUp,
+            color: "#f7d617",
+          },
+        ],
+        suppliers: [],
+        suppliersByStock: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const tables = analyticsData.tables || {};
+
+    const normalizeSupplierRow = (row) => ({
+      supplier_id: row?.supplier_id || row?.id || "",
+      name: row?.name || "—",
+      phone: row?.phone || "—",
+      products_count: row?.products_count || 0,
+      stock_qty: row?.stock_qty || 0,
+      stock_value: row?.stock_value || 0,
+      period_qty_sold: row?.period_qty_sold || 0,
+      period_revenue: row?.period_revenue || 0,
+      period_transactions: row?.period_transactions || 0,
+      rank_by_qty: row?.rank_by_qty || "—",
+      rank_by_stock: row?.rank_by_stock || "—",
+      rating: row?.rating || 0,
+    });
+
+    return {
+      kpis: [
+        {
+          title: "Поставщиков",
+          value: formatNumber(cards.suppliers_count || 0),
+          icon: Users,
+          color: "#f7d617",
+        },
+        {
+          title: "Стоимость остатков",
+          value: formatNumber(cards.total_stock_value || 0),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Продано за период",
+          value: formatAnalyticsQty(cards.total_period_qty_sold || 0),
+          icon: ShoppingCart,
+          color: "#f7d617",
+        },
+        {
+          title: "Выручка за период",
+          value: formatNumber(cards.total_period_revenue || 0),
+          currency: "сом",
+          icon: TrendingUp,
+          color: "#f7d617",
+        },
+      ],
+      suppliers: (tables.suppliers || []).map(normalizeSupplierRow),
+      suppliersByStock: (tables.suppliers_by_stock || []).map(
+        normalizeSupplierRow,
+      ),
     };
   }, [analyticsData, activeTab]);
 
@@ -1251,7 +1384,9 @@ const Analytics = () => {
             </div>
 
             {/* Фильтры для Sales и Cashiers */}
-            {(activeTab === "sales" || activeTab === "cashiers") && (
+            {(activeTab === "sales" ||
+              activeTab === "cashiers" ||
+              activeTab === "suppliers") && (
               <>
                 <div className="analytics-page__filter-group">
                   <label>Способ оплаты</label>
@@ -1353,6 +1488,7 @@ const Analytics = () => {
 
             {/* Лимит записей для детальных вкладок */}
             {(activeTab === "products" ||
+              activeTab === "suppliers" ||
               activeTab === "users" ||
               activeTab === "finance") && (
               <div className="analytics-page__filter-group">
@@ -1450,6 +1586,14 @@ const Analytics = () => {
           onClick={() => setActiveTab("products")}
         >
           Товары
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "suppliers" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("suppliers")}
+        >
+          Поставщики
         </button>
         <button
           className={`analytics-page__tab ${
@@ -2377,6 +2521,147 @@ const Analytics = () => {
               </tbody>
             </table>,
           )}
+        </div>
+      )}
+
+      {activeTab === "suppliers" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {suppliersData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                  {kpi.subtitle && (
+                    <div className="analytics-page__kpi-subtitle">
+                      {kpi.subtitle}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card analytics-page__table-card--scrollable">
+              <h3 className="analytics-page__table-title">
+                Поставщики по продажам
+              </h3>
+              <div className="analytics-page__table-scroll analytics-page__table-scroll--suppliers">
+                <table className="analytics-page__table analytics-page__table--suppliers">
+                  <thead>
+                    <tr>
+                      <th>Поставщик</th>
+                      <th>Телефон</th>
+                      <th>SKU</th>
+                      <th>Остаток</th>
+                      <th>Стоимость остатков</th>
+                      <th>Продано</th>
+                      <th>Выручка</th>
+                      <th>Чеков</th>
+                      <th>Место по продажам</th>
+                      <th>Место по складу</th>
+                      <th>Рейтинг</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suppliersData.suppliers.length > 0 ? (
+                      suppliersData.suppliers.map((row) => (
+                        <tr key={row.supplier_id || row.name}>
+                          <td>{row.name}</td>
+                          <td>{row.phone}</td>
+                          <td>{row.products_count}</td>
+                          <td>{formatAnalyticsQty(row.stock_qty)}</td>
+                          <td>{formatCurrency(row.stock_value, 0)}</td>
+                          <td>{formatAnalyticsQty(row.period_qty_sold)}</td>
+                          <td>{formatCurrency(row.period_revenue, 0)}</td>
+                          <td>{row.period_transactions}</td>
+                          <td>{row.rank_by_qty}</td>
+                          <td>{row.rank_by_stock}</td>
+                          <td>{Number(row.rating || 0).toFixed(1)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={11}
+                          style={{ textAlign: "center", color: "#6b7280" }}
+                        >
+                          Нет данных
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="analytics-page__table-card analytics-page__table-card--scrollable">
+              <h3 className="analytics-page__table-title">
+                Поставщики по складу
+              </h3>
+              <div className="analytics-page__table-scroll analytics-page__table-scroll--suppliers">
+                <table className="analytics-page__table analytics-page__table--suppliers">
+                  <thead>
+                    <tr>
+                      <th>Поставщик</th>
+                      <th>Телефон</th>
+                      <th>SKU</th>
+                      <th>Остаток</th>
+                      <th>Стоимость остатков</th>
+                      <th>Продано</th>
+                      <th>Выручка</th>
+                      <th>Чеков</th>
+                      <th>Место по продажам</th>
+                      <th>Место по складу</th>
+                      <th>Рейтинг</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suppliersData.suppliersByStock.length > 0 ? (
+                      suppliersData.suppliersByStock.map((row) => (
+                        <tr key={`stock-${row.supplier_id || row.name}`}>
+                          <td>{row.name}</td>
+                          <td>{row.phone}</td>
+                          <td>{row.products_count}</td>
+                          <td>{formatAnalyticsQty(row.stock_qty)}</td>
+                          <td>{formatCurrency(row.stock_value, 0)}</td>
+                          <td>{formatAnalyticsQty(row.period_qty_sold)}</td>
+                          <td>{formatCurrency(row.period_revenue, 0)}</td>
+                          <td>{row.period_transactions}</td>
+                          <td>{row.rank_by_qty}</td>
+                          <td>{row.rank_by_stock}</td>
+                          <td>{Number(row.rating || 0).toFixed(1)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={11}
+                          style={{ textAlign: "center", color: "#6b7280" }}
+                        >
+                          Нет данных
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

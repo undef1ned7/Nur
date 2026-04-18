@@ -4,6 +4,30 @@
 
 const MAX_PROMOTION_TIERS = 30;
 
+/**
+ * Доп. штрихкоды для API: разделители перенос/запятая/;; пустые и дубли отбрасываются;
+ * совпадение с основным barcode не отправляем (валидация бэкенда).
+ * @param {string|undefined|null} text
+ * @param {string|undefined|null} mainBarcode
+ * @returns {string[]}
+ */
+export const parseAlternateBarcodesForApi = (text, mainBarcode) => {
+  const main = String(mainBarcode ?? "").trim();
+  const raw = String(text ?? "");
+  const seen = new Set();
+  const out = [];
+  for (const segment of raw.split(/[\n\r,;]+/)) {
+    const t = String(segment).replace(/\s+/g, "").trim();
+    if (!t) continue;
+    if (main && t === main) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+};
+
 /** Нормализация ступеней акции из API (поле promotion_rules) в состояние формы */
 export const normalizePromotionRulesFromApi = (rules) => {
   if (!Array.isArray(rules)) return [];
@@ -155,9 +179,15 @@ export const buildProductPayload = ({
     kindValue = "bundle";
   }
 
+  const alternate_barcodes = parseAlternateBarcodesForApi(
+    marketData.alternateBarcodesText,
+    barcode,
+  );
+
   let payload = {
     name,
     barcode: barcode || null,
+    alternate_barcodes,
     brand_name: brand_name || "",
     category_name: category_name || "",
     article: marketData.article || "",
@@ -169,6 +199,10 @@ export const buildProductPayload = ({
     expiration_date: marketData.expiryDate || null,
     client: client || null,
     plu: pluValue,
+    hotkey_group:
+      String(marketData.hotkeyGroup || "")
+        .trim()
+        .toUpperCase() || null,
     description: marketData.description || "",
     characteristics: hasCharacteristics ? characteristics : null,
     kind: kindValue,

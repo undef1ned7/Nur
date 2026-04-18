@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Search,
-  Filter,
-  Calendar,
+  ClipboardList,
   Eye,
   Pencil,
   Printer,
-  Plus,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -29,6 +27,7 @@ import "./Documents.scss";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import InventorySessionsTab from "./components/InventorySessionsTab";
 
 const Documents = () => {
   const alert = useAlert();
@@ -45,7 +44,34 @@ const Documents = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
 
-  const [activeTab, setActiveTab] = useState("receipts");
+  const activeTab = useMemo(() => {
+    const t = searchParams.get("tab");
+    if (t === "inventory") return "inventory";
+    if (t === "invoices") return "invoices";
+    return "receipts";
+  }, [searchParams]);
+
+  const setActiveTab = useCallback(
+    (tab) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (tab === "receipts") {
+            p.delete("tab");
+          } else {
+            p.set("tab", tab);
+          }
+          if (tab === "inventory") {
+            p.delete("page");
+          }
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -133,20 +159,20 @@ const Documents = () => {
     }));
   }, [documents, activeTab, currentPage]);
 
-  // Обновление URL только при изменении страницы (без поиска)
+  // Обновление URL страницы для чеков/накладных, сохраняем tab=…
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (currentPage > 1) {
-      params.set("page", currentPage.toString());
-    }
-    const newSearchString = params.toString();
-    const currentSearchString = searchParams.toString();
-    // Обновляем URL только если параметры действительно изменились
-    if (newSearchString !== currentSearchString) {
-      setSearchParams(params, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+    if (activeTab !== "receipts" && activeTab !== "invoices") return;
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (currentPage > 1) p.set("page", String(currentPage));
+        else p.delete("page");
+        if (p.toString() === prev.toString()) return prev;
+        return p;
+      },
+      { replace: true },
+    );
+  }, [currentPage, activeTab, setSearchParams]);
 
   // Сброс страницы при смене таба
   useEffect(() => {
@@ -322,40 +348,42 @@ const Documents = () => {
   return (
     <div className="documents">
       {/* Header with search and filters */}
-      <div className="documents__header">
-        <div className="documents__search">
-          <Search size={20} className="documents__search-icon" />
-          <input
-            type="text"
-            className="documents__search-input"
-            placeholder="Поиск по номеру или контрагенту..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <div
+        className={`documents__header${
+          activeTab === "inventory" ? " documents__header--inventory-only" : ""
+        }`}
+      >
+        {activeTab !== "inventory" ? (
+          <div className="documents__search">
+            <Search size={20} className="documents__search-icon" />
+            <input
+              type="text"
+              className="documents__search-input"
+              placeholder="Поиск по номеру или контрагенту..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        ) : null}
         <div className="documents__header-actions">
-          {/* <button
-            className="documents__create-btn"
-            onClick={() => navigate("/crm/market/documents/create")}
-          >
-            <Plus size={18} />
-            Создать
-          </button> */}
-          <button
-            className="documents__filter-btn"
-            onClick={() => setShowReconciliationModal(true)}
-            style={{ marginRight: 10 }}
-          >
-            Создать акт сверки
-          </button>
-          {/* <button className="documents__filter-btn">
-            <Filter size={18} />
-            Фильтры
-          </button> */}
-          {/* <button className="documents__period-btn">
-            <Calendar size={18} />
-            Период
-          </button> */}
+          {activeTab === "inventory" ? (
+            <button
+              type="button"
+              className="documents__create-btn"
+              onClick={() => navigate("/crm/sklad")}
+            >
+              <ClipboardList size={18} />
+              Создать инвентаризацию
+            </button>
+          ) : (
+            <button
+              className="documents__filter-btn"
+              onClick={() => setShowReconciliationModal(true)}
+              style={{ marginRight: 10 }}
+            >
+              Создать акт сверки
+            </button>
+          )}
         </div>
       </div>
 
@@ -377,10 +405,21 @@ const Documents = () => {
         >
           Накладные
         </button>
+        <button
+          className={`documents__tab ${
+            activeTab === "inventory" ? "documents__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("inventory")}
+        >
+          Инвентаризация
+        </button>
       </div>
 
       {/* Table */}
       <DataContainer>
+        {activeTab === "inventory" ? (
+          <InventorySessionsTab />
+        ) : (
         <div className="documents__table-wrapper">
           <table className="documents__table">
             <thead>
@@ -513,10 +552,11 @@ const Documents = () => {
             </tbody>
           </table>
         </div>
+        )}
       </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
-      {totalPages > 1 && (
+      {activeTab !== "inventory" && totalPages > 1 && (
         <div className="documents__pagination">
           <button
             type="button"

@@ -2202,6 +2202,287 @@
   }
 }
 
+.sellReturn__modal {
+  width: min(1120px, calc(100vw - 48px)) !important;
+  max-width: 1120px !important;
+  max-height: min(88vh, 980px);
+  padding: 24px !important;
+  border-radius: 18px !important;
+}
+
+.sellReturn {
+  padding-top: 6px;
+}
+
+.sellReturn__loading {
+  text-align: center;
+  padding: 20px;
+}
+
+.sellReturn__lead {
+  line-height: 1.5;
+  color: #374151;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.sellReturn__summary {
+  margin-top: 12px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.sellReturn__summaryMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sellReturn__summaryTitle {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.sellReturn__summaryMeta {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sellReturn__summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sellReturn__summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  span {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  b {
+    font-size: 16px;
+    color: #111827;
+  }
+}
+
+.sellReturn__items {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+
+.sellReturn__itemsHead,
+.sellReturn__itemRow {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(170px, 1fr) minmax(160px, 0.9fr);
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+}
+
+.sellReturn__itemsHead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.sellReturn__itemRow + .sellReturn__itemRow {
+  border-top: 1px solid #f1f5f9;
+}
+
+.sellReturn__itemInfo {
+  min-width: 0;
+}
+
+.sellReturn__itemName {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.sellReturn__itemMeta,
+.sellReturn__itemAvailable {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sellReturn__itemAvailable {
+  font-weight: 700;
+}
+
+.sellReturn__qtyInput {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+
+  &:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  }
+}
+
+.sellReturn__error {
+  margin-top: 12px;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.sellReturn__hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sellReturn__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+
+  .btn,
+  .danger-btn {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 768px) {
+  .sellReturn__modal {
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+    max-height: calc(100vh - 20px);
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .sellReturn__lead {
+    font-size: 14px;
+  }
+
+  .sellReturn__summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sellReturn__summary {
+    padding: 16px;
+  }
+
+  .sellReturn__itemsHead {
+    display: none;
+  }
+
+  .sellReturn__items {
+    max-height: none;
+    overflow: visible;
+    border-radius: 14px;
+  }
+
+  .sellReturn__itemRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .sellReturn__itemAvailable {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+  }
+
+  .sellReturn__qtyInput {
+    min-height: 52px;
+    font-size: 16px;
+  }
+
+  .sellReturn__actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .sellReturn__modal {
+    width: 100vw !important;
+    max-height: 100vh;
+    min-height: 100vh;
+    padding: 14px !important;
+    border-radius: 0 !important;
+  }
+
+  .sellReturn {
+    padding-top: 0;
+  }
+
+  .sellReturn__summary {
+    margin-top: 10px;
+    padding: 14px;
+  }
+
+  .sellReturn__summaryTitle {
+    font-size: 16px;
+  }
+
+  .sellReturn__itemRow {
+    padding: 14px;
+  }
+
+  .sellReturn__itemName {
+    font-size: 14px;
+  }
+
+  .sellReturn__itemMeta,
+  .sellReturn__itemAvailable,
+  .sellReturn__hint {
+    font-size: 12px;
+  }
+
+  .sellReturn__actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 10px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 28%);
+  }
+}
+
 /* ============================================
    PAGINATION
    ============================================ */

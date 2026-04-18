@@ -96,7 +96,7 @@ const Sell = () => {
   const alert = useAlert();
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { company } = useUser();
+  const { company, profile, userId } = useUser();
   const { list: cashBoxes } = useCash();
   const {
     history,
@@ -116,6 +116,11 @@ const Sell = () => {
     () => parseInt(searchParams.get("page") || "1", 10),
     [searchParams],
   );
+  const currentUserId = String(profile?.id || userId || "").trim();
+  const currentUserRole = String(profile?.role || "").trim().toLowerCase();
+  const isOwnerOrAdmin =
+    currentUserRole === "owner" || currentUserRole === "admin";
+  const userParam = String(searchParams.get("user") || "").trim();
 
   const [showDetailSell, setShowDetailSell] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -249,6 +254,24 @@ const Sell = () => {
     historyCount,
     historyNext,
   ]);
+
+  useEffect(() => {
+    if (!isMarketCompany || isOwnerOrAdmin || !currentUserId || userParam) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("user", currentUserId);
+    params.delete("page");
+    setSearchParams(params, { replace: true });
+  }, [
+    currentUserId,
+    isMarketCompany,
+    isOwnerOrAdmin,
+    searchParams,
+    setSearchParams,
+    userParam,
+  ]);
+
+  const effectiveUserParam =
+    userParam || (isMarketCompany && !isOwnerOrAdmin ? currentUserId : "");
   // Синхронизация URL с состоянием страницы
 
   useEffect(() => {
@@ -281,7 +304,13 @@ const Sell = () => {
 
   // поиск по истории (дебаунс)
   const debouncedSearch = useDebounce((v) => {
-    dispatch(historySellProduct({ search: v, page: 1 }));
+    dispatch(
+      historySellProduct({
+        search: v,
+        page: 1,
+        ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+      }),
+    );
     dispatch(historySellObjects({ search: v, page: 1 }));
     // Сбрасываем на первую страницу при поиске
     const params = new URLSearchParams(searchParams);
@@ -292,9 +321,15 @@ const Sell = () => {
 
   useEffect(() => {
     if (showSellMainStart) return;
-    dispatch(historySellProduct({ search: "", page: currentPage }));
+    dispatch(
+      historySellProduct({
+        search: "",
+        page: currentPage,
+        ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+      }),
+    );
     dispatch(historySellObjects({ search: "", page: currentPage }));
-  }, [dispatch, showSellMainStart, currentPage]);
+  }, [dispatch, showSellMainStart, currentPage, effectiveUserParam]);
 
   // Плавно прокручиваем страницу вверх при изменении страницы
   useEffect(() => {
@@ -408,6 +443,14 @@ const Sell = () => {
     return paymentMethodTranslate[lowerMethod] || method;
   };
 
+  const canReturnSale = (sale) => {
+    if (!isMarketCompany) return false;
+    const status = String(sale?.status || "")
+      .trim()
+      .toLowerCase();
+    return status === "paid" || status === "debt";
+  };
+
   const handleAddCashbox = async () => {
     try {
       dispatch(addCashFlows({ ...newCashbox, cashbox: selectCashBox1 }));
@@ -486,7 +529,13 @@ const Sell = () => {
 
       clearSelection();
       alert("Выбранные записи удалены");
-      dispatch(historySellProduct({ search: "", page: currentPage }));
+      dispatch(
+        historySellProduct({
+          search: "",
+          page: currentPage,
+          ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+        }),
+      );
       dispatch(historySellObjects({ search: "", page: currentPage }));
     } catch (e) {
       alert("Не удалось удалить: " + e.message);
@@ -562,7 +611,13 @@ const Sell = () => {
       const params = new URLSearchParams(searchParams);
       params.delete("page");
       setSearchParams(params, { replace: true });
-      dispatch(historySellProduct({ search: "", page: 1 }));
+      dispatch(
+        historySellProduct({
+          search: "",
+          page: 1,
+          ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+        }),
+      );
       dispatch(historySellObjects({ search: "", page: 1 }));
     } catch (e) {
       alert("Не удалось очистить историю: " + e.message);
@@ -794,7 +849,7 @@ const Sell = () => {
                               className="sellTable__actions"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {company?.sector?.name === "Магазин" && (
+                              {canReturnSale(item) && (
                                 <button
                                   type="button"
                                   className="sellTable__refund"
@@ -909,7 +964,7 @@ const Sell = () => {
                             className="sellCard__actions"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {company?.sector?.name === "Магазин" && (
+                            {canReturnSale(item) && (
                               <button
                                 type="button"
                                 className="sellCard__refund"
@@ -974,10 +1029,18 @@ const Sell = () => {
         <RefundPurchase
           item={itemId}
           onClose={() => setShowRefundModal(false)}
-          onChanged={() => {
-            hideSaleId(itemId?.id);
+          onChanged={(updatedSale) => {
+            if (String(updatedSale?.status || "").toLowerCase() === "canceled") {
+              hideSaleId(updatedSale?.id || itemId?.id);
+            }
             setShowRefundModal(false);
-            dispatch(historySellProduct({ search: "", page: currentPage }));
+            dispatch(
+              historySellProduct({
+                search: "",
+                page: currentPage,
+                ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+              }),
+            );
             dispatch(historySellObjects({ search: "", page: currentPage }));
           }}
         />

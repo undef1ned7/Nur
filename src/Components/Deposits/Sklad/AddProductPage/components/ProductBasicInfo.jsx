@@ -1,5 +1,10 @@
 import React from "react";
 
+const HOTKEY_GROUP_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const value = `F${index + 1}`;
+  return { value, label: value };
+});
+
 /**
  * Компонент основной информации о товаре
  */
@@ -34,7 +39,7 @@ const ProductBasicInfo = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="market-product-form__form-group">
           <label className="market-product-form__label">
             {itemType === "service" ? "Код услуги" : "Код товара"}
@@ -72,6 +77,25 @@ const ProductBasicInfo = ({
           )}
         </div>
 
+        <div className="market-product-form__form-group col-span-full">
+          <label className="market-product-form__label">
+            Дополнительные штрихкоды
+          </label>
+          <textarea
+            className="market-product-form__input market-product-form__textarea"
+            rows={3}
+            placeholder="По одному коду в строке (или через запятую)"
+            value={marketData.alternateBarcodesText ?? ""}
+            onChange={(e) =>
+              handleMarketDataChange("alternateBarcodesText", e.target.value)
+            }
+          />
+          <p className="market-product-form__hint">
+            Учитываются при поиске на складе и сканировании на кассе. Не должны
+            совпадать с основным штрихкодом.
+          </p>
+        </div>
+
         <div className="market-product-form__form-group col-span-full xl:col-span-1">
           <label className="market-product-form__label">Артикул</label>
           <input
@@ -83,6 +107,24 @@ const ProductBasicInfo = ({
               handleMarketDataChange("article", e.target.value)
             }
           />
+        </div>
+
+        <div className="market-product-form__form-group col-span-full xl:col-span-1">
+          <label className="market-product-form__label">Горячая клавиша</label>
+          <select
+            className="market-product-form__input"
+            value={marketData.hotkeyGroup || ""}
+            onChange={(e) =>
+              handleMarketDataChange("hotkeyGroup", e.target.value)
+            }
+          >
+            <option value="">Без горячей клавиши</option>
+            {HOTKEY_GROUP_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>

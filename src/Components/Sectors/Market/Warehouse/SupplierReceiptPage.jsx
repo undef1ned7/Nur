@@ -14,6 +14,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import InvoicePdfDocument from "../Documents/components/InvoicePdfDocument";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { productSearchHaystackLower } from "../../../../../tools/productBarcode";
 import "./Warehouse.scss";
 import "./SupplierReceiptPage.scss";
 
@@ -188,15 +189,7 @@ export default function SupplierReceiptPage() {
     const query = search.trim().toLowerCase();
     if (!query) return products;
     return products.filter((product) => {
-      const haystack = [
-        product?.name,
-        product?.title,
-        product?.code,
-        product?.article,
-        product?.barcode,
-      ]
-        .map((value) => String(value || "").toLowerCase())
-        .join(" ");
+      const haystack = productSearchHaystackLower(product);
       return haystack.includes(query);
     });
   }, [products, search]);

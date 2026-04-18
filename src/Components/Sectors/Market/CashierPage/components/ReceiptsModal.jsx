@@ -16,7 +16,15 @@ import { useProducts } from "../../../../../store/slices/productSlice";
 import ReceiptPreviewModal from "../../Documents/components/ReceiptPreviewModal";
 import "./ReceiptsModal.scss";
 
-const ReceiptsModal = ({ onClose }) => {
+const getLocalTodayIso = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const ReceiptsModal = ({ onClose, userFilter = "" }) => {
   const dispatch = useDispatch();
   const { list: clients } = useClient();
   const { list: products } = useProducts();
@@ -26,9 +34,7 @@ const ReceiptsModal = ({ onClose }) => {
   const [previewReceiptData, setPreviewReceiptData] = useState(null);
 
   // Фильтры
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState(getLocalTodayIso());
   const [documentNumber, setDocumentNumber] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -38,27 +44,19 @@ const ReceiptsModal = ({ onClose }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [receiptsDetails, setReceiptsDetails] = useState(new Map()); // Кэш деталей чеков с items
 
-  // Функция для загрузки всех страниц
-  const fetchAllReceipts = async () => {
-    const allReceipts = [];
-    let nextUrl = "/main/pos/sales/";
-    let guard = 0;
-    const maxPages = 100;
-
-    while (nextUrl && guard < maxPages) {
-      try {
-        const { data } = await api.get(nextUrl);
-        const results = Array.isArray(data?.results) ? data.results : [];
-        allReceipts.push(...results);
-        nextUrl = data?.next || null;
-        guard += 1;
-      } catch (error) {
-        console.error("Ошибка при загрузке чеков:", error);
-        break;
-      }
-    }
-
-    return allReceipts;
+  // Загружаем только одну страницу без автоматического обхода page=1,2,3...
+  const fetchReceipts = async () => {
+    const normalizedUserFilter = String(userFilter || "").trim();
+    const { data } = await api.get("/main/pos/sales/", {
+      params: {
+        page: 1,
+        page_size: 200,
+        ordering: "-created_at",
+        ...(normalizedUserFilter ? { user: normalizedUserFilter } : {}),
+      },
+    });
+    if (Array.isArray(data?.results)) return data.results;
+    return Array.isArray(data) ? data : [];
   };
 
   // Загрузка деталей чека (для получения items)
@@ -81,8 +79,8 @@ const ReceiptsModal = ({ onClose }) => {
     const loadReceipts = async () => {
       try {
         setLoading(true);
-        const allReceipts = await fetchAllReceipts();
-        setReceipts(allReceipts);
+        const nextReceipts = await fetchReceipts();
+        setReceipts(nextReceipts);
       } catch (error) {
         console.error("Ошибка при загрузке чеков:", error);
       } finally {
@@ -91,7 +89,7 @@ const ReceiptsModal = ({ onClose }) => {
     };
 
     loadReceipts();
-  }, []);
+  }, [userFilter]);
 
   // Фильтрация клиентов
   const filteredClients = useMemo(() => {
@@ -306,7 +304,7 @@ const ReceiptsModal = ({ onClose }) => {
               <button
                 className="receipts-modal__reset-btn"
                 onClick={() => {
-                  setSelectedDate(new Date().toISOString().split("T")[0]);
+                  setSelectedDate(getLocalTodayIso());
                   setDocumentNumber("");
                   setClientSearch("");
                   setProductSearch("");

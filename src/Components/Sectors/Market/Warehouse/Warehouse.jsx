@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./Warehouse.scss";
+import api from "../../../../api";
 import FilterModal from "./components/FilterModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import WarehouseHeader from "./components/WarehouseHeader";
@@ -23,13 +24,47 @@ import {
 } from "./hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
+
+const WAREHOUSE_SELECTED_IDS_KEY = "marketWarehouseSelectedProductIds";
+const WAREHOUSE_SELECTED_SNAPSHOTS_KEY = "marketWarehouseSelectedProductSnapshots";
+
+const loadSnapshotsFromStorage = () => {
+  if (typeof sessionStorage === "undefined") return {};
+  try {
+    const raw = sessionStorage.getItem(WAREHOUSE_SELECTED_SNAPSHOTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    const out = {};
+    Object.entries(parsed).forEach(([k, v]) => {
+      if (v && typeof v === "object") out[String(k)] = v;
+    });
+    return out;
+  } catch {
+    return {};
+  }
+};
+
+const pickProductSnapshot = (product) => ({
+  id: product.id,
+  name: product.name,
+  quantity: product.quantity ?? 0,
+  unit: product.unit || "шт",
+  code: product.code || product.article,
+  article: product.article,
+  barcode: product.barcode,
+  alternate_barcodes: product.alternate_barcodes,
+});
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { useAlert } from "@/hooks/useDialog";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const alert = useAlert();
 
   // Реф для отслеживания предыдущих продуктов
   const prevProductsRef = useRef([]);
@@ -38,6 +73,8 @@ const Warehouse = () => {
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
+  const [suppliers, setSuppliers] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -55,6 +92,34 @@ const Warehouse = () => {
 
   // Загрузка справочников
   const { brands, categories } = useWarehouseReferences();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSuppliers = async () => {
+      try {
+        setSuppliersLoading(true);
+        const res = await api.get("/main/clients/", {
+          params: { type: "suppliers", page_size: 500 },
+        });
+        const nextSuppliers = res?.data?.results || res?.data || [];
+        if (!mounted) return;
+        setSuppliers(Array.isArray(nextSuppliers) ? nextSuppliers : []);
+      } catch (error) {
+        if (!mounted) return;
+        console.error("Ошибка при загрузке поставщиков склада:", error);
+        setSuppliers([]);
+      } finally {
+        if (mounted) setSuppliersLoading(false);
+      }
+    };
+
+    void loadSuppliers();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
@@ -134,7 +199,35 @@ const Warehouse = () => {
     handleSelectAll,
     clearSelection,
     setSelectedRows,
-  } = useProductSelection(products);
+  } = useProductSelection(products, WAREHOUSE_SELECTED_IDS_KEY);
+
+  const [selectedSnapshots, setSelectedSnapshots] = useState(
+    loadSnapshotsFromStorage,
+  );
+
+  useEffect(() => {
+    setSelectedSnapshots((prev) => {
+      const next = { ...prev };
+      (products || []).forEach((p) => {
+        const sid = String(p.id);
+        if (selectedRows.has(sid)) {
+          next[sid] = pickProductSnapshot(p);
+        }
+      });
+      Object.keys(next).forEach((id) => {
+        if (!selectedRows.has(id)) delete next[id];
+      });
+      try {
+        sessionStorage.setItem(
+          WAREHOUSE_SELECTED_SNAPSHOTS_KEY,
+          JSON.stringify(next),
+        );
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, [products, selectedRows]);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -153,9 +246,9 @@ const Warehouse = () => {
 
   const handlePageChange = useCallback(
     (newPage) => {
-      handlePageChangeBase(newPage, () => setSelectedRows(new Set()));
+      handlePageChangeBase(newPage);
     },
-    [handlePageChangeBase, setSelectedRows]
+    [handlePageChangeBase],
   );
 
   const handleBulkDelete = useCallback(() => {
@@ -201,6 +294,23 @@ const Warehouse = () => {
     navigate("/crm/sklad/receipt");
   }, [navigate]);
 
+  const selectedProducts = useMemo(() => {
+    if (!selectedRows?.size) return [];
+    return [...selectedRows]
+      .map((id) => selectedSnapshots[id])
+      .filter(Boolean);
+  }, [selectedRows, selectedSnapshots]);
+
+  const handleOpenInventory = useCallback(() => {
+    if (selectedProducts.length === 0) {
+      navigate("/crm/market/documents?tab=inventory");
+      return;
+    }
+    navigate("/crm/market/documents?tab=inventory", {
+      state: { inventoryProducts: selectedProducts },
+    });
+  }, [navigate, selectedProducts]);
+
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);
   }, []);
@@ -216,6 +326,8 @@ const Warehouse = () => {
       <WarehouseHeader
         onCreateProduct={handleCreateProduct}
         onGoodsReceipt={handleGoodsReceipt}
+        onInventory={handleOpenInventory}
+        selectedCount={selectedCount}
       />
 
       <SearchSection
@@ -281,6 +393,8 @@ const Warehouse = () => {
             onResetFilters={handleResetFilters}
             brands={brands}
             categories={categories}
+            suppliers={suppliers}
+            suppliersLoading={suppliersLoading}
           />
         </ReactPortal>
       )}

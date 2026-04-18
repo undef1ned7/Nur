@@ -235,9 +235,27 @@
 
   &__tabs {
     display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
     margin-bottom: 24px;
     border-bottom: 1px solid #e5e7eb;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 2px;
+    }
   }
 
   &__tab {
@@ -250,6 +268,8 @@
     color: #6b7280;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
+    flex: 0 0 auto;
 
     &:hover {
       color: #111827;
@@ -390,6 +410,12 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
+  &__table-card--scrollable {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
   &__table-header {
     display: flex;
     justify-content: space-between;
@@ -494,6 +520,27 @@
       &:last-child td {
         border-bottom: none;
       }
+    }
+  }
+
+  &__table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow: auto;
+  }
+
+  &__table-scroll--suppliers {
+    max-height: min(68vh, 720px);
+  }
+
+  &__table--suppliers {
+    min-width: 1180px;
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f9fafb;
     }
   }
 
@@ -827,6 +874,10 @@
     &__table {
       min-width: 600px;
     }
+
+    &__table--suppliers {
+      min-width: 1180px;
+    }
   }
 
   // Мобильные устройства (до 768px)
@@ -932,6 +983,10 @@
     &__table {
       min-width: 500px;
       font-size: 13px;
+    }
+
+    &__table--suppliers {
+      min-width: 960px;
     }
 
     &__table th {
@@ -1053,6 +1108,10 @@
     &__table {
       min-width: 400px;
       font-size: 12px;
+    }
+
+    &__table--suppliers {
+      min-width: 860px;
     }
 
     &__table th {
