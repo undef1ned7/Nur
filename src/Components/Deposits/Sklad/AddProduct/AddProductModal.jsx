@@ -153,7 +153,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
     setError("");
     try {
       // обновляем существующий товар: увеличиваем остаток и цены
-      await dispatch(
+     const response = await dispatch(
         updateProductAsync({
           productId: itemId,
           updatedData: {
@@ -164,7 +164,8 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           },
         })
       ).unwrap();
-
+      console.log('response', response);
+      
       if (selectedSupplier && paymentType !== "full") {
         const prepaymentValue = toNum(prepayment);
         const remainingDebt =
@@ -221,6 +222,8 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
         onClose?.();
       })
     } catch (e) {
+      console.log('askdjalskdasd', e);
+      
       const errorMessage = validateResErrors(e, "Не удалось сохранить. Попробуйте ещё раз.");
       alert(errorMessage, true)
     }

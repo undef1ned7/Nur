@@ -83,8 +83,9 @@ export const updateProductApi = async (productId, productData) => {
         `Update Product (ID: ${productId}) Error Status:`,
         error.response.status
       );
-      return Promise.reject(error.response.data);
+      return Promise.reject(error);
     }
+
   }
 };
 

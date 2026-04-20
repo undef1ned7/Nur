@@ -58,7 +58,7 @@ export const updateProductAsync = createAsyncThunk(
       // если нет helpers — (await api.patch(`/main/products/${productId}/`, updatedData)).data
       return await updateProductApi(productId, updatedData);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return rejectWithValue(error);
     }
   }
 );
