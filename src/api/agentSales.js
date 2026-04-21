@@ -32,8 +32,8 @@ export const getAllProductionSaleDetail = async (saleId) => {
   return data;
 };
 
-export const getAllProductionSaleReturn = async (saleId) => {
-  const { data } = await api.post(`/main/pos/sales/${saleId}/return/`);
+export const getAllProductionSaleReturn = async (saleId, payload = {}) => {
+  const { data } = await api.post(`/main/pos/sales/${saleId}/return/`, payload);
   return data;
 };
 
@@ -41,8 +41,11 @@ export const getAllProductionSaleReturn = async (saleId) => {
  * Возврат продажи (только paid или debt). Статус → canceled.
  * @param {string} saleId - UUID продажи
  */
-export const agentSaleReturn = async (saleId) => {
-  const { data } = await api.post(`/main/agents/me/sales/${saleId}/return/`);
+export const agentSaleReturn = async (saleId, payload = {}) => {
+  const { data } = await api.post(
+    `/main/agents/me/sales/${saleId}/return/`,
+    payload,
+  );
   return data;
 };
 

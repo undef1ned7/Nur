@@ -2,16 +2,14 @@ import { Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
-import { useConfirm } from "../../../../hooks/useDialog";
 import {
   getAgentSalesList,
   getAllProductionSalesList,
-  agentSaleReturn,
-  getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import ProductionSellDetail from "./ProductionSellDetail";
+import ProductionRefundPurchase from "./ProductionRefundPurchase";
 import "../../../pages/Sell/sell.scss";
 import "./ProductionSell.scss";
 
@@ -48,7 +46,6 @@ const paymentMethodTranslate = {
 const ProductionSell = () => {
   const navigate = useNavigate();
   const { profile } = useUser();
-  const confirm = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,7 +59,8 @@ const ProductionSell = () => {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [ordering, setOrdering] = useState("-created_at");
-  const [returningId, setReturningId] = useState(null);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundItem, setRefundItem] = useState(null);
 
   const debouncedSetSearch = useDebounce((value) => setSearch(value), 500);
   const isOwner = profile?.role === "owner";
@@ -70,7 +68,9 @@ const ProductionSell = () => {
 
   const fetchSalesList = useCallback(
     (params) =>
-      isOwnerOrAdmin ? getAllProductionSalesList(params) : getAgentSalesList(params),
+      isOwnerOrAdmin
+        ? getAllProductionSalesList(params)
+        : getAgentSalesList(params),
     [isOwnerOrAdmin],
   );
 
@@ -104,36 +104,10 @@ const ProductionSell = () => {
     return s === "paid" || s === "debt";
   };
 
-  const handleReturn = useCallback(
-    async (item) => {
-      if (!item?.id || !canReturnSale(item)) return;
-      confirm(
-        "Выполнить возврат? Статус продажи станет «Возвращена», товар вернётся на склад или агенту.",
-        async (ok) => {
-          if (!ok) return;
-          setReturningId(item.id);
-          setError("");
-          try {
-            if (isOwnerOrAdmin) {
-              await getAllProductionSaleReturn(item.id);
-            } else {
-              await agentSaleReturn(item.id);
-            }
-            fetchList();
-          } catch (err) {
-            const msg =
-              err?.response?.data?.detail ||
-              err?.message ||
-              "Не удалось выполнить возврат";
-            setError(msg);
-          } finally {
-            setReturningId(null);
-          }
-        },
-      );
-    },
-    [confirm, fetchList, isOwnerOrAdmin],
-  );
+  const handleOpenRefund = useCallback((item) => {
+    setRefundItem(item);
+    setShowRefundModal(true);
+  }, []);
 
   useEffect(() => {
     fetchList();
@@ -207,7 +181,7 @@ const ProductionSell = () => {
             </span>
           </div>
         </div>
-        
+
         {isOwner && (
           <button
             type="button"
@@ -379,12 +353,9 @@ const ProductionSell = () => {
                               <button
                                 type="button"
                                 className="sellTable__refund"
-                                onClick={() => handleReturn(item)}
-                                disabled={returningId === item.id}
+                                onClick={() => handleOpenRefund(item)}
                               >
-                                {returningId === item.id
-                                  ? "Возврат…"
-                                  : "Возврат"}
+                                Возврат
                               </button>
                             )}
                           </td>
@@ -469,10 +440,9 @@ const ProductionSell = () => {
                             <button
                               type="button"
                               className="sellCard__refund"
-                              onClick={() => handleReturn(item)}
-                              disabled={returningId === item.id}
+                              onClick={() => handleOpenRefund(item)}
                             >
-                              {returningId === item.id ? "Возврат…" : "Возврат"}
+                              Возврат
                             </button>
                           )}
                         </div>
@@ -495,6 +465,27 @@ const ProductionSell = () => {
             setDetailId("");
           }}
           onReturnSuccess={fetchList}
+          onOpenRefund={(sale) => {
+            setShowDetail(false);
+            setDetailId("");
+            setRefundItem(sale);
+            setShowRefundModal(true);
+          }}
+        />
+      )}
+      {showRefundModal && refundItem && (
+        <ProductionRefundPurchase
+          item={refundItem}
+          useGlobalAccess={isOwnerOrAdmin}
+          onClose={() => {
+            setShowRefundModal(false);
+            setRefundItem(null);
+          }}
+          onChanged={() => {
+            setShowRefundModal(false);
+            setRefundItem(null);
+            fetchList();
+          }}
         />
       )}
     </div>
