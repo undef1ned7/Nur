@@ -98,6 +98,21 @@ const formatApiErrors = (e) => {
   }
 };
 
+const hasNestedOrderRequiredError = (err) => {
+  const items = err?.response?.data?.items;
+  if (!Array.isArray(items)) return false;
+  return items.some((row) => {
+    const orderErr = row?.order;
+    if (!orderErr) return false;
+    if (Array.isArray(orderErr)) {
+      return orderErr.some((msg) =>
+        String(msg || "").toLowerCase().includes("обязательное поле"),
+      );
+    }
+    return String(orderErr || "").toLowerCase().includes("обязательное поле");
+  });
+};
+
 const newIdempotencyKey = () => {
   try {
     if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -753,6 +768,7 @@ const Orders = () => {
           name: orderItemTitle(it),
           qty: Math.max(1, Number(it.quantity) || 1),
           price: linePrice(it),
+          comment: String(it.comment || "").trim(),
         })),
       };
     },
@@ -767,9 +783,16 @@ const Orders = () => {
       setPrintingId(order.id);
       try {
         await checkPrinterConnection().catch(() => false);
-        let payload = buildPrintPayload(order);
+        // Для чека берем актуальный detail заказа, чтобы не потерять comment в items.
+        const detailedOrder = await api
+          .get(`/cafe/orders/${order.id}/`)
+          .then((r) => r?.data || null)
+          .catch(() => null);
+        const sourceOrder = detailedOrder ? { ...order, ...detailedOrder } : order;
+
+        let payload = buildPrintPayload(sourceOrder);
         if (!String(payload.waiter_name || "").trim()) {
-          const w = await fetchCafeWaiterLabelByEmployeeId(order?.waiter);
+          const w = await fetchCafeWaiterLabelByEmployeeId(sourceOrder?.waiter);
           if (w) payload = { ...payload, waiter_name: w };
         }
 
@@ -824,6 +847,7 @@ const Orders = () => {
         items: (items || []).map((it) => ({
           name: orderItemTitle(it),
           qty: Math.max(1, Number(it.quantity) || 1),
+          comment: String(it.comment || "").trim(),
           // price: linePrice(it),
         })),
       };
@@ -1065,6 +1089,7 @@ const Orders = () => {
               service_title: it.service_title || it.title || "",
               price: toNum(it.unit_price ?? it.price),
               quantity: Number(it.quantity) || 1,
+              comment: it.comment || "",
               is_rejected: !!it.is_rejected,
               rejection_reason: it.rejection_reason || "",
             };
@@ -1078,6 +1103,7 @@ const Orders = () => {
         title: it.menu_item_title || it.title,
         price: linePrice(it),
         quantity: Number(it.quantity) || 1,
+            comment: it.comment || "",
             is_rejected: !!it.is_rejected,
             rejection_reason: it.rejection_reason || "",
           };
@@ -1132,6 +1158,7 @@ const Orders = () => {
             title: menu.title,
             price: toNum(menu.price),
             quantity: 1,
+            comment: "",
             is_rejected: false,
             rejection_reason: "",
           },
@@ -1162,6 +1189,15 @@ const Orders = () => {
     setForm((prev) => ({
       ...prev,
       items: prev.items.map((i) => (i._key === lineKey ? { ...i, quantity: next } : i)),
+    }));
+  };
+
+  const changeItemComment = (lineKey, raw) => {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((i) =>
+        i._key === lineKey ? { ...i, comment: String(raw || "").slice(0, 500) } : i,
+      ),
     }));
   };
 
@@ -1243,7 +1279,32 @@ const Orders = () => {
         const basePayload = normalizeOrderPayload(form, true);
         if (startPlan) delete basePayload.waiter;
         else if (isStaff) basePayload.waiter = userId;
-        const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
+        let res;
+        try {
+          res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
+        } catch (createErr) {
+          // Некоторые бэкенды требуют items[].order даже при создании заказа.
+          // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
+          if (!hasNestedOrderRequiredError(createErr)) throw createErr;
+
+          const headerPayload = { ...basePayload, items: [] };
+          const created = await postWithWaiterFallback(
+            "/cafe/orders/",
+            headerPayload,
+            "post",
+          );
+          const createdOrderId = created?.data?.id;
+          if (!createdOrderId) throw createErr;
+
+          const patchPayload = normalizeOrderPayload(form, false, createdOrderId);
+          if (startPlan) delete patchPayload.waiter;
+          await postWithWaiterFallback(
+            `/cafe/orders/${createdOrderId}/`,
+            patchPayload,
+            "patch",
+          );
+          res = created;
+        }
 
         try {
           const tableId = toId(form.table);
@@ -1885,6 +1946,14 @@ const Orders = () => {
                                     <span className="cafeOrders__itemKind"> · услуга</span>
                                   ) : null}
                                 </div>
+                                <textarea
+                                  className="cafeOrders__input"
+                                  placeholder="Комментарий к блюду"
+                                  value={it.comment || ""}
+                                  onChange={(e) => changeItemComment(it._key, e.target.value)}
+                                  disabled={saving}
+                                  rows={2}
+                                />
                                 <div className="cafeOrders__itemMeta">
                                   <span>{fmtMoney(price)} сом</span>
                                   <span className="cafeOrders__dot">•</span>
