@@ -995,6 +995,7 @@ const CashierPage = () => {
             itemId: cartItemId, // ID элемента в корзине (для API: DELETE/PATCH /items/<itemId>/)
             productId: productId ?? null, // ID товара (если это товар)
             isCustom: isCustom,
+            isWeight: Boolean(item.is_weight),
             salePackage,
             name: item.product_name || item.display_name || item.name || "—",
             price: price,
@@ -2853,12 +2854,18 @@ const CashierPage = () => {
                             formatQuantity(item.quantity || 0)
                           }
                           onChange={(e) => {
-                            const value = e.target.value;
+                            const rawValue = e.target.value;
+                            const value = String(rawValue || "").replace(",", ".");
                             if (value === "" || value === "-") {
                               setCartQuantities((prev) => ({
                                 ...prev,
                                 [item.id]: value,
                               }));
+                              return;
+                            }
+                            if (item.isWeight) {
+                              if (!/^\d*\.?\d*$/.test(value)) return;
+                            } else if (!/^\d+$/.test(value)) {
                               return;
                             }
                             const numValue = parseFloat(value);
@@ -3013,6 +3020,7 @@ const CashierPage = () => {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") e.target.blur();
                           }}
+                          inputMode={item.isWeight ? "decimal" : "numeric"}
                         />
                         <button
                           type="button"

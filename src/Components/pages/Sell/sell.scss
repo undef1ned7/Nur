@@ -924,6 +924,7 @@
       align-items: center;
       column-gap: 10px;
       width: 100%;
+      flex-wrap: nowrap;
       span {
         display: flex;
         align-items: center;
@@ -943,6 +944,101 @@
       letter-spacing: -2%;
       border-radius: 8px;
       cursor: pointer;
+    }
+  }
+
+  &__filters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  &__search-wrap {
+    flex: 1 1 280px;
+    min-width: 240px;
+  }
+
+  &__filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+    line-height: 1;
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  &__filter-field {
+    border: 1px solid #00000033;
+    border-radius: 8px;
+    background-color: #ffffff;
+    height: 36px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 10px;
+    font-size: 13px;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    appearance: none;
+
+    &:focus {
+      border-color: #f7d617;
+      box-shadow: 0 0 0 3px rgba(247, 214, 23, 0.22);
+    }
+  }
+
+  .sellFiltersModal {
+    width: min(520px, calc(100vw - 24px));
+    max-height: calc(100vh - 40px);
+  }
+
+  .sellFiltersModal__content {
+    padding: 16px;
+  }
+
+  .sellFiltersModal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 2px;
+
+    span {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+    }
+  }
+
+  .sellFiltersModal__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 18px;
+  }
+
+  .sellFiltersModal__actions {
+    margin-top: 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: nowrap;
+
+    .sell__reset,
+    .sell__header-btn {
+      min-width: 130px;
+      margin: 0;
+      padding: 10px 14px;
     }
   }
   &__table {
@@ -1092,6 +1188,21 @@
   }
   .sell__header-left > * {
     width: 100%;
+  }
+  .sell__filters {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .sell__search-wrap {
+    width: 100%;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .sell__filter-field {
+    width: 100%;
+    min-width: 0;
   }
   .start__actions {
     flex-direction: column;
@@ -1407,10 +1518,26 @@
     width: 100%;
   }
 
+  .sell__filters {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .sell__filter-field {
+    height: 38px;
+    font-size: 14px;
+  }
+
   .sell__header-btn {
     width: 100%;
     padding: 10px;
     font-size: 14px;
+  }
+
+  .sell__filter-btn {
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
   }
 
   // Таблица продаж (Sell.jsx)
@@ -1640,6 +1767,34 @@
   .sell__header-btn {
     padding: 10px 15px;
     font-size: 13px;
+  }
+
+  .sell__filter-btn {
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+  }
+
+  .sellFiltersModal__grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .sellFiltersModal {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+  }
+
+  .sellFiltersModal__content {
+    padding: 12px;
+  }
+
+  .sellFiltersModal__actions {
+    .sell__reset,
+    .sell__header-btn {
+      width: auto;
+      min-width: 120px;
+    }
   }
 
   .start__body-title {
@@ -2378,6 +2533,67 @@
     padding: 12px 16px;
     font-size: 15px;
     font-weight: 700;
+  }
+}
+
+/* Sell filters modal rendered via Portal (outside .sell tree) */
+.sellFiltersModal {
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100vh - 40px);
+}
+
+.sellFiltersModal__content {
+  padding: 16px;
+}
+
+.sellFiltersModal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 18px;
+}
+
+.sellFiltersModal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 2px;
+
+  span {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+}
+
+.sellFiltersModal__actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: nowrap;
+
+  .sell__reset,
+  .sell__header-btn {
+    min-width: 120px;
+    margin: 0;
+    padding: 10px 14px;
+    width: auto;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .sellFiltersModal {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+  }
+
+  .sellFiltersModal__content {
+    padding: 12px;
+  }
+
+  .sellFiltersModal__grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 }
 
