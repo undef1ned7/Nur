@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import api from "../../../api";
 import { useDebounce } from "../../../hooks/useDebounce";
+import { fetchClientsAsync } from "../../../store/creators/clientCreators";
 import {
   historySellObjects,
   historySellProduct,
@@ -17,6 +18,7 @@ import {
   useCash,
 } from "../../../store/slices/cashSlice";
 import { useSale } from "../../../store/slices/saleSlice";
+import { useClient } from "../../../store/slices/ClientSlice";
 import { useUser } from "../../../store/slices/userSlice";
 import AddCashFlowsModal from "../../Deposits/Kassa/AddCashFlowsModal/AddCashFlowsModal";
 import RefundPurchase from "./RefundPurchase";
@@ -27,6 +29,7 @@ import SellMainStart from "./SellMainStart";
 import "./sell.scss";
 import { useAlert } from "../../../hooks/useDialog";
 import DataContainer from "../../common/DataContainer/DataContainer";
+import Modal from "../../common/Modal/Modal";
 
 /**
  * Создание долга для клиента.
@@ -97,6 +100,7 @@ const Sell = () => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const { company, profile, userId } = useUser();
+  const { list: clientsRaw } = useClient();
   const { list: cashBoxes } = useCash();
   const {
     history,
@@ -134,8 +138,26 @@ const Sell = () => {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [itemId, setItemId] = useState({});
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [error, setError] = useState(null);
   const [historyView, setHistoryView] = useState("table"); // table | cards (по умолчанию таблица)
+  const [dateFrom, setDateFrom] = useState(searchParams.get("date_from") || "");
+  const [dateTo, setDateTo] = useState(searchParams.get("date_to") || "");
+  const [clientFilter, setClientFilter] = useState(
+    searchParams.get("client") || "",
+  );
+  const [statusFilter, setStatusFilter] = useState(
+    searchParams.get("status") || "",
+  );
+  const clients = useMemo(
+    () =>
+      Array.isArray(clientsRaw?.results)
+        ? clientsRaw.results
+        : Array.isArray(clientsRaw)
+          ? clientsRaw
+          : [],
+    [clientsRaw],
+  );
 
   const [newCashbox, setNewCashbox] = useState({
     name: "",
@@ -272,6 +294,17 @@ const Sell = () => {
 
   const effectiveUserParam =
     userParam || (isMarketCompany && !isOwnerOrAdmin ? currentUserId : "");
+
+  const historyBaseParams = useMemo(
+    () => ({
+      ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
+      ...(isMarketCompany && dateFrom ? { date_from: dateFrom } : {}),
+      ...(isMarketCompany && dateTo ? { date_to: dateTo } : {}),
+      ...(isMarketCompany && clientFilter ? { client: clientFilter } : {}),
+      ...(isMarketCompany && statusFilter ? { status: statusFilter } : {}),
+    }),
+    [effectiveUserParam, isMarketCompany, dateFrom, dateTo, clientFilter, statusFilter],
+  );
   // Синхронизация URL с состоянием страницы
 
   useEffect(() => {
@@ -304,32 +337,54 @@ const Sell = () => {
 
   // поиск по истории (дебаунс)
   const debouncedSearch = useDebounce((v) => {
-    dispatch(
-      historySellProduct({
-        search: v,
-        page: 1,
-        ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
-      }),
-    );
-    dispatch(historySellObjects({ search: v, page: 1 }));
+    const requestParams = { ...historyBaseParams, search: v, page: 1 };
+    dispatch(historySellProduct(requestParams));
+    if (isBuildingCompany) {
+      dispatch(historySellObjects(requestParams));
+    }
     // Сбрасываем на первую страницу при поиске
-    const params = new URLSearchParams(searchParams);
-    params.delete("page");
-    setSearchParams(params, { replace: true });
+    const urlParams = new URLSearchParams(searchParams);
+    urlParams.delete("page");
+    setSearchParams(urlParams, { replace: true });
   }, 600);
   const onChange = (e) => debouncedSearch(e.target.value);
 
   useEffect(() => {
     if (showSellMainStart) return;
+    const params = { ...historyBaseParams, search: "", page: currentPage };
     dispatch(
-      historySellProduct({
-        search: "",
-        page: currentPage,
-        ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
-      }),
+      historySellProduct(params),
     );
-    dispatch(historySellObjects({ search: "", page: currentPage }));
-  }, [dispatch, showSellMainStart, currentPage, effectiveUserParam]);
+    if (isBuildingCompany) {
+      dispatch(historySellObjects(params));
+    }
+  }, [
+    dispatch,
+    showSellMainStart,
+    currentPage,
+    historyBaseParams,
+    isBuildingCompany,
+  ]);
+
+  useEffect(() => {
+    if (!isMarketCompany) return;
+    dispatch(fetchClientsAsync());
+  }, [dispatch, isMarketCompany]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (dateFrom) params.set("date_from", dateFrom);
+    else params.delete("date_from");
+    if (dateTo) params.set("date_to", dateTo);
+    else params.delete("date_to");
+    if (clientFilter) params.set("client", clientFilter);
+    else params.delete("client");
+    if (statusFilter) params.set("status", statusFilter);
+    else params.delete("status");
+    if (currentPage > 1) params.delete("page");
+    setSearchParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, clientFilter, statusFilter]);
 
   // Плавно прокручиваем страницу вверх при изменении страницы
   useEffect(() => {
@@ -531,12 +586,20 @@ const Sell = () => {
       alert("Выбранные записи удалены");
       dispatch(
         historySellProduct({
+          ...historyBaseParams,
           search: "",
           page: currentPage,
-          ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
         }),
       );
-      dispatch(historySellObjects({ search: "", page: currentPage }));
+      if (isBuildingCompany) {
+        dispatch(
+          historySellObjects({
+            ...historyBaseParams,
+            search: "",
+            page: currentPage,
+          }),
+        );
+      }
     } catch (e) {
       alert("Не удалось удалить: " + e.message);
     } finally {
@@ -613,12 +676,20 @@ const Sell = () => {
       setSearchParams(params, { replace: true });
       dispatch(
         historySellProduct({
+          ...historyBaseParams,
           search: "",
           page: 1,
-          ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
         }),
       );
-      dispatch(historySellObjects({ search: "", page: 1 }));
+      if (isBuildingCompany) {
+        dispatch(
+          historySellObjects({
+            ...historyBaseParams,
+            search: "",
+            page: 1,
+          }),
+        );
+      }
     } catch (e) {
       alert("Не удалось очистить историю: " + e.message);
     } finally {
@@ -666,7 +737,7 @@ const Sell = () => {
       <>
         <div className="sell__header">
           <div className="sell__header-left">
-            <div className="sell__header-input">
+            <div className="sell__header-input sell__search-wrap">
               <input
                 className="w-full"
                 onChange={onChange}
@@ -677,6 +748,14 @@ const Sell = () => {
                 <Search size={15} color="#91929E" />
               </span>
             </div>
+            {isMarketCompany && (
+              <button
+                className="sell__header-btn sell__filter-btn"
+                onClick={() => setShowFiltersModal(true)}
+              >
+                Фильтр
+              </button>
+            )}
           </div>
           {!isStartPlanCompany && !isMarketCompany && (
             <button
@@ -1036,12 +1115,20 @@ const Sell = () => {
             setShowRefundModal(false);
             dispatch(
               historySellProduct({
+                ...historyBaseParams,
                 search: "",
                 page: currentPage,
-                ...(effectiveUserParam ? { user: effectiveUserParam } : {}),
               }),
             );
-            dispatch(historySellObjects({ search: "", page: currentPage }));
+            if (isBuildingCompany) {
+              dispatch(
+                historySellObjects({
+                  ...historyBaseParams,
+                  search: "",
+                  page: currentPage,
+                }),
+              );
+            }
           }}
         />
       )}
@@ -1050,6 +1137,86 @@ const Sell = () => {
       )}
       {showDetailSell && (
         <SellDetail onClose={() => setShowDetailSell(false)} id={sellId} />
+      )}
+      {isMarketCompany && showFiltersModal && (
+        <Modal
+          open={showFiltersModal}
+          onClose={() => setShowFiltersModal(false)}
+          title="Фильтры"
+          className="sellFiltersModal"
+          contentClassName="sellFiltersModal__content"
+        >
+          <div className="sellFiltersModal__grid">
+            <label className="sellFiltersModal__field">
+              <span>Дата начала</span>
+              <input
+                type="date"
+                className="sell__filter-field"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="sellFiltersModal__field">
+              <span>Дата конца</span>
+              <input
+                type="date"
+                className="sell__filter-field"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+            <label className="sellFiltersModal__field">
+              <span>Клиент</span>
+              <select
+                className="sell__filter-field"
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+              >
+                <option value="">Все клиенты</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.full_name || client.name || client.phone || "Клиент"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sellFiltersModal__field">
+              <span>Статус</span>
+              <select
+                className="sell__filter-field"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">Все статусы</option>
+                <option value="new">Новый</option>
+                <option value="paid">Оплаченный</option>
+                <option value="debt">Долг</option>
+                <option value="canceled">Отмененный</option>
+              </select>
+            </label>
+          </div>
+          <div className="sellFiltersModal__actions">
+            <button
+              type="button"
+              className="sell__reset"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+                setClientFilter("");
+                setStatusFilter("");
+              }}
+            >
+              Сбросить
+            </button>
+            <button
+              type="button"
+              className="sell__header-btn"
+              onClick={() => setShowFiltersModal(false)}
+            >
+              Применить
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
