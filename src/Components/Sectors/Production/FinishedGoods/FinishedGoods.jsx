@@ -3314,7 +3314,8 @@ const FinishedGoods = ({ products, onChanged }) => {
                               style={{
                                 display: "flex",
                                 gap: "8px",
-                                flexWrap: "wrap",
+                                // flexWrap: "wrap",
+                                width: "100%",
                               }}
                             >
                               <button

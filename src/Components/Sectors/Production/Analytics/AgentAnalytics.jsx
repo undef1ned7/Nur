@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   DollarSign,
   Package,
+  Wallet,
   RefreshCw,
   BarChart3,
   ArrowLeftRight,
@@ -250,6 +251,7 @@ const AgentAnalytics = () => {
         totalDiscounts: 0,
         totalProductsOnHand: 0,
         totalProductsValue: 0,
+        totalClientsDebt: 0,
       };
     }
 
@@ -270,6 +272,56 @@ const AgentAnalytics = () => {
       totalDiscounts,
       totalProductsOnHand: summary.items_on_hand_qty || 0,
       totalProductsValue: summary.items_on_hand_amount || 0,
+      totalClientsDebt: Number(summary.clients_debt_total) || 0,
+    };
+  }, [analyticsData]);
+
+  // Данные для графика долга по клиентам из charts.clients_debt
+  const clientsDebtChartData = useMemo(() => {
+    const clientsDebt = Array.isArray(analyticsData?.charts?.clients_debt)
+      ? analyticsData.charts.clients_debt
+      : [];
+
+    if (clientsDebt.length === 0) {
+      return {
+        labels: ["Нет данных"],
+        datasets: [
+          {
+            label: "Долг (сом)",
+            data: [0],
+            backgroundColor: "#f7d74f",
+            borderColor: "#f7d74f",
+            borderWidth: 1,
+            borderRadius: 4,
+          },
+        ],
+      };
+    }
+
+    const sorted = Array.from(clientsDebt)
+      .map((item) => ({
+        name:
+          item.client_name ||
+          item.name ||
+          item.full_name ||
+          `Клиент #${item.client_id || "?"}`,
+        debt: Number(item.debt || item.amount || item.total || 0),
+      }))
+      .sort((a, b) => b.debt - a.debt)
+      .slice(0, 15);
+
+    return {
+      labels: sorted.map((item) => item.name),
+      datasets: [
+        {
+          label: "Долг (сом)",
+          data: sorted.map((item) => item.debt),
+          backgroundColor: "#f7d74f",
+          borderColor: "#f7d74f",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
     };
   }, [analyticsData]);
 
@@ -1183,6 +1235,15 @@ const AgentAnalytics = () => {
             <p>{metrics.totalProductsValue.toLocaleString()} сом</p>
           </div>
         </div>
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <Wallet size={24} />
+          </div>
+          <div>
+            <h3>Долг по клиентам</h3>
+            <p>{metrics.totalClientsDebt.toLocaleString()} сом</p>
+          </div>
+        </div>
       </div>
 
       {/* Графики продаж */}
@@ -1260,6 +1321,26 @@ const AgentAnalytics = () => {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="agent-analytics__section">
+        <h2 className="agent-analytics__section-title">
+          <span className="agent-analytics__section-icon chart-container">
+            <Wallet className="chart-icon" />
+          </span>
+          Долг по клиентам
+        </h2>
+        <div className="agent-analytics__charts">
+          <div className="agent-analytics__chart-card agent-analytics__chart-card--full">
+            <h3>Клиенты с долгом (сделки + POS)</h3>
+            <div className="agent-analytics__chart-container">
+              <Bar
+                data={clientsDebtChartData}
+                options={horizontalBarChartOptions}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

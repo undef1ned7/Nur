@@ -5,10 +5,7 @@ import {
   getAgentSaleInvoiceJson,
   getAgentSaleDetail,
   getAllProductionSaleDetail,
-  agentSaleReturn,
-  getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
-import { useConfirm } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
 import ProductionInvoicePdfDocument from "./ProductionInvoicePdfDocument";
 
@@ -23,13 +20,12 @@ const ProductionSellDetail = ({
   onClose,
   id,
   onReturnSuccess,
+  onOpenRefund,
   useGlobalAccess = false,
 }) => {
   const { company, profile } = useUser();
-  const confirm = useConfirm();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [returning, setReturning] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [error, setError] = useState("");
   const formatMoney = (value) => Number(value || 0).toFixed(2);
@@ -84,40 +80,6 @@ const ProductionSellDetail = ({
     };
   }, [id, useGlobalAccess]);
 
-  const handleReturn = async () => {
-    if (!id || !sale) return;
-    const status = (sale.status || "").toLowerCase();
-    if (status !== "paid" && status !== "debt") {
-      setError("Возврат возможен только для оплаченных или долговых продаж.");
-      return;
-    }
-    confirm(
-      "Выполнить возврат? Статус продажи станет «Возвращена».",
-      async (ok) => {
-        if (!ok) return;
-        setError("");
-        setReturning(true);
-        try {
-          if (useGlobalAccess) {
-            await getAllProductionSaleReturn(id);
-          } else {
-            await agentSaleReturn(id);
-          }
-          onReturnSuccess?.();
-          onClose();
-        } catch (err) {
-          const msg =
-            err?.response?.data?.detail ||
-            err?.message ||
-            "Не удалось выполнить возврат";
-          setError(msg);
-        } finally {
-          setReturning(false);
-        }
-      },
-    );
-  };
-
   const handleDownloadInvoice = async () => {
     if (!id) return;
     setError("");
@@ -148,13 +110,14 @@ const ProductionSellDetail = ({
             const saleItem = saleItemsMap[item.id];
             return {
               ...item,
-              line_discount: saleItem?.line_discount ?? item.line_discount ?? "0",
+              line_discount:
+                saleItem?.line_discount ?? item.line_discount ?? "0",
               quantity: item.qty ?? saleItem?.quantity ?? item.quantity ?? "1",
               line_total:
                 item.total != null
                   ? Number(item.total)
-                  : saleItem?.line_total ??
-                    Number(item.unit_price) * Number(item.qty || 1),
+                  : (saleItem?.line_total ??
+                    Number(item.unit_price) * Number(item.qty || 1)),
             };
           })
         : [];
@@ -357,11 +320,10 @@ const ProductionSellDetail = ({
                     <button
                       type="button"
                       className="receipt__row-btn"
-                      onClick={handleReturn}
-                      disabled={returning}
+                      onClick={() => onOpenRefund?.(sale)}
                       style={{ minWidth: 170 }}
                     >
-                      {returning ? "Возврат..." : "Возврат"}
+                      Возврат
                     </button>
                   )}
                 </div>

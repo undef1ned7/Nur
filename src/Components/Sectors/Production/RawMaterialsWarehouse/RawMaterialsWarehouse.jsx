@@ -22,7 +22,11 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import "../../Market/Warehouse/Warehouse.scss";
-import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import {
+  useAlert,
+  useConfirm,
+  useErrorModal,
+} from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -49,8 +53,8 @@ const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
    AddModal — добавление сырья
    ========================================= */
 const AddModal = ({ onClose, selectCashBox, onSaved }) => {
-  const alert = useAlert()
-  const error = useErrorModal()
+  const alert = useAlert();
+  const error = useErrorModal();
   const { company } = useUser();
   const { list: clients = [] } = useClient();
   const [state, setState] = useState({
@@ -76,7 +80,10 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
   const suppliers = useMemo(
-    () => (Array.isArray(clients) ? clients : []).filter((c) => c.type === "suppliers"),
+    () =>
+      (Array.isArray(clients) ? clients : []).filter(
+        (c) => c.type === "suppliers",
+      ),
     [clients],
   );
   const selectedSupplier = useMemo(
@@ -124,7 +131,10 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
       // EDIT: count -> quantity
       const result = await dispatch(createItemMake(state)).unwrap();
 
-      if ((paymentType === "debt" || paymentType === "prepayment") && state.client) {
+      if (
+        (paymentType === "debt" || paymentType === "prepayment") &&
+        state.client
+      ) {
         const prepaymentValue = Number(prepayment || 0);
         const remainingDebt =
           paymentType === "prepayment"
@@ -133,7 +143,10 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
 
         if (company?.subscription_plan?.name === "Старт" && remainingDebt > 0) {
           await api.post("/main/debts/", {
-            name: selectedSupplier?.full_name || selectedSupplier?.name || "Поставщик",
+            name:
+              selectedSupplier?.full_name ||
+              selectedSupplier?.name ||
+              "Поставщик",
             phone: selectedSupplier?.phone || "",
             due_date: firstPaymentDate,
             amount: remainingDebt,
@@ -147,7 +160,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
             statusRu: paymentType === "prepayment" ? "Предоплата" : "Долги",
             amount: totalAmount,
             debtMonths: Number(debtMonths || 1),
-            prepayment: paymentType === "prepayment" ? prepaymentValue : undefined,
+            prepayment:
+              paymentType === "prepayment" ? prepaymentValue : undefined,
             first_due_date: firstPaymentDate,
           }),
         ).unwrap();
@@ -157,16 +171,19 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
         await dispatch(
           addCashFlows({
             ...cashData,
-            amount: paymentType === "prepayment" ? Number(prepayment || 0) : totalAmount,
+            amount:
+              paymentType === "prepayment"
+                ? Number(prepayment || 0)
+                : totalAmount,
             source_cashbox_flow_id: result.id,
-          })
+          }),
         ).unwrap();
       }
 
-      alert('Сырье добавлен!', () => {
+      alert("Сырье добавлен!", () => {
         onSaved?.();
         onClose();
-      })
+      });
     } catch (e) {
       const errorMessage = validateResErrors(e, "Ошибка при добавлении сырья");
       error(errorMessage);
@@ -247,7 +264,6 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
             type="number"
             min="0"
             step="0.0001"
-
             value={state.quantity}
             onChange={onChange}
             required
@@ -347,8 +363,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
    Поля: name, unit, price, quantity
    ========================================= */
 const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
-  const alert = useAlert()
-  const confirm = useConfirm()
+  const alert = useAlert();
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const [form, setForm] = useState({
     name: item?.name ?? "",
@@ -379,19 +395,22 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
       };
 
       await dispatch(
-        updateItemsMake({ id: item.id, updatedData: payload })
+        updateItemsMake({ id: item.id, updatedData: payload }),
       ).unwrap();
-      alert('Редактировано!', () => {
+      alert("Редактировано!", () => {
         setSaving(false);
         onSaved?.();
         onClose();
-      })
+      });
     } catch (e) {
       const errorMessage = validateResErrors(e, "Ошибка при обновлении сырья");
-      alert(errorMessage,
+      alert(
+        errorMessage,
         () => {
           setSaving(false);
-        }, true);
+        },
+        true,
+      );
     }
   };
 
@@ -406,13 +425,16 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
           onClose();
         } catch (e) {
           setDeleting(false);
-          const errorMessage = validateResErrors(e, "Ошибка при удалении сырья");
+          const errorMessage = validateResErrors(
+            e,
+            "Ошибка при удалении сырья",
+          );
           alert(errorMessage, true);
         }
       } else {
         setDeleting(false);
       }
-    })
+    });
   };
 
   return (
@@ -533,9 +555,9 @@ const RawMaterialsWarehouse = () => {
   const debounceTimerRef = useRef(null);
   const { isMobile } = useResize(({ isMobile }) => {
     if (isMobile) {
-      setViewMode('cards')
+      setViewMode("cards");
     } else {
-      setViewMode(getInitialViewMode())
+      setViewMode(getInitialViewMode());
     }
   });
 
@@ -614,6 +636,16 @@ const RawMaterialsWarehouse = () => {
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [products, debouncedSearch, categoryId, dateFrom, dateTo]);
 
+  const filteredTotalValue = useMemo(
+    () =>
+      filtered.reduce(
+        (sum, item) =>
+          sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+        0,
+      ),
+    [filtered],
+  );
+
   const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
 
   const handleOpen = (id) => {
@@ -643,8 +675,9 @@ const RawMaterialsWarehouse = () => {
           </div>
           <div className="warehouse-header__title-section">
             <h1 className="warehouse-header__title">Склад сырья</h1>
+            {/* <p className="">Управление сырьем и материалами</p> */}
             <p className="warehouse-header__subtitle">
-              Управление сырьем и материалами
+              Общая стоимость: {formatPrice(filteredTotalValue)} сом
             </p>
           </div>
         </div>
@@ -725,31 +758,35 @@ const RawMaterialsWarehouse = () => {
           </div>
 
           {/* View toggle */}
-          {!isMobile && (<div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+          {!isMobile && (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                  viewMode === "table"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
                 }`}
-            >
-              <Table2 size={16} />
-              Таблица
-            </button>
+              >
+                <Table2 size={16} />
+                Таблица
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                  viewMode === "cards"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
                 }`}
-            >
-              <LayoutGrid size={16} />
-              Карточки
-            </button>
-          </div>)}
+              >
+                <LayoutGrid size={16} />
+                Карточки
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -801,7 +838,9 @@ const RawMaterialsWarehouse = () => {
                           </div>
                         </td>
                         <td>{item.unit || "—"}</td>
-                        <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </td>
                         <td>{formatPrice(item.price)}</td>
                         <td>
                           {item.quantity === 0 ? (
