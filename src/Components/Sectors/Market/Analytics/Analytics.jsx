@@ -59,6 +59,8 @@ const normalizeLowStockStatusType = (status) => {
   return "low";
 };
 
+const MARKET_ANALYTICS_TIMEOUT_MS = 160000;
+
 const Analytics = () => {
   const dispatch = useDispatch();
   const { company, currentUser } = useUser();
@@ -244,7 +246,7 @@ const Analytics = () => {
 
         const response = await api.get("/main/analytics/market/", {
           params,
-          timeout: 3000,
+          timeout: MARKET_ANALYTICS_TIMEOUT_MS,
         });
         setAnalyticsData(response.data);
         if (tab === "finance") {
@@ -260,7 +262,7 @@ const Analytics = () => {
             }
             const salaryResponse = await api.get("/main/analytics/market/", {
               params: salaryParams,
-              timeout: 3000,
+              timeout: MARKET_ANALYTICS_TIMEOUT_MS,
             });
             setSalaryAnalyticsRows(
               Array.isArray(salaryResponse?.data?.rows)
@@ -276,7 +278,16 @@ const Analytics = () => {
         }
       } catch (err) {
         console.error("Ошибка при загрузке аналитики:", err);
-        setError(err.response?.data?.detail || "Ошибка при загрузке данных");
+        const isTimeout =
+          err?.code === "ECONNABORTED" ||
+          (typeof err?.message === "string" &&
+            err.message.toLowerCase().includes("timeout"));
+        setError(
+          err.response?.data?.detail ||
+            (isTimeout
+              ? "Сервер долго отвечает. Уменьшите период или попробуйте позже."
+              : "Ошибка при загрузке данных"),
+        );
         setSalaryAnalyticsRows([]);
       } finally {
         setLoading(false);
