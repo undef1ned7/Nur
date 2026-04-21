@@ -18,6 +18,7 @@ import {
   createReturnApi,
   getReturnApi,
   approveReturnApi,
+  approveReturnsBulkApi,
   rejectReturnApi,
   createAgentMeReturnApi,
 } from "../../api/transfers";
@@ -243,6 +244,19 @@ export const approveReturnAsync = createAsyncThunk(
       return await approveReturnApi(returnId);
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+export const approveReturnsBulkAsync = createAsyncThunk(
+  "returns/approveBulk",
+  async (payload, { rejectWithValue }) => {
+    try {
+      return await approveReturnsBulkApi(payload);
+    } catch (error) {
+      return rejectWithValue(
+        error?.response?.data ?? error?.message ?? error,
+      );
     }
   }
 );

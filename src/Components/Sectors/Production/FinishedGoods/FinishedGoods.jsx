@@ -3073,7 +3073,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     <div className="warehouse-page">
       {/* Header */}
       <div className="warehouse-header">
-        <div className="warehouse-header__left">
+        <div className="warehouse-header__left align-middle">
           <div className="warehouse-header__icon">
             <div className="warehouse-header__icon-box">📦</div>
           </div>
