@@ -90,6 +90,16 @@ const CashierPage = () => {
   const { shifts } = useShifts();
   const { list: cashBoxes } = useCash();
   const { currentUser, profile, userId } = useUser();
+  const cashierFullName = useMemo(() => {
+    const src = profile || currentUser || {};
+    const fullName = String(src?.full_name || "").trim();
+    if (fullName) return fullName;
+    const firstName = String(src?.first_name || "").trim();
+    const lastName = String(src?.last_name || "").trim();
+    const name = [firstName, lastName].filter(Boolean).join(" ").trim();
+    if (name) return name;
+    return String(src?.username || src?.email || "Пользователь");
+  }, [profile, currentUser]);
   const [openShiftState, setOpenShiftState] = useState(null); // Локальное состояние для открытой смены
 
   // Функция для форматирования количества (убирает лишние нули)
@@ -2213,21 +2223,7 @@ const CashierPage = () => {
             <h1 className="cashier-page__title">Касса</h1>
             <p className="cashier-page__subtitle">
               {openShiftId ? (
-                <>
-                  Смена #
-                  {openShift?.code ||
-                    (() => {
-                      const idStr = openShiftId.toString();
-                      // Извлекаем только цифры из ID
-                      const digitsOnly = idStr.replace(/\D/g, "");
-                      // Если есть достаточно цифр (минимум 4), используем последние 8, иначе используем последние 8 символов без дефисов
-                      return digitsOnly.length >= 4
-                        ? digitsOnly.slice(-8)
-                        : idStr.replace(/-/g, "").slice(-8).toUpperCase();
-                    })() ||
-                    "—"}{" "}
-                  • {openShift.cashier_display || "—"}
-                </>
+                cashierFullName
               ) : (
                 "Нет открытой смены"
               )}

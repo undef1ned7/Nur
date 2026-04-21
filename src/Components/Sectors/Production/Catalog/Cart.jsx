@@ -766,7 +766,9 @@ const OrderSummary = ({
               fontSize: "14px",
             }}
           >
-            <option value="">Наличные</option>
+            <option value="">Выберите тип оплаты</option>
+            <option value="cash">Наличные</option>
+            <option value="transfer">Перевод</option>
             <option value="Долги">Долг</option>
             <option value="Предоплата">Предоплата</option>
           </select>
@@ -868,6 +870,7 @@ const OrderSummary = ({
         disabled={
           submitting ||
           !selectedClient ||
+          !paymentType ||
           // (!usingServer && (cartItems || []).length === 0) ||
           !isEditable
         }
@@ -920,7 +923,7 @@ const Cart = ({
   const [submitting, setSubmitting] = useState(false);
 
   // Состояние для долга
-  const [paymentType, setPaymentType] = useState(""); // "", "Долги", "Предоплата"
+  const [paymentType, setPaymentType] = useState(""); // "" | "cash" | "transfer" | "Долги" | "Предоплата"
   const [debtMonths, setDebtMonths] = useState("");
   const [firstDueDate, setFirstDueDate] = useState("");
   const [prepaymentAmount, setPrepaymentAmount] = useState("");
@@ -1387,6 +1390,13 @@ const Cart = ({
             ? 0
             : Number(totalAmount || 0);
 
+      const paymentMethod =
+        paymentType === "cash"
+          ? "cash"
+          : paymentType === "Долги" || paymentType === "Предоплата"
+            ? "debt"
+            : "transfer";
+
       if (requestedAmount > 0) {
         await api.post("/construction/cashflows/", {
           cashbox: cashboxId,
@@ -1403,6 +1413,10 @@ const Cart = ({
           client_id: selectedClient.id,
           client: selectedClient.id,
           print_receipt: false,
+          payment_method: paymentMethod,
+          ...(paymentType === "cash"
+            ? { cash_received: Number(requestedAmount || 0) }
+            : {}),
         }),
       ).unwrap();
 
@@ -1420,7 +1434,9 @@ const Cart = ({
       onNotify &&
         onNotify(
           "success",
-          paymentType ? `Долг успешно создан` : "Заказ успешно оформлен",
+          paymentType === "Долги" || paymentType === "Предоплата"
+            ? "Долг успешно создан"
+            : "Заказ успешно оформлен",
         );
       // Clear local state so next open uses a new draft id from parent
       setAgentCartId(null);
