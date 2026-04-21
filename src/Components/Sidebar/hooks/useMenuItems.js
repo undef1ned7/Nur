@@ -4,6 +4,7 @@ import { HIDE_RULES } from "../config/hideRules";
 import { useMenuPermissions } from "./useMenuPermissions";
 import { menuIcons } from "../config/menuIcons";
 import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig";
+import { isStartPlan } from "../../../utils/subscriptionPlan";
 
 /**
  * Хук для сборки финального списка пунктов меню
@@ -76,13 +77,29 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     const configKey = sectorMapping[sectorKey] || sectorKey;
     const sectorConfig = MENU_CONFIG.sector[configKey] || [];
 
-    // Для тарифа "Старт": магазин — только аналитика маркета; кафе — все пункты кроме кухни (повар/KDS)
-    if (tariff === "Старт") {
+    // Для тарифа "Старт": магазин — только аналитика маркета; кафе — все пункты кроме кухни (повар/KDS); производство — без агента (передача, каталог, запросы); склад — без агента (заявки агентов)
+    if (isStartPlan(tariff || company?.subscription_plan?.name)) {
       if (configKey === "cafe") {
         return sectorConfig.filter((item) => {
           if (item.to === "/crm/cafe/cook") return false;
           return hasPermission(item.permission);
         });
+      }
+      if (configKey === "production") {
+        const skip = new Set([
+          "/crm/production/agents",
+          "/crm/production/catalog",
+          "/crm/production/request",
+        ]);
+        return sectorConfig.filter(
+          (item) => !skip.has(item.to) && hasPermission(item.permission),
+        );
+      }
+      if (configKey === "warehouse") {
+        const skip = new Set(["/crm/warehouse/agents"]);
+        return sectorConfig.filter(
+          (item) => !skip.has(item.to) && hasPermission(item.permission),
+        );
       }
       const filteredItems = sectorConfig.filter((item) => {
         if (item.to === "/crm/market/analytics") {

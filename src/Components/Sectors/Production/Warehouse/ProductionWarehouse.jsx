@@ -24,7 +24,7 @@ import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   fetchTransfersAsync,
   fetchReturnsAsync,
-  approveReturnAsync,
+  approveReturnsBulkAsync,
 } from "../../../../store/creators/transferCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
@@ -38,6 +38,7 @@ import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 
 /**
  * Склеивает возвраты (returns) с передачами (transfers).
@@ -115,6 +116,65 @@ export function buildReturnRowsFromArrays(
   return rows;
 }
 
+function getReturnProductId(returnItem) {
+  if (!returnItem) return null;
+  if (returnItem.product_id) return returnItem.product_id;
+  const p = returnItem.product;
+  if (p && typeof p === "object") return p.id ?? p.uuid ?? null;
+  if (typeof p === "string") return p;
+  return null;
+}
+
+function getReturnProductLabel(returnItem) {
+  if (!returnItem) return "Товар без названия";
+  if (returnItem.product_name) return returnItem.product_name;
+  const p = returnItem.product;
+  if (p && typeof p === "object") {
+    return p.name ?? p.title ?? p.label ?? "Товар без названия";
+  }
+  if (typeof p === "string") return p;
+  return "Товар без названия";
+}
+
+function groupPendingReturnsByProduct(returns) {
+  const m = new Map();
+  for (const r of returns || []) {
+    const pid = getReturnProductId(r);
+    const key = pid != null ? String(pid) : `__row:${r.id}`;
+    if (!m.has(key)) {
+      m.set(key, {
+        productId: pid,
+        label: getReturnProductLabel(r),
+        items: [],
+      });
+    }
+    const g = m.get(key);
+    if (
+      (!g.label || g.label === "Товар без названия") &&
+      getReturnProductLabel(r) !== "Товар без названия"
+    ) {
+      g.label = getReturnProductLabel(r);
+    }
+    g.items.push(r);
+  }
+  return Array.from(m.values());
+}
+
+function formatBulkApproveMessage(data, contextLine) {
+  const approved = data?.approved_count ?? data?.items?.length ?? 0;
+  const errCount = data?.errors_count ?? 0;
+  const errs = Array.isArray(data?.errors) ? data.errors : [];
+  let msg = `${contextLine}\nПринято записей: ${approved}.`;
+  if (errCount > 0) {
+    msg += ` Ошибок: ${errCount}.`;
+    if (errs.length) {
+      msg += ` ${errs.slice(0, 5).map(String).join("; ")}`;
+      if (errs.length > 5) msg += "…";
+    }
+  }
+  return msg;
+}
+
 const PendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
 
@@ -173,29 +233,29 @@ const PendingModal = ({ onClose, onChanged }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
-  const handleAcceptReturn = async (agentId) => {
-    const group = groupedReturns.find((g) => g.agentId === agentId);
-    if (!group) return;
-
-    setAcceptingReturn(agentId);
+  const runReturnsBulkApprove = async (
+    loadingKey,
+    payload,
+    contextLine,
+    { autoCloseOnFullSuccess = false } = {},
+  ) => {
+    setAcceptingReturn(loadingKey);
     try {
-      // Принимаем все возвраты агента
-      const promises = group.returns.map((returnItem) =>
-        dispatch(approveReturnAsync(returnItem.id)).unwrap(),
-      );
-      await Promise.all(promises);
-
-      setAlertModal({
-        open: true,
-        type: "success",
-        title: "Успешно",
-        message: `Все возвраты агента "${group.agentName}" успешно приняты! Всего: ${group.returns.length} возвратов, количество: ${group.totalQty}`,
-      });
+      const data = await dispatch(approveReturnsBulkAsync(payload)).unwrap();
+      const errCount = data?.errors_count ?? 0;
       onChanged?.();
       dispatch(fetchReturnsAsync());
-      setTimeout(() => {
-        onClose?.();
-      }, 1500);
+      setAlertModal({
+        open: true,
+        type: errCount > 0 ? "error" : "success",
+        title: errCount > 0 ? "Частичный результат" : "Успешно",
+        message: formatBulkApproveMessage(data, contextLine),
+      });
+      if (autoCloseOnFullSuccess && errCount === 0) {
+        setTimeout(() => {
+          onClose?.();
+        }, 1500);
+      }
     } catch (error) {
       const errorMessage = validateResErrors(
         error,
@@ -210,6 +270,44 @@ const PendingModal = ({ onClose, onChanged }) => {
     } finally {
       setAcceptingReturn(null);
     }
+  };
+
+  const handleAcceptReturn = (agentId) => {
+    const group = groupedReturns.find((g) => g.agentId === agentId);
+    if (!group) return;
+    const ids = group.returns.map((r) => r.id).filter(Boolean);
+    if (!ids.length) return;
+    return runReturnsBulkApprove(
+      `agent:${agentId}`,
+      { ids },
+      `Агент «${group.agentName}»: запрос на принятие ${ids.length} возврат(ов).`,
+      { autoCloseOnFullSuccess: true },
+    );
+  };
+
+  const handleAcceptReturnsByProduct = (agentId, productKey, productGroup) => {
+    const group = groupedReturns.find((g) => g.agentId === agentId);
+    if (!group || !productGroup?.items?.length) return;
+
+    const { productId, items } = productGroup;
+    const ids = items.map((r) => r.id).filter(Boolean);
+    const hasAgent = Boolean(agentId && agentId !== "unknown");
+
+    let payload;
+    if (productId && hasAgent) {
+      payload = { product_id: productId, agent_id: agentId };
+    } else if (ids.length) {
+      payload = { ids };
+    } else {
+      return;
+    }
+
+    return runReturnsBulkApprove(
+      `product:${agentId}:${productKey}`,
+      payload,
+      `Товар «${productGroup.label}» (агент «${group.agentName}»).`,
+      { autoCloseOnFullSuccess: false },
+    );
   };
 
   const load = async () => {
@@ -590,14 +688,20 @@ const PendingModal = ({ onClose, onChanged }) => {
                                 onClick={() =>
                                   handleAcceptReturn(group.agentId)
                                 }
-                                disabled={acceptingReturn === group.agentId}
-                                title="Принять все возвраты агента"
+                                disabled={
+                                  acceptingReturn === `agent:${group.agentId}` ||
+                                  (acceptingReturn &&
+                                    acceptingReturn.startsWith(
+                                      `product:${group.agentId}:`,
+                                    ))
+                                }
+                                title="Принять все возвраты агента одним запросом"
                               >
                                 <CheckCircle
                                   size={16}
                                   style={{ marginRight: "6px" }}
                                 />
-                                {acceptingReturn === group.agentId
+                                {acceptingReturn === `agent:${group.agentId}`
                                   ? "Принятие..."
                                   : "Принять все"}
                               </button>
@@ -614,44 +718,118 @@ const PendingModal = ({ onClose, onChanged }) => {
                                     </span>
                                   </div>
                                   <div className="pending-modal__items-grid">
-                                    {group.returns.map(
-                                      (returnItem, itemIdx) => (
+                                    {groupPendingReturnsByProduct(
+                                      group.returns,
+                                    ).map((productGroup) => {
+                                      const productKey =
+                                        productGroup.productId != null
+                                          ? String(productGroup.productId)
+                                          : productGroup.items[0]?.id ||
+                                            productGroup.label;
+                                      const bulkKey = `product:${group.agentId}:${productKey}`;
+                                      const totalQty = productGroup.items.reduce(
+                                        (s, r) =>
+                                          s + (Number(r.qty || 0) || 0),
+                                        0,
+                                      );
+                                      return (
                                         <div
-                                          key={returnItem.id || itemIdx}
+                                          key={bulkKey}
                                           className="pending-modal__item-card"
                                         >
                                           <div className="pending-modal__item-name">
-                                            {returnItem.product ||
-                                              "Товар без названия"}
+                                            {productGroup.label}
                                           </div>
                                           <div className="pending-modal__item-details">
                                             <span className="pending-modal__item-quantity">
-                                              Количество:{" "}
+                                              Возвратов:{" "}
                                               <strong>
-                                                {returnItem.qty || 0}
+                                                {productGroup.items.length}
                                               </strong>
+                                              , сумма qty:{" "}
+                                              <strong>{totalQty}</strong>
                                             </span>
-                                            {returnItem.returned_at && (
-                                              <span className="pending-modal__item-price">
-                                                Дата:{" "}
-                                                <strong>
-                                                  {new Date(
-                                                    returnItem.returned_at,
-                                                  ).toLocaleString("ru-RU", {
-                                                    timeZone: "Asia/Bishkek",
-                                                    day: "2-digit",
-                                                    month: "2-digit",
-                                                    year: "numeric",
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                  })}
-                                                </strong>
-                                              </span>
-                                            )}
                                           </div>
+                                          <div
+                                            style={{
+                                              marginTop: "10px",
+                                              display: "flex",
+                                              flexWrap: "wrap",
+                                              gap: "8px",
+                                            }}
+                                          >
+                                            <button
+                                              type="button"
+                                              className="pending-modal__btn pending-modal__btn--primary"
+                                              style={{
+                                                fontSize: "13px",
+                                                padding: "6px 12px",
+                                              }}
+                                              onClick={() =>
+                                                handleAcceptReturnsByProduct(
+                                                  group.agentId,
+                                                  productKey,
+                                                  productGroup,
+                                                )
+                                              }
+                                              disabled={
+                                                acceptingReturn === bulkKey ||
+                                                acceptingReturn ===
+                                                  `agent:${group.agentId}`
+                                              }
+                                              title="Один запрос: все pending-возвраты этого товара у агента"
+                                            >
+                                              <CheckCircle
+                                                size={14}
+                                                style={{ marginRight: "6px" }}
+                                              />
+                                              {acceptingReturn === bulkKey
+                                                ? "Принятие…"
+                                                : "Принять все по товару"}
+                                            </button>
+                                          </div>
+                                          <ul
+                                            style={{
+                                              margin: "10px 0 0",
+                                              paddingLeft: "18px",
+                                              fontSize: "12px",
+                                              color: "#6b7280",
+                                            }}
+                                          >
+                                            {productGroup.items.map(
+                                              (returnItem, itemIdx) => (
+                                                <li
+                                                  key={
+                                                    returnItem.id || itemIdx
+                                                  }
+                                                >
+                                                  qty:{" "}
+                                                  <strong>
+                                                    {returnItem.qty || 0}
+                                                  </strong>
+                                                  {returnItem.returned_at
+                                                    ? ` · ${new Date(
+                                                        returnItem.returned_at,
+                                                      ).toLocaleString(
+                                                        "ru-RU",
+                                                        {
+                                                          timeZone:
+                                                            "Asia/Bishkek",
+                                                          day: "2-digit",
+                                                          month: "2-digit",
+                                                          year: "numeric",
+                                                          hour: "2-digit",
+                                                          minute: "2-digit",
+                                                        },
+                                                      )}`
+                                                    : ""}
+                                                </li>
+                                              ),
+                                            )}
+                                          </ul>
                                         </div>
-                                      ),
-                                    )}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </td>
@@ -966,6 +1144,10 @@ const ProductionWarehouse = () => {
   const [activeTab, setActiveTab] = useState(0);
   const dispatch = useDispatch();
   const { list: products } = useProducts();
+  const { tariff, company } = useUser();
+  const startPlanProduction = isStartPlan(
+    tariff || company?.subscription_plan?.name,
+  );
 
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAgentCartsModal, setShowAgentCartsModal] = useState(false);
@@ -1048,7 +1230,7 @@ const ProductionWarehouse = () => {
               </span>
             );
           })}
-          {activeTab === 0 && (
+          {activeTab === 0 && !startPlanProduction && (
             <>
               <span
                 onClick={() => setShowPendingModal(true)}

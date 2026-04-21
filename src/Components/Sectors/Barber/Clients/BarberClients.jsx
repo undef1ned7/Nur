@@ -218,22 +218,31 @@ export const BarberClients = () => {
         }
 
         // Нормализуем данные
-        const normalized = results.map((c) => ({
-          id: c.id,
-          fullName: c.full_name || "",
-          phone: c.phone || "",
-          birthDate: c.birth_date || "",
-          status:
-            API_TO_UI_STATUS[String(c.status || "").toLowerCase()] ||
-            "Активен",
-          notes: c.notes || "",
-          createdAt: c.created_at || c.createdAt || null,
-          visitsCount:
-            c.visits_count ??
-            c.visitsCount ??
-            c.visits ??
-            null,
-        }));
+        const normalized = results.map((c) => {
+          const fileRaw = c.file;
+          const fileUrl =
+            typeof fileRaw === "string"
+              ? fileRaw
+              : fileRaw?.url || fileRaw?.file || null;
+          return {
+            id: c.id,
+            fullName: c.full_name || "",
+            phone: c.phone || "",
+            birthDate: c.birth_date || "",
+            status:
+              API_TO_UI_STATUS[String(c.status || "").toLowerCase()] ||
+              "Активен",
+            notes: c.notes || "",
+            fileUrl,
+            fileComment: c.file_comment || "",
+            createdAt: c.created_at || c.createdAt || null,
+            visitsCount:
+              c.visits_count ??
+              c.visitsCount ??
+              c.visits ??
+              null,
+          };
+        });
 
         setClients(normalized);
         setClientsCount(count);
@@ -470,35 +479,65 @@ export const BarberClients = () => {
   const saveClient = async (form) => {
     setSaving(true);
     try {
+      const statusApi = UI_TO_API_STATUS[form.status] || "active";
+      const company = localStorage.getItem("company");
+      const hasFile = form.file instanceof File && form.file.size > 0;
+
       const payload = {
         full_name: form.fullName,
         phone: form.phone,
         birth_date: form.birthDate || null,
-        status: UI_TO_API_STATUS[form.status] || "active",
+        status: statusApi,
         notes: form.notes || null,
-        company: localStorage.getItem("company"),
+        company,
+        file_comment: form.fileComment?.trim() || null,
       };
       for (let [key, value] of Object.entries(payload)) {
         if (!value) payload[key] = null;
       }
-      if (currentClient?.id) {
-        const id = encodeURIComponent(currentClient.id);
 
-        try {
-          await api.patch(`/barbershop/clients/${id}/`, payload);
-        } catch (err) {
-          const st = err?.response?.status;
-          if (st === 404 || st === 405 || st === 301 || st === 302) {
-            await api.patch(`/barbershop/clients/${id}`, payload);
-          } else {
-            throw err;
+      const multipartConfig = {
+        transformRequest: [
+          (data, headers) => {
+            delete headers["Content-Type"];
+            return data;
+          },
+        ],
+      };
+
+      const sendBody = async (body, useMultipart) => {
+        const cfg = useMultipart ? multipartConfig : {};
+        if (currentClient?.id) {
+          const id = encodeURIComponent(currentClient.id);
+          try {
+            await api.patch(`/barbershop/clients/${id}/`, body, cfg);
+          } catch (err) {
+            const st = err?.response?.status;
+            if (st === 404 || st === 405 || st === 301 || st === 302) {
+              await api.patch(`/barbershop/clients/${id}`, body, cfg);
+            } else {
+              throw err;
+            }
           }
+        } else {
+          await api.post("/barbershop/clients/", body, cfg);
         }
+      };
+
+      if (hasFile) {
+        const fd = new FormData();
+        fd.append("full_name", form.fullName);
+        fd.append("phone", form.phone || "");
+        fd.append("birth_date", form.birthDate || "");
+        fd.append("status", statusApi);
+        fd.append("notes", form.notes || "");
+        fd.append("company", company || "");
+        const fc = form.fileComment?.trim();
+        if (fc) fd.append("file_comment", fc);
+        fd.append("file", form.file);
+        await sendBody(fd, true);
       } else {
-        await api.post(
-          "/barbershop/clients/",
-          payload
-        );
+        await sendBody(payload, false);
       }
 
       refreshClients();
@@ -519,12 +558,18 @@ export const BarberClients = () => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
+    const fileField = fd.get("clientFile");
+    const file =
+      fileField instanceof File && fileField.size > 0 ? fileField : null;
+
     const form = {
       fullName: fd.get("fullName")?.toString().trim() || "",
       phone: fd.get("phone")?.toString().trim() || "",
       birthDate: fd.get("birthDate")?.toString().trim() || "",
       status: fd.get("status")?.toString().trim() || "Активен",
       notes: fd.get("notes")?.toString() || "",
+      file,
+      fileComment: fd.get("fileComment")?.toString().trim() || "",
     };
 
     const { errs, alerts } = await validateClient(form);

@@ -233,6 +233,41 @@ const ClientModals = ({
                     placeholder="Заметка..."
                   />
                 </div>
+
+                <div className="barberclient__field barberclient__field--full">
+                  <label className="barberclient__label" htmlFor="clientFile">
+                    Файл
+                  </label>
+                  {currentClient?.fileUrl ? (
+                    <a
+                      className="barberclient__fileLink"
+                      href={currentClient.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Текущий файл
+                    </a>
+                  ) : null}
+                  <input
+                    id="clientFile"
+                    name="clientFile"
+                    type="file"
+                    className="barberclient__file"
+                  />
+                </div>
+
+                <div className="barberclient__field barberclient__field--full">
+                  <label className="barberclient__label" htmlFor="fileComment">
+                    Комментарий к файлу
+                  </label>
+                  <textarea
+                    id="fileComment"
+                    name="fileComment"
+                    className="barberclient__textarea"
+                    defaultValue={currentClient?.fileComment || ""}
+                    placeholder="Описание или пояснение к прикреплённому файлу..."
+                  />
+                </div>
               </div>
 
               <div className="barberclient__formActions">

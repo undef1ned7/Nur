@@ -906,6 +906,52 @@ $accent-blacklist: #ef4444;
     resize: vertical;
   }
 
+  &__file {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 400;
+    background: #fafafa;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:focus {
+      outline: none;
+      background: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.15);
+    }
+
+    &::file-selector-button {
+      margin-right: 12px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: #1a1a1a;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+  }
+
+  &__fileLink {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #b45309;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: #92400e;
+    }
+  }
+
   &__formActions {
     border-top: 1px solid rgba(0, 0, 0, 0.06);
     padding: 16px 22px;

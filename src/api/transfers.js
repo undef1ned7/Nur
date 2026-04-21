@@ -266,6 +266,23 @@ export const approveReturnApi = async (returnId) => {
   }
 };
 
+/** Массовое подтверждение возвратов: { ids } или { product_id, agent_id? } */
+export const approveReturnsBulkApi = async (body) => {
+  try {
+    const response = await api.post("main/returns/approve-bulk/", body);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Approve Returns Bulk Error Data:", error.response.data);
+      console.error(
+        "Approve Returns Bulk Error Status:",
+        error.response.status,
+      );
+      return Promise.reject(error.response.data);
+    }
+  }
+};
+
 export const rejectReturnApi = async (returnId) => {
   try {
     const response = await api.post(`main/returns/${returnId}/reject/`);

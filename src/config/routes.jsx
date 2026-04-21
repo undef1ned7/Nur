@@ -153,6 +153,7 @@ import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/C
 import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocumentsPage";
 import WarehouseKassa from "../Components/Sectors/Warehouse/Kassa/WarehouseKassa";
 import WarehouseAgents from "../Components/Sectors/Warehouse/Agents/Agents";
+import WarehouseStartAgentGate from "../Components/Sectors/Warehouse/WarehouseStartAgentGate";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
 import ProductionWarehouseProductDetail from "../Components/Sectors/Production/Warehouse/ProductionWarehouseProductDetail";
@@ -164,6 +165,7 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 import ProductionSell from "../Components/Sectors/Production/Sell/ProductionSell";
 import ProductionSellStartPage from "../Components/Sectors/Production/Sell/ProductionSellStartPage";
 import ProductionFinishedGoodsAddPage from "../Components/Sectors/Production/FinishedGoods/ProductionFinishedGoodsAddPage";
+import ProductionStartAgentGate from "../Components/Sectors/Production/ProductionStartAgentGate";
 
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
@@ -223,6 +225,38 @@ const createProtectedRoute = (path, Component, props) => (
     element={
       <ProtectedRoute>
         <Component />
+      </ProtectedRoute>
+    }
+    {...props}
+  />
+);
+
+/** Производство: маршруты с агентом недоступны на тарифе «Старт». */
+const createProductionAgentProtectedRoute = (path, Component, props) => (
+  <Route
+    key={path}
+    path={path}
+    element={
+      <ProtectedRoute>
+        <ProductionStartAgentGate>
+          <Component />
+        </ProductionStartAgentGate>
+      </ProtectedRoute>
+    }
+    {...props}
+  />
+);
+
+/** Склад: маршруты агента недоступны на тарифе «Старт». */
+const createWarehouseAgentProtectedRoute = (path, Component, props) => (
+  <Route
+    key={path}
+    path={path}
+    element={
+      <ProtectedRoute>
+        <WarehouseStartAgentGate>
+          <Component />
+        </WarehouseStartAgentGate>
       </ProtectedRoute>
     }
     {...props}
@@ -615,14 +649,19 @@ export const crmRoutes = (profile) => [
       element={<MoneyDocumentsPage />}
     />
   </Route>,
-  createProtectedRoute("warehouse/agents", WarehouseAgents),
+  createWarehouseAgentProtectedRoute("warehouse/agents", WarehouseAgents),
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
   createProtectedRoute("warehouse/stocks", WarehouseStocks),
   createProtectedRoute("warehouse/stocks/:warehouse_id", WarehouseStocks),
   ...(profile?.role === "agent"
-    ? [createProtectedRoute("warehouse/agent-stocks", AgentStocks)]
+    ? [
+        createWarehouseAgentProtectedRoute(
+          "warehouse/agent-stocks",
+          AgentStocks,
+        ),
+      ]
     : []),
   createProtectedRoute("warehouse/stocks/add-product", AddWarehouseProductPage),
   createProtectedRoute(
@@ -660,10 +699,13 @@ export const crmRoutes = (profile) => [
     ProductionWarehouseProductDetail,
   ),
   createProtectedRoute("production/analytics", ProductionAnalytics),
-  createProtectedRoute("production/agents/:agentId/analytics", AgentAnalytics),
-  createProtectedRoute("production/agents", ProductionAgents),
-  createProtectedRoute("production/catalog", ProductionCatalog),
-  createProtectedRoute("production/request", ProductionRequest),
+  createProductionAgentProtectedRoute(
+    "production/agents/:agentId/analytics",
+    AgentAnalytics,
+  ),
+  createProductionAgentProtectedRoute("production/agents", ProductionAgents),
+  createProductionAgentProtectedRoute("production/catalog", ProductionCatalog),
+  createProductionAgentProtectedRoute("production/request", ProductionRequest),
   createProtectedRoute("production/sell", ProductionSell),
   createProtectedRoute("production/sell/start", ProductionSellStartPage),
 

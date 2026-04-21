@@ -10,7 +10,10 @@ import {
   updateItemsMake,
   deleteItemsMake,
 } from "../../../../store/creators/productCreators";
-import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+import {
+  createClientAsync,
+  fetchClientsAsync,
+} from "../../../../store/creators/clientCreators";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import {
   addCashFlows,
@@ -68,6 +71,21 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
   const [debtMonths, setDebtMonths] = useState("1");
   const [prepayment, setPrepayment] = useState("");
   const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    date: new Date().toISOString().split("T")[0],
+    type: "suppliers",
+    llc: "",
+    inn: "",
+    okpo: "",
+    score: "",
+    bik: "",
+    address: "",
+  });
   const dispatch = useDispatch();
   const [cashData, setCashData] = useState({
     cashbox: "",
@@ -94,6 +112,47 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
   const onChange = (e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onSupplierFormChange = (e) => {
+    const { name, value } = e.target;
+    setSupplierForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreateSupplier = async () => {
+    if (!supplierForm.full_name?.trim()) {
+      error("Укажите ФИО или название поставщика");
+      return;
+    }
+    setCreatingSupplier(true);
+    try {
+      const created = await dispatch(createClientAsync(supplierForm)).unwrap();
+      const newId = created?.id ?? created?.uuid;
+      await dispatch(fetchClientsAsync()).unwrap();
+      if (newId != null) {
+        setState((prev) => ({ ...prev, client: String(newId) }));
+      }
+      setSupplierForm({
+        full_name: "",
+        phone: "",
+        email: "",
+        date: new Date().toISOString().split("T")[0],
+        type: "suppliers",
+        llc: "",
+        inn: "",
+        okpo: "",
+        score: "",
+        bik: "",
+        address: "",
+      });
+      setShowSupplierForm(false);
+      alert("Поставщик создан", () => {});
+    } catch (err) {
+      const msg = validateResErrors(err, "Не удалось создать поставщика");
+      error(msg);
+    } finally {
+      setCreatingSupplier(false);
+    }
   };
 
   const onSubmit = async (e) => {
@@ -287,6 +346,115 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="add-modal__cancel"
+            style={{ marginTop: 8, width: "100%" }}
+            onClick={() => setShowSupplierForm((v) => !v)}
+          >
+            {showSupplierForm ? "Отменить создание" : "Создать поставщика"}
+          </button>
+          {showSupplierForm && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                rowGap: "10px",
+                marginTop: "10px",
+              }}
+            >
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                placeholder="ФИО или название *"
+                name="full_name"
+                value={supplierForm.full_name}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="llc"
+                placeholder="ОсОО"
+                value={supplierForm.llc}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="inn"
+                placeholder="ИНН"
+                value={supplierForm.inn}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="okpo"
+                placeholder="ОКПО"
+                value={supplierForm.okpo}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="score"
+                placeholder="Р/счёт"
+                value={supplierForm.score}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="bik"
+                placeholder="БИК"
+                value={supplierForm.bik}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="address"
+                placeholder="Адрес"
+                value={supplierForm.address}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="text"
+                name="phone"
+                placeholder="Телефон"
+                value={supplierForm.phone}
+              />
+              <input
+                className="add-modal__input"
+                onChange={onSupplierFormChange}
+                type="email"
+                name="email"
+                placeholder="Почта"
+                value={supplierForm.email}
+              />
+              <div style={{ display: "flex", columnGap: "10px" }}>
+                <button
+                  type="button"
+                  className="add-modal__cancel"
+                  onClick={() => setShowSupplierForm(false)}
+                  disabled={creatingSupplier}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="add-modal__save"
+                  onClick={handleCreateSupplier}
+                  disabled={creatingSupplier}
+                >
+                  {creatingSupplier ? "Создание…" : "Создать"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {!!state.client && (
@@ -669,7 +837,7 @@ const RawMaterialsWarehouse = () => {
     <div className="warehouse-page">
       {/* Header */}
       <div className="warehouse-header">
-        <div className="warehouse-header__left">
+        <div className="warehouse-header__left !align-middle">
           <div className="warehouse-header__icon">
             <div className="warehouse-header__icon-box">📦</div>
           </div>

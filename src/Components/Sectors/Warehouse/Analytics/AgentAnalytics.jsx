@@ -42,6 +42,8 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { getAgentMeAnalytics, getOwnerAgentAnalytics } from "../../../../api/warehouse";
+import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import "./Analytics.scss";
 
 const PERIODS = [
@@ -246,6 +248,9 @@ const AccordionItem = ({
 const AgentAnalytics = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const { tariff, company } = useUser();
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
+  const showAgentSalesAnalytics = !startPlan;
   const agentId = searchParams.get("agent_id") || null;
   const agentName = location.state?.agentName || null;
 
@@ -432,12 +437,14 @@ const AgentAnalytics = () => {
               description="Товаров выдано"
               icon={Package}
             />
-            <KpiCard
-              label="Продажи"
-              value={`${formatNum(salesAmount)} сом`}
-              description={`${formatNum(salesCount)} продаж, ${formatNum(salesQty)} шт`}
-              icon={ShoppingCart}
-            />
+            {showAgentSalesAnalytics && (
+              <KpiCard
+                label="Продажи"
+                value={`${formatNum(salesAmount)} сом`}
+                description={`${formatNum(salesCount)} продаж, ${formatNum(salesQty)} шт`}
+                icon={ShoppingCart}
+              />
+            )}
             <KpiCard
               label="Возвраты"
               value={`${formatNum(returnsAmount)} сом`}
@@ -475,81 +482,83 @@ const AgentAnalytics = () => {
           </div>
 
           <div className="warehouse-analytics__chartsRow">
-            <div className="warehouse-analytics__card warehouse-analytics__card--chart">
-              <div className="warehouse-analytics__cardTitle">
-                Динамика продаж
+            {showAgentSalesAnalytics && (
+              <div className="warehouse-analytics__card warehouse-analytics__card--chart">
+                <div className="warehouse-analytics__cardTitle">
+                  Динамика продаж
+                </div>
+                <div className="warehouse-analytics__chartWrap">
+                  {salesChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart
+                        data={salesChartData}
+                        margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="agentAnalyticsAreaFill"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="var(--wa-primary)"
+                              stopOpacity={0.4}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="var(--wa-primary)"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--wa-border)"
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) =>
+                            v && v.length > 6 ? v.slice(0, 6) : v
+                          }
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => formatNum(v)}
+                        />
+                        <Tooltip
+                          formatter={(value) => [
+                            formatNum(value),
+                            "Продажи (сом)",
+                          ]}
+                          labelFormatter={(l) => `Дата: ${l}`}
+                        />
+                        <Legend
+                          formatter={() => "Продажи (сом)"}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: 12 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="sum"
+                          stroke="var(--wa-primary)"
+                          strokeWidth={2}
+                          fill="url(#agentAnalyticsAreaFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="warehouse-analytics__chartWrap--empty">
+                      Нет данных за период.
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="warehouse-analytics__chartWrap">
-                {salesChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart
-                      data={salesChartData}
-                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="agentAnalyticsAreaFill"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="var(--wa-primary)"
-                            stopOpacity={0.4}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="var(--wa-primary)"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--wa-border)"
-                      />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) =>
-                          v && v.length > 6 ? v.slice(0, 6) : v
-                        }
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) => formatNum(v)}
-                      />
-                      <Tooltip
-                        formatter={(value) => [
-                          formatNum(value),
-                          "Продажи (сом)",
-                        ]}
-                        labelFormatter={(l) => `Дата: ${l}`}
-                      />
-                      <Legend
-                        formatter={() => "Продажи (сом)"}
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: 12 }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="sum"
-                        stroke="var(--wa-primary)"
-                        strokeWidth={2}
-                        fill="url(#agentAnalyticsAreaFill)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="warehouse-analytics__chartWrap--empty">
-                    Нет данных за период.
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
 
             <div className="warehouse-analytics__card warehouse-analytics__card--chart">
               <div className="warehouse-analytics__cardTitle">
