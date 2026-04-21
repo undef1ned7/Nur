@@ -15,6 +15,13 @@ export const stripEmpty = (obj) =>
     Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "")
   );
 
+export const stripEmptyKeepComment = (obj) =>
+  Object.fromEntries(
+    Object.entries(obj).filter(
+      ([k, v]) => k === "comment" || (v !== undefined && v !== null && v !== ""),
+    ),
+  );
+
 /** unit_price как строка decimal или null (x-nullable). */
 export const decimalStringOrNull = (v) => {
   if (v === null || v === undefined || v === "") return null;
@@ -45,26 +52,28 @@ export const serializeOrderItemInline = (i, orderRef) => {
       line_kind: "service",
       menu_item: null,
       service_title: String(i.service_title || "").trim().slice(0, 255),
+      comment: String(i.comment || "").trim().slice(0, 500),
       unit_price: decimalStringOrNull(i.unit_price ?? i.price),
       quantity: qty,
       is_rejected: rejected,
       rejection_reason,
     };
     if (i.id) row.id = i.id;
-    return row;
+    return stripEmptyKeepComment(row);
   }
 
   const row = {
     order: orderRef,
     line_kind: "menu",
     menu_item: toId(i.menu_item),
+    comment: String(i.comment || "").trim().slice(0, 500),
     unit_price: decimalStringOrNull(i.price ?? i.unit_price),
     quantity: qty,
     is_rejected: rejected,
     rejection_reason,
   };
   if (i.id) row.id = i.id;
-  return row;
+  return stripEmptyKeepComment(row);
 };
 
 export const normalizeOrderPayload = (f, isNew = false, editingOrderId = null) => {

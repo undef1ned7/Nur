@@ -459,8 +459,12 @@ function buildPrettyReceiptFromJSON(payload) {
     const qty = Math.max(1, Number(it.qty || 0));
     const price = Number(it.price || 0);
     const sum = qty * price;
+    const comment = String(it.comment ?? "").trim();
 
     chunks.push(enc(name + "\n"));
+    if (comment) {
+      chunks.push(enc(`Комментарий: ${comment}\n`));
+    }
     chunks.push(enc(`${qty} x ${money(price)} = ${money(sum)}\n`));
     chunks.push(enc("\n"));
   }
