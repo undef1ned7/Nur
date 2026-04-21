@@ -765,68 +765,33 @@ const CashierPage = () => {
           return;
         }
 
-        // Проверяем наличие товара ПЕРЕД добавлением в корзину
-        // Ищем товар в списке продуктов по штрих-коду
-        let scannedProduct = products.find((p) =>
-          productMatchesBarcode(p, barcode),
-        );
-
-        if (scannedProduct) {
-          const availableQuantity = parseFloat(scannedProduct.quantity || 0);
-          const isInStock = availableQuantity > 0;
-
-          if (!isInStock) {
-            showAlert(
-              "warning",
-              "Товар отсутствует",
-              "Товар отсутствует в наличии",
-            );
-            barcodeProcessingRef.current = false;
-            setScannedBarcode("");
-            return;
-          }
+        const res = await dispatch(
+          sendBarCode({ barcode, id: saleId }),
+        ).unwrap();
+        if (res?.error) {
+          const msg =
+            typeof res.error === "string"
+              ? res.error
+              : "Товар с таким штрих-кодом не найден";
+          showAlert("error", "Ошибка сканирования", msg);
+          return;
         }
 
-        // Если товара нет в локальном списке (например, из-за пагинации),
-        // пробуем найти его по штрих-коду через API, чтобы добавить поштучно.
-        if (!scannedProduct) {
-          try {
-            const productByBarcode = await api.get(
-              `/main/products/global-barcode/${barcode}/`,
-            );
-            if (productByBarcode?.data?.id) {
-              scannedProduct = productByBarcode.data;
+        const scanItems = res?.items ?? res?.cart?.items;
+        if (Array.isArray(scanItems) && scanItems.length > 0) {
+          for (let i = scanItems.length - 1; i >= 0; i--) {
+            const it = scanItems[i];
+            const pid = it.product ?? it.product_id;
+            const p = products.find((x) => x.id === pid);
+            if (p && productMatchesBarcode(p, barcode)) {
+              requestCartQuantityFocus({
+                itemId: it.id,
+                productId: pid,
+                salePackage: it.sale_package ?? null,
+              });
+              break;
             }
-          } catch (_e) {
-            // Игнорируем и ниже используем серверный scan endpoint как fallback
           }
-        }
-
-        if (scannedProduct) {
-          // Для найденного товара добавляем поштучно, как в UI-кнопке "+1 шт (из упаковки)".
-          // Это предотвращает добавление целой упаковки (например, 10 шт) при сканировании.
-          const piecePackage = getDefaultPiecePackage(scannedProduct);
-          await addToCartWithPackage(scannedProduct, piecePackage?.id ?? null);
-        } else {
-          // Fallback: если товара нет в локальном списке, полагаемся на серверный scan endpoint.
-          const res = await dispatch(
-            sendBarCode({ barcode, id: saleId }),
-          ).unwrap();
-          if (res?.error) {
-            const msg =
-              typeof res.error === "string"
-                ? res.error
-                : "Товар с таким штрих-кодом не найден";
-            showAlert("error", "Ошибка сканирования", msg);
-            return;
-          }
-        }
-
-        if (scannedProduct?.id) {
-          requestCartQuantityFocus({
-            productId: scannedProduct.id,
-            salePackage: null,
-          });
         }
         // Обновляем продажу после добавления товара
         try {
