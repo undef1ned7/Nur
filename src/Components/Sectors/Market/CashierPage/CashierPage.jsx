@@ -248,6 +248,9 @@ const CashierPage = () => {
   const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
+  const qtyInputScanGuardRef = React.useRef({ count: 0, lastTime: 0 });
+  const qtyInputFocusRef = React.useRef({ itemId: null, prevValue: "" });
+  const suppressQtyBlurUpdateRef = React.useRef({});
   const cartQtyInputRefs = React.useRef(new Map()); // item.id -> input
   const pendingQtyFocusRef = React.useRef(null); // { itemId?, productId?, salePackage? }
   const [showMenuModal, setShowMenuModal] = useState(false);
@@ -727,13 +730,23 @@ const CashierPage = () => {
 
         // Если нет продажи, создаем её
         if (!saleId) {
-          const result = await dispatch(
-            startSale({
-              discount_total: 0,
-              shift: openShiftId,
-            }),
-          ).unwrap();
-          saleId = result?.id;
+          try {
+            const result = await dispatch(
+              startSale({
+                discount_total: 0,
+                shift: openShiftId,
+              }),
+            ).unwrap();
+            saleId = result?.id;
+          } catch (e) {
+            // startSale может быть отклонен condition callback-ом, если уже идет параллельный запрос.
+            // В таком случае не показываем ошибку сканирования, а пробуем взять уже созданную продажу.
+            const msg = String(e?.message || e || "");
+            if (!msg.includes("condition callback returning false")) {
+              throw e;
+            }
+            saleId = currentSale?.id;
+          }
         }
 
         if (!saleId) {
@@ -744,7 +757,7 @@ const CashierPage = () => {
 
         // Проверяем наличие товара ПЕРЕД добавлением в корзину
         // Ищем товар в списке продуктов по штрих-коду
-        const scannedProduct = products.find((p) =>
+        let scannedProduct = products.find((p) =>
           productMatchesBarcode(p, barcode),
         );
 
@@ -764,34 +777,63 @@ const CashierPage = () => {
           }
         }
 
-        // Добавляем товар по штрих-коду
-        const res = await dispatch(
-          sendBarCode({ barcode, id: saleId }),
-        ).unwrap();
-
-        if (res?.error) {
-          const msg =
-            typeof res.error === "string"
-              ? res.error
-              : "Товар с таким штрих-кодом не найден";
-          showAlert("error", "Ошибка сканирования", msg);
-        } else {
-          if (scannedProduct?.id) {
-            requestCartQuantityFocus({
-              productId: scannedProduct.id,
-              salePackage: null,
-            });
+        // Если товара нет в локальном списке (например, из-за пагинации),
+        // пробуем найти его по штрих-коду через API, чтобы добавить поштучно.
+        if (!scannedProduct) {
+          try {
+            const productByBarcode = await api.get(
+              `/main/products/global-barcode/${barcode}/`,
+            );
+            if (productByBarcode?.data?.id) {
+              scannedProduct = productByBarcode.data;
+            }
+          } catch (_e) {
+            // Игнорируем и ниже используем серверный scan endpoint как fallback
           }
-          // Обновляем продажу после добавления товара
+        }
+
+        if (scannedProduct) {
+          // Для найденного товара добавляем поштучно, как в UI-кнопке "+1 шт (из упаковки)".
+          // Это предотвращает добавление целой упаковки (например, 10 шт) при сканировании.
+          const piecePackage = getDefaultPiecePackage(scannedProduct);
+          await addToCartWithPackage(scannedProduct, piecePackage?.id ?? null);
+        } else {
+          // Fallback: если товара нет в локальном списке, полагаемся на серверный scan endpoint.
+          const res = await dispatch(
+            sendBarCode({ barcode, id: saleId }),
+          ).unwrap();
+          if (res?.error) {
+            const msg =
+              typeof res.error === "string"
+                ? res.error
+                : "Товар с таким штрих-кодом не найден";
+            showAlert("error", "Ошибка сканирования", msg);
+            return;
+          }
+        }
+
+        if (scannedProduct?.id) {
+          requestCartQuantityFocus({
+            productId: scannedProduct.id,
+            salePackage: null,
+          });
+        }
+        // Обновляем продажу после добавления товара
+        try {
           await dispatch(
             startSale({ discount_total: 0, shift: openShiftId }),
           ).unwrap();
-          // Обновляем время последнего сканирования после успешного добавления
-          // Это защитит от открытия страницы оплаты при Enter от сканера
-          lastScanTimeRef.current = Date.now();
-          // Убеждаемся, что флаг сканирования установлен
-          isScanningRef.current = true;
+        } catch (e) {
+          const msg = String(e?.message || e || "");
+          if (!msg.includes("condition callback returning false")) {
+            throw e;
+          }
         }
+        // Обновляем время последнего сканирования после успешного добавления
+        // Это защитит от открытия страницы оплаты при Enter от сканера
+        lastScanTimeRef.current = Date.now();
+        // Убеждаемся, что флаг сканирования установлен
+        isScanningRef.current = true;
       } catch (error) {
         console.error("Ошибка при сканировании:", error);
         showAlert(
@@ -1255,6 +1297,61 @@ const CashierPage = () => {
   }, [searchTerm]);
 
   // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
+  useEffect(() => {
+    // Если сканер начинает "печатать" в инпут количества, сначала снимаем фокус с инпута,
+    // чтобы символы скана не попали в поле количества (например "10").
+    const blurQtyInputBeforeScan = (e) => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLInputElement)) return;
+      if (!active.classList.contains("cashier-page__cart-item-quantity-input")) {
+        qtyInputScanGuardRef.current.count = 0;
+        return;
+      }
+
+      const key = e.key || "";
+      const isChar = key.length === 1 && /^[0-9A-Za-z]$/.test(key);
+      const isScanTerminator = key === "Enter" || key === "Tab";
+      if (!isChar && !isScanTerminator) return;
+
+      const now = Date.now();
+      const dt = now - qtyInputScanGuardRef.current.lastTime;
+      qtyInputScanGuardRef.current.lastTime = now;
+
+      // Для ручного ввода (в т.ч. дробных значений) guard НЕ должен срабатывать.
+      // Считаем сканером только очень быстрый поток символов.
+      if (dt < 40) {
+        qtyInputScanGuardRef.current.count += 1;
+      } else {
+        qtyInputScanGuardRef.current.count = 1;
+      }
+
+      // Блокируем ввод в количество только при явном паттерне сканера
+      // (несколько символов подряд с очень маленьким интервалом).
+      if (qtyInputScanGuardRef.current.count >= 3) {
+        e.preventDefault();
+        const focusedItemId = active.dataset?.cartItemId;
+        if (
+          focusedItemId &&
+          qtyInputFocusRef.current.itemId === focusedItemId &&
+          qtyInputFocusRef.current.prevValue !== ""
+        ) {
+          suppressQtyBlurUpdateRef.current[focusedItemId] = true;
+          setCartQuantities((prev) => ({
+            ...prev,
+            [focusedItemId]: qtyInputFocusRef.current.prevValue,
+          }));
+        }
+        active.blur();
+        qtyInputScanGuardRef.current.count = 0;
+      }
+    };
+
+    window.addEventListener("keydown", blurQtyInputBeforeScan, true);
+    return () => {
+      window.removeEventListener("keydown", blurQtyInputBeforeScan, true);
+    };
+  }, []);
+
   useEffect(() => {
     const handleGlobalEnter = (e) => {
       const now = Date.now();
@@ -2754,6 +2851,7 @@ const CashierPage = () => {
                           }}
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
+                          data-cart-item-id={item.id}
                           value={
                             cartQuantities[item.id] ??
                             formatQuantity(item.quantity || 0)
@@ -2844,8 +2942,24 @@ const CashierPage = () => {
                               [item.id]: value,
                             }));
                           }}
-                          onFocus={(e) => e.target.select()}
+                          onFocus={(e) => {
+                            qtyInputFocusRef.current = {
+                              itemId: String(item.id),
+                              prevValue:
+                                cartQuantities[item.id] ??
+                                formatQuantity(item.quantity || 0),
+                            };
+                            e.target.select();
+                          }}
                           onBlur={async (e) => {
+                            if (suppressQtyBlurUpdateRef.current[String(item.id)]) {
+                              delete suppressQtyBlurUpdateRef.current[String(item.id)];
+                              qtyInputFocusRef.current = {
+                                itemId: null,
+                                prevValue: "",
+                              };
+                              return;
+                            }
                             const value = e.target.value;
                             const qtyNum = normalizeQuantity(
                               Math.max(0, parseFloat(value) || 0),
@@ -2895,6 +3009,10 @@ const CashierPage = () => {
                                 [item.id]: formatQuantity(item.quantity || 0),
                               }));
                             }
+                            qtyInputFocusRef.current = {
+                              itemId: null,
+                              prevValue: "",
+                            };
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") e.target.blur();

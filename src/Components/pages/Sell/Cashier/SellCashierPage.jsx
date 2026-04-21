@@ -430,7 +430,7 @@ const SellCashierPage = () => {
 
         // Проверяем наличие товара ПЕРЕД добавлением в корзину
         // Ищем товар в списке продуктов по штрих-коду
-        const scannedProduct = products.find((p) =>
+        let scannedProduct = products.find((p) =>
           productMatchesBarcode(p, barcode),
         );
 
@@ -450,28 +450,48 @@ const SellCashierPage = () => {
           }
         }
 
-        // Добавляем товар по штрих-коду
-        const res = await dispatch(
-          sendBarCode({ barcode, id: saleId }),
-        ).unwrap();
+        // Если товара нет в локальном списке (пагинация), пробуем получить его по barcode.
+        if (!scannedProduct) {
+          try {
+            const productByBarcode = await api.get(
+              `/main/products/global-barcode/${barcode}/`,
+            );
+            if (productByBarcode?.data?.id) {
+              scannedProduct = productByBarcode.data;
+            }
+          } catch (_e) {
+            // Ниже покажем штатную ошибку "не найден"
+          }
+        }
 
-        if (res?.error) {
-          const msg =
-            typeof res.error === "string"
-              ? res.error
-              : "Товар с таким штрих-кодом не найден";
-          showAlert("error", "Ошибка сканирования", msg);
-        } else {
-          // Обновляем продажу после добавления товара
+        if (!scannedProduct) {
+          showAlert(
+            "error",
+            "Ошибка сканирования",
+            "Товар с таким штрих-кодом не найден",
+          );
+          return;
+        }
+
+        // Добавляем поштучно (+1), как при обычном клике в каталоге.
+        await addToCart(scannedProduct);
+
+        // Обновляем продажу после добавления товара
+        try {
           await dispatch(
             startSale({ discount_total: 0, shift: openShiftId }),
           ).unwrap();
-          // Обновляем время последнего сканирования после успешного добавления
-          // Это защитит от открытия страницы оплаты при Enter от сканера
-          lastScanTimeRef.current = Date.now();
-          // Убеждаемся, что флаг сканирования установлен
-          isScanningRef.current = true;
+        } catch (e) {
+          const msg = String(e?.message || e || "");
+          if (!msg.includes("condition callback returning false")) {
+            throw e;
+          }
         }
+        // Обновляем время последнего сканирования после успешного добавления
+        // Это защитит от открытия страницы оплаты при Enter от сканера
+        lastScanTimeRef.current = Date.now();
+        // Убеждаемся, что флаг сканирования установлен
+        isScanningRef.current = true;
       } catch (error) {
         console.error("Ошибка при сканировании:", error);
         showAlert(
