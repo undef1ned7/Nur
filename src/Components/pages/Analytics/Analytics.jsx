@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import api from "../../../api";
 import { useUser } from "../../../store/slices/userSlice";
+import { isStartPlan } from "../../../utils/subscriptionPlan";
 import AgentAnalytics from "../../Sectors/Production/Analytics/AgentAnalytics";
 
 import "./Analytics.scss";
@@ -105,7 +106,8 @@ const Sparkline = ({ values = [], width = 520, height = 140 }) => {
 
 const Analytics = () => {
   // из userSlice
-  const { profile, sector, company } = useUser();
+  const { profile, sector, company, tariff } = useUser();
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
 
   /* ---------- controls ---------- */
   // По умолчанию: месяц (последние 30 дней)
@@ -283,10 +285,14 @@ const Analytics = () => {
       {
         Период: `${periodInfo.date_from} - ${periodInfo.date_to}`,
         Пользователей: summary.users_count || 0,
-        Передач: summary.transfers_count || 0,
-        Принятий: summary.acceptances_count || 0,
-        "Товаров передано": summary.items_transferred || 0,
-        "Продаж": summary.sales_count || 0,
+        ...(startPlan
+          ? {}
+          : {
+              Передач: summary.transfers_count || 0,
+              Принятий: summary.acceptances_count || 0,
+              "Товаров передано": summary.items_transferred || 0,
+            }),
+        Продаж: summary.sales_count || 0,
         "Сумма продаж": summary.sales_amount || "0.00",
       },
     ];
@@ -460,24 +466,32 @@ const Analytics = () => {
                 {nfInt.format(summary.users_count || 0)}
               </div>
             </div>
-            <div className="analytics-sales__kpi">
-              <div className="analytics-sales__kpi-label">Передач</div>
-              <div className="analytics-sales__kpi-value">
-                {nfInt.format(summary.transfers_count || 0)}
+            {!startPlan && (
+              <div className="analytics-sales__kpi">
+                <div className="analytics-sales__kpi-label">Передач</div>
+                <div className="analytics-sales__kpi-value">
+                  {nfInt.format(summary.transfers_count || 0)}
+                </div>
               </div>
-            </div>
-            <div className="analytics-sales__kpi">
-              <div className="analytics-sales__kpi-label">Принятий</div>
-              <div className="analytics-sales__kpi-value">
-                {nfInt.format(summary.acceptances_count || 0)}
+            )}
+            {!startPlan && (
+              <div className="analytics-sales__kpi">
+                <div className="analytics-sales__kpi-label">Принятий</div>
+                <div className="analytics-sales__kpi-value">
+                  {nfInt.format(summary.acceptances_count || 0)}
+                </div>
               </div>
-            </div>
-            <div className="analytics-sales__kpi">
-              <div className="analytics-sales__kpi-label">Товаров передано</div>
-              <div className="analytics-sales__kpi-value">
-                {nfInt.format(summary.items_transferred || 0)}
+            )}
+            {!startPlan && (
+              <div className="analytics-sales__kpi">
+                <div className="analytics-sales__kpi-label">
+                  Товаров передано
+                </div>
+                <div className="analytics-sales__kpi-value">
+                  {nfInt.format(summary.items_transferred || 0)}
+                </div>
               </div>
-            </div>
+            )}
             <div className="analytics-sales__kpi">
               <div className="analytics-sales__kpi-label">Продаж</div>
               <div className="analytics-sales__kpi-value">
@@ -513,25 +527,33 @@ const Analytics = () => {
             )}
           </div>
 
-          <div className="analytics-sales__card">
+          {!startPlan && (
+            <div className="analytics-sales__card">
               <div className="analytics-sales__card-title">
-              Динамика передач ({groupBy === "day" ? "дни" : groupBy === "week" ? "недели" : "месяцы"})
+                Динамика передач (
+                {groupBy === "day"
+                  ? "дни"
+                  : groupBy === "week"
+                    ? "недели"
+                    : "месяцы"}
+                )
               </div>
-            {transfersChartData.values.length > 0 ? (
-              <>
-                <Sparkline values={transfersChartData.values} />
-                <div className="analytics-sales__legend">
-                  {transfersChartData.labels.map((l, i) => (
+              {transfersChartData.values.length > 0 ? (
+                <>
+                  <Sparkline values={transfersChartData.values} />
+                  <div className="analytics-sales__legend">
+                    {transfersChartData.labels.map((l, i) => (
                       <span className="analytics-sales__legend-item" key={i}>
                         {l}
                       </span>
                     ))}
                   </div>
                 </>
-            ) : (
-              <div className="analytics-sales__note">Нет данных</div>
+              ) : (
+                <div className="analytics-sales__note">Нет данных</div>
               )}
             </div>
+          )}
 
           {/* Tables */}
           <div className="analytics-sales__card">
@@ -596,37 +618,39 @@ const Analytics = () => {
                 )}
           </div>
 
-          <div className="analytics-sales__card">
-            <div className="analytics-sales__card-title">
-              Топ пользователей по передачам
-          </div>
-            {charts?.top_users_by_transfers?.length > 0 ? (
-              <div className="analytics-sales__table-wrap">
-                <table className="analytics-sales__table">
-                  <thead>
-                    <tr>
-                      <th>Пользователь</th>
-                      <th>Роль</th>
-                      <th>Передач</th>
-                      <th>Товаров передано</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {charts.top_users_by_transfers.map((item, i) => (
-                      <tr key={item.user_id || i}>
-                        <td>{item.user_name || "—"}</td>
-                        <td>{item.role || "—"}</td>
-                        <td>{nfInt.format(item.transfers_count || 0)}</td>
-                        <td>{nfInt.format(item.items_transferred || 0)}</td>
+          {!startPlan && (
+            <div className="analytics-sales__card">
+              <div className="analytics-sales__card-title">
+                Топ пользователей по передачам
+              </div>
+              {charts?.top_users_by_transfers?.length > 0 ? (
+                <div className="analytics-sales__table-wrap">
+                  <table className="analytics-sales__table">
+                    <thead>
+                      <tr>
+                        <th>Пользователь</th>
+                        <th>Роль</th>
+                        <th>Передач</th>
+                        <th>Товаров передано</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {charts.top_users_by_transfers.map((item, i) => (
+                        <tr key={item.user_id || i}>
+                          <td>{item.user_name || "—"}</td>
+                          <td>{item.role || "—"}</td>
+                          <td>{nfInt.format(item.transfers_count || 0)}</td>
+                          <td>{nfInt.format(item.items_transferred || 0)}</td>
                         </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="analytics-sales__note">Нет данных</div>
-            )}
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="analytics-sales__note">Нет данных</div>
+              )}
+            </div>
+          )}
 
           {/* Pie Chart for Sales Distribution */}
           {charts?.sales_distribution_by_product?.length > 0 && (

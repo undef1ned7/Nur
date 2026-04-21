@@ -30,6 +30,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { fetchAgentAnalytics } from "../../../../store/creators/analyticsCreators";
+import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import "./AgentAnalytics.scss";
 import {
   CARD_DETAILS_PAGE_SIZE,
@@ -58,6 +60,8 @@ ChartJS.register(
 const AgentAnalytics = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { tariff, company } = useUser();
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
   const { agentId } = useParams();
   const [period, setPeriod] = useState("month"); // day, week, month, custom (API)
   const [dateForDay, setDateForDay] = useState(() =>
@@ -1043,68 +1047,74 @@ const AgentAnalytics = () => {
 
       {/* Метрики */}
       <div className="agent-analytics__metrics">
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() => openCardDetails("transfers_count", "Передач")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("transfers_count", "Передач");
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardDetails("transfers_count", "Передач")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("transfers_count", "Передач");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
+              <Package size={24} />
+            </div>
+            <div>
+              <h3>Передач</h3>
+              <p>{metrics.totalTransfers}</p>
+            </div>
+          </div>
+        )}
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardDetails("acceptances_count", "Приёмок")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("acceptances_count", "Приёмок");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+              <ShoppingCart size={24} />
+            </div>
+            <div>
+              <h3>Приёмок</h3>
+              <p>{metrics.totalAcceptances}</p>
+            </div>
+          </div>
+        )}
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() =>
+              openCardDetails("items_transferred", "Товаров передано")
             }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
-            <Package size={24} />
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("items_transferred", "Товаров передано");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <h3>Товаров передано</h3>
+              <p>{metrics.totalQuantityTransferred.toLocaleString()}</p>
+            </div>
           </div>
-          <div>
-            <h3>Передач</h3>
-            <p>{metrics.totalTransfers}</p>
-          </div>
-        </div>
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() => openCardDetails("acceptances_count", "Приёмок")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("acceptances_count", "Приёмок");
-            }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
-            <ShoppingCart size={24} />
-          </div>
-          <div>
-            <h3>Приёмок</h3>
-            <p>{metrics.totalAcceptances}</p>
-          </div>
-        </div>
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            openCardDetails("items_transferred", "Товаров передано")
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("items_transferred", "Товаров передано");
-            }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <h3>Товаров передано</h3>
-            <p>{metrics.totalQuantityTransferred.toLocaleString()}</p>
-          </div>
-        </div>
+        )}
         <div
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
@@ -1345,35 +1355,37 @@ const AgentAnalytics = () => {
       </div>
 
       {/* Графики передач и приёмок */}
-      <div className="agent-analytics__section">
-        <h2 className="agent-analytics__section-title ">
-          <span className="agent-analytics__section-icon chart-container">
-            <ArrowLeftRight className="chart-icon" />
-          </span>
-          Передачи и приёмки
-        </h2>
-        <div className="agent-analytics__charts">
-          <div className="agent-analytics__chart-card">
-            <h3>Передачи по датам</h3>
-            <div className="agent-analytics__chart-container">
-              <Line data={transfersByDateData} options={barChartOptions} />
+      {!startPlan && (
+        <div className="agent-analytics__section">
+          <h2 className="agent-analytics__section-title ">
+            <span className="agent-analytics__section-icon chart-container">
+              <ArrowLeftRight className="chart-icon" />
+            </span>
+            Передачи и приёмки
+          </h2>
+          <div className="agent-analytics__charts">
+            <div className="agent-analytics__chart-card">
+              <h3>Передачи по датам</h3>
+              <div className="agent-analytics__chart-container">
+                <Line data={transfersByDateData} options={barChartOptions} />
+              </div>
             </div>
-          </div>
 
-          <div className="agent-analytics__chart-card">
-            <h3>Топ товаров по передачам</h3>
-            <div className="agent-analytics__chart-container">
-              <Bar
-                data={transfersByProductData}
-                options={horizontalBarChartOptions}
-              />
+            <div className="agent-analytics__chart-card">
+              <h3>Топ товаров по передачам</h3>
+              <div className="agent-analytics__chart-container">
+                <Bar
+                  data={transfersByProductData}
+                  options={horizontalBarChartOptions}
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Таблица передач */}
-      {transfersHistory.length > 0 && (
+      {!startPlan && transfersHistory.length > 0 && (
         <>
           <h2 className="agent-analytics__section-title">
             <span className="agent-analytics__section-icon chart-container">

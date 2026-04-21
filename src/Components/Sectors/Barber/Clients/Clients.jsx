@@ -37,9 +37,7 @@ export const Clients = () => {
         <BarberClients />
       ) : (
         <Suspense
-          fallback={
-            <div className="barberclient__loading">Загрузка…</div>
-          }
+          fallback={<div className="barberclient__loading">Загрузка…</div>}
         >
           <MarketClients />
         </Suspense>

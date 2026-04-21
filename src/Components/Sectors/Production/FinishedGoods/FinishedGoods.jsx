@@ -74,6 +74,7 @@ import usePlurize from "../../../../hooks/usePlurize";
 import useResize from "../../../../hooks/useResize";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -2889,6 +2890,10 @@ const FinishedGoods = ({ products, onChanged }) => {
   const navigate = useNavigate();
   const { loading, error } = useProducts();
   const { list: cashBoxes } = useCash();
+  const { tariff, company } = useUser();
+  const startPlanNoAgent = isStartPlan(
+    tariff || company?.subscription_plan?.name,
+  );
 
   const [selectCashBox, setSelectCashBox] = useState("");
 
@@ -3092,13 +3097,15 @@ const FinishedGoods = ({ products, onChanged }) => {
             <Plus size={16} />
             Добавить товар
           </button>
-          <button
-            className="warehouse-header__create-btn"
-            onClick={() => setShowTransferProductModal(true)}
-          >
-            <Plus size={16} />
-            Передать товар
-          </button>
+          {!startPlanNoAgent && (
+            <button
+              className="warehouse-header__create-btn"
+              onClick={() => setShowTransferProductModal(true)}
+            >
+              <Plus size={16} />
+              Передать товар
+            </button>
+          )}
         </div>
       </div>
 
@@ -3203,7 +3210,9 @@ const FinishedGoods = ({ products, onChanged }) => {
                     <th>Поставщик</th>
                     <th>Цена</th>
                     <th>Дата</th>
-                    <th>Количество / У агентов</th>
+                    <th>
+                      {startPlanNoAgent ? "Количество" : "Количество / У агентов"}
+                    </th>
                     <th>Категория</th>
                     <th>Действия</th>
                   </tr>
@@ -3299,7 +3308,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                               }}
                             >
                               <div>На складе: {item.quantity || 0}</div>
-                              {item.qty_on_agent > 0 && (
+                              {!startPlanNoAgent && item.qty_on_agent > 0 && (
                                 <div
                                   style={{ fontSize: "12px", color: "#666" }}
                                 >
@@ -3355,7 +3364,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                               >
                                 Добавить
                               </button>
-                              {item.qty_on_agent > 0 && (
+                              {!startPlanNoAgent && item.qty_on_agent > 0 && (
                                 <button
                                   className="warehouse-header__create-btn"
                                   style={{
@@ -3462,7 +3471,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                             <div className="text-slate-500">Количество</div>
                             <div className="mt-0.5 font-semibold text-slate-900">
                               На складе: {item.quantity || 0}
-                              {item.qty_on_agent > 0 && (
+                              {!startPlanNoAgent && item.qty_on_agent > 0 && (
                                 <span className="ml-2 text-xs text-slate-600">
                                   • У агентов: {item.qty_on_agent}
                                 </span>
@@ -3518,7 +3527,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                           >
                             Добавить
                           </button>
-                          {item.qty_on_agent > 0 && (
+                          {!startPlanNoAgent && item.qty_on_agent > 0 && (
                             <button
                               className="warehouse-header__create-btn"
                               style={{
@@ -3563,7 +3572,7 @@ const FinishedGoods = ({ products, onChanged }) => {
           item={itemId}
         />
       )}
-      {showTransferProductModal && (
+      {showTransferProductModal && !startPlanNoAgent && (
         <TransferProductModal
           onClose={() => setShowTransferProductModal(false)}
           onChanged={onChanged}

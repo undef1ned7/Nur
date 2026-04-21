@@ -663,6 +663,13 @@ export const MENU_CONFIG = {
 
     production: [
       {
+        label: "Аналитика",
+        to: "/crm/production/analytics",
+        icon: menuIcons.chartBar,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
         label: "Склад",
         to: "/crm/production/warehouse",
         icon: menuIcons.warehouse,
@@ -676,13 +683,7 @@ export const MENU_CONFIG = {
         permission: "can_view_sale",
         implemented: true,
       },
-      {
-        label: "Аналитика",
-        to: "/crm/production/analytics",
-        icon: menuIcons.chartBar,
-        permission: "can_view_analytics",
-        implemented: true,
-      },
+
       {
         label: "Передача",
         to: "/crm/production/agents",

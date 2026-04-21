@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   useNavigate,
@@ -37,6 +43,7 @@ import warehouseAPI from "../../../../api/warehouse";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import "./CreateSaleDocument.scss";
@@ -215,7 +222,7 @@ const CreateSaleDocument = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();
-  const { company, profile: userProfile } = useUser();
+  const { company, profile: userProfile, tariff } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
   const { employees } = useDepartments();
@@ -700,74 +707,77 @@ const CreateSaleDocument = () => {
     });
   };
 
-  const loadProductsForGroup = useCallback(async (groupKey, groupIdOrNull) => {
-    if (!warehouse) return;
-    const requestWarehouse = warehouse;
-    const key = String(groupKey);
+  const loadProductsForGroup = useCallback(
+    async (groupKey, groupIdOrNull) => {
+      if (!warehouse) return;
+      const requestWarehouse = warehouse;
+      const key = String(groupKey);
 
-    setGroupProducts((prev) => ({
-      ...(prev || {}),
-      [key]: {
-        ...(prev?.[key] || {}),
-        loading: true,
-        error: null,
-        search: debouncedProductSearch || "",
-      },
-    }));
+      setGroupProducts((prev) => ({
+        ...(prev || {}),
+        [key]: {
+          ...(prev?.[key] || {}),
+          loading: true,
+          error: null,
+          search: debouncedProductSearch || "",
+        },
+      }));
 
-    try {
-      const params = {
-        warehouse,
-        page_size: 1000,
-      };
-      if (debouncedProductSearch?.trim()) {
-        params.search = debouncedProductSearch.trim();
-      }
-      if (groupIdOrNull) {
-        params.product_group = groupIdOrNull;
-      }
+      try {
+        const params = {
+          warehouse,
+          page_size: 1000,
+        };
+        if (debouncedProductSearch?.trim()) {
+          params.search = debouncedProductSearch.trim();
+        }
+        if (groupIdOrNull) {
+          params.product_group = groupIdOrNull;
+        }
 
-      const result = await dispatch(fetchProductsAsync(params));
-      // если склад поменялся пока грузили — ничего не обновляем
-      if (warehouseRef.current !== requestWarehouse) return;
+        const result = await dispatch(fetchProductsAsync(params));
+        // если склад поменялся пока грузили — ничего не обновляем
+        if (warehouseRef.current !== requestWarehouse) return;
 
-      if (fetchProductsAsync.fulfilled.match(result)) {
-        const list =
-          result.payload?.results ||
-          (Array.isArray(result.payload) ? result.payload : []);
-        setGroupProducts((prev) => ({
-          ...(prev || {}),
-          [key]: {
-            items: list,
-            loading: false,
-            error: null,
-            search: debouncedProductSearch || "",
-          },
-        }));
-      } else {
+        if (fetchProductsAsync.fulfilled.match(result)) {
+          const list =
+            result.payload?.results ||
+            (Array.isArray(result.payload) ? result.payload : []);
+          setGroupProducts((prev) => ({
+            ...(prev || {}),
+            [key]: {
+              items: list,
+              loading: false,
+              error: null,
+              search: debouncedProductSearch || "",
+            },
+          }));
+        } else {
+          setGroupProducts((prev) => ({
+            ...(prev || {}),
+            [key]: {
+              items: [],
+              loading: false,
+              error: result.payload || result.error || true,
+              search: debouncedProductSearch || "",
+            },
+          }));
+        }
+      } catch (e) {
+        console.error("Ошибка загрузки товаров группы:", e);
         setGroupProducts((prev) => ({
           ...(prev || {}),
           [key]: {
             items: [],
             loading: false,
-            error: result.payload || result.error || true,
+            error: e,
             search: debouncedProductSearch || "",
           },
         }));
       }
-    } catch (e) {
-      console.error("Ошибка загрузки товаров группы:", e);
-      setGroupProducts((prev) => ({
-        ...(prev || {}),
-        [key]: {
-          items: [],
-          loading: false,
-          error: e,
-          search: debouncedProductSearch || "",
-        },
-      }));
-    }
-  }, [warehouse, debouncedProductSearch, dispatch]);
+    },
+    [warehouse, debouncedProductSearch, dispatch],
+  );
 
   // При изменении строки поиска обновляем уже раскрытые группы автоматически.
   useEffect(() => {
@@ -1323,6 +1333,8 @@ const CreateSaleDocument = () => {
   }, [counterparties, docType]);
 
   const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
+  const applyAgentFilter = isAgentFilterRelevant && !startPlan;
   const isOwnerOrAdmin =
     userProfile?.role === "owner" || userProfile?.role === "admin";
   const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
@@ -1363,7 +1375,7 @@ const CreateSaleDocument = () => {
     const list = Array.isArray(filteredCounterparties)
       ? filteredCounterparties
       : [];
-    const agentKey = isAgentFilterRelevant && agentId ? String(agentId) : "";
+    const agentKey = applyAgentFilter && agentId ? String(agentId) : "";
     const filtered =
       agentKey.trim() === ""
         ? list
@@ -1381,7 +1393,7 @@ const CreateSaleDocument = () => {
           cp.phone || ""
         } ${cp.inn || ""}`.trim(),
       }));
-  }, [filteredCounterparties, agentId, isAgentFilterRelevant]);
+  }, [filteredCounterparties, agentId, applyAgentFilter]);
 
   const agentOptions = useMemo(() => {
     return (Array.isArray(agents) ? agents : []).map((a) => ({
@@ -1409,9 +1421,10 @@ const CreateSaleDocument = () => {
 
   useEffect(() => {
     if (editDocumentId) return;
+    if (startPlan) return;
     if (isOwnerOrAdmin || !currentUserAgentId) return;
     setAgentId(currentUserAgentId);
-  }, [editDocumentId, isOwnerOrAdmin, currentUserAgentId]);
+  }, [editDocumentId, isOwnerOrAdmin, currentUserAgentId, startPlan]);
 
   const warehouseOptions = useMemo(() => {
     return (Array.isArray(warehouses) ? warehouses : [])
@@ -1982,7 +1995,7 @@ const CreateSaleDocument = () => {
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(clientId && { counterparty: clientId }),
-        ...(isAgentFilterRelevant && { agent: agentId || null }),
+        ...(applyAgentFilter && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -2123,7 +2136,7 @@ const CreateSaleDocument = () => {
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(clientId && { counterparty: clientId }),
-        ...(isAgentFilterRelevant && { agent: agentId || null }),
+        ...(applyAgentFilter && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -2908,45 +2921,49 @@ const CreateSaleDocument = () => {
               )}
               {showAgentCounterpartyFields && (
                 <>
-                  <div className="create-sale-document__field create-sale-document__field--with-icon">
-                    <User
-                      size={18}
-                      className="create-sale-document__field-icon"
-                    />
-                    <div className="create-sale-document__field-inner">
-                      <label>Агент</label>
-                      {isOwnerOrAdmin ? (
-                        <SearchSelect
-                          value={agentId}
-                          onChange={(v) => setAgentId(String(v || ""))}
-                          options={[
-                            {
-                              value: "",
-                              label: "Все агенты",
-                              searchText: "Все агенты",
-                            },
-                            ...agentOptions,
-                          ]}
-                          placeholder="Выберите агента (необязательно)"
-                          emptyText="Агенты не найдены"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={currentAgentLabel}
-                          readOnly
-                          disabled
-                        />
-                      )}
+                  {!startPlan && (
+                    <div className="create-sale-document__field create-sale-document__field--with-icon">
+                      <User
+                        size={18}
+                        className="create-sale-document__field-icon"
+                      />
+                      <div className="create-sale-document__field-inner">
+                        <label>Агент</label>
+                        {isOwnerOrAdmin ? (
+                          <SearchSelect
+                            value={agentId}
+                            onChange={(v) => setAgentId(String(v || ""))}
+                            options={[
+                              {
+                                value: "",
+                                label: "Все агенты",
+                                searchText: "Все агенты",
+                              },
+                              ...agentOptions,
+                            ]}
+                            placeholder="Выберите агента (необязательно)"
+                            emptyText="Агенты не найдены"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={currentAgentLabel}
+                            readOnly
+                            disabled
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
                     <User
                       size={18}
                       className="create-sale-document__field-icon"
                     />
                     <div className="create-sale-document__field-inner">
-                      <label>Контрагент{isCounterpartyRequired ? " *" : ""}</label>
+                      <label>
+                        Контрагент{isCounterpartyRequired ? " *" : ""}
+                      </label>
                       <SearchSelect
                         value={clientId}
                         onChange={(v) => setClientId(String(v || ""))}

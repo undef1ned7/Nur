@@ -38,6 +38,7 @@ import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 
 /**
  * Склеивает возвраты (returns) с передачами (transfers).
@@ -1143,6 +1144,10 @@ const ProductionWarehouse = () => {
   const [activeTab, setActiveTab] = useState(0);
   const dispatch = useDispatch();
   const { list: products } = useProducts();
+  const { tariff, company } = useUser();
+  const startPlanProduction = isStartPlan(
+    tariff || company?.subscription_plan?.name,
+  );
 
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAgentCartsModal, setShowAgentCartsModal] = useState(false);
@@ -1225,7 +1230,7 @@ const ProductionWarehouse = () => {
               </span>
             );
           })}
-          {activeTab === 0 && (
+          {activeTab === 0 && !startPlanProduction && (
             <>
               <span
                 onClick={() => setShowPendingModal(true)}

@@ -86,6 +86,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import {
   getOwnerAnalytics,
   getAgentMeAnalytics,
@@ -287,8 +288,10 @@ const AccordionItem = ({
 const WarehouseAnalytics = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const { profile } = useUser();
+  const { profile, tariff, company } = useUser();
   const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
+  const showAgentSalesAnalytics = !startPlan;
 
   const agentId = searchParams.get("agent_id") || null;
   const agentName = location.state?.agentName || null;
@@ -500,19 +503,27 @@ const WarehouseAnalytics = () => {
               description="Товаров выдано"
               icon={Package}
             />
-            <KpiCard
-              label={
-                isAgentView ? "Количество моих продаж" : "Количество продаж агентов"
-              }
-              value={formatNum(salesCount)}
-              description="За период"
-              icon={ShoppingCart}
-            />
-            <KpiCard
-              label={isAgentView ? "Сумма моих продаж" : "Сумма продаж агентов"}
-              value={`${formatNum(salesAmount)} сом`}
-              icon={ShoppingCart}
-            />
+            {showAgentSalesAnalytics && (
+              <>
+                <KpiCard
+                  label={
+                    isAgentView
+                      ? "Количество моих продаж"
+                      : "Количество продаж агентов"
+                  }
+                  value={formatNum(salesCount)}
+                  description="За период"
+                  icon={ShoppingCart}
+                />
+                <KpiCard
+                  label={
+                    isAgentView ? "Сумма моих продаж" : "Сумма продаж агентов"
+                  }
+                  value={`${formatNum(salesAmount)} сом`}
+                  icon={ShoppingCart}
+                />
+              </>
+            )}
             <KpiCard
               label="Остаток на руках, шт"
               value={formatNum(onHandQty)}
@@ -525,134 +536,140 @@ const WarehouseAnalytics = () => {
             />
           </div>
 
-          <div className="warehouse-analytics__chartsRow">
-            <div className="warehouse-analytics__card warehouse-analytics__card--chart">
-              <div className="warehouse-analytics__cardTitle">
-                {isAgentView ? "Динамика продаж" : "Динамика продаж агентов"}
-              </div>
-              <div className="warehouse-analytics__chartWrap">
-                {salesChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart
-                      data={salesChartData}
-                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="warehouseAnalyticsAreaFill"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="var(--wa-primary)"
-                            stopOpacity={0.4}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="var(--wa-primary)"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--wa-border)"
-                      />
-                      <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) =>
-                          v && v.length > 6 ? v.slice(0, 6) : v
-                        }
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) => formatNum(v)}
-                      />
-                      <Tooltip
-                        formatter={(value) => [
-                          formatNum(value),
-                          "Продажи (сом)",
-                        ]}
-                        labelFormatter={(l) => `Дата: ${l}`}
-                      />
-                      <Legend
-                        formatter={() => "Продажи (сом)"}
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: 12 }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="sum"
-                        stroke="var(--wa-primary)"
-                        strokeWidth={2}
-                        fill="url(#warehouseAnalyticsAreaFill)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="warehouse-analytics__chartWrap--empty">
-                    Нет данных за период.
-                  </div>
-                )}
+          {showAgentSalesAnalytics && (
+            <div className="warehouse-analytics__chartsRow">
+              <div className="warehouse-analytics__card warehouse-analytics__card--chart">
+                <div className="warehouse-analytics__cardTitle">
+                  {isAgentView ? "Динамика продаж" : "Динамика продаж агентов"}
+                </div>
+                <div className="warehouse-analytics__chartWrap">
+                  {salesChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart
+                        data={salesChartData}
+                        margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="warehouseAnalyticsAreaFill"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="var(--wa-primary)"
+                              stopOpacity={0.4}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="var(--wa-primary)"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--wa-border)"
+                        />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) =>
+                            v && v.length > 6 ? v.slice(0, 6) : v
+                          }
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => formatNum(v)}
+                        />
+                        <Tooltip
+                          formatter={(value) => [
+                            formatNum(value),
+                            "Продажи (сом)",
+                          ]}
+                          labelFormatter={(l) => `Дата: ${l}`}
+                        />
+                        <Legend
+                          formatter={() => "Продажи (сом)"}
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ fontSize: 12 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="sum"
+                          stroke="var(--wa-primary)"
+                          strokeWidth={2}
+                          fill="url(#warehouseAnalyticsAreaFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="warehouse-analytics__chartWrap--empty">
+                      Нет данных за период.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {isOwnerOrAdmin && (
             <>
               <div className="warehouse-analytics__accordion">
-                <AccordionItem
-                  id="wa-top-sales"
-                  title="Топ агентов по продажам"
-                  icon={ShoppingCart}
-                  badge={bySalesRows.length ? `${bySalesRows.length}` : "0"}
-                  defaultOpen
-                >
-                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
-                    {bySalesRows.length > 0 ? (
-                      <PaginatedTable
-                        head={["Агент", "Продажи", "Кол-во", "Доля"]}
-                        rows={bySalesRows}
-                        colTemplate="1fr 120px 90px 70px"
-                        numeric={[1, 2, 3]}
-                      />
-                    ) : (
-                      <div className="warehouse-analytics-table__empty">
-                        Нет данных за период.
+                {showAgentSalesAnalytics && (
+                  <>
+                    <AccordionItem
+                      id="wa-top-sales"
+                      title="Топ агентов по продажам"
+                      icon={ShoppingCart}
+                      badge={bySalesRows.length ? `${bySalesRows.length}` : "0"}
+                      defaultOpen
+                    >
+                      <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                        {bySalesRows.length > 0 ? (
+                          <PaginatedTable
+                            head={["Агент", "Продажи", "Кол-во", "Доля"]}
+                            rows={bySalesRows}
+                            colTemplate="1fr 120px 90px 70px"
+                            numeric={[1, 2, 3]}
+                          />
+                        ) : (
+                          <div className="warehouse-analytics-table__empty">
+                            Нет данных за период.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </AccordionItem>
+                    </AccordionItem>
 
-                <AccordionItem
-                  id="wa-top-received"
-                  title="Топ агентов по полученным товарам"
-                  icon={Package}
-                  badge={
-                    byReceivedRows.length ? `${byReceivedRows.length}` : "0"
-                  }
-                  defaultOpen={false}
-                >
-                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
-                    {byReceivedRows.length > 0 ? (
-                      <PaginatedTable
-                        head={["Агент", "Позиций", "Доля"]}
-                        rows={byReceivedRows}
-                        colTemplate="1fr 100px 70px"
-                        numeric={[1, 2]}
-                      />
-                    ) : (
-                      <div className="warehouse-analytics-table__empty">
-                        Нет данных за период.
+                    <AccordionItem
+                      id="wa-top-received"
+                      title="Топ агентов по полученным товарам"
+                      icon={Package}
+                      badge={
+                        byReceivedRows.length ? `${byReceivedRows.length}` : "0"
+                      }
+                      defaultOpen={false}
+                    >
+                      <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                        {byReceivedRows.length > 0 ? (
+                          <PaginatedTable
+                            head={["Агент", "Позиций", "Доля"]}
+                            rows={byReceivedRows}
+                            colTemplate="1fr 100px 70px"
+                            numeric={[1, 2]}
+                          />
+                        ) : (
+                          <div className="warehouse-analytics-table__empty">
+                            Нет данных за период.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </AccordionItem>
+                    </AccordionItem>
+                  </>
+                )}
 
                 <AccordionItem
                   id="wa-warehouses"

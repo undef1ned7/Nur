@@ -34,6 +34,7 @@ import api from "../../../../api";
 import { fetchProductionAnalytics } from "../../../../store/creators/analyticsCreators";
 import { setProductionAnalyticsFilters } from "../../../../store/slices/analyticsSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import AgentAnalytics from "./AgentAnalytics";
 import "./AgentAnalytics.scss";
 import {
@@ -61,7 +62,8 @@ ChartJS.register(
 
 const ProductionAnalytics = () => {
   const dispatch = useDispatch();
-  const { profile } = useUser();
+  const { profile, tariff, company } = useUser();
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
 
   const {
     data: analyticsData,
@@ -1066,79 +1068,85 @@ const ProductionAnalytics = () => {
           </div>
         </div>
 
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() => openCardDetails("transfers_count", "Перемещений")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("transfers_count", "Перемещений");
-            }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
-            <ArrowLeftRight size={24} />
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardDetails("transfers_count", "Перемещений")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("transfers_count", "Перемещений");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
+              <ArrowLeftRight size={24} />
+            </div>
+            <div>
+              <h3>Перемещений</h3>
+              <p>{formatNumber(summary.transfers_count || 0)}</p>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Всего за период
+              </span>
+            </div>
           </div>
-          <div>
-            <h3>Перемещений</h3>
-            <p>{formatNumber(summary.transfers_count || 0)}</p>
-            <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Всего за период
-            </span>
-          </div>
-        </div>
+        )}
 
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() => openCardDetails("acceptances_count", "Приёмки")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("acceptances_count", "Приёмки");
-            }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
-            <Package size={24} />
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardDetails("acceptances_count", "Приёмки")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("acceptances_count", "Приёмки");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+              <Package size={24} />
+            </div>
+            <div>
+              <h3>Принято</h3>
+              <p>{formatNumber(summary.acceptances_count || 0)}</p>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Приёмок товаров
+              </span>
+            </div>
           </div>
-          <div>
-            <h3>Принято</h3>
-            <p>{formatNumber(summary.acceptances_count || 0)}</p>
-            <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Приёмок товаров
-            </span>
-          </div>
-        </div>
+        )}
 
-        <div
-          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            openCardDetails("items_transferred", "Товаров перемещено")
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openCardDetails("items_transferred", "Товаров перемещено");
+        {!startPlan && (
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() =>
+              openCardDetails("items_transferred", "Товаров перемещено")
             }
-          }}
-        >
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
-            <Package size={24} />
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("items_transferred", "Товаров перемещено");
+              }
+            }}
+          >
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+              <Package size={24} />
+            </div>
+            <div>
+              <h3>Товаров</h3>
+              <p>{formatNumber(summary.items_transferred || 0)}</p>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Перемещено единиц
+              </span>
+            </div>
           </div>
-          <div>
-            <h3>Товаров</h3>
-            <p>{formatNumber(summary.items_transferred || 0)}</p>
-            <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Перемещено единиц
-            </span>
-          </div>
-        </div>
+        )}
 
         <div
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
@@ -1526,12 +1534,14 @@ const ProductionAnalytics = () => {
       {/* Блок с перемещениями и распределением продаж */}
       <div className="agent-analytics__section">
         <div className="agent-analytics__charts">
-          <div className="agent-analytics__chart-card">
-            <h3>Перемещения по датам</h3>
-            <div className="agent-analytics__chart-container">
-              <Bar data={transfersByDateData} options={barOptions} />
+          {!startPlan && (
+            <div className="agent-analytics__chart-card">
+              <h3>Перемещения по датам</h3>
+              <div className="agent-analytics__chart-container">
+                <Bar data={transfersByDateData} options={barOptions} />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="agent-analytics__chart-card">
             <h3>Распределение продаж по товарам</h3>
@@ -1801,43 +1811,45 @@ const ProductionAnalytics = () => {
         </div>
         {/* </div> */}
       </div>
-      <div className="agent-analytics__section">
-        <div className="agent-analytics__table-card">
-          <h3 className="agent-analytics__table-title">
-            Топ пользователей по перемещениям
-          </h3>
-          <div className="agent-analytics__table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Пользователь</th>
-                  <th>Роль</th>
-                  <th>Перемещений</th>
-                  <th>Товаров</th>
-                </tr>
-              </thead>
-              <tbody>
-                {charts.top_users_by_transfers?.length > 0 ? (
-                  charts.top_users_by_transfers.map((user, index) => (
-                    <tr key={index}>
-                      <td>{user.user_name || "—"}</td>
-                      <td>{user.role || "—"}</td>
-                      <td>{formatNumber(user.transfers_count || 0)}</td>
-                      <td>{formatNumber(user.items_transferred || 0)} шт</td>
-                    </tr>
-                  ))
-                ) : (
+      {!startPlan && (
+        <div className="agent-analytics__section">
+          <div className="agent-analytics__table-card">
+            <h3 className="agent-analytics__table-title">
+              Топ пользователей по перемещениям
+            </h3>
+            <div className="agent-analytics__table">
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center" }}>
-                      Нет данных
-                    </td>
+                    <th>Пользователь</th>
+                    <th>Роль</th>
+                    <th>Перемещений</th>
+                    <th>Товаров</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {charts.top_users_by_transfers?.length > 0 ? (
+                    charts.top_users_by_transfers.map((user, index) => (
+                      <tr key={index}>
+                        <td>{user.user_name || "—"}</td>
+                        <td>{user.role || "—"}</td>
+                        <td>{formatNumber(user.transfers_count || 0)}</td>
+                        <td>{formatNumber(user.items_transferred || 0)} шт</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center" }}>
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       <div className="agent-analytics__section">
         <div className="agent-analytics__table-card">
           <h3 className="agent-analytics__table-title">
