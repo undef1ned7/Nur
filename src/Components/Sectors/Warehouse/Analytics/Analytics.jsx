@@ -540,7 +540,7 @@ const WarehouseAnalytics = () => {
             <div className="warehouse-analytics__chartsRow">
               <div className="warehouse-analytics__card warehouse-analytics__card--chart">
                 <div className="warehouse-analytics__cardTitle">
-                  {isAgentView ? "Динамика продаж" : "Динамика продаж агентов"}
+                  {isAgentView ? "Динамика продаж" : "Динамика продаж"}
                 </div>
                 <div className="warehouse-analytics__chartWrap">
                   {salesChartData.length > 0 ? (

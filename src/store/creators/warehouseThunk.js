@@ -10,7 +10,11 @@ export const fetchWarehouseDocuments = createAsyncThunk(
   "warehouse/fetchDocuments",
   async (params = {}, { rejectWithValue }) => {
     try {
-      const data = await warehouseAPI.listDocuments(params);
+      const { doc_type, ...rest } = params;
+      const data =
+        doc_type === "COMMERCIAL_OFFER"
+          ? await warehouseAPI.listCommercialOfferDocuments(rest)
+          : await warehouseAPI.listDocuments(params);
       return data;
     } catch (error) {
       return rejectWithValue(error);

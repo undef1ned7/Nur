@@ -127,6 +127,16 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     );
   }, [company?.sector?.name]);
 
+  const isWarehouseSector = useMemo(() => {
+    if (!company?.sector?.name) return false;
+    return company.sector.name.toLowerCase().trim() === "склад";
+  }, [company?.sector?.name]);
+
+  const cashierPath = useMemo(() => {
+    if (isWarehouseSector) return "/crm/warehouse/kassa";
+    return "/crm/market/cashier";
+  }, [isWarehouseSector]);
+
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
@@ -277,7 +287,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         {showCashierButton && (
           <button
             className="header__cashier-btn"
-            onClick={() => navigate("/crm/market/cashier")}
+            onClick={() => navigate(cashierPath)}
             title="Интерфейс кассира"
           >
             <ShoppingCart size={20} />

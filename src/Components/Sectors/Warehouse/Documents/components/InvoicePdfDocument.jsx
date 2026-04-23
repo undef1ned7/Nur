@@ -18,6 +18,7 @@ import InvoicePdfTotalsSection from "./InvoicePdfTotalsSection";
 
 registerPdfFonts();
 
+// Генерируем PDF накладной
 export default function InvoicePdfDocument({ data }) {
   const doc = data?.document || {};
   const seller = data?.seller || {};
@@ -81,6 +82,7 @@ export default function InvoicePdfDocument({ data }) {
 
   const invoiceNumber = doc.number || "";
   const invoiceDate = doc.datetime || doc.date || "";
+  const docComment = String(doc.comment ?? data?.comment ?? "").trim();
 
   return (
     <Document>
@@ -149,6 +151,12 @@ export default function InvoicePdfDocument({ data }) {
             )}
           </View>
         )}
+
+        {docComment ? (
+          <View style={{ marginTop: 4, marginBottom: 6 }}>
+            <Text style={{ fontSize: 8 }}>Комментарий: {safe(docComment)}</Text>
+          </View>
+        ) : null}
 
         <InvoicePdfGoodsTable
           items={items}

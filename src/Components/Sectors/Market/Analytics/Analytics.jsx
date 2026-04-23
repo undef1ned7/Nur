@@ -26,12 +26,10 @@ import {
   Filler,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import api from "../../../../api/index";
 import { useUser } from "../../../../store/slices/userSlice";
 import { useCash } from "../../../../store/slices/cashSlice";
-import { fetchBranchesAsync } from "../../../../store/creators/branchCreators";
-import { getCashBoxes } from "../../../../store/slices/cashSlice";
 import "./Analytics.scss";
 
 ChartJS.register(
@@ -47,14 +45,18 @@ ChartJS.register(
 );
 
 const translateLowStockStatus = (status) => {
-  const normalized = String(status || "").trim().toLowerCase();
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
   if (normalized === "critical") return "Критично";
   if (normalized === "low") return "Низкий";
   return String(status || "Низкий").trim() || "Низкий";
 };
 
 const normalizeLowStockStatusType = (status) => {
-  const normalized = String(status || "").trim().toLowerCase();
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
   if (normalized === "critical" || normalized === "критично") return "critical";
   return "low";
 };
@@ -62,7 +64,6 @@ const normalizeLowStockStatusType = (status) => {
 const MARKET_ANALYTICS_TIMEOUT_MS = 160000;
 
 const Analytics = () => {
-  const dispatch = useDispatch();
   const { company, currentUser } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: branches } = useSelector(
@@ -118,12 +119,6 @@ const Analytics = () => {
     month: "long",
     year: "numeric",
   });
-
-  // Загрузка данных для фильтров
-  useEffect(() => {
-    dispatch(fetchBranchesAsync());
-    dispatch(getCashBoxes());
-  }, [dispatch]);
 
   // На маркете кассу выбирать нельзя: фиксируем "Основная касса"
   const DEFAULT_CASHBOX_NAME = "Основная касса";
@@ -2741,8 +2736,7 @@ const Analytics = () => {
                           : `idx-${rowIndex}`,
                       );
                       const isOpen =
-                        hasProducts &&
-                        expandedUserPerformanceId === rowKey;
+                        hasProducts && expandedUserPerformanceId === rowKey;
                       return (
                         <React.Fragment key={rowKey}>
                           <tr
@@ -3013,11 +3007,15 @@ const Analytics = () => {
                       <tr key={`${row.user_id || "user"}-${idx}`}>
                         <td>{row.employee_label || "-"}</td>
                         <td>{row.pay_scheme_label || row.pay_scheme || "-"}</td>
-                        <td>{formatCurrency(row.monthly_base_salary || 0, 2)}</td>
+                        <td>
+                          {formatCurrency(row.monthly_base_salary || 0, 2)}
+                        </td>
                         <td>{formatCurrency(row.sales_percent || 0, 2)}</td>
                         <td>{formatNumber(row.period_days || 0)}</td>
                         <td>{formatCurrency(row.base_prorated || 0, 2)}</td>
-                        <td>{formatCurrency(row.employee_sales_period || 0, 2)}</td>
+                        <td>
+                          {formatCurrency(row.employee_sales_period || 0, 2)}
+                        </td>
                         <td>{formatCurrency(row.percent_bonus || 0, 2)}</td>
                         <td>{formatCurrency(row.total || 0, 2)}</td>
                       </tr>

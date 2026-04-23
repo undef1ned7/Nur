@@ -8,6 +8,7 @@ import {
   FaWhatsapp,
   FaWarehouse,
   FaBarcode,
+  FaCashRegister,
 } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 
@@ -68,6 +69,12 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
         description:
           "Подключение страницы для отправки товарной номенклатуры на торговые весы.",
         icon: <FaBarcode />,
+      },
+      "cashier-interface": {
+        title: "Интерфейс кассира",
+        description:
+          "Подключение интерфейса кассира для быстрой продажи, оформления оплат и работы с чеками.",
+        icon: <FaCashRegister />,
       },
     }),
     []

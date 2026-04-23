@@ -2,7 +2,13 @@ import React, { useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import SocialModal from "./SocialModal";
 import "./AdditionalServices.scss";
-import { FaInstagram, FaTelegram, FaWhatsapp, FaBarcode } from "react-icons/fa";
+import {
+  FaInstagram,
+  FaTelegram,
+  FaWhatsapp,
+  FaBarcode,
+  FaCashRegister,
+} from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 import { useMenuPermissions } from "../../Sidebar/hooks/useMenuPermissions";
 import { getAdditionalServicesForPage } from "../../Sidebar/config/additionalServicesConfig";
@@ -68,6 +74,13 @@ const AdditionalServices = () => {
         icon: <FaBarcode />,
         description:
           "Отправка товаров со склада на торговые весы для автоматической работы по штрих-кодам.",
+      },
+      {
+        id: "cashier-interface",
+        name: "Интерфейс кассира",
+        icon: <FaCashRegister />,
+        description:
+          "Подключение интерфейса кассира для быстрой продажи, оформления оплат и работы с чеками.",
       },
     ],
     []
