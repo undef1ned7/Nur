@@ -49,6 +49,8 @@ import { useDepartments } from "../../../../store/slices/departmentSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import ReactPortal from "../../../common/Portal/ReactPortal";
+import CreateCounterpartyModal from "../../Market/Counterparties/components/CreateCounterpartyModal";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -59,6 +61,7 @@ const VALID_DOC_TYPES = [
   "RECEIPT",
   "WRITE_OFF",
   "TRANSFER",
+  "COMMERCIAL_OFFER",
 ];
 
 /** Остаток 0 с учётом строк из API (например "0.000"). */
@@ -256,7 +259,9 @@ const CreateSaleDocument = () => {
   const [docType, setDocType] = useState(initialDocType);
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
-  const [isDocumentPosted, setIsDocumentPosted] = useState(true);
+  const [isDocumentPosted, setIsDocumentPosted] = useState(
+    () => initialDocType !== "COMMERCIAL_OFFER",
+  );
   const [isOrder, setIsOrder] = useState(false);
   const [documentDateValue, setDocumentDateValue] = useState(
     new Date().toISOString().split("T")[0],
@@ -270,6 +275,8 @@ const CreateSaleDocument = () => {
   const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
+  const [showCreateCounterpartyModal, setShowCreateCounterpartyModal] =
+    useState(false);
   const [showProductSelectModal, setShowProductSelectModal] = useState(false);
   const [productSelectModalProduct, setProductSelectModalProduct] =
     useState(null);
@@ -1484,7 +1491,9 @@ const CreateSaleDocument = () => {
 
   // Агент и контрагент в продаже/возврате показываем всегда (раньше скрывались при оплате не в долг)
   const showAgentCounterpartyFields =
-    isCounterpartyRequired || isAgentFilterRelevant;
+    isCounterpartyRequired ||
+    isAgentFilterRelevant ||
+    docType === "COMMERCIAL_OFFER";
 
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
@@ -1938,6 +1947,23 @@ const CreateSaleDocument = () => {
     return error.detail || error.message || "Ошибка при сохранении документа";
   };
 
+  /** Тело для КП: обязательные поля API + без лишних полей (payment_kind, agent, line_total…). */
+  const toCommercialOfferPayload = (data) => ({
+    doc_type: "COMMERCIAL_OFFER",
+    warehouse_from: data.warehouse_from,
+    counterparty: data.counterparty ?? null,
+    comment: data.comment ?? "",
+    discount_percent: data.discount_percent,
+    discount_amount: data.discount_amount,
+    items: (data.items || []).map((it) => ({
+      product: it.product,
+      qty: it.qty,
+      price: it.price,
+      discount_percent: it.discount_percent,
+      discount_amount: it.discount_amount,
+    })),
+  });
+
   // Вспомогательный хелпер: выбор правильного эндпоинта для создания документа по типу
   const createDocumentByType = async (payload) => {
     switch (docType) {
@@ -1957,6 +1983,10 @@ const CreateSaleDocument = () => {
         return warehouseAPI.createWriteOffDocument(payload);
       case "TRANSFER":
         return warehouseAPI.createTransferDocument(payload);
+      case "COMMERCIAL_OFFER":
+        return warehouseAPI.createCommercialOfferDocument(
+          toCommercialOfferPayload(payload),
+        );
       default:
         // Фолбэк на общий эндпоинт /documents/
         return warehouseAPI.createDocument(payload);
@@ -1994,7 +2024,11 @@ const CreateSaleDocument = () => {
         }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
-        ...(clientId && { counterparty: clientId }),
+        ...(docType === "COMMERCIAL_OFFER"
+          ? { counterparty: clientId || null }
+          : clientId
+            ? { counterparty: clientId }
+            : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
@@ -2027,8 +2061,15 @@ const CreateSaleDocument = () => {
       let createdDocument;
       try {
         if (editDocumentId) {
+          const payloadForUpdate =
+            docType === "COMMERCIAL_OFFER"
+              ? toCommercialOfferPayload(documentData)
+              : documentData;
           const result = await dispatch(
-            updateWarehouseDocument({ id: editDocumentId, documentData }),
+            updateWarehouseDocument({
+              id: editDocumentId,
+              documentData: payloadForUpdate,
+            }),
           );
           if (!updateWarehouseDocument.fulfilled.match(result)) {
             const errData = result.payload || result.error;
@@ -2047,7 +2088,8 @@ const CreateSaleDocument = () => {
       }
 
       // Если документ должен быть проведен, вызываем POST /documents/{id}/post/
-      if (isDocumentPosted) {
+      // (для COMMERCIAL_OFFER проведение не поддерживается API)
+      if (isDocumentPosted && docType !== "COMMERCIAL_OFFER") {
         const postResult = await dispatch(
           postWarehouseDocument({
             id: createdDocument.id,
@@ -2070,7 +2112,9 @@ const CreateSaleDocument = () => {
       alert(
         "Документ успешно " +
           (editDocumentId ? "обновлен" : "сохранен") +
-          (isDocumentPosted ? " и проведен" : ""),
+          (isDocumentPosted && docType !== "COMMERCIAL_OFFER"
+            ? " и проведен"
+            : ""),
       );
 
       // Очищаем локальное состояние
@@ -2135,7 +2179,11 @@ const CreateSaleDocument = () => {
         }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
-        ...(clientId && { counterparty: clientId }),
+        ...(docType === "COMMERCIAL_OFFER"
+          ? { counterparty: clientId || null }
+          : clientId
+            ? { counterparty: clientId }
+            : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
         comment: comment || "",
         discount_percent: String(discountPercentNum.toFixed(2)),
@@ -2169,8 +2217,15 @@ const CreateSaleDocument = () => {
       let createdDocument;
       try {
         if (editDocumentId) {
+          const payloadForUpdate =
+            docType === "COMMERCIAL_OFFER"
+              ? toCommercialOfferPayload(documentData)
+              : documentData;
           const result = await dispatch(
-            updateWarehouseDocument({ id: editDocumentId, documentData }),
+            updateWarehouseDocument({
+              id: editDocumentId,
+              documentData: payloadForUpdate,
+            }),
           );
           if (!updateWarehouseDocument.fulfilled.match(result)) {
             const errData = result.payload || result.error;
@@ -2189,7 +2244,7 @@ const CreateSaleDocument = () => {
       }
 
       // При сохранении и печати тоже уважаем флаг «Документ проведён»
-      if (isDocumentPosted) {
+      if (isDocumentPosted && docType !== "COMMERCIAL_OFFER") {
         const postResult = await dispatch(
           postWarehouseDocument({
             id: createdDocument.id,
@@ -2303,6 +2358,7 @@ const CreateSaleDocument = () => {
             discount_percent: docDiscountPercent,
             discount_amount: docDiscountCombined,
             discount_total: docDiscountCombined,
+            comment: doc.comment ?? "",
           },
           seller: {
             id: company?.id || "",
@@ -2761,11 +2817,14 @@ const CreateSaleDocument = () => {
                   {docType === "RECEIPT" && "Приход"}
                   {docType === "WRITE_OFF" && "Списание"}
                   {docType === "TRANSFER" && "Перемещение"}
+                  {docType === "COMMERCIAL_OFFER" && "Коммерческое предложение"}
                   {!docType && "Документ"}{" "}
                   {documentId ? `#${documentId.slice(4, 12)}` : ""}
                 </h1>
                 <p className="create-sale-document__doc-subtitle">
-                  Создание документа продажи
+                  {docType === "COMMERCIAL_OFFER"
+                    ? "Без проведения: склад, остатки и касса не затрагиваются"
+                    : "Создание документа продажи"}
                 </p>
               </div>
               <div className="create-sale-document__header-meta">
@@ -2779,22 +2838,24 @@ const CreateSaleDocument = () => {
                   <Calendar size={18} />
                   {displayDate}
                 </div>
-                <label className="create-sale-document__toggle">
-                  <input
-                    type="checkbox"
-                    className="create-sale-document__toggle-input"
-                    checked={isDocumentPosted}
-                    onChange={(e) => setIsDocumentPosted(e.target.checked)}
-                  />
-                  <span className="create-sale-document__toggle-track">
-                    <span className="create-sale-document__toggle-thumb">
-                      <Check size={14} strokeWidth={2.5} />
+                {docType !== "COMMERCIAL_OFFER" && (
+                  <label className="create-sale-document__toggle">
+                    <input
+                      type="checkbox"
+                      className="create-sale-document__toggle-input"
+                      checked={isDocumentPosted}
+                      onChange={(e) => setIsDocumentPosted(e.target.checked)}
+                    />
+                    <span className="create-sale-document__toggle-track">
+                      <span className="create-sale-document__toggle-thumb">
+                        <Check size={14} strokeWidth={2.5} />
+                      </span>
                     </span>
-                  </span>
-                  <span className="create-sale-document__toggle-label">
-                    Документ проведён
-                  </span>
-                </label>
+                    <span className="create-sale-document__toggle-label">
+                      Документ проведён
+                    </span>
+                  </label>
+                )}
                 {isPaymentKindRelevant && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
                     <label className="create-sale-document__payment-option">
@@ -2975,6 +3036,16 @@ const CreateSaleDocument = () => {
                         }
                         emptyText="Контрагенты не найдены"
                       />
+                      <div className="create-sale-document__counterparty-actions">
+                        <button
+                          type="button"
+                          className="create-sale-document__counterparty-create-btn"
+                          onClick={() => setShowCreateCounterpartyModal(true)}
+                        >
+                          <Plus size={16} />
+                          Создать контрагента
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </>
@@ -3410,6 +3481,32 @@ const CreateSaleDocument = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showCreateCounterpartyModal && (
+        <ReactPortal wrapperId="create_counter_modal">
+          <CreateCounterpartyModal
+            onCreated={(created) => {
+              const createdId = created?.id ?? created?.uuid;
+              if (createdId) {
+                setClientId(String(createdId));
+              }
+
+              const createdAgent =
+                typeof created?.agent === "object" && created?.agent != null
+                  ? (created.agent.id ?? created.agent.uuid ?? "")
+                  : (created?.agent ?? "");
+
+              if (createdAgent) {
+                setAgentId(String(createdAgent));
+              }
+            }}
+            onClose={() => {
+              setShowCreateCounterpartyModal(false);
+              dispatch(fetchWarehouseCounterparties());
+            }}
+          />
+        </ReactPortal>
       )}
 
       {/* Модальное окно предоплаты (при выборе «В долг») */}

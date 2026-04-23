@@ -579,6 +579,10 @@ export const MENU_CONFIG = {
           { label: "Списание", to: "/crm/warehouse/documents/write_off" },
           { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
           {
+            label: "Коммерческое предложение",
+            to: "/crm/warehouse/documents/commercial_offer",
+          },
+          {
             label: "Приход в кассу",
             to: "/crm/warehouse/documents/money/receipt",
           },

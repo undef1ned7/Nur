@@ -63,7 +63,12 @@ const DOC_TYPE_FROM_PARAM = {
   receipt: "RECEIPT",
   write_off: "WRITE_OFF",
   transfer: "TRANSFER",
+  commercial_offer: "COMMERCIAL_OFFER",
 };
+
+/** Проведение/отмена проведения на складе недоступны для КП (POST …/post/ вернёт 400). */
+const documentAllowsWarehousePosting = (doc) =>
+  doc?.doc_type !== "COMMERCIAL_OFFER";
 
 /** Дата/время в списке документов: 02.04.2026:00:35:20 */
 const formatDocumentDateTime = (value) => {
@@ -773,7 +778,10 @@ const Documents = () => {
       document: {
         type: doc.doc_type?.toLowerCase() || "sale_invoice",
         doc_type: doc.doc_type || "SALE",
-        title: "Накладная",
+        title:
+          doc.doc_type === "COMMERCIAL_OFFER"
+            ? "Коммерческое предложение"
+            : "Накладная",
         id: doc.id,
         number: doc.number || "",
         date: doc.date || doc.created_at?.split("T")[0] || "",
@@ -782,6 +790,7 @@ const Documents = () => {
         discount_percent: docDiscountPercent,
         discount_amount: docDiscountAmount,
         discount_total: docDiscountAmount,
+        comment: doc.comment ?? "",
       },
       seller,
       buyer,
@@ -1178,7 +1187,8 @@ const Documents = () => {
                               >
                                 <Printer size={18} />
                               </button>
-                              {isSaleDraftLikeStatus(item.rawStatus) && (
+                              {isSaleDraftLikeStatus(item.rawStatus) &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -1187,7 +1197,8 @@ const Documents = () => {
                                   <Check size={18} />
                                 </button>
                               )}
-                              {item.rawStatus === "CASH_PENDING" && (
+                              {item.rawStatus === "CASH_PENDING" &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <>
                                   <button
                                     type="button"
@@ -1215,7 +1226,8 @@ const Documents = () => {
                                   </button>
                                 </>
                               )}
-                              {item.rawStatus === "POSTED" && (
+                              {item.rawStatus === "POSTED" &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <button
                                   type="button"
                                   className="documents__action-btn documents__action-btn--unpost"
@@ -1279,7 +1291,8 @@ const Documents = () => {
                               >
                                 <Download size={18} />
                               </button>
-                              {isSaleDraftLikeStatus(item.rawStatus) && (
+                              {isSaleDraftLikeStatus(item.rawStatus) &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -1288,7 +1301,8 @@ const Documents = () => {
                                   <Check size={18} />
                                 </button>
                               )}
-                              {item.rawStatus === "CASH_PENDING" && (
+                              {item.rawStatus === "CASH_PENDING" &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <>
                                   <button
                                     type="button"
@@ -1316,7 +1330,8 @@ const Documents = () => {
                                   </button>
                                 </>
                               )}
-                              {item.rawStatus === "POSTED" && (
+                              {item.rawStatus === "POSTED" &&
+                                documentAllowsWarehousePosting(item.document) && (
                                 <button
                                   type="button"
                                   className="documents__action-btn documents__action-btn--unpost"
@@ -1544,7 +1559,8 @@ const Documents = () => {
                         <Download size={18} />
                       </button>
                     )}
-                    {isSaleDraftLikeStatus(item.rawStatus) && (
+                    {isSaleDraftLikeStatus(item.rawStatus) &&
+                      documentAllowsWarehousePosting(item.document) && (
                       <button
                         className="documents__action-btn"
                         onClick={() => handlePost(item)}
@@ -1553,7 +1569,8 @@ const Documents = () => {
                         <Check size={18} />
                       </button>
                     )}
-                    {item.rawStatus === "CASH_PENDING" && (
+                    {item.rawStatus === "CASH_PENDING" &&
+                      documentAllowsWarehousePosting(item.document) && (
                       <>
                         <button
                           type="button"
@@ -1581,7 +1598,8 @@ const Documents = () => {
                         </button>
                       </>
                     )}
-                    {item.rawStatus === "POSTED" && (
+                    {item.rawStatus === "POSTED" &&
+                      documentAllowsWarehousePosting(item.document) && (
                       <button
                         type="button"
                         className="documents__action-btn documents__action-btn--unpost"

@@ -13,7 +13,7 @@ const isAgentRole = (profile) =>
 /**
  * Модальное окно для создания контрагента
  */
-const CreateCounterpartyModal = ({ onClose }) => {
+const CreateCounterpartyModal = ({ onClose, onCreated }) => {
   const dispatch = useDispatch();
   const { profile } = useUser() || {};
   const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
@@ -129,7 +129,11 @@ const CreateCounterpartyModal = ({ onClose }) => {
         payload.agent = formData.agent;
       }
 
-      await dispatch(createWarehouseCounterparty(payload)).unwrap();
+      const created = await dispatch(createWarehouseCounterparty(payload)).unwrap();
+
+      if (typeof onCreated === "function") {
+        onCreated(created);
+      }
 
       // При успешном создании закрываем модальное окно
       // Список обновится автоматически через Redux slice

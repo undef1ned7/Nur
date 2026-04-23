@@ -564,6 +564,52 @@ export const createTransferDocument = async (payload) => {
 };
 
 /**
+ * Список коммерческих предложений (COMMERCIAL_OFFER)
+ * GET /api/warehouse/documents/commercial-offer/
+ */
+export const listCommercialOfferDocuments = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/documents/commercial-offer/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error(
+        "List Commercial Offer Documents Error:",
+        error.response.data
+      );
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Создать коммерческое предложение (COMMERCIAL_OFFER)
+ * POST /api/warehouse/documents/commercial-offer/
+ * В теле требуется doc_type: COMMERCIAL_OFFER; проведение (POST …/post/) не поддерживается.
+ */
+export const createCommercialOfferDocument = async (payload) => {
+  try {
+    const response = await api.post(
+      "warehouse/documents/commercial-offer/",
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error(
+        "Create Commercial Offer Document Error:",
+        error.response.data
+      );
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
  * Перемещение товаров между складами (transfer endpoint)
  * POST /api/warehouse/transfer/
  * @param {Object} payload - { warehouse_from, warehouse_to, comment, items[] }
@@ -2520,6 +2566,8 @@ export default {
   createWriteOffDocument,
   listTransferDocuments,
   createTransferDocument,
+  listCommercialOfferDocuments,
+  createCommercialOfferDocument,
   transferWarehouse,
   // Документы агента (4.2.1)
   listAgentDocuments,

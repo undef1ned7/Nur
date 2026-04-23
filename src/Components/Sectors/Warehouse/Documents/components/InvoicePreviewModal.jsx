@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { X, Printer } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { pdf } from "@react-pdf/renderer";
 
 import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
@@ -8,23 +8,24 @@ import { useUser } from "../../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./InvoicePdfDocument";
 
 import "./InvoicePreviewModal.scss";
-import { useAlert, useConfirm } from "../../../../../hooks/useDialog";
+import { useAlert } from "../../../../../hooks/useDialog";
 
 const InvoicePreviewModal = ({
   invoiceId,
   invoiceData: initialInvoiceData,
   document: initialDocument,
   onClose,
-  onEdit,
 }) => {
   const alert = useAlert();
-  const confirm = useConfirm(); 
   const dispatch = useDispatch();
   const { company } = useUser();
   const [invoiceData, setInvoiceData] = useState(initialInvoiceData);
-  const [loading, setLoading] = useState(!initialInvoiceData && !initialDocument);
+  const [loading, setLoading] = useState(
+    !initialInvoiceData && !initialDocument,
+  );
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
 
   // Функция для преобразования warehouse документа в формат для PDF
   const transformWarehouseDocument = (doc) => {
@@ -93,7 +94,12 @@ const InvoicePreviewModal = ({
             total: String(lineTotal.toFixed(2)),
             unit: item.product?.unit ?? item.unit ?? "ШТ",
             article:
-              String(item.product?.article ?? item.article ?? item.product_article ?? "").trim() || "",
+              String(
+                item.product?.article ??
+                  item.article ??
+                  item.product_article ??
+                  "",
+              ).trim() || "",
             discount_percent: Number(item.discount_percent || 0),
             discount_amount: Number(item.discount_amount || 0),
             price_before_discount: String(price.toFixed(2)),
@@ -104,14 +110,16 @@ const InvoicePreviewModal = ({
     // Вычисляем итоги
     const subtotal = items.reduce(
       (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
-      0
+      0,
     );
     const itemsDiscountTotal = items.reduce(
       (sum, item) =>
         sum +
-        (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
+        (Number(item.unit_price) *
+          Number(item.qty) *
+          Number(item.discount_percent || 0)) /
           100,
-      0
+      0,
     );
     const totalDiscount = itemsDiscountTotal + docDiscountAmount;
     const total = Number(doc.total) || subtotal - totalDiscount;
@@ -134,6 +142,7 @@ const InvoicePreviewModal = ({
         discount_percent: docDiscountPercent,
         discount_amount: docDiscountAmount,
         discount_total: docDiscountAmount,
+        comment: doc.comment ?? "",
       },
       seller,
       buyer,
@@ -163,6 +172,13 @@ const InvoicePreviewModal = ({
     a.remove();
     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   };
+
+  const previewSourceData = useMemo(() => {
+    if (initialInvoiceData) return initialInvoiceData;
+    if (invoiceData) return invoiceData;
+    if (initialDocument) return transformWarehouseDocument(initialDocument);
+    return null;
+  }, [initialInvoiceData, invoiceData, initialDocument]);
 
   useEffect(() => {
     // Если данные уже переданы, используем их
@@ -205,6 +221,43 @@ const InvoicePreviewModal = ({
     }
   }, [invoiceId, initialInvoiceData, initialDocument, dispatch, company]);
 
+  useEffect(() => {
+    let mounted = true;
+    let objectUrl = "";
+
+    const buildPreview = async () => {
+      if (!previewSourceData) {
+        setPreviewUrl("");
+        return;
+      }
+
+      try {
+        const blob = await pdf(
+          <InvoicePdfDocument data={previewSourceData} />,
+        ).toBlob();
+        objectUrl = window.URL.createObjectURL(blob);
+        if (mounted) {
+          setPreviewUrl(objectUrl);
+        }
+      } catch (previewError) {
+        console.error("Ошибка при генерации превью накладной:", previewError);
+        if (mounted) {
+          setPreviewUrl("");
+          setError("Не удалось сформировать предпросмотр накладной");
+        }
+      }
+    };
+
+    buildPreview();
+
+    return () => {
+      mounted = false;
+      if (objectUrl) {
+        window.URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [previewSourceData]);
+
   const handlePrint = async () => {
     if (!invoiceId && !invoiceData) return;
 
@@ -235,48 +288,11 @@ const InvoicePreviewModal = ({
       console.error("Ошибка при генерации PDF:", printError);
       alert(
         "Ошибка при генерации PDF: " +
-          (printError.message || "Неизвестная ошибка")
+          (printError.message || "Неизвестная ошибка"),
       );
     } finally {
       setPrinting(false);
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatDateTime = (dateString) => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatMoney = (amount) => {
-    return parseFloat(amount || 0).toLocaleString("ru-RU", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
   };
 
   if (loading) {
@@ -317,80 +333,10 @@ const InvoicePreviewModal = ({
     );
   }
 
-  // Нормализация данных из нового формата API (как в PDF)
-  const items = Array.isArray(invoiceData?.items)
-    ? invoiceData.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const total = Number(it.total ?? qty * unit);
-
-        // Скидка на уровне товара
-        const itemDiscountPercent = Number(it.discount_percent ?? 0);
-
-        // Цена без скидки товара
-        let priceNoDiscount = Number(
-          it.original_price ??
-            it.price_before_discount ??
-            it.price_without_discount ??
-            0
-        );
-
-        // Если цена без скидки не указана, вычисляем её
-        if (priceNoDiscount === 0 || priceNoDiscount === unit) {
-          if (itemDiscountPercent > 0) {
-            priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
-          } else {
-            priceNoDiscount = unit;
-          }
-        }
-
-        return {
-          id: it.id,
-          name: it.name || it.product_name || "Товар",
-          qty,
-          unit_price: unit,
-          price_no_discount: priceNoDiscount,
-          discount: itemDiscountPercent,
-          total,
-          unit: it.unit || "ШТ",
-          article: it.article || "",
-        };
-      })
-    : [];
-
-  const subtotal = parseFloat(invoiceData?.totals?.subtotal || 0);
-  const discount = parseFloat(invoiceData?.totals?.discount_total || 0);
-  const total = parseFloat(invoiceData?.totals?.total || 0);
-
-  // Данные компании (продавец) из seller
-  const seller = invoiceData?.seller || {};
-  const companyName = seller.name || "";
-  const companyInn = seller.inn || "";
-  const companyOkpo = seller.okpo || "";
-  const companyScore = seller.score || "";
-  const companyBik = seller.bik || "";
-  const companyAddress = seller.address || "";
-  const companyPhone = seller.phone || "";
-
-  // Данные клиента (покупатель) из buyer
-  const buyer = invoiceData?.buyer || null;
-  const clientName = buyer?.name || "";
-  const clientInn = buyer?.inn || "";
-  const clientOkpo = buyer?.okpo || "";
-  const clientScore = buyer?.score || "";
-  const clientBik = buyer?.bik || "";
-  const clientAddress = buyer?.address || "";
-  const clientPhone = buyer?.phone || "";
-
-  // Номер накладной из document
-  const document = invoiceData?.document || {};
-  const invoiceNumber = document.number || "";
-  const invoiceDate = document.datetime || document.date || "";
-
   return (
     <div className="invoice-preview-modal-overlay" onClick={onClose}>
       <div
-        className="invoice-preview-modal"
+        className="invoice-preview-modal !h-[100%]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="invoice-preview-modal__header">
@@ -403,202 +349,17 @@ const InvoicePreviewModal = ({
         </div>
 
         <div className="invoice-preview-modal__content">
-          <div className="invoice-preview-modal__invoice">
-            {/* Дата и время создания */}
-            <div className="invoice-preview-modal__created-date">
-              {formatDateTime(new Date().toISOString())}
+          {previewUrl ? (
+            <iframe
+              title="Предпросмотр накладной"
+              src={previewUrl}
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          ) : (
+            <div className="invoice-preview-modal__loading">
+              Формируем предпросмотр...
             </div>
-
-            {/* Заголовок накладной */}
-            <div className="invoice-preview-modal__invoice-header">
-              <div className="invoice-preview-modal__invoice-title">
-                {(() => {
-                  const docType = invoiceData?.doc_type || invoiceData?.document?.doc_type || "SALE";
-                  const titles = {
-                    SALE: "Расходная накладная",
-                    PURCHASE: "Приходная накладная",
-                    SALE_RETURN: "Расходная накладная на возврат",
-                    PURCHASE_RETURN: "Приходная накладная на возврат",
-                    INVENTORY: "Бланк инвентаризации",
-                    RECEIPT: "Оприходование",
-                    WRITE_OFF: "Списание",
-                    TRANSFER: "Накладная на перемещение",
-                  };
-                  return titles[docType] || "Накладная";
-                })()}{" "}
-                № {invoiceNumber || "—"} от {formatDate(invoiceDate)}
-              </div>
-            </div>
-
-            {/* Поставщик и Покупатель */}
-            <div className="invoice-preview-modal__parties">
-              <div className="invoice-preview-modal__party">
-                <span className="invoice-preview-modal__party-label">
-                  Поставщик:{" "}
-                </span>
-                <span className="invoice-preview-modal__party-value">
-                  {seller?.name || "—"}
-                </span>
-                {seller?.address && (
-                  <span className="invoice-preview-modal__party-value">
-                    {" "}
-                    {seller.address}
-                  </span>
-                )}
-              </div>
-              <div className="invoice-preview-modal__party">
-                <span className="invoice-preview-modal__party-label">
-                  Покупатель:{" "}
-                </span>
-                <span className="invoice-preview-modal__party-value">
-                  {buyer ? buyer.name || buyer.full_name || "—" : "—"}
-                </span>
-              </div>
-            </div>
-
-            {/* Склад */}
-            {invoiceData?.warehouse && (
-              <div className="invoice-preview-modal__warehouse">
-                Склад: «{invoiceData.warehouse}»
-              </div>
-            )}
-
-            {/* Таблица товаров */}
-            <div className="invoice-preview-modal__table">
-              {/* Заголовок таблицы */}
-              <div className="invoice-preview-modal__table-header">
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no">
-                  №
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
-                  Наименование
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article">
-                  Арт.
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit">
-                  Ед. изм.
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
-                  Кол-во
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount">
-                  Цена без скидки
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount">
-                  Скидка
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price">
-                  Цена
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
-                  Сумма
-                </div>
-              </div>
-
-              {/* Строки товаров */}
-              {items.length > 0 ? (
-                items.map((item, index) => (
-                  <div
-                    key={item.id || index}
-                    className="invoice-preview-modal__table-row"
-                  >
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no">
-                      {index + 1}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
-                      {item.name}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article">
-                      {item.article || "—"}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit">
-                      {item.unit || "ШТ"}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
-                      {formatMoney(item.qty)}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount">
-                      {formatMoney(item.price_no_discount)}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount">
-                      {item.discount > 0 ? `${formatMoney(item.discount)}%` : "—"}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price">
-                      {formatMoney(item.unit_price)}
-                    </div>
-                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
-                      {formatMoney(item.total)}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="invoice-preview-modal__table-row">
-                  <div
-                    className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name"
-                    style={{ gridColumn: "1 / -1" }}
-                  >
-                    Нет товаров
-                  </div>
-                </div>
-              )}
-
-              {/* Строка "Итого:" */}
-              <div className="invoice-preview-modal__table-row invoice-preview-modal__table-row--total">
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
-                  Итого:
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
-                  {formatMoney(items.reduce((sum, it) => sum + it.qty, 0))}
-                </div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price"></div>
-                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
-                  {formatMoney(total)}
-                </div>
-              </div>
-            </div>
-
-            {/* Итоги */}
-            <div className="invoice-preview-modal__totals">
-              {discount > 0 && (
-                <div className="invoice-preview-modal__total-row">
-                  <span>Скидка:</span>
-                  <span>{formatMoney(discount)}</span>
-                </div>
-              )}
-              <div className="invoice-preview-modal__total-row invoice-preview-modal__total-row--bold">
-                <span>ИТОГО:</span>
-                <span>{formatMoney(total)}</span>
-              </div>
-            </div>
-
-            {/* Текст с количеством наименований и суммой */}
-            <div className="invoice-preview-modal__items-info">
-              Всего наименований {items.length}, на сумму {formatMoney(total)}{" "}
-              KGS
-            </div>
-
-            {/* Подписи */}
-            <div className="invoice-preview-modal__signatures">
-              <div className="invoice-preview-modal__signature">
-                <div className="invoice-preview-modal__signature-label">
-                  Отпустил
-                </div>
-                <div className="invoice-preview-modal__signature-line"></div>
-              </div>
-              <div className="invoice-preview-modal__signature">
-                <div className="invoice-preview-modal__signature-label">
-                  Получил
-                </div>
-                <div className="invoice-preview-modal__signature-line"></div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         <div className="invoice-preview-modal__actions">
