@@ -22,8 +22,9 @@
   }
 
   &__toolbar {
-    display: grid;
-    grid-template-columns: minmax(280px, 360px) minmax(280px, 1fr);
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
     gap: 16px;
     margin-bottom: 20px;
   }
@@ -32,6 +33,13 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 200px;
+    flex: 1 1 220px;
+  }
+
+  &__field--date {
+    min-width: 150px;
+    flex: 0 0 170px;
   }
 
   &__label {
@@ -90,8 +98,29 @@
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     margin-bottom: 20px;
+  }
+
+  &__supplier-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__supplier-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
   }
 
   &__secondary-button,
@@ -248,6 +277,108 @@
   &__price-input--mobile {
     width: 100%;
   }
+
+  &__modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 12px;
+  }
+
+  &__modal-card {
+    width: min(460px, 100%);
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 16px;
+    box-shadow: var(--shadow);
+
+    .market-receipt-page__field + .market-receipt-page__field {
+      margin-top: 12px;
+    }
+  }
+
+  &__modal-card--full {
+    width: min(1200px, 100%);
+    max-height: calc(100vh - 24px);
+    padding: 0;
+    overflow: auto;
+  }
+
+  &__modal-title {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__modal-hint {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #f8fafc;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  &__modal-actions {
+    justify-content: flex-end;
+    margin-top: 14px;
+    margin-bottom: 0;
+    overflow-x: visible;
+  }
+}
+
+@media (max-width: 1200px) {
+  .market-receipt-page {
+    &__field {
+      min-width: 160px;
+      flex: none;
+    }
+
+    &__search {
+      min-height: 38px;
+      padding: 0 10px;
+      gap: 8px;
+
+      input {
+        font-size: 13px;
+      }
+    }
+
+    &__field {
+      .market-receipt-page__qty-input,
+      .market-receipt-page__price-input {
+        min-height: 36px;
+        height: 36px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+    }
+
+    .searchableCombo__control {
+      height: 36px;
+      min-height: 36px;
+      padding: 0 8px 0 10px;
+    }
+
+    .searchableCombo__input {
+      font-size: 13px;
+    }
+
+    &__supplier-add {
+      width: 40px;
+      min-width: 40px;
+      height: 36px;
+    }
+  }
 }
 
 @media (max-width: 900px) {
@@ -259,13 +390,20 @@
 
     &__toolbar,
     &__summary {
-      grid-template-columns: 1fr;
+      flex-direction: column;
+      align-items: stretch;
       gap: 10px;
       margin-bottom: 14px;
     }
 
     &__field {
       gap: 6px;
+      flex: none;
+    }
+
+    &__field--date {
+      min-width: 0;
+      flex: none;
     }
 
     &__label {
@@ -273,11 +411,11 @@
     }
 
     &__search {
-      min-height: 40px;
-      padding: 0 12px;
+      min-height: 36px;
+      padding: 0 10px;
 
       input {
-        font-size: 13px;
+        font-size: 12px;
       }
     }
 
@@ -293,6 +431,7 @@
     &__actions {
       justify-content: stretch;
       gap: 8px;
+      flex-wrap: wrap;
       margin-bottom: 14px;
     }
 
@@ -301,9 +440,21 @@
     &__qty-input,
     &__price-input {
       width: 100%;
-      min-height: 40px;
-      padding: 0 14px;
-      font-size: 13px;
+      min-height: 34px;
+      height: 34px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    .searchableCombo__control {
+      height: 34px;
+      min-height: 34px;
+      border-radius: 10px;
+      padding: 0 8px;
+    }
+
+    .searchableCombo__input {
+      font-size: 12px;
     }
 
     &__table-wrap {

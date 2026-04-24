@@ -14,6 +14,7 @@ const SearchSection = ({
   onOpenFilters,
   count,
   foundCount,
+  scanLookupLoading = false,
   showViewModeToggle = true,
   searchPlaceholder = "Поиск по названию товара...",
 }) => {
@@ -34,6 +35,12 @@ const SearchSection = ({
         <span>
           Всего: {count ?? 0} • Найдено: {foundCount}
         </span>
+        {scanLookupLoading && (
+          <span className="warehouse-search__scan-loading" role="status" aria-live="polite">
+            <span className="warehouse-search__scan-spinner" aria-hidden />
+            Поиск товара по штрихкоду...
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
           {showViewModeToggle && (

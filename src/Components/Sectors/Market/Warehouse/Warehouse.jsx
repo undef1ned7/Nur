@@ -15,6 +15,7 @@ import {
   bulkDeleteProductsAsync,
   fetchProductsAsync,
 } from "../../../../store/creators/productCreators";
+import useScanDetection from "use-scan-detection";
 import { useSearch } from "./hooks/useSearch";
 import { usePagination } from "./hooks/usePagination";
 import { useProductSelection } from "./hooks/useProductSelection";
@@ -75,6 +76,7 @@ const Warehouse = () => {
   const [filters, setFilters] = useState({});
   const [suppliers, setSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [scanLookupLoading, setScanLookupLoading] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -204,6 +206,10 @@ const Warehouse = () => {
   const [selectedSnapshots, setSelectedSnapshots] = useState(
     loadSnapshotsFromStorage,
   );
+  const barcodeProcessingRef = useRef(false);
+  const lastScanTimeRef = useRef(0);
+  const lastScannedBarcodeRef = useRef("");
+  const isScanningRef = useRef(false);
 
   useEffect(() => {
     setSelectedSnapshots((prev) => {
@@ -290,10 +296,6 @@ const Warehouse = () => {
     navigate("/crm/sklad/add-product");
   }, [navigate]);
 
-  const handleGoodsReceipt = useCallback(() => {
-    navigate("/crm/sklad/receipt");
-  }, [navigate]);
-
   const selectedProducts = useMemo(() => {
     if (!selectedRows?.size) return [];
     return [...selectedRows]
@@ -315,6 +317,91 @@ const Warehouse = () => {
     setViewMode(mode);
   }, []);
 
+  useScanDetection({
+    minLength: 3,
+    onComplete: async (barcode) => {
+      const scanned = String(barcode || "").trim();
+      if (!scanned || barcodeProcessingRef.current) return;
+
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.isContentEditable)
+      ) {
+        return;
+      }
+      if (showFilterModal || showDeleteConfirmModal) return;
+
+      const now = Date.now();
+      const isDuplicateScan =
+        lastScannedBarcodeRef.current === scanned &&
+        now - lastScanTimeRef.current < 1500;
+      if (isDuplicateScan || isScanningRef.current) return;
+
+      barcodeProcessingRef.current = true;
+      isScanningRef.current = true;
+      lastScannedBarcodeRef.current = scanned;
+      lastScanTimeRef.current = now;
+      setScanLookupLoading(true);
+      let tempSaleId = null;
+      try {
+        const startRes = await api.post("/main/pos/sales/start/", {
+          order_discount_total: 0,
+        });
+        tempSaleId = startRes?.data?.id;
+        if (!tempSaleId) {
+          alert("Не удалось подготовить поиск по штрихкоду.", true);
+          return;
+        }
+
+        const scanRes = await api.post(`/main/pos/sales/${tempSaleId}/scan/`, {
+          barcode: scanned,
+        });
+
+        const scanData = scanRes?.data || {};
+        const scanItems = Array.isArray(scanData?.items)
+          ? scanData.items
+          : Array.isArray(scanData?.cart?.items)
+            ? scanData.cart.items
+            : [];
+
+        const productId =
+          scanItems.length > 0
+            ? scanItems[scanItems.length - 1]?.product ||
+              scanItems[scanItems.length - 1]?.product_id
+            : null;
+
+        if (productId) {
+          navigate(`/crm/sklad/${productId}`);
+          return;
+        }
+
+        alert("Товар с таким штрихкодом не найден.", true);
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка поиска товара по штрихкоду",
+        );
+        alert(errorMessage, true);
+      } finally {
+        if (tempSaleId) {
+          try {
+            await api.delete(`/main/pos/sales/${tempSaleId}/`);
+          } catch {
+            // ignore temporary sale cleanup errors
+          }
+        }
+        barcodeProcessingRef.current = false;
+        setScanLookupLoading(false);
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 300);
+      }
+    },
+  });
+
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
     () => formatDeleteMessage(selectedCount),
@@ -325,7 +412,6 @@ const Warehouse = () => {
     <div className="warehouse-page">
       <WarehouseHeader
         onCreateProduct={handleCreateProduct}
-        onGoodsReceipt={handleGoodsReceipt}
         onInventory={handleOpenInventory}
         selectedCount={selectedCount}
       />
@@ -333,6 +419,7 @@ const Warehouse = () => {
       <SearchSection
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
+        scanLookupLoading={scanLookupLoading}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         onOpenFilters={() => setShowFilterModal(true)}

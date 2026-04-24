@@ -102,6 +102,8 @@ const Analytics = () => {
     payment_method: "",
     min_total: "",
     max_total: "",
+    purchase_date_from: "",
+    purchase_date_to: "",
     // Stock filters
     product: "",
     category: "",
@@ -224,6 +226,14 @@ const Analytics = () => {
             params.payment_method = filters.payment_method;
           if (filters.min_total) params.min_total = filters.min_total;
           if (filters.max_total) params.max_total = filters.max_total;
+          if (tab === "suppliers") {
+            if (filters.purchase_date_from) {
+              params.purchase_date_from = filters.purchase_date_from;
+            }
+            if (filters.purchase_date_to) {
+              params.purchase_date_to = filters.purchase_date_to;
+            }
+          }
         }
 
         if (tab === "warehouse") {
@@ -306,6 +316,8 @@ const Analytics = () => {
       payment_method: "",
       min_total: "",
       max_total: "",
+      purchase_date_from: "",
+      purchase_date_to: "",
       product: "",
       category: "",
       kind: "",
@@ -1427,6 +1439,32 @@ const Analytics = () => {
                     placeholder="0"
                   />
                 </div>
+
+                {activeTab === "suppliers" && (
+                  <>
+                    <div className="analytics-page__filter-group">
+                      <label>Дата закупки от</label>
+                      <input
+                        type="date"
+                        value={filters.purchase_date_from}
+                        onChange={(e) =>
+                          updateFilter("purchase_date_from", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className="analytics-page__filter-group">
+                      <label>Дата закупки до</label>
+                      <input
+                        type="date"
+                        value={filters.purchase_date_to}
+                        onChange={(e) =>
+                          updateFilter("purchase_date_to", e.target.value)
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 

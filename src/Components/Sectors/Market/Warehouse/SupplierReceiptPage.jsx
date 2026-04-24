@@ -4,11 +4,13 @@ import {
   ArrowLeft,
   Download,
   PackageCheck,
+  Plus,
   RefreshCw,
   Search,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../api";
+import AddProductPage from "../../../Deposits/Sklad/AddProductPage";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import InvoicePdfDocument from "../Documents/components/InvoicePdfDocument";
@@ -87,6 +89,11 @@ export default function SupplierReceiptPage() {
   const [suppliers, setSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [createSupplierOpen, setCreateSupplierOpen] = useState(false);
+  const [createSupplierName, setCreateSupplierName] = useState("");
+  const [createSupplierPhone, setCreateSupplierPhone] = useState("");
+  const [createSupplierSaving, setCreateSupplierSaving] = useState(false);
+  const [createProductOpen, setCreateProductOpen] = useState(false);
 
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -166,6 +173,39 @@ export default function SupplierReceiptPage() {
       setProductsLoading(false);
     }
   };
+
+  const handleCreateSupplier = async () => {
+    const full_name = String(createSupplierName || "").trim();
+    const phone = String(createSupplierPhone || "").trim();
+    if (!full_name) {
+      alert("Введите имя поставщика.", true);
+      return;
+    }
+    if (!phone) {
+      alert("Введите телефон поставщика.", true);
+      return;
+    }
+    try {
+      setCreateSupplierSaving(true);
+      const { data } = await api.post("/main/clients/", {
+        type: "suppliers",
+        full_name,
+        phone,
+      });
+      const createdId = String(data?.id || "").trim();
+      await loadSuppliers();
+      if (createdId) setSelectedSupplierId(createdId);
+      setCreateSupplierOpen(false);
+      setCreateSupplierName("");
+      setCreateSupplierPhone("");
+    } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка создания поставщика");
+      alert(errorMessage, true);
+    } finally {
+      setCreateSupplierSaving(false);
+    }
+  };
+
 
   useEffect(() => {
     void loadSuppliers();
@@ -421,14 +461,14 @@ export default function SupplierReceiptPage() {
         <div className="warehouse-header__left">
           <button
             className="market-receipt-page__back-button"
-            onClick={() => navigate("/crm/sklad")}
+            onClick={() => navigate("/crm/market/procurement")}
             type="button"
           >
             <ArrowLeft size={16} />
-            Назад к складу
+            Назад к закупкам
           </button>
           <div className="warehouse-header__title-section">
-            <h1 className="warehouse-header__title">Прием товара</h1>
+            <h1 className="warehouse-header__title">Закупки</h1>
             <p className="warehouse-header__subtitle">
               Выберите поставщика и оприходуйте его товары на склад
             </p>
@@ -441,15 +481,25 @@ export default function SupplierReceiptPage() {
           <div className="market-receipt-page__toolbar">
             <div className="market-receipt-page__field">
               <label className="market-receipt-page__label">Поставщик</label>
-              <SearchableCombobox
-                value={selectedSupplierId}
-                onChange={setSelectedSupplierId}
-                options={supplierOptions}
-                placeholder={
-                  suppliersLoading ? "Загрузка поставщиков..." : "Выберите поставщика"
-                }
-                classNamePrefix="searchableCombo"
-              />
+              <div className="market-receipt-page__supplier-row">
+                <SearchableCombobox
+                  value={selectedSupplierId}
+                  onChange={setSelectedSupplierId}
+                  options={supplierOptions}
+                  placeholder={
+                    suppliersLoading ? "Загрузка поставщиков..." : "Выберите поставщика"
+                  }
+                  classNamePrefix="searchableCombo"
+                />
+                <button
+                  type="button"
+                  className="market-receipt-page__supplier-add"
+                  onClick={() => setCreateSupplierOpen(true)}
+                  title="Добавить поставщика"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
 
             <div className="market-receipt-page__field market-receipt-page__field--search">
@@ -470,7 +520,7 @@ export default function SupplierReceiptPage() {
           <div className="market-receipt-page__summary">
             <div className="market-receipt-page__summary-item">
               <span className="market-receipt-page__summary-label">Поставщик</span>
-              <strong>{selectedSupplier ? buildSupplierLabel(selectedSupplier) : "Не выбран"}</strong>
+              <strong>{selectedSupplier ? buildSupplierLabel(selectedSupplier) : "—"}</strong>
             </div>
             <div className="market-receipt-page__summary-item">
               <span className="market-receipt-page__summary-label">Выбрано товаров</span>
@@ -487,6 +537,15 @@ export default function SupplierReceiptPage() {
           </div>
 
           <div className="market-receipt-page__actions">
+            <button
+              type="button"
+              className="market-receipt-page__secondary-button"
+              onClick={() => setCreateProductOpen(true)}
+              disabled={!selectedSupplierId || submitting || productsLoading}
+            >
+              <Plus size={16} />
+              Добавить товар
+            </button>
             <button
               type="button"
               className="market-receipt-page__secondary-button"
@@ -659,6 +718,70 @@ export default function SupplierReceiptPage() {
           )}
         </div>
       </DataContainer>
+      {createSupplierOpen && (
+        <div className="market-receipt-page__modal-overlay" onClick={() => setCreateSupplierOpen(false)}>
+          <div className="market-receipt-page__modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="market-receipt-page__modal-title">Новый поставщик</h3>
+            <div className="market-receipt-page__field">
+              <label className="market-receipt-page__label">Имя *</label>
+              <input
+                className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                value={createSupplierName}
+                onChange={(e) => setCreateSupplierName(e.target.value)}
+                placeholder="Название/ФИО"
+              />
+            </div>
+            <div className="market-receipt-page__field">
+              <label className="market-receipt-page__label">Телефон *</label>
+              <input
+                className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                value={createSupplierPhone}
+                onChange={(e) => setCreateSupplierPhone(e.target.value)}
+                placeholder="+996..."
+              />
+            </div>
+            <div className="market-receipt-page__actions">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={() => setCreateSupplierOpen(false)}
+                disabled={createSupplierSaving}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="market-receipt-page__primary-button"
+                onClick={handleCreateSupplier}
+                disabled={createSupplierSaving}
+              >
+                {createSupplierSaving ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {createProductOpen && (
+        <div className="market-receipt-page__modal-overlay" onClick={() => setCreateProductOpen(false)}>
+          <div
+            className="market-receipt-page__modal-card market-receipt-page__modal-card--full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AddProductPage
+              embedded
+              forceProductOnly
+              embeddedPrefillSupplierId={selectedSupplierId}
+              embeddedReturnTo="/crm/market/procurement/receipt"
+              onEmbeddedClose={() => setCreateProductOpen(false)}
+              onEmbeddedSaved={async () => {
+                setCreateProductOpen(false);
+                await loadSupplierProducts(selectedSupplierId);
+                alert("Товар создан и привязан к поставщику");
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
