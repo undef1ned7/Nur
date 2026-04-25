@@ -48,6 +48,7 @@ const getSectorPermissions = (sectorName) => {
     ],
     Кафе: [
       "can_view_cafe_menu",
+      "can_view_cafe_calculation",
       "can_view_cafe_orders",
       "can_view_cafe_purchasing",
       "can_view_cafe_booking",
