@@ -476,6 +476,13 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Заготовки",
+        to: "/crm/cafe/costing",
+        icon: menuIcons.scale,
+        permission: "can_view_cafe_menu",
+        implemented: true,
+      },
+      {
         label: "Инвентаризация",
         to: "/crm/cafe/inventory",
         icon: menuIcons.clipboardCheck,

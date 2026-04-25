@@ -52,34 +52,6 @@ const buildFormFromDetail = (detail, fallbackCategory = "") => ({
   kitchen: detail?.kitchen ? String(detail.kitchen) : "",
   price: String(detail?.price ?? "0").replace(",", "."),
   is_active: !!detail?.is_active,
-  ingredients: Array.isArray(detail?.ingredients)
-    ? detail.ingredients.map((ing) => ({
-        id: ing.id ?? "",
-        product: ing.product,
-        product_title: ing.product_title ?? "",
-        product_unit: ing.product_unit ?? "",
-        product_unit_price: ing.product_unit_price ?? null,
-        amount: String(ing.amount ?? "").replace(",", "."),
-        ingredient_cost: ing.ingredient_cost ?? null,
-        quantity_in_package: String(ing.quantity_in_package ?? "").replace(
-          ",",
-          ".",
-        ),
-        cold_loss_percent: String(ing.cold_loss_percent ?? "").replace(
-          ",",
-          ".",
-        ),
-        hot_loss_percent: String(ing.hot_loss_percent ?? "").replace(",", "."),
-        unit: ing.unit ?? "",
-        gross_unit: ing.gross_unit ?? "",
-        gross_kg: ing.gross_kg ?? null,
-        net_kg: ing.net_kg ?? null,
-        output_ready_kg: ing.output_ready_kg ?? null,
-        cost_price_rub: ing.cost_price_rub ?? null,
-        cost_per_unit_rub: ing.cost_per_unit_rub ?? null,
-        cost_per_unit_weight_rub: ing.cost_per_unit_weight_rub ?? null,
-      }))
-    : [],
 });
 
 const EMPTY_FORM = {
@@ -88,7 +60,6 @@ const EMPTY_FORM = {
   kitchen: "",
   price: "0",
   is_active: true,
-  ingredients: [],
 };
 
 export default function CafeMenuItemPage() {
@@ -103,6 +74,20 @@ export default function CafeMenuItemPage() {
   const [categories, setCategories] = useState([]);
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
+  const [preparations, setPreparations] = useState([]);
+  const [processingTypes, setProcessingTypes] = useState([]);
+  const [dishIngredients, setDishIngredients] = useState([]);
+  const [dishCost, setDishCost] = useState(null);
+  const [dishCostLoading, setDishCostLoading] = useState(false);
+  const [ingredientSaving, setIngredientSaving] = useState(false);
+  const [ingredientCreateOpen, setIngredientCreateOpen] = useState(false);
+  const [newIngredient, setNewIngredient] = useState({
+    ingredient_type: "product",
+    product: "",
+    preparation: "",
+    quantity: "1",
+    unit: "g",
+  });
   const [form, setForm] = useState(EMPTY_FORM);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -159,6 +144,17 @@ export default function CafeMenuItemPage() {
     return map;
   }, [warehouse]);
 
+  const preparationOptions = useMemo(
+    () =>
+      (Array.isArray(preparations) ? preparations : [])
+        .map((item) => ({
+          value: String(item.id),
+          label: safeStr(item.name || "Заготовка"),
+        }))
+        .filter((opt) => opt.value && opt.label),
+    [preparations],
+  );
+
   const fetchCategories = useCallback(async () => {
     const res = await api.get("/cafe/categories/");
     return getListFromResponse(res);
@@ -172,6 +168,30 @@ export default function CafeMenuItemPage() {
   const fetchWarehouse = useCallback(async () => {
     const res = await api.get("/cafe/warehouse/");
     return getListFromResponse(res);
+  }, []);
+
+  const fetchPreparations = useCallback(async () => {
+    const res = await api.get("/cafe/preparations/");
+    return getListFromResponse(res);
+  }, []);
+
+  const fetchProcessingTypes = useCallback(async () => {
+    const res = await api.get("/cafe/processing-types/");
+    return getListFromResponse(res);
+  }, []);
+
+  const fetchDishIngredients = useCallback(async (dishId) => {
+    if (!dishId) return [];
+    const res = await api.get("/cafe/dish-ingredients/", {
+      params: { dish: String(dishId) },
+    });
+    return getListFromResponse(res);
+  }, []);
+
+  const fetchDishCost = useCallback(async (dishId) => {
+    if (!dishId) return null;
+    const res = await api.get(`/cafe/dishes/${encodeURIComponent(String(dishId))}/cost/`);
+    return res?.data || null;
   }, []);
 
   const fetchMenuItemDetail = useCallback(async (menuItemId) => {
@@ -188,11 +208,13 @@ export default function CafeMenuItemPage() {
     (async () => {
       try {
         setLoading(true);
-        const [categoriesData, kitchensData, warehouseData, detail] =
+        const [categoriesData, kitchensData, warehouseData, preparationsData, processingData, detail] =
           await Promise.all([
             fetchCategories(),
             fetchKitchens(),
             fetchWarehouse(),
+            fetchPreparations(),
+            fetchProcessingTypes(),
             isEditing ? fetchMenuItemDetail(id) : Promise.resolve(null),
           ]);
 
@@ -201,13 +223,39 @@ export default function CafeMenuItemPage() {
         setCategories(Array.isArray(categoriesData) ? categoriesData : []);
         setKitchens(Array.isArray(kitchensData) ? kitchensData : []);
         setWarehouse(Array.isArray(warehouseData) ? warehouseData : []);
+        setPreparations(Array.isArray(preparationsData) ? preparationsData : []);
+        setProcessingTypes(Array.isArray(processingData) ? processingData : []);
 
         if (detail) {
           setForm(
             buildFormFromDetail(detail, String(categoriesData?.[0]?.id || "")),
           );
           setImagePreview(detail.image_url || "");
+          try {
+            setDishCostLoading(true);
+            const [nextDishIngredients, nextDishCost] = await Promise.all([
+              fetchDishIngredients(detail.id),
+              fetchDishCost(detail.id),
+            ]);
+            if (mounted) {
+              setDishIngredients(
+                (Array.isArray(nextDishIngredients) ? nextDishIngredients : []).map((it) => ({
+                  ...it,
+                  processing_items: Array.isArray(it.processings)
+                    ? it.processings
+                    : Array.isArray(it.processing_items)
+                      ? it.processing_items
+                      : [],
+                })),
+              );
+              setDishCost(nextDishCost || null);
+            }
+          } catch {}
+          finally {
+            if (mounted) setDishCostLoading(false);
+          }
         } else {
+          setDishCost(null);
           setForm((prev) => ({
             ...prev,
             category: String(categoriesData?.[0]?.id || ""),
@@ -239,6 +287,24 @@ export default function CafeMenuItemPage() {
     };
   }, [imagePreview]);
 
+  useEffect(() => {
+    if (!isEditing || activeTab !== "ingredients" || !id) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setDishCostLoading(true);
+        const nextDishCost = await fetchDishCost(id);
+        if (mounted) setDishCost(nextDishCost || null);
+      } catch {
+      } finally {
+        if (mounted) setDishCostLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab, fetchDishCost, id, isEditing]);
+
   const updateField = useCallback(
     (patch) => setForm((prev) => ({ ...prev, ...patch })),
     [],
@@ -259,86 +325,124 @@ export default function CafeMenuItemPage() {
     [imagePreview],
   );
 
-  const addIngredientRow = useCallback(
-    () =>
-      setForm((prev) => ({
-        ...prev,
-        ingredients: [
-          ...(prev.ingredients || []),
-          {
-            product: "",
-            amount: "1",
-            quantity_in_package: "1",
-            cold_loss_percent: "0",
-            hot_loss_percent: "0",
-          },
-        ],
-      })),
-    [],
+  const reloadDishIngredients = useCallback(async () => {
+    if (!id) return;
+    try {
+      setDishCostLoading(true);
+      const [rows, nextDishCost] = await Promise.all([
+        fetchDishIngredients(id),
+        fetchDishCost(id),
+      ]);
+      setDishIngredients(
+        (Array.isArray(rows) ? rows : []).map((it) => ({
+          ...it,
+          processing_items: Array.isArray(it.processings)
+            ? it.processings
+            : Array.isArray(it.processing_items)
+              ? it.processing_items
+              : [],
+        })),
+      );
+      setDishCost(nextDishCost || null);
+    } finally {
+      setDishCostLoading(false);
+    }
+  }, [fetchDishIngredients, fetchDishCost, id]);
+
+  const addIngredientRow = useCallback(async () => {
+    if (!id) {
+      alert("Сначала сохраните блюдо", true);
+      return;
+    }
+    const payload = {
+      ingredient_type: newIngredient.ingredient_type,
+      quantity: numberToString(newIngredient.quantity || "0"),
+      unit: newIngredient.unit || "g",
+      ...(newIngredient.ingredient_type === "product"
+        ? { product: newIngredient.product || null }
+        : { preparation: newIngredient.preparation || null }),
+    };
+    try {
+      setIngredientSaving(true);
+      await api.post(`/cafe/dishes/${encodeURIComponent(String(id))}/ingredients/`, payload);
+      setNewIngredient({
+        ingredient_type: "product",
+        product: "",
+        preparation: "",
+        quantity: "1",
+        unit: "g",
+      });
+      setIngredientCreateOpen(false);
+      await reloadDishIngredients();
+    } catch (err) {
+      alert(validateResErrors(err, "Ошибка добавления ингредиента"), true);
+    } finally {
+      setIngredientSaving(false);
+    }
+  }, [alert, id, newIngredient, reloadDishIngredients]);
+
+  const updateIngredientRow = useCallback(
+    async (row, patch) => {
+      const ingredientId = row?.id;
+      if (!ingredientId) return;
+      try {
+        setIngredientSaving(true);
+        await api.patch(`/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`, patch);
+        await reloadDishIngredients();
+      } catch (err) {
+        alert(validateResErrors(err, "Ошибка обновления ингредиента"), true);
+      } finally {
+        setIngredientSaving(false);
+      }
+    },
+    [alert, reloadDishIngredients],
   );
 
-  const updateIngredientRow = useCallback((idx, field, value) => {
-    setForm((prev) => {
-      const rows = [...(prev.ingredients || [])];
-      const row = { ...(rows[idx] || {}) };
-      const clearComputedFields = () => {
-        row.gross_unit = "";
-        row.gross_kg = null;
-        row.net_kg = null;
-        row.output_ready_kg = null;
-        row.ingredient_cost = null;
-        row.cost_price_rub = null;
-        row.cost_per_unit_weight_rub = null;
-      };
-
-      if (field === "product") {
-        clearComputedFields();
-        row.product = value;
-        const product = warehouseMap.get(String(value || ""));
-        if (product) {
-          row.product_title = product.title || "";
-          row.product_unit = product.unit || "";
-          row.product_unit_price = product.unit_price ?? null;
-          row.unit = product.unit || row.unit || "";
-          row.cost_per_unit_rub = product.unit_price ?? null;
-          if (!String(row.quantity_in_package || "").trim()) {
-            row.quantity_in_package = String(
-              product.quantity_in_package ?? "1",
-            ).replace(",", ".");
-          }
-        } else {
-          row.product_title = "";
-          row.product_unit = "";
-          row.product_unit_price = null;
-          row.unit = "";
-          row.cost_per_unit_rub = null;
-        }
+  const removeIngredientRow = useCallback(
+    async (row) => {
+      const ingredientId = row?.id;
+      if (!ingredientId) return;
+      try {
+        setIngredientSaving(true);
+        await api.delete(`/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`);
+        await reloadDishIngredients();
+      } catch (err) {
+        alert(validateResErrors(err, "Ошибка удаления ингредиента"), true);
+      } finally {
+        setIngredientSaving(false);
       }
+    },
+    [alert, reloadDishIngredients],
+  );
 
-      if (
-        field === "amount" ||
-        field === "quantity_in_package" ||
-        field === "cold_loss_percent" ||
-        field === "hot_loss_percent"
-      ) {
-        const normalized = normalizeDecimalValue(value);
-        if (normalized !== null) {
-          row[field] = normalized;
-          clearComputedFields();
-        }
+  const addProcessingToIngredient = useCallback(
+    async (ingredientId, processingTypeId) => {
+      if (!ingredientId || !processingTypeId) return;
+      try {
+        await api.post("/cafe/dish-ingredient-processings/", {
+          ingredient: ingredientId,
+          processing_type: processingTypeId,
+        });
+        await reloadDishIngredients();
+      } catch (err) {
+        alert(validateResErrors(err, "Ошибка добавления обработки"), true);
       }
+    },
+    [alert, reloadDishIngredients],
+  );
 
-      rows[idx] = row;
-      return { ...prev, ingredients: rows };
-    });
-  }, [warehouseMap]);
-
-  const removeIngredientRow = useCallback((idx) => {
-    setForm((prev) => ({
-      ...prev,
-      ingredients: (prev.ingredients || []).filter((_, i) => i !== idx),
-    }));
-  }, []);
+  const removeProcessingFromIngredient = useCallback(
+    async (processingRowId) => {
+      if (!processingRowId) return;
+      try {
+        await api.delete(`/cafe/dish-ingredient-processings/${encodeURIComponent(String(processingRowId))}/`);
+        await reloadDishIngredients();
+      } catch (err) {
+        alert(validateResErrors(err, "Ошибка удаления обработки"), true);
+      }
+    },
+    [alert, reloadDishIngredients],
+  );
 
   const buildFormPayload = useCallback(() => {
     const payload = {
@@ -352,37 +456,6 @@ export default function CafeMenuItemPage() {
         ),
       ),
       is_active: !!form.is_active,
-      ingredients: (form.ingredients || [])
-        .filter(
-          (row) => row && row.product && String(row.amount || "").trim() !== "",
-        )
-        .map((row) => ({
-          product: row.product,
-          amount: numberToString(
-            Math.max(0, Number(String(row.amount).replace(",", ".")) || 0),
-          ),
-          quantity_in_package: numberToString(
-            Math.max(
-              0,
-              Number(String(row.quantity_in_package || "1").replace(",", ".")) ||
-                0,
-            ),
-          ),
-          cold_loss_percent: numberToString(
-            Math.max(
-              0,
-              Number(String(row.cold_loss_percent || "0").replace(",", ".")) ||
-                0,
-            ),
-          ),
-          hot_loss_percent: numberToString(
-            Math.max(
-              0,
-              Number(String(row.hot_loss_percent || "0").replace(",", ".")) ||
-                0,
-            ),
-          ),
-        })),
     };
 
     if (!payload.title || !payload.category) return null;
@@ -415,7 +488,6 @@ export default function CafeMenuItemPage() {
         if (payload.kitchen) formData2.append("kitchen", payload.kitchen);
         formData2.append("price", payload.price);
         formData2.append("is_active", payload.is_active ? "true" : "false");
-        formData2.append("ingredients", JSON.stringify(payload.ingredients));
         formData2.append("image", imageFile);
 
         await api.put(
@@ -707,75 +779,86 @@ export default function CafeMenuItemPage() {
                 <button
                   type="button"
                   className="cafeMenu__btn cafeMenu__btn--secondary"
-                  onClick={addIngredientRow}
+                  onClick={() => setIngredientCreateOpen(true)}
+                  disabled={!isEditing || ingredientSaving}
                 >
                   <FaPlus /> Добавить ингредиент
                 </button>
               </div>
 
+              {isEditing && (
+                <div className="cafeMenuItemPage__ingredientMetrics">
+                  <div className="cafeMenuItemPage__ingredientMetric">
+                    <span>Себестоимость</span>
+                    <strong>
+                      {dishCostLoading
+                        ? "Обновляем..."
+                        : formatMetricValue(dishCost?.cost_price)}
+                    </strong>
+                  </div>
+                  <div className="cafeMenuItemPage__ingredientMetric">
+                    <span>Цена продажи</span>
+                    <strong>{formatMetricValue(dishCost?.sale_price)}</strong>
+                  </div>
+                  <div className="cafeMenuItemPage__ingredientMetric">
+                    <span>Маржа (сумма)</span>
+                    <strong>{formatMetricValue(dishCost?.margin_amount)}</strong>
+                  </div>
+                  <div className="cafeMenuItemPage__ingredientMetric">
+                    <span>Маржа (%)</span>
+                    <strong>{formatMetricValue(dishCost?.margin_percent, "%")}</strong>
+                  </div>
+                </div>
+              )}
+
+              {!isEditing && (
+                <div className="cafeMenu__alert">
+                  Сначала сохраните блюдо, затем добавляйте ингредиенты по новой схеме.
+                </div>
+              )}
+
               <div className="cafeMenu__ingList">
-                {(form?.ingredients || []).length > 0 ? (
-                  (form?.ingredients || []).map((row, idx) => {
-                    const ingredientUnit = getIngredientUnitLabel(
-                      row,
-                      warehouseMap,
-                    );
+                {(dishIngredients || []).length > 0 ? (
+                  (dishIngredients || []).map((row, idx) => {
+                    const ingredientUnit = row?.unit || "—";
+                    const processingItems = Array.isArray(row?.processing_items)
+                      ? row.processing_items
+                      : [];
 
                     return (
                     <div
-                      key={`${row?.product || "new"}-${idx}`}
+                      key={`${row?.id || "new"}-${idx}`}
                       className="cafeMenu__ingRow"
                     >
                       <div className="cafeMenu__ingCol">
                         <label className="cafeMenu__label cafeMenu__label--sm">
-                          Товар
+                          Тип ингредиента
                         </label>
-                        <SearchableCombobox
-                          value={String(row?.product ?? "")}
-                          onChange={(val) =>
-                            updateIngredientRow(idx, "product", String(val))
-                          }
-                          options={productOptions}
-                          placeholder="Поиск товара…"
-                          classNamePrefix="cafeMenuCombo"
-                        />
+                        <input className="cafeMenu__input" value={row?.ingredient_type || "—"} disabled />
                       </div>
 
                       <div className="cafeMenu__ingCol cafeMenu__ingCol--amount">
                         <label className="cafeMenu__label cafeMenu__label--sm">
-                          Норма, {ingredientUnit}
+                          Ингредиент
                         </label>
                         <input
                           className="cafeMenu__input"
-                          value={formatDecimalInput(row?.amount)}
-                          onChange={(e) =>
-                            updateIngredientRow(
-                              idx,
-                              "amount",
-                              formatDecimalInput(e.target.value),
-                            )
-                          }
-                          placeholder="1"
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          required
+                          value={row?.product_name || row?.preparation_name || "—"}
+                          disabled
                         />
                       </div>
 
                       <div className="cafeMenu__ingCol cafeMenuItemPage__ingCompactField">
                         <label className="cafeMenu__label cafeMenu__label--sm">
-                          Кол-во в фасовке, {ingredientUnit}
+                          Количество
                         </label>
                         <input
                           className="cafeMenu__input"
-                          value={formatDecimalInput(row?.quantity_in_package)}
+                          value={formatDecimalInput(row?.quantity)}
                           onChange={(e) =>
-                            updateIngredientRow(
-                              idx,
-                              "quantity_in_package",
-                              formatDecimalInput(e.target.value),
-                            )
+                            updateIngredientRow(row, {
+                              quantity: numberToString(formatDecimalInput(e.target.value)),
+                            })
                           }
                           placeholder="1"
                           type="text"
@@ -786,128 +869,79 @@ export default function CafeMenuItemPage() {
 
                       <div className="cafeMenu__ingCol cafeMenuItemPage__ingCompactField">
                         <label className="cafeMenu__label cafeMenu__label--sm">
-                          Холодная обр., %
+                          Ед. изм.
                         </label>
-                        <input
+                        <select
                           className="cafeMenu__input"
-                          value={formatDecimalInput(row?.cold_loss_percent)}
+                          value={row?.unit || "g"}
                           onChange={(e) =>
-                            updateIngredientRow(
-                              idx,
-                              "cold_loss_percent",
-                              formatDecimalInput(e.target.value),
-                            )
+                            updateIngredientRow(row, {
+                              unit: e.target.value,
+                            })
                           }
-                          placeholder="0"
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                        />
-                      </div>
-
-                      <div className="cafeMenu__ingCol cafeMenuItemPage__ingCompactField">
-                        <label className="cafeMenu__label cafeMenu__label--sm">
-                          Горячая обр., %
-                        </label>
-                        <input
-                          className="cafeMenu__input"
-                          value={formatDecimalInput(row?.hot_loss_percent)}
-                          onChange={(e) =>
-                            updateIngredientRow(
-                              idx,
-                              "hot_loss_percent",
-                              formatDecimalInput(e.target.value),
-                            )
-                          }
-                          placeholder="0"
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                        />
+                        >
+                          <option value="kg">кг</option>
+                          <option value="g">г</option>
+                          <option value="l">л</option>
+                          <option value="ml">мл</option>
+                          <option value="pcs">шт</option>
+                        </select>
                       </div>
 
                       <div className="cafeMenuItemPage__ingredientMetrics">
                         <div className="cafeMenuItemPage__ingredientMetric cafeMenuItemPage__ingredientMetric--wide">
-                          <span>Товар</span>
-                          <strong>
-                            {row?.product_title ||
-                              warehouseMap.get(String(row?.product || ""))?.title ||
-                              "—"}
-                          </strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Ед. изм. товара</span>
-                          <strong>
-                            {row?.product_unit ||
-                              warehouseMap.get(String(row?.product || ""))?.unit ||
-                              "—"}
-                          </strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Цена товара</span>
-                          <strong>
-                            {formatMetricValue(
-                              row?.product_unit_price ??
-                                warehouseMap.get(String(row?.product || ""))?.unit_price,
-                              ingredientUnit,
-                            )}
-                          </strong>
+                          <span>Себестоимость ед.</span>
+                          <strong>{formatMetricValue(row?.unit_cost)}</strong>
                         </div>
                         <div className="cafeMenuItemPage__ingredientMetric">
                           <span>Стоимость ингредиента</span>
-                          <strong>
-                            {formatMetricValue(
-                              row?.ingredient_cost ?? row?.cost_price_rub,
-                            )}
-                          </strong>
+                          <strong>{formatMetricValue(row?.ingredient_cost)}</strong>
                         </div>
                         <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Ед. изм. ингредиента</span>
-                          <strong>
-                            {ingredientUnit}
-                          </strong>
+                          <span>Стоимость обработок</span>
+                          <strong>{formatMetricValue(row?.processing_cost)}</strong>
                         </div>
                         <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Брутто, {ingredientUnit}</span>
-                          <strong>
-                            {formatMetricValue(row?.gross_unit, ingredientUnit)}
-                          </strong>
+                          <span>Итог по ингредиенту</span>
+                          <strong>{formatMetricValue(row?.total_cost)}</strong>
                         </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Брутто, кг</span>
-                          <strong>{formatMetricValue(row?.gross_kg)}</strong>
+                      </div>
+
+                      <div className="cafeMenu__ingCol">
+                        <label className="cafeMenu__label cafeMenu__label--sm">Обработки</label>
+                        <div className="cafeMenuItemPage__ingredientMetrics">
+                          {processingItems.length > 0 ? (
+                            processingItems.map((pr) => (
+                              <div key={String(pr.id || pr.processing_id || pr.processing_type)} className="cafeMenuItemPage__ingredientMetric cafeMenuItemPage__ingredientMetric--wide">
+                                <span>{pr.processing_type_name || pr.name || "Обработка"}</span>
+                                <strong>{formatMetricValue(pr.cost)}</strong>
+                                <button
+                                  type="button"
+                                  className="cafeMenu__iconBtn cafeMenu__iconBtn--danger"
+                                  onClick={() => removeProcessingFromIngredient(pr.id)}
+                                  title="Удалить обработку"
+                                >
+                                  <FaTrash />
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="cafeMenu__hint">Нет обработок</div>
+                          )}
                         </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Нетто, кг</span>
-                          <strong>{formatMetricValue(row?.net_kg)}</strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Выход готового, кг</span>
-                          <strong>
-                            {formatMetricValue(row?.output_ready_kg)}
-                          </strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Себестоимость</span>
-                          <strong>
-                            {formatMetricValue(row?.cost_price_rub)}
-                          </strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Стоимость за ед.</span>
-                          <strong>
-                            {formatMetricValue(
-                              row?.cost_per_unit_rub ??
-                                warehouseMap.get(String(row?.product || ""))?.unit_price,
-                              ingredientUnit,
-                            )}
-                          </strong>
-                        </div>
-                        <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Стоимость за ед. веса</span>
-                          <strong>
-                            {formatMetricValue(row?.cost_per_unit_weight_rub)}
-                          </strong>
+                        <div style={{ marginTop: 8 }}>
+                          <SearchableCombobox
+                            value=""
+                            onChange={(val) =>
+                              addProcessingToIngredient(row.id, String(val || ""))
+                            }
+                            options={(processingTypes || []).map((pt) => ({
+                              value: String(pt.id),
+                              label: `${pt.name} (${pt.charge_type})`,
+                            }))}
+                            placeholder="Добавить обработку..."
+                            classNamePrefix="cafeMenuCombo"
+                          />
                         </div>
                       </div>
 
@@ -918,9 +952,10 @@ export default function CafeMenuItemPage() {
                         <button
                           type="button"
                           className="cafeMenu__iconBtn cafeMenu__iconBtn--danger"
-                          onClick={() => removeIngredientRow(idx)}
+                          onClick={() => removeIngredientRow(row)}
                           aria-label="Удалить"
                           title="Удалить ингредиент"
+                          disabled={ingredientSaving}
                         >
                           <FaTrash />
                         </button>
@@ -961,6 +996,134 @@ export default function CafeMenuItemPage() {
         onClose={() => setKitchenCreateOpen(false)}
         onCreated={handleKitchenCreated}
       />
+      {isEditing && ingredientCreateOpen && (
+        <div
+          className="cafeMenuModal__overlay"
+          onClick={() => {
+            if (!ingredientSaving) setIngredientCreateOpen(false);
+          }}
+        >
+          <div
+            className="cafeMenuModal__card cafeMenuItemPage__ingredientModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cafeMenuModal__header">
+              <div className="cafeMenuModal__headLeft">
+                <h3 className="cafeMenuModal__title">Новый ингредиент</h3>
+                <div className="cafeMenuModal__sub">
+                  Выберите тип, позицию, количество и единицу измерения
+                </div>
+              </div>
+              <button
+                type="button"
+                className="cafeMenuModal__close"
+                onClick={() => setIngredientCreateOpen(false)}
+                disabled={ingredientSaving}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="cafeMenuItemPage__ingredientModalBody">
+              <div className="cafeMenu__ingRow">
+                <div className="cafeMenu__ingCol">
+                  <label className="cafeMenu__label cafeMenu__label--sm">Тип ингредиента</label>
+                  <select
+                    className="cafeMenu__input"
+                    value={newIngredient.ingredient_type}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        ingredient_type: e.target.value,
+                        product: "",
+                        preparation: "",
+                      }))
+                    }
+                  >
+                    <option value="product">Товар</option>
+                    <option value="preparation">Заготовка</option>
+                  </select>
+                </div>
+                <div className="cafeMenu__ingCol">
+                  <label className="cafeMenu__label cafeMenu__label--sm">
+                    {newIngredient.ingredient_type === "product" ? "Товар" : "Заготовка"}
+                  </label>
+                  <SearchableCombobox
+                    value={
+                      newIngredient.ingredient_type === "product"
+                        ? String(newIngredient.product || "")
+                        : String(newIngredient.preparation || "")
+                    }
+                    onChange={(val) =>
+                      setNewIngredient((prev) =>
+                        prev.ingredient_type === "product"
+                          ? { ...prev, product: String(val || "") }
+                          : { ...prev, preparation: String(val || "") },
+                      )
+                    }
+                    options={
+                      newIngredient.ingredient_type === "product"
+                        ? productOptions
+                        : preparationOptions
+                    }
+                    placeholder="Выберите..."
+                    classNamePrefix="cafeMenuCombo"
+                  />
+                </div>
+                <div className="cafeMenu__ingCol cafeMenuItemPage__ingCompactField">
+                  <label className="cafeMenu__label cafeMenu__label--sm">Количество</label>
+                  <input
+                    className="cafeMenu__input"
+                    value={formatDecimalInput(newIngredient.quantity)}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({
+                        ...prev,
+                        quantity: formatDecimalInput(e.target.value),
+                      }))
+                    }
+                  />
+                </div>
+                <div className="cafeMenu__ingCol cafeMenuItemPage__ingCompactField">
+                  <label className="cafeMenu__label cafeMenu__label--sm">Ед. изм.</label>
+                  <select
+                    className="cafeMenu__input"
+                    value={newIngredient.unit}
+                    onChange={(e) =>
+                      setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))
+                    }
+                  >
+                    <option value="kg">кг</option>
+                    <option value="g">г</option>
+                    <option value="l">л</option>
+                    <option value="ml">мл</option>
+                    <option value="pcs">шт</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="cafeMenuItemPage__ingredientModalActions">
+                <button
+                  type="button"
+                  className="cafeMenu__btn cafeMenu__btn--secondary"
+                  onClick={() => setIngredientCreateOpen(false)}
+                  disabled={ingredientSaving}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeMenu__btn cafeMenu__btn--primary"
+                  onClick={addIngredientRow}
+                  disabled={ingredientSaving}
+                >
+                  <FaPlus /> {ingredientSaving ? "Добавляем..." : "Добавить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

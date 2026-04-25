@@ -117,6 +117,7 @@ import CafeStock from "../Components/Sectors/cafe/Stock/Stock";
 import CafeKassa from "../Components/Sectors/cafe/kassaCafe/kassa";
 import CafeClients from "../Components/Sectors/cafe/Clients/Clients";
 import CafeTables from "../Components/Sectors/cafe/Tables/Tables";
+import CafeCosting from "../Components/Sectors/cafe/Costing/Costing";
 
 // Building
 import BuildingWork from "../Components/Sectors/Building/BuildingWork/BuildingWork";
@@ -597,6 +598,7 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("reports", CafeReports),
       createProtectedRoute("reservations", CafeReservations),
       createProtectedRoute("stock", CafeStock),
+      createProtectedRoute("costing", CafeCosting),
       createProtectedRoute("kassa/*", CafeKassa),
       createProtectedRoute("clients", CafeClients),
       createProtectedRoute("tables", CafeTables),

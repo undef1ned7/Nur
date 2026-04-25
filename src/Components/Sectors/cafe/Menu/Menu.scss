@@ -1838,6 +1838,23 @@
     align-self: auto;
     padding-left: 0;
   }
+
+  &__ingredientModal {
+    width: min(780px, calc(100% - 24px));
+  }
+
+  &__ingredientModalBody {
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+  }
+
+  &__ingredientModalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1886,6 +1903,18 @@
     .cafeMenu__ingCol--trash {
       justify-items: stretch;
       padding-left: 0;
+    }
+
+    &__ingredientModalBody {
+      padding: 12px;
+    }
+
+    &__ingredientModalActions {
+      justify-content: stretch;
+
+      .cafeMenu__btn {
+        flex: 1 1 100%;
+      }
     }
   }
 }
