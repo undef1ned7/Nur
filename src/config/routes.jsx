@@ -233,6 +233,25 @@ const createProtectedRoute = (path, Component, props) => (
   />
 );
 
+const createPermissionProtectedRoute = (
+  path,
+  Component,
+  permissionKey,
+  profile,
+  props,
+) => (
+  <Route
+    key={path}
+    path={path}
+    element={
+      <ProtectedRoute>
+        {profile?.[permissionKey] ? <Component /> : <Navigate to="/crm/cafe/menu" replace />}
+      </ProtectedRoute>
+    }
+    {...props}
+  />
+);
+
 /** Производство: маршруты с агентом недоступны на тарифе «Старт». */
 const createProductionAgentProtectedRoute = (path, Component, props) => (
   <Route
@@ -598,7 +617,12 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("reports", CafeReports),
       createProtectedRoute("reservations", CafeReservations),
       createProtectedRoute("stock", CafeStock),
-      createProtectedRoute("costing", CafeCosting),
+      createPermissionProtectedRoute(
+        "costing",
+        CafeCosting,
+        "can_view_cafe_calculation",
+        profile,
+      ),
       createProtectedRoute("kassa/*", CafeKassa),
       createProtectedRoute("clients", CafeClients),
       createProtectedRoute("tables", CafeTables),

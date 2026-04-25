@@ -479,7 +479,7 @@ export const MENU_CONFIG = {
         label: "Заготовки",
         to: "/crm/cafe/costing",
         icon: menuIcons.scale,
-        permission: "can_view_cafe_menu",
+        permission: "can_view_cafe_calculation",
         implemented: true,
       },
       {

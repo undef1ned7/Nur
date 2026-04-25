@@ -168,6 +168,11 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
     Кафе: [
       { value: "Меню", label: "Меню", backendKey: "can_view_cafe_menu" },
       {
+        value: "Заготовки",
+        label: "Заготовки",
+        backendKey: "can_view_cafe_calculation",
+      },
+      {
         value: "Заказы Кафе",
         label: "Заказы Кафе",
         backendKey: "can_view_cafe_orders",
