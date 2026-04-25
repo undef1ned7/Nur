@@ -1,0 +1,407 @@
+.cafe-costing-page {
+  &__card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 24px;
+  }
+
+  &__subtitle {
+    margin: 8px 0 16px;
+    color: var(--muted);
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  &__tab {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__tab--active {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    color: #111;
+  }
+
+  &__section {
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+  }
+
+  &__row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 180px;
+    flex: 1 1 220px;
+  }
+
+  &__field-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  &__row--between {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__input {
+    min-height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-width: 160px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 2px rgba(247, 215, 79, 0.2);
+    }
+  }
+
+  &__btn {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #111;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      filter: brightness(0.97);
+    }
+  }
+
+  &__btn--small {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  &__stats {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  &__stats span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  &__table-wrap {
+    margin-top: 10px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fff;
+    }
+  }
+
+  &__actions {
+    display: inline-flex;
+    gap: 6px;
+
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 8px;
+      padding: 4px 8px;
+      cursor: pointer;
+
+      &:hover {
+        background: #f8fafc;
+      }
+    }
+  }
+
+  &__danger-btn {
+    border: 1px solid #ef4444;
+    background: #fff;
+    color: #dc2626;
+    border-radius: 8px;
+    min-height: 34px;
+    min-width: 34px;
+    padding: 0;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.08);
+    }
+  }
+
+  &__empty {
+    padding: 20px;
+    color: var(--muted);
+  }
+
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+  }
+
+  &__modal {
+    width: min(520px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    overflow-x: hidden;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    h3 {
+      margin: 0 0 2px;
+      font-size: 18px;
+    }
+
+    .cafe-costing-page__field {
+      min-width: 0;
+      flex: none;
+      width: 100%;
+      gap: 4px;
+    }
+
+    .cafe-costing-page__input {
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .cafe-costing-page__field--qty {
+      flex: 1 1 200px;
+      min-width: 140px;
+      width: auto;
+    }
+
+    .cafe-costing-page__field--unit {
+      flex: 0 0 120px;
+      min-width: 120px;
+      width: auto;
+    }
+
+    .cafe-costing-page__row {
+      margin-top: 0;
+      gap: 8px;
+      align-items: flex-end;
+      width: 100%;
+    }
+
+    .cafe-costing-page__row button {
+      min-height: 38px;
+      border-radius: 10px;
+      padding: 0 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+    }
+
+    .cafe-costing-page__row button[type="submit"] {
+      border-color: transparent;
+      background: var(--primary);
+      color: #111;
+    }
+
+    .cafe-costing-page__row button:hover {
+      filter: brightness(0.98);
+    }
+  }
+
+  &__ingredient-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px;
+    padding: 10px 54px 10px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    position: relative;
+  }
+
+  &__ingredients-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  &__qty-unit {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex: 1 1 320px;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  &__field--qty {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+
+  &__field--unit {
+    flex: 0 0 120px;
+    min-width: 84px;
+  }
+
+  &__ingredient-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    margin: 0;
+    z-index: 2;
+    min-width: 24px;
+    width: 24px;
+    min-height: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+}
+
+@media (max-width: 900px) {
+  .cafe-costing-page {
+    &__card {
+      padding: 14px;
+    }
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__tab {
+      width: 100%;
+      text-align: left;
+    }
+
+    &__input {
+      width: 100%;
+      min-width: 0;
+    }
+
+    &__qty-unit {
+      width: 100%;
+      flex-wrap: nowrap;
+    }
+
+    &__ingredient-row {
+      flex-direction: column;
+      align-items: stretch;
+      padding-right: 48px;
+    }
+
+    &__field--unit {
+      flex: 0 0 92px;
+      min-width: 92px;
+    }
+
+    &__actions {
+      width: 100%;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    &__danger-btn {
+      min-height: 34px;
+      min-width: 34px;
+      width: 34px;
+      padding: 0;
+      font-size: 12px;
+    }
+
+    &__ingredient-remove {
+      top: 6px;
+      right: 6px;
+    }
+
+    &__modal .cafe-costing-page__row button {
+      min-height: 34px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    &__stats {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+

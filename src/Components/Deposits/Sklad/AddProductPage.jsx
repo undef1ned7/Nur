@@ -52,7 +52,14 @@ import {
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 
-const AddProductPage = () => {
+const AddProductPage = ({
+  embedded = false,
+  embeddedPrefillSupplierId = "",
+  embeddedReturnTo = "",
+  onEmbeddedClose = null,
+  onEmbeddedSaved = null,
+  forceProductOnly = false,
+}) => {
   const { id: productId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,6 +78,20 @@ const AddProductPage = () => {
   } = useProducts();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
+  const returnToPath =
+    (typeof embeddedReturnTo === "string" && embeddedReturnTo.trim()) ||
+    (typeof location.state?.returnTo === "string" && location.state.returnTo.trim()) ||
+    "/crm/sklad";
+  const prefillSupplierId = String(
+    embeddedPrefillSupplierId || location.state?.prefillSupplierId || "",
+  ).trim();
+  const handleReturn = useCallback(() => {
+    if (embedded && typeof onEmbeddedClose === "function") {
+      onEmbeddedClose();
+      return;
+    }
+    navigate(returnToPath);
+  }, [embedded, navigate, onEmbeddedClose, returnToPath]);
 
   // Режим редактирования
   const isEditMode = !!productId;
@@ -82,6 +103,11 @@ const AddProductPage = () => {
 
   // Для маркета: тип товара (товар/услуга/комплект)
   const [itemType, setItemType] = useState("product"); // "product", "service", "kit"
+  useEffect(() => {
+    if (!forceProductOnly) return;
+    setItemType("product");
+  }, [forceProductOnly]);
+
 
   // const [state1, setState2] = useState([]);
   // useEffect(() => {
@@ -220,6 +246,14 @@ const AddProductPage = () => {
     plu: "",
     scale_type: "",
   });
+
+  useEffect(() => {
+    if (isEditMode || !prefillSupplierId) return;
+    setNewItemData((prev) => {
+      if (String(prev.client || "").trim()) return prev;
+      return { ...prev, client: prefillSupplierId };
+    });
+  }, [isEditMode, prefillSupplierId]);
 
   const [state, setState] = useState({
     full_name: "",
@@ -805,7 +839,11 @@ const AddProductPage = () => {
         "Успех",
       );
       setTimeout(() => {
-        navigate("/crm/sklad");
+        if (embedded && typeof onEmbeddedSaved === "function") {
+          onEmbeddedSaved();
+          return;
+        }
+        navigate(returnToPath);
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
@@ -1008,7 +1046,7 @@ const AddProductPage = () => {
         <div className="add-product-page__header">
           <button
             className="add-product-page__back"
-            onClick={() => navigate("/crm/sklad")}
+            onClick={handleReturn}
           >
             <ArrowLeft size={20} />
             Вернуться к складу
@@ -1076,7 +1114,7 @@ const AddProductPage = () => {
                 </div>
               )}
               <AddProductBarcode
-                onClose={() => navigate("/crm/sklad")}
+                onClose={handleReturn}
                 onShowSuccessAlert={(productName) => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
@@ -1084,7 +1122,7 @@ const AddProductPage = () => {
                     "Успех",
                   );
                   setTimeout(() => {
-                    navigate("/crm/sklad");
+                    handleReturn();
                   }, 1500);
                 }}
                 onShowErrorAlert={(errorMsg) => {
@@ -1101,6 +1139,7 @@ const AddProductPage = () => {
             <MarketProductForm
               itemType={itemType}
               setItemType={setItemType}
+              forceProductOnly={forceProductOnly}
               newItemData={newItemData}
               setNewItemData={setNewItemData}
               marketData={marketData}
@@ -1114,6 +1153,7 @@ const AddProductPage = () => {
               handleSubmit={handleSubmit}
               creating={creating || updating}
               navigate={navigate}
+              handleReturn={handleReturn}
               generateBarcode={generateBarcode}
               handleKitSearch={handleKitSearch}
               kitSearchResults={kitSearchResults}
@@ -1729,7 +1769,7 @@ const AddProductPage = () => {
                 <div className="add-product-page__actions">
                   <button
                     className="add-product-page__cancel-btn"
-                    onClick={() => navigate("/crm/sklad")}
+                    onClick={handleReturn}
                     disabled={creating}
                   >
                     Отмена
@@ -1755,6 +1795,7 @@ const AddProductPage = () => {
 const MarketProductForm = ({
   itemType,
   setItemType,
+  forceProductOnly = false,
   newItemData,
   setNewItemData,
   marketData,
@@ -1768,6 +1809,7 @@ const MarketProductForm = ({
   handleSubmit,
   creating,
   navigate,
+  handleReturn,
   generateBarcode,
   handleKitSearch,
   kitSearchResults,
@@ -2001,11 +2043,13 @@ const MarketProductForm = ({
   return (
     <div className="market-product-form">
       {/* Выбор типа: Товар, Услуга, Комплект */}
-      <ProductTypeSelector
-        itemType={itemType}
-        setItemType={setItemType}
-        isEditMode={isEditMode}
-      />
+      {!forceProductOnly && (
+        <ProductTypeSelector
+          itemType={itemType}
+          setItemType={setItemType}
+          isEditMode={isEditMode}
+        />
+      )}
 
       {/* Основная информация */}
       <ProductBasicInfo
@@ -3092,7 +3136,7 @@ const MarketProductForm = ({
       <div className="market-product-form__actions">
         <button
           className="market-product-form__cancel-btn"
-          onClick={() => navigate("/crm/sklad")}
+          onClick={handleReturn}
           disabled={creating}
         >
           Отмена

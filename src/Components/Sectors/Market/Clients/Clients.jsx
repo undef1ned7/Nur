@@ -632,7 +632,6 @@ const isInvalidChoiceError = (e) => {
 
 const BASE_TABS = [
   { key: "clients", label: "Клиенты" },
-  { key: "suppliers", label: "Поставщики" },
   { key: "debtors", label: "Должники" },
 ];
 
@@ -660,7 +659,7 @@ const TYPE_VARIANTS_BY_TAB = {
   contractor: ["contractor"],
 };
 
-export default function MarketClients() {
+export default function MarketClients({ forcedTab = null, hideTabs = false }) {
   const navigate = useNavigate();
 
   const { company: user } = useUser();
@@ -683,7 +682,11 @@ export default function MarketClients() {
     return base;
   }, [sectorName]);
 
-  const [activeTab, setActiveTab] = useState("clients");
+  const [activeTab, setActiveTab] = useState(forcedTab || "clients");
+  useEffect(() => {
+    if (!forcedTab) return;
+    if (activeTab !== forcedTab) setActiveTab(forcedTab);
+  }, [forcedTab, activeTab]);
   useEffect(() => {
     if (activeTab === "clientsBooking" && sectorName !== "Гостиница") {
       setActiveTab("clients");
@@ -999,7 +1002,7 @@ export default function MarketClients() {
               : "Клиенты";
 
   // ───────────────────────── clientsBooking рендерит HostelClients
-  if (activeTab === "clientsBooking") {
+  if (!forcedTab && activeTab === "clientsBooking") {
     return (
       <section className="clients" style={{ display: "block" }}>
         <nav className="tabs" aria-label="Секции">
@@ -1033,19 +1036,21 @@ export default function MarketClients() {
   return (
     <div className="clients-page">
       {/* Tabs */}
-      <nav className="clients-tabs" aria-label="Секции">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`clients-tabs__tab ${activeTab === t.key ? "clients-tabs__tab--active" : ""
-              }`}
-            onClick={() => setActiveTab(t.key)}
-            type="button"
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      {!hideTabs && (
+        <nav className="clients-tabs" aria-label="Секции">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`clients-tabs__tab ${activeTab === t.key ? "clients-tabs__tab--active" : ""
+                }`}
+              onClick={() => setActiveTab(t.key)}
+              type="button"
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {/* Header */}
       <div className="clients-header">

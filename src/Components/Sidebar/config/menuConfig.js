@@ -358,6 +358,7 @@ export const MENU_CONFIG = {
 
     // Магазин
     market: [
+
       {
         label: "История",
         to: "/crm/market/history",
@@ -377,6 +378,20 @@ export const MENU_CONFIG = {
         to: "/crm/shifts",
         icon: menuIcons.calendar,
         permission: "can_view_shifts",
+        implemented: true,
+      },
+      {
+        label: "Закупки",
+        to: "/crm/market/procurement",
+        icon: menuIcons.receiptText,
+        permission: "can_view_market_procurement",
+        implemented: true,
+      },
+      {
+        label: "Поставщики",
+        to: "/crm/market/suppliers",
+        icon: menuIcons.filePerson,
+        permission: "can_view_market_supplier",
         implemented: true,
       },
       {
@@ -458,6 +473,13 @@ export const MENU_CONFIG = {
         to: "/crm/cafe/stock",
         icon: menuIcons.boxes,
         permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Заготовки",
+        to: "/crm/cafe/costing",
+        icon: menuIcons.scale,
+        permission: "can_view_cafe_menu",
         implemented: true,
       },
       {

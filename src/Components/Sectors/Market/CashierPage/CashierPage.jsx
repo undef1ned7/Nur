@@ -240,7 +240,6 @@ const CashierPage = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
-  const receiptUserParam = String(searchParams.get("user") || "").trim();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -312,7 +311,6 @@ const CashierPage = () => {
   const permissionsSource = profile || currentUser || {};
   const mgmtRole = normalizeMgmtRole(permissionsSource?.role);
   const isPrivilegedRole = mgmtRole === "owner" || mgmtRole === "admin";
-  const currentMarketUserId = String(profile?.id || currentUser?.id || userId || "").trim();
   const canMarketDiscount =
     isPrivilegedRole || permissionsSource?.can_view_market_discount === true;
   const canMarketEditPrice =
@@ -320,24 +318,9 @@ const CashierPage = () => {
   const canMarketDeleteCartItem =
     isPrivilegedRole ||
     permissionsSource?.can_view_market_delete_cart_item === true;
-  const effectiveReceiptUserParam =
-    receiptUserParam || (!isPrivilegedRole ? currentMarketUserId : "");
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     () => window.innerWidth > 768,
   );
-
-  useEffect(() => {
-    if (isPrivilegedRole || !currentMarketUserId || receiptUserParam) return;
-    const params = new URLSearchParams(searchParams);
-    params.set("user", currentMarketUserId);
-    setSearchParams(params, { replace: true });
-  }, [
-    currentMarketUserId,
-    isPrivilegedRole,
-    receiptUserParam,
-    searchParams,
-    setSearchParams,
-  ]);
   const [desktopProductsWidth, setDesktopProductsWidth] = useState(() => {
     try {
       const raw = Number(localStorage.getItem("market_cashier_products_width_pct"));
@@ -626,11 +609,11 @@ const CashierPage = () => {
     showCustomerModal,
     showDebtModal,
     showDeletionsLogModal,
+    showReceiptsModal,
     showDiscountModal,
     showMenuModal,
     showOpenShiftPage,
     showPaymentPage,
-    showReceiptsModal,
     showShiftPage,
   ]);
 
@@ -3070,10 +3053,7 @@ const CashierPage = () => {
       )}
 
       {showReceiptsModal && (
-        <ReceiptsModal
-          onClose={() => setShowReceiptsModal(false)}
-          userFilter={effectiveReceiptUserParam}
-        />
+        <ReceiptsModal onClose={() => setShowReceiptsModal(false)} />
       )}
 
       {showHotkeyProductsModal && (

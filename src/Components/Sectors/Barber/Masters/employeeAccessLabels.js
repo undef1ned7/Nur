@@ -78,6 +78,16 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         label: "Документы",
         backendKey: "can_view_document",
       },
+      {
+        value: "Закупки",
+        label: "Закупки",
+        backendKey: "can_view_market_procurement",
+      },
+      {
+        value: "Поставщики",
+        label: "Поставщики",
+        backendKey: "can_view_market_supplier",
+      },
     ];
 
   const SECTOR_ACCESS_TYPES = {

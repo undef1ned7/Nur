@@ -54,6 +54,16 @@ const SECTOR_ACCESS_TYPES = {
       label: "Интерфейс кассира",
       backendKey: "can_view_cashier",
     },
+    {
+      value: "Закупки",
+      label: "Закупки",
+      backendKey: "can_view_market_procurement",
+    },
+    {
+      value: "Поставщики",
+      label: "Поставщики",
+      backendKey: "can_view_market_supplier",
+    },
   ],
   Барбершоп: [
     {

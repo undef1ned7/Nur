@@ -89,6 +89,7 @@ import MarketBar from "../Components/Sectors/Market/Bar/Bar";
 import MarketWarehouse from "../Components/Sectors/Market/Warehouse/Warehouse";
 import MarketProductDetail from "../Components/Sectors/Market/Warehouse/components/ProductDetail";
 import MarketSupplierReceiptPage from "../Components/Sectors/Market/Warehouse/SupplierReceiptPage";
+import MarketSupplierReceiptsListPage from "../Components/Sectors/Market/Warehouse/SupplierReceiptsListPage";
 import MarketCashierPage from "../Components/Sectors/Market/CashierPage/CashierPage";
 import MarketCategories from "../Components/Sectors/Market/Categories/Categories";
 import MarketClients from "../Components/Sectors/Market/Clients/Clients";
@@ -116,6 +117,7 @@ import CafeStock from "../Components/Sectors/cafe/Stock/Stock";
 import CafeKassa from "../Components/Sectors/cafe/kassaCafe/kassa";
 import CafeClients from "../Components/Sectors/cafe/Clients/Clients";
 import CafeTables from "../Components/Sectors/cafe/Tables/Tables";
+import CafeCosting from "../Components/Sectors/cafe/Costing/Costing";
 
 // Building
 import BuildingWork from "../Components/Sectors/Building/BuildingWork/BuildingWork";
@@ -444,7 +446,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("sklad/add-product", AddProductPage),
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
-  createProtectedRoute("sklad/receipt", MarketSupplierReceiptPage),
+  createProtectedRoute("market/procurement/receipt", MarketSupplierReceiptPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
   createProtectedRoute("sell", Sell),
@@ -505,9 +507,19 @@ export const crmRoutes = (profile) => [
 
   // Market routes
   createProtectedRoute("market/bar", MarketBar),
+  createProtectedRoute("market/procurement", MarketSupplierReceiptsListPage),
+  <Route
+    key="market/suppliers"
+    path="market/suppliers"
+    element={
+      <ProtectedRoute>
+        <MarketClients forcedTab="suppliers" hideTabs />
+      </ProtectedRoute>
+    }
+  />,
   createProtectedRoute("sklad", MarketWarehouse),
   createProtectedRoute("sklad/:id", MarketProductDetail),
-  createProtectedRoute("sklad/receipt", MarketSupplierReceiptPage),
+  createProtectedRoute("market/procurement/receipt", MarketSupplierReceiptPage),
   createProtectedRoute("market/cashier", MarketCashierPage),
   createProtectedRoute("market/categories", MarketCategories),
   createProtectedRoute("clients", MarketClients),
@@ -586,6 +598,7 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("reports", CafeReports),
       createProtectedRoute("reservations", CafeReservations),
       createProtectedRoute("stock", CafeStock),
+      createProtectedRoute("costing", CafeCosting),
       createProtectedRoute("kassa/*", CafeKassa),
       createProtectedRoute("clients", CafeClients),
       createProtectedRoute("tables", CafeTables),

@@ -40,6 +40,16 @@ const BASIC_ACCESS_TYPES = [
     backendKey: "can_view_employees",
   },
   { value: "Настройки", label: "Настройки", backendKey: "can_view_settings" },
+  {
+    value: "Закупки",
+    label: "Закупки",
+    backendKey: "can_view_market_procurement",
+  },
+  {
+    value: "Поставщики",
+    label: "Поставщики",
+    backendKey: "can_view_market_supplier",
+  },
 ];
 
 // Секторные permissions
@@ -511,6 +521,8 @@ const AccessList = ({
         allMenuPermissions.add("can_view_market_discount");
         allMenuPermissions.add("can_view_market_edit_price");
         allMenuPermissions.add("can_view_market_delete_cart_item");
+        allMenuPermissions.add("can_view_market_procurement");
+        allMenuPermissions.add("can_view_market_supplier");
       }
     }
 
