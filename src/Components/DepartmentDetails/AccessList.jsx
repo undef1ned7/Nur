@@ -104,6 +104,11 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_barber_history",
     },
     { value: "Записи", label: "Записи", backendKey: "can_view_barber_records" },
+    {
+      value: "Документы клиентов",
+      label: "Документы клиентов",
+      backendKey: "can_view_document",
+    },
   ],
   Гостиница: [
     { value: "Комнаты", label: "Комнаты", backendKey: "can_view_hostel_rooms" },

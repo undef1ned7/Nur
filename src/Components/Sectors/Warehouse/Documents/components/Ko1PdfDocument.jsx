@@ -390,7 +390,7 @@ export default function Ko1PdfDocument({ data }) {
                 <Text>Код аналит. учёта</Text>
               </View>
               <View style={[styles.th, styles.colSum]}>
-                <Text>Сумма руб. коп.</Text>
+                <Text>Сумма сом тыйын</Text>
               </View>
               <View style={[styles.thLast, styles.colPurp]}>
                 <Text>Код цел. назнач.</Text>
@@ -434,7 +434,7 @@ export default function Ko1PdfDocument({ data }) {
             <View style={styles.fieldRow}>
               <Text style={styles.fieldLabel}> </Text>
               <Text style={styles.fieldValue}>
-                {rub} руб. {kop} коп.
+                {rub} сом {kop} тыйын
               </Text>
             </View>
             <View style={styles.fieldRow}>
@@ -515,7 +515,7 @@ export default function Ko1PdfDocument({ data }) {
           </Text>
           <Text style={styles.receiptText}>Основание: {data.basis}</Text>
           <Text style={styles.receiptText}>
-            Сумма {rub} руб. {kop} коп.
+            Сумма {rub} сом {kop} тыйын
           </Text>
           <Text style={styles.receiptHint}>(цифрами)</Text>
           <Text style={styles.receiptText}>{data.amountWords}</Text>

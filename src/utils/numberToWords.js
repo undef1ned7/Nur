@@ -137,27 +137,6 @@ function intToWordsNonNegative(n) {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-/** Копейки 0–99 прописью (жен. род). */
-function kopecksWords(k) {
-  const kk = Math.min(99, Math.max(0, k));
-  if (kk === 0) {
-    return "ноль";
-  }
-  const t = Math.floor(kk / 10);
-  const u = kk % 10;
-  if (t === 1) {
-    return TEENS[u];
-  }
-  const parts = [];
-  if (t > 0) {
-    parts.push(TENS[t]);
-  }
-  if (u > 0) {
-    parts.push(ONES_F[u]);
-  }
-  return parts.join(" ");
-}
-
 function capitalizeFirst(s) {
   if (!s) {
     return s;
@@ -166,12 +145,12 @@ function capitalizeFirst(s) {
 }
 
 /**
- * Конвертирует число в строку прописью на русском.
- * Пример: 1500.5 → "Одна тысяча пятьсот рублей пятьдесят копеек"
+ * Конвертирует число в строку прописью на русском (целая часть — сом прописью, тыйын — цифрами).
+ * Пример: 1500.5 → "Одна тысяча пятьсот сом 50 тыйын"
  */
 export function numberToWords(amount) {
   if (!Number.isFinite(amount)) {
-    return "Ноль рублей ноль копеек";
+    return "Ноль сом 00 тыйын";
   }
 
   const sign = amount < 0 ? "Минус " : "";
@@ -183,9 +162,7 @@ export function numberToWords(amount) {
   }
 
   const rubText = capitalizeFirst(intToWordsNonNegative(rubles));
-  const rubNoun = pluralForm(rubles, "рубль", "рубля", "рублей");
-  const kopText = kopecksWords(kopecks);
-  const kopNoun = pluralForm(kopecks, "копейка", "копейки", "копеек");
+  const tyiynDigits = String(kopecks).padStart(2, "0");
 
-  return `${sign}${rubText} ${rubNoun} ${kopText} ${kopNoun}`;
+  return `${sign}${rubText} сом ${tyiynDigits} тыйын`;
 }

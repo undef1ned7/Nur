@@ -792,6 +792,11 @@ const Masters = () => {
             label: "Записи",
             backendKey: "can_view_barber_records",
           },
+          {
+            value: "Документы клиентов",
+            label: "Документы клиентов",
+            backendKey: "can_view_document",
+          },
         ],
         Гостиница: [
           {

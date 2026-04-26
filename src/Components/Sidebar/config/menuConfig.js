@@ -221,6 +221,13 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Документы клиентов",
+        to: "/crm/barber/client-documents",
+        icon: menuIcons.fileText,
+        permission: "can_view_document",
+        implemented: true,
+      },
+      {
         label: "Услуги",
         to: "/crm/barber/services",
         icon: menuIcons.tags,
