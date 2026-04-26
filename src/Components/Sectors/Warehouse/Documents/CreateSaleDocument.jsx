@@ -2150,6 +2150,105 @@ const CreateSaleDocument = () => {
     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   };
 
+  /** Экранирование для XML (электронная счёт-фактура). */
+  const escapeXmlText = (unsafe) => {
+    if (unsafe == null || unsafe === "") return "";
+    return String(unsafe)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  /**
+   * XML счёт-фактуры в формате, совместимом с обменом (структура как в примере receipts/receipt).
+   */
+  const buildElectronicInvoiceXml = ({
+    invoiceNumber,
+    dateStr,
+    invoiceDateTime,
+    totalCost,
+    bankAccount,
+    contractorBankAccount,
+    contractorName,
+    contractorPin,
+    foreignName,
+    note,
+    goodsRows,
+    paymentTypeCode,
+    exchangeCode,
+  }) => {
+    const e = escapeXmlText;
+    const nil = (tag) => `        <${tag} xsi:nil="true"/>`;
+    const goodsXml = goodsRows
+      .map(
+        (g) => `            <good>
+                <baseCount>${g.baseCount}</baseCount>
+                <goodsName>${e(g.goodsName)}</goodsName>
+                <price>${g.price}</price>
+                <stAmount>${g.stAmount}</stAmount>
+                <stCode>${g.stCode}</stCode>
+                <vatAmount>${g.vatAmount}</vatAmount>
+            </good>`,
+      )
+      .join("\n");
+
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<receipts xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <receipt>
+${nil("amountToBePaid")}
+${nil("assessedContributionsAmount")}
+        <bankAccount>${e(bankAccount)}</bankAccount>
+${nil("closingBalances")}
+        <contractorBankAccount>${e(contractorBankAccount)}</contractorBankAccount>
+${nil("contractorBranchName")}
+${nil("contractorCitizenshipCode")}
+${nil("contractorCitizenshipName")}
+        <contractorName>${e(contractorName)}</contractorName>
+        <contractorPin>${e(contractorPin)}</contractorPin>
+${nil("correctedReceiptCode")}
+${nil("correctedReceiptCreationDate")}
+${nil("correctionReasonCode")}
+${nil("correctionReasonName")}
+        <createdDate>${dateStr}</createdDate>
+        <currencyCode>417</currencyCode>
+        <currencyName>Сом</currencyName>
+        <deliveryContractDate>${invoiceDateTime}</deliveryContractDate>
+        <deliveryContractNumber></deliveryContractNumber>
+        <deliveryDate>${dateStr}</deliveryDate>
+        <documentStatusName>Создан</documentStatusName>
+        <exchangeCode>${e(exchangeCode)}</exchangeCode>
+        <exchangeRate>1.0000</exchangeRate>
+${nil("finesAmount")}
+        <foreignName>${e(foreignName)}</foreignName>
+        <goods>
+${goodsXml}
+        </goods>
+        <invoiceDate>${invoiceDateTime}</invoiceDate>
+        <invoiceDeliveryTypeCode>399</invoiceDeliveryTypeCode>
+        <invoiceNumber>${e(invoiceNumber)}</invoiceNumber>
+        <isIndustry>false</isIndustry>
+        <isPriceWithoutTaxes>false</isPriceWithoutTaxes>
+        <isResident>true</isResident>
+${nil("markGoods")}
+        <note>${e(note)}</note>
+${nil("openingBalances")}
+        <ownedCrmReceiptCode></ownedCrmReceiptCode>
+${nil("paidAmount")}
+        <paymentTypeCode>${paymentTypeCode}</paymentTypeCode>
+${nil("personalAccountNumber")}
+        <receiptTypeCode>10</receiptTypeCode>
+${nil("sellerBranchPin")}
+        <totalCost>${totalCost}</totalCost>
+        <type>10</type>
+        <vatCode>100</vatCode>
+        <vatDeliveryTypeCode>102</vatDeliveryTypeCode>
+    </receipt>
+</receipts>
+`;
+  };
+
   // Сохранение и печать
   const handleSaveAndPrint = async (printType) => {
     // Используем ту же валидацию, что и для handleSave
@@ -2158,6 +2257,8 @@ const CreateSaleDocument = () => {
       alert(validation.error);
       return;
     }
+
+    setShowSavePrintMenu(false);
 
     try {
       // Сначала создаем документ через новый API
@@ -2463,9 +2564,61 @@ const CreateSaleDocument = () => {
           <ReceiptPdfDocument data={receiptData} />,
         ).toBlob();
         downloadBlob(blob, `receipt_${docNumber}.pdf`);
+      } else if (printType === "esf_xml") {
+        const pad2 = (n) => String(n).padStart(2, "0");
+        const y = currentDate.getFullYear();
+        const mo = pad2(currentDate.getMonth() + 1);
+        const da = pad2(currentDate.getDate());
+        const dateStr = `${y}-${mo}-${da}`;
+        const invoiceDateTime = `${dateStr}T00:00:00+06:00`;
+        const paymentTypeCode = paymentKind === "cash" ? "10" : "20";
+        const exchangeCode =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : "00000000-0000-4000-8000-000000000000";
+
+        const contractorName =
+          selectedCounterparty?.name || buyerName || "";
+        const contractorPin = String(
+          selectedCounterparty?.inn ?? "",
+        ).trim();
+        const xmlString = buildElectronicInvoiceXml({
+          invoiceNumber: String(docNumber),
+          dateStr,
+          invoiceDateTime,
+          totalCost: Number(total).toFixed(2),
+          bankAccount: String(company?.score ?? "").trim(),
+          contractorBankAccount: String(
+            selectedCounterparty?.score ?? "",
+          ).trim(),
+          contractorName,
+          contractorPin,
+          foreignName: contractorName,
+          note: String(doc.comment ?? comment ?? ""),
+          goodsRows: items.map((item) => {
+            const qty = Number(item.qty || 0);
+            const price = Number(item.unit_price || 0);
+            return {
+              baseCount: qty.toFixed(5),
+              goodsName: item.name,
+              price: price.toFixed(5),
+              stAmount: "0.00",
+              stCode: "50",
+              vatAmount: "0.00",
+            };
+          }),
+          paymentTypeCode,
+          exchangeCode,
+        });
+
+        const xmlBlob = new Blob([xmlString], {
+          type: "application/xml;charset=utf-8",
+        });
+        const safeNum = String(docNumber).replace(/[^\w.-]+/g, "_");
+        downloadBlob(xmlBlob, `invoice_esf_${safeNum}.xml`);
       }
 
-      // Очищаем корзину после успешного скачивания PDF
+      // Очищаем корзину после успешного скачивания файла (PDF / XML)
       setCartItems([]);
 
       // Сбрасываем локальное состояние
@@ -2479,14 +2632,14 @@ const CreateSaleDocument = () => {
 
       navigate(documentsListPath);
     } catch (error) {
-      console.error("Ошибка генерации PDF:", error);
+      console.error("Ошибка сохранения или экспорта:", error);
       // Если это ошибка API, используем formatApiError, иначе обычное сообщение
       const errorMessage =
         error?.response?.data || error?.payload || error?.error
           ? formatApiError(
               error?.response?.data || error?.payload || error?.error,
             )
-          : error?.message || "Не удалось сгенерировать PDF";
+          : error?.message || "Не удалось сохранить документ или сформировать файл";
       alert("Ошибка: " + errorMessage);
     }
   };
@@ -2937,6 +3090,9 @@ const CreateSaleDocument = () => {
                     </button>
                     <button onClick={() => handleSaveAndPrint("receipt")}>
                       Товарный чек
+                    </button>
+                    <button onClick={() => handleSaveAndPrint("esf_xml")}>
+                      Электронная счёт-фактура (XML)
                     </button>
                   </div>
                 )}
