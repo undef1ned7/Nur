@@ -1826,6 +1826,11 @@
   .cafeMenu__ingRow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fcfcfd;
 
     > * {
       min-width: 0;
@@ -1837,6 +1842,9 @@
     justify-items: end;
     align-self: auto;
     padding-left: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
   }
 
   &__ingredientModal {
@@ -1847,6 +1855,8 @@
     padding: 16px;
     display: grid;
     gap: 14px;
+    max-height: min(76vh, 620px);
+    overflow: auto;
   }
 
   &__ingredientModalActions {
@@ -1898,11 +1908,15 @@
 
     .cafeMenu__ingRow {
       grid-template-columns: 1fr;
+      padding: 8px;
+      gap: 8px;
     }
 
     .cafeMenu__ingCol--trash {
       justify-items: stretch;
       padding-left: 0;
+      flex-wrap: wrap;
+      justify-content: flex-start;
     }
 
     &__ingredientModalBody {
