@@ -9,7 +9,7 @@ import { FaArrowLeft, FaPlus, FaSave, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import KitchenCreateModal from "../Cook/components/KitchenCreateModal";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Menu.scss";
 
@@ -17,14 +17,16 @@ const getListFromResponse = (res) => res?.data?.results || res?.data || [];
 
 const safeStr = (value) => String(value ?? "");
 
-const formatDecimalInput = (value) => {
+const formatDecimalInput = (value, maxFractionDigits = null) => {
   const cleaned = String(value ?? "").replace(",", ".");
   if (cleaned === "") return "";
   const numbers = cleaned.replace(/[^\d.]/g, "");
   const parts = numbers.split(".");
-  return parts.length <= 2
-    ? numbers
-    : `${parts[0]}.${parts.slice(1).join("")}`;
+  const normalized =
+    parts.length <= 2 ? numbers : `${parts[0]}.${parts.slice(1).join("")}`;
+  if (maxFractionDigits === null || !normalized.includes(".")) return normalized;
+  const [intPart, fracPart = ""] = normalized.split(".");
+  return `${intPart}.${fracPart.slice(0, maxFractionDigits)}`;
 };
 
 const numberToString = (value) =>
@@ -33,6 +35,14 @@ const numberToString = (value) =>
 const normalizeDecimalValue = (value) => {
   const cleaned = String(value ?? "").replace(",", ".");
   return /^\d*\.?\d*$/.test(cleaned) ? cleaned : null;
+};
+
+const formatQuantity3 = (value) => {
+  const raw = String(value ?? "").replace(",", ".");
+  if (!raw) return "";
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return "";
+  return num.toFixed(3);
 };
 
 const formatMetricValue = (value, suffix = "") => {
@@ -45,6 +55,16 @@ const getIngredientUnitLabel = (row, warehouseMap) =>
   row?.product_unit ||
   warehouseMap.get(String(row?.product || ""))?.unit ||
   "ед.";
+
+const normalizeIngredientRows = (rows) =>
+  (Array.isArray(rows) ? rows : []).map((it) => ({
+    ...it,
+    processing_items: Array.isArray(it.processings)
+      ? it.processings
+      : Array.isArray(it.processing_items)
+        ? it.processing_items
+        : [],
+  }));
 
 const buildFormFromDetail = (detail, fallbackCategory = "") => ({
   title: detail?.title || "",
@@ -66,6 +86,7 @@ export default function CafeMenuItemPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const alert = useAlert();
+  const confirm = useConfirm();
   const isEditing = Boolean(id);
 
   const [activeTab, setActiveTab] = useState("description");
@@ -75,12 +96,12 @@ export default function CafeMenuItemPage() {
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
   const [preparations, setPreparations] = useState([]);
-  const [processingTypes, setProcessingTypes] = useState([]);
   const [dishIngredients, setDishIngredients] = useState([]);
   const [dishCost, setDishCost] = useState(null);
   const [dishCostLoading, setDishCostLoading] = useState(false);
   const [ingredientSaving, setIngredientSaving] = useState(false);
   const [ingredientCreateOpen, setIngredientCreateOpen] = useState(false);
+  const [ingredientEditId, setIngredientEditId] = useState("");
   const [newIngredient, setNewIngredient] = useState({
     ingredient_type: "product",
     product: "",
@@ -175,19 +196,6 @@ export default function CafeMenuItemPage() {
     return getListFromResponse(res);
   }, []);
 
-  const fetchProcessingTypes = useCallback(async () => {
-    const res = await api.get("/cafe/processing-types/");
-    return getListFromResponse(res);
-  }, []);
-
-  const fetchDishIngredients = useCallback(async (dishId) => {
-    if (!dishId) return [];
-    const res = await api.get("/cafe/dish-ingredients/", {
-      params: { dish: String(dishId) },
-    });
-    return getListFromResponse(res);
-  }, []);
-
   const fetchDishCost = useCallback(async (dishId) => {
     if (!dishId) return null;
     const res = await api.get(`/cafe/dishes/${encodeURIComponent(String(dishId))}/cost/`);
@@ -208,13 +216,12 @@ export default function CafeMenuItemPage() {
     (async () => {
       try {
         setLoading(true);
-        const [categoriesData, kitchensData, warehouseData, preparationsData, processingData, detail] =
+        const [categoriesData, kitchensData, warehouseData, preparationsData, detail] =
           await Promise.all([
             fetchCategories(),
             fetchKitchens(),
             fetchWarehouse(),
             fetchPreparations(),
-            fetchProcessingTypes(),
             isEditing ? fetchMenuItemDetail(id) : Promise.resolve(null),
           ]);
 
@@ -224,7 +231,6 @@ export default function CafeMenuItemPage() {
         setKitchens(Array.isArray(kitchensData) ? kitchensData : []);
         setWarehouse(Array.isArray(warehouseData) ? warehouseData : []);
         setPreparations(Array.isArray(preparationsData) ? preparationsData : []);
-        setProcessingTypes(Array.isArray(processingData) ? processingData : []);
 
         if (detail) {
           setForm(
@@ -233,21 +239,9 @@ export default function CafeMenuItemPage() {
           setImagePreview(detail.image_url || "");
           try {
             setDishCostLoading(true);
-            const [nextDishIngredients, nextDishCost] = await Promise.all([
-              fetchDishIngredients(detail.id),
-              fetchDishCost(detail.id),
-            ]);
+            const nextDishCost = await fetchDishCost(detail.id);
             if (mounted) {
-              setDishIngredients(
-                (Array.isArray(nextDishIngredients) ? nextDishIngredients : []).map((it) => ({
-                  ...it,
-                  processing_items: Array.isArray(it.processings)
-                    ? it.processings
-                    : Array.isArray(it.processing_items)
-                      ? it.processing_items
-                      : [],
-                })),
-              );
+              setDishIngredients(normalizeIngredientRows(detail?.ingredients));
               setDishCost(nextDishCost || null);
             }
           } catch {}
@@ -329,25 +323,16 @@ export default function CafeMenuItemPage() {
     if (!id) return;
     try {
       setDishCostLoading(true);
-      const [rows, nextDishCost] = await Promise.all([
-        fetchDishIngredients(id),
+      const [detail, nextDishCost] = await Promise.all([
+        fetchMenuItemDetail(id),
         fetchDishCost(id),
       ]);
-      setDishIngredients(
-        (Array.isArray(rows) ? rows : []).map((it) => ({
-          ...it,
-          processing_items: Array.isArray(it.processings)
-            ? it.processings
-            : Array.isArray(it.processing_items)
-              ? it.processing_items
-              : [],
-        })),
-      );
+      setDishIngredients(normalizeIngredientRows(detail?.ingredients));
       setDishCost(nextDishCost || null);
     } finally {
       setDishCostLoading(false);
     }
-  }, [fetchDishIngredients, fetchDishCost, id]);
+  }, [fetchDishCost, fetchMenuItemDetail, id]);
 
   const addIngredientRow = useCallback(async () => {
     if (!id) {
@@ -373,6 +358,7 @@ export default function CafeMenuItemPage() {
         unit: "g",
       });
       setIngredientCreateOpen(false);
+      setIngredientEditId("");
       await reloadDishIngredients();
     } catch (err) {
       alert(validateResErrors(err, "Ошибка добавления ингредиента"), true);
@@ -381,67 +367,65 @@ export default function CafeMenuItemPage() {
     }
   }, [alert, id, newIngredient, reloadDishIngredients]);
 
-  const updateIngredientRow = useCallback(
-    async (row, patch) => {
-      const ingredientId = row?.id;
-      if (!ingredientId) return;
-      try {
-        setIngredientSaving(true);
-        await api.patch(`/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`, patch);
-        await reloadDishIngredients();
-      } catch (err) {
-        alert(validateResErrors(err, "Ошибка обновления ингредиента"), true);
-      } finally {
-        setIngredientSaving(false);
-      }
-    },
-    [alert, reloadDishIngredients],
-  );
+  const openEditIngredientModal = useCallback((row) => {
+    if (!row?.id) return;
+    setIngredientEditId(String(row.id));
+    setNewIngredient({
+      ingredient_type: row?.ingredient_type === "preparation" ? "preparation" : "product",
+      product: String(row?.product || ""),
+      preparation: String(row?.preparation || ""),
+      quantity: formatDecimalInput(row?.quantity || "1", 3),
+      unit: String(row?.unit || "g"),
+    });
+    setIngredientCreateOpen(true);
+  }, []);
+
+  const saveIngredientEdit = useCallback(async () => {
+    if (!ingredientEditId) return;
+    const payload = {
+      ingredient_type: newIngredient.ingredient_type,
+      quantity: numberToString(newIngredient.quantity || "0"),
+      unit: newIngredient.unit || "g",
+      ...(newIngredient.ingredient_type === "product"
+        ? { product: newIngredient.product || null, preparation: null }
+        : { preparation: newIngredient.preparation || null, product: null }),
+    };
+    try {
+      setIngredientSaving(true);
+      await api.patch(
+        `/cafe/dish-ingredients/${encodeURIComponent(String(ingredientEditId))}/`,
+        payload,
+      );
+      setIngredientCreateOpen(false);
+      setIngredientEditId("");
+      await reloadDishIngredients();
+    } catch (err) {
+      alert(validateResErrors(err, "Ошибка обновления ингредиента"), true);
+    } finally {
+      setIngredientSaving(false);
+    }
+  }, [alert, ingredientEditId, newIngredient, reloadDishIngredients]);
 
   const removeIngredientRow = useCallback(
     async (row) => {
       const ingredientId = row?.id;
       if (!ingredientId) return;
-      try {
-        setIngredientSaving(true);
-        await api.delete(`/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`);
-        await reloadDishIngredients();
-      } catch (err) {
-        alert(validateResErrors(err, "Ошибка удаления ингредиента"), true);
-      } finally {
-        setIngredientSaving(false);
-      }
+      confirm("Удалить этот ингредиент?", async (ok) => {
+        if (!ok) return;
+        try {
+          setIngredientSaving(true);
+          await api.delete(
+            `/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`,
+          );
+          await reloadDishIngredients();
+        } catch (err) {
+          alert(validateResErrors(err, "Ошибка удаления ингредиента"), true);
+        } finally {
+          setIngredientSaving(false);
+        }
+      });
     },
-    [alert, reloadDishIngredients],
-  );
-
-  const addProcessingToIngredient = useCallback(
-    async (ingredientId, processingTypeId) => {
-      if (!ingredientId || !processingTypeId) return;
-      try {
-        await api.post("/cafe/dish-ingredient-processings/", {
-          ingredient: ingredientId,
-          processing_type: processingTypeId,
-        });
-        await reloadDishIngredients();
-      } catch (err) {
-        alert(validateResErrors(err, "Ошибка добавления обработки"), true);
-      }
-    },
-    [alert, reloadDishIngredients],
-  );
-
-  const removeProcessingFromIngredient = useCallback(
-    async (processingRowId) => {
-      if (!processingRowId) return;
-      try {
-        await api.delete(`/cafe/dish-ingredient-processings/${encodeURIComponent(String(processingRowId))}/`);
-        await reloadDishIngredients();
-      } catch (err) {
-        alert(validateResErrors(err, "Ошибка удаления обработки"), true);
-      }
-    },
-    [alert, reloadDishIngredients],
+    [alert, confirm, reloadDishIngredients],
   );
 
   const buildFormPayload = useCallback(() => {
@@ -779,7 +763,17 @@ export default function CafeMenuItemPage() {
                 <button
                   type="button"
                   className="cafeMenu__btn cafeMenu__btn--secondary"
-                  onClick={() => setIngredientCreateOpen(true)}
+                  onClick={() => {
+                    setIngredientEditId("");
+                    setNewIngredient({
+                      ingredient_type: "product",
+                      product: "",
+                      preparation: "",
+                      quantity: "1",
+                      unit: "g",
+                    });
+                    setIngredientCreateOpen(true);
+                  }}
                   disabled={!isEditing || ingredientSaving}
                 >
                   <FaPlus /> Добавить ингредиент
@@ -820,10 +814,12 @@ export default function CafeMenuItemPage() {
               <div className="cafeMenu__ingList">
                 {(dishIngredients || []).length > 0 ? (
                   (dishIngredients || []).map((row, idx) => {
-                    const ingredientUnit = row?.unit || "—";
-                    const processingItems = Array.isArray(row?.processing_items)
-                      ? row.processing_items
-                      : [];
+                    const ingredientKind =
+                      row?.ingredient_type === "preparation"
+                        ? "Заготовка"
+                        : row?.ingredient_type === "product"
+                          ? "Товар"
+                          : "—";
 
                     return (
                     <div
@@ -834,7 +830,7 @@ export default function CafeMenuItemPage() {
                         <label className="cafeMenu__label cafeMenu__label--sm">
                           Тип ингредиента
                         </label>
-                        <input className="cafeMenu__input" value={row?.ingredient_type || "—"} disabled />
+                        <input className="cafeMenu__input" value={ingredientKind} disabled />
                       </div>
 
                       <div className="cafeMenu__ingCol cafeMenu__ingCol--amount">
@@ -854,16 +850,8 @@ export default function CafeMenuItemPage() {
                         </label>
                         <input
                           className="cafeMenu__input"
-                          value={formatDecimalInput(row?.quantity)}
-                          onChange={(e) =>
-                            updateIngredientRow(row, {
-                              quantity: numberToString(formatDecimalInput(e.target.value)),
-                            })
-                          }
-                          placeholder="1"
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
+                          value={formatQuantity3(row?.quantity)}
+                          disabled
                         />
                       </div>
 
@@ -874,11 +862,7 @@ export default function CafeMenuItemPage() {
                         <select
                           className="cafeMenu__input"
                           value={row?.unit || "g"}
-                          onChange={(e) =>
-                            updateIngredientRow(row, {
-                              unit: e.target.value,
-                            })
-                          }
+                          disabled
                         >
                           <option value="kg">кг</option>
                           <option value="g">г</option>
@@ -898,7 +882,7 @@ export default function CafeMenuItemPage() {
                           <strong>{formatMetricValue(row?.ingredient_cost)}</strong>
                         </div>
                         <div className="cafeMenuItemPage__ingredientMetric">
-                          <span>Стоимость обработок</span>
+                          <span>Стоимость доп. работ</span>
                           <strong>{formatMetricValue(row?.processing_cost)}</strong>
                         </div>
                         <div className="cafeMenuItemPage__ingredientMetric">
@@ -907,48 +891,18 @@ export default function CafeMenuItemPage() {
                         </div>
                       </div>
 
-                      <div className="cafeMenu__ingCol">
-                        <label className="cafeMenu__label cafeMenu__label--sm">Обработки</label>
-                        <div className="cafeMenuItemPage__ingredientMetrics">
-                          {processingItems.length > 0 ? (
-                            processingItems.map((pr) => (
-                              <div key={String(pr.id || pr.processing_id || pr.processing_type)} className="cafeMenuItemPage__ingredientMetric cafeMenuItemPage__ingredientMetric--wide">
-                                <span>{pr.processing_type_name || pr.name || "Обработка"}</span>
-                                <strong>{formatMetricValue(pr.cost)}</strong>
-                                <button
-                                  type="button"
-                                  className="cafeMenu__iconBtn cafeMenu__iconBtn--danger"
-                                  onClick={() => removeProcessingFromIngredient(pr.id)}
-                                  title="Удалить обработку"
-                                >
-                                  <FaTrash />
-                                </button>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="cafeMenu__hint">Нет обработок</div>
-                          )}
-                        </div>
-                        <div style={{ marginTop: 8 }}>
-                          <SearchableCombobox
-                            value=""
-                            onChange={(val) =>
-                              addProcessingToIngredient(row.id, String(val || ""))
-                            }
-                            options={(processingTypes || []).map((pt) => ({
-                              value: String(pt.id),
-                              label: `${pt.name} (${pt.charge_type})`,
-                            }))}
-                            placeholder="Добавить обработку..."
-                            classNamePrefix="cafeMenuCombo"
-                          />
-                        </div>
-                      </div>
-
                       <div className="cafeMenu__ingCol cafeMenu__ingCol--trash">
                         <label className="cafeMenu__label cafeMenu__label--sm">
                           &nbsp;
                         </label>
+                        <button
+                          type="button"
+                          className="cafeMenu__btn cafeMenu__btn--secondary"
+                          onClick={() => openEditIngredientModal(row)}
+                          disabled={ingredientSaving}
+                        >
+                          Изменить
+                        </button>
                         <button
                           type="button"
                           className="cafeMenu__iconBtn cafeMenu__iconBtn--danger"
@@ -1000,7 +954,10 @@ export default function CafeMenuItemPage() {
         <div
           className="cafeMenuModal__overlay"
           onClick={() => {
-            if (!ingredientSaving) setIngredientCreateOpen(false);
+            if (!ingredientSaving) {
+              setIngredientCreateOpen(false);
+              setIngredientEditId("");
+            }
           }}
         >
           <div
@@ -1009,7 +966,9 @@ export default function CafeMenuItemPage() {
           >
             <div className="cafeMenuModal__header">
               <div className="cafeMenuModal__headLeft">
-                <h3 className="cafeMenuModal__title">Новый ингредиент</h3>
+                <h3 className="cafeMenuModal__title">
+                  {ingredientEditId ? "Изменить ингредиент" : "Новый ингредиент"}
+                </h3>
                 <div className="cafeMenuModal__sub">
                   Выберите тип, позицию, количество и единицу измерения
                 </div>
@@ -1017,7 +976,10 @@ export default function CafeMenuItemPage() {
               <button
                 type="button"
                 className="cafeMenuModal__close"
-                onClick={() => setIngredientCreateOpen(false)}
+                onClick={() => {
+                  setIngredientCreateOpen(false);
+                  setIngredientEditId("");
+                }}
                 disabled={ingredientSaving}
                 aria-label="Закрыть"
               >
@@ -1075,11 +1037,11 @@ export default function CafeMenuItemPage() {
                   <label className="cafeMenu__label cafeMenu__label--sm">Количество</label>
                   <input
                     className="cafeMenu__input"
-                    value={formatDecimalInput(newIngredient.quantity)}
+                    value={formatDecimalInput(newIngredient.quantity, 3)}
                     onChange={(e) =>
                       setNewIngredient((prev) => ({
                         ...prev,
-                        quantity: formatDecimalInput(e.target.value),
+                        quantity: formatDecimalInput(e.target.value, 3),
                       }))
                     }
                   />
@@ -1106,7 +1068,10 @@ export default function CafeMenuItemPage() {
                 <button
                   type="button"
                   className="cafeMenu__btn cafeMenu__btn--secondary"
-                  onClick={() => setIngredientCreateOpen(false)}
+                  onClick={() => {
+                    setIngredientCreateOpen(false);
+                    setIngredientEditId("");
+                  }}
                   disabled={ingredientSaving}
                 >
                   Отмена
@@ -1114,10 +1079,17 @@ export default function CafeMenuItemPage() {
                 <button
                   type="button"
                   className="cafeMenu__btn cafeMenu__btn--primary"
-                  onClick={addIngredientRow}
+                  onClick={ingredientEditId ? saveIngredientEdit : addIngredientRow}
                   disabled={ingredientSaving}
                 >
-                  <FaPlus /> {ingredientSaving ? "Добавляем..." : "Добавить"}
+                  <FaPlus />{" "}
+                  {ingredientSaving
+                    ? ingredientEditId
+                      ? "Сохраняем..."
+                      : "Добавляем..."
+                    : ingredientEditId
+                      ? "Сохранить"
+                      : "Добавить"}
                 </button>
               </div>
             </div>
