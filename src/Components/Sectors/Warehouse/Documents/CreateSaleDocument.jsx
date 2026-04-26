@@ -31,6 +31,8 @@ import {
 import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import Ko1PdfDocument from "./components/Ko1PdfDocument.jsx";
+import { numberToWords } from "../../../../utils/numberToWords.js";
 import {
   fetchWarehouseCounterparties,
   fetchWarehouses,
@@ -51,6 +53,7 @@ import { useAlert } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import CreateCounterpartyModal from "../../Market/Counterparties/components/CreateCounterpartyModal";
+import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -2159,6 +2162,8 @@ const CreateSaleDocument = () => {
       return;
     }
 
+    setShowSavePrintMenu(false);
+
     try {
       // Сначала создаем документ через новый API
       const discountPercentNum = Number(documentDiscount) || 0;
@@ -2463,9 +2468,74 @@ const CreateSaleDocument = () => {
           <ReceiptPdfDocument data={receiptData} />,
         ).toBlob();
         downloadBlob(blob, `receipt_${docNumber}.pdf`);
+      } else if (printType === "esf_xml") {
+        const xmlString = buildArchiveInvoiceXml({
+          number: String(docNumber),
+          date: currentDate,
+          currency: "KGS",
+          paymentType: paymentKind === "cash" ? "cash" : "credit",
+          note: doc.comment || comment || undefined,
+          seller: {
+            name: company?.name || "",
+            inn: company?.inn ? String(company.inn) : undefined,
+            bankAccount: company?.score || undefined,
+            address: company?.address || undefined,
+          },
+          buyer:
+            selectedCounterparty?.name || buyerName
+              ? {
+                  name: selectedCounterparty?.name || buyerName || "",
+                  inn: selectedCounterparty?.inn
+                    ? String(selectedCounterparty.inn)
+                    : undefined,
+                  bankAccount: selectedCounterparty?.score || undefined,
+                }
+              : undefined,
+          items: items.map((item) => ({
+            name: item.name,
+            unit: item.unit || "шт",
+            quantity: Number(item.qty),
+            unitPrice: Number(item.unit_price),
+          })),
+          discountTotal: totalDiscount > 0 ? totalDiscount : undefined,
+        });
+
+        const blob = new Blob([xmlString], {
+          type: "application/xml;charset=utf-8",
+        });
+        downloadBlob(
+          blob,
+          `invoice_${String(docNumber).replace(/[^\w.-]+/g, "_")}.xml`,
+        );
+      } else if (printType === "ko1") {
+        const ko1Data = {
+          organization: company?.name || "",
+          structuralUnit: "",
+          documentNumber: String(docNumber),
+          date: currentDate.toISOString().split("T")[0],
+          receivedFrom:
+            selectedCounterparty?.name || buyerName || "",
+          basis: doc.comment || comment || "Оплата по договору",
+          amountNumber: total.toLocaleString("ru-RU", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+          amountWords: numberToWords(total),
+          chiefAccountant:
+            userProfile?.full_name || userProfile?.name || "",
+          cashier: userProfile?.full_name || userProfile?.name || "",
+        };
+
+        const blob = await pdf(
+          <Ko1PdfDocument data={ko1Data} />,
+        ).toBlob();
+        downloadBlob(
+          blob,
+          `ko1_${String(docNumber).replace(/[^\w.-]+/g, "_")}.pdf`,
+        );
       }
 
-      // Очищаем корзину после успешного скачивания PDF
+      // Очищаем корзину после успешного скачивания файла (PDF / XML)
       setCartItems([]);
 
       // Сбрасываем локальное состояние
@@ -2479,14 +2549,14 @@ const CreateSaleDocument = () => {
 
       navigate(documentsListPath);
     } catch (error) {
-      console.error("Ошибка генерации PDF:", error);
+      console.error("Ошибка сохранения или экспорта:", error);
       // Если это ошибка API, используем formatApiError, иначе обычное сообщение
       const errorMessage =
         error?.response?.data || error?.payload || error?.error
           ? formatApiError(
               error?.response?.data || error?.payload || error?.error,
             )
-          : error?.message || "Не удалось сгенерировать PDF";
+          : error?.message || "Не удалось сохранить документ или сформировать файл";
       alert("Ошибка: " + errorMessage);
     }
   };
@@ -2937,6 +3007,12 @@ const CreateSaleDocument = () => {
                     </button>
                     <button onClick={() => handleSaveAndPrint("receipt")}>
                       Товарный чек
+                    </button>
+                    <button onClick={() => handleSaveAndPrint("esf_xml")}>
+                      Электронная счёт-фактура (XML)
+                    </button>
+                    <button onClick={() => handleSaveAndPrint("ko1")}>
+                      ПКО (КО-1)
                     </button>
                   </div>
                 )}

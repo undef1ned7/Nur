@@ -59,6 +59,7 @@ import MarketEmployEmployeeDetail from "../Components/Sectors/Barber/Masters/Mar
 import BarberServices from "../Components/Sectors/Barber/Services/Services";
 import BarberHistory from "../Components/Sectors/Barber/History/History";
 import BarberDocuments from "../Components/Sectors/Barber/Documents/Documents";
+import BarberClientDocuments from "../Components/Sectors/Barber/ClientDocuments/BarberClientDocuments";
 import Recorda from "../Components/Sectors/Barber/Recorda/Recorda";
 import BarberClients from "../Components/Sectors/Barber/Clients/Clients";
 import BarberAnalitika from "../Components/Sectors/Barber/BarberAnalitika/BarberAnalitika";
@@ -502,6 +503,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("documents", BarberDocuments),
   createProtectedRoute("barber/records", Recorda),
   createProtectedRoute("barber/clients", BarberClients),
+  createProtectedRoute("barber/client-documents", BarberClientDocuments),
   createProtectedRoute("barber/cash-reports", BarberAnalitika),
   createProtectedRoute("barber/requests", BarberRequests),
 

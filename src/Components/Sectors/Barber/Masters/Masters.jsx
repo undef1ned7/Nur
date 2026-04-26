@@ -1508,4 +1508,5 @@ const Masters = () => {
 };
 
 export { RoleSelect };
+export const BARBER_CAN_VIEW_CLIENT_DOCUMENTS = "can_view_document";
 export default Masters;

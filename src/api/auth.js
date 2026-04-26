@@ -26,6 +26,7 @@ const getSectorPermissions = (sectorName) => {
       "can_view_barber_services",
       "can_view_barber_history",
       "can_view_barber_records",
+      "can_view_document",
     ],
     Гостиница: [
       "can_view_hostel_rooms",

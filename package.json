@@ -52,6 +52,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "serve": "vite preview",
     "printer-bridge": "node tools/printer-bridge.mjs"
@@ -80,6 +81,7 @@
     "eslint-config-react-app": "^7.0.1",
     "sass": "^1.97.3",
     "vite": "^7.3.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^3.0.5"
   }
 }
