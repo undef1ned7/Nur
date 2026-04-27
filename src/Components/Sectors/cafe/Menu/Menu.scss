@@ -1792,7 +1792,7 @@
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    gap: 10px;
     padding: 10px 12px;
     border-radius: 12px;
     background: #fff;
@@ -1806,6 +1806,18 @@
 
     &--wide {
       grid-column: span 2;
+    }
+
+    &--processing {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px;
+      border: 1px solid #d9e2ec;
+      border-radius: 10px;
+      background: #fcfdff;
     }
 
     span {
@@ -1823,14 +1835,17 @@
     }
   }
 
+  &__processingMeta {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    flex: 1 1 220px;
+  }
+
+
   .cafeMenu__ingRow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-    gap: 10px;
-    padding: 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    background: #fcfcfd;
 
     > * {
       min-width: 0;
@@ -1842,9 +1857,10 @@
     justify-items: end;
     align-self: auto;
     padding-left: 0;
-    display: flex;
-    gap: 8px;
-    align-items: center;
+  }
+
+  .cafeMenu__ingCol--processing {
+    grid-column: 1 / -1;
   }
 
   &__ingredientModal {
@@ -1855,8 +1871,6 @@
     padding: 16px;
     display: grid;
     gap: 14px;
-    max-height: min(76vh, 620px);
-    overflow: auto;
   }
 
   &__ingredientModalActions {
@@ -1908,15 +1922,11 @@
 
     .cafeMenu__ingRow {
       grid-template-columns: 1fr;
-      padding: 8px;
-      gap: 8px;
     }
 
     .cafeMenu__ingCol--trash {
       justify-items: stretch;
       padding-left: 0;
-      flex-wrap: wrap;
-      justify-content: flex-start;
     }
 
     &__ingredientModalBody {
