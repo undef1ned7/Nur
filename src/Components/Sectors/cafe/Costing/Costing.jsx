@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Trash2, X } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Costing.scss";
 
@@ -24,18 +25,17 @@ const emptyPreparation = {
   stock_quantity: "0",
   is_active: true,
 };
-const emptyReceiveForm = {
-  input_quantity: "",
-  output_quantity: "",
-  processing_cost: "",
-};
-
-const emptyProcessing = {
+const emptyPreparationProcessing = {
+  id: "",
   name: "",
   cost: "",
   charge_type: "fixed",
   unit: "",
-  is_active: true,
+};
+const emptyReceiveForm = {
+  input_quantity: "",
+  output_quantity: "",
+  processing_cost: "",
 };
 
 const emptyPreviewIngredient = {
@@ -48,7 +48,10 @@ const emptyPreviewIngredient = {
 };
 
 export default function CafeCosting() {
+  const navigate = useNavigate();
+  const { preparationId } = useParams();
   const alert = useAlert();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -70,10 +73,25 @@ export default function CafeCosting() {
   const [prepModalOpen, setPrepModalOpen] = useState(false);
   const [prepEditingId, setPrepEditingId] = useState("");
   const [prepForm, setPrepForm] = useState(emptyPreparation);
-
-  const [procModalOpen, setProcModalOpen] = useState(false);
-  const [procEditingId, setProcEditingId] = useState("");
-  const [procForm, setProcForm] = useState(emptyProcessing);
+  const [prepProcessings, setPrepProcessings] = useState([]);
+  const [prepProcessingModalOpen, setPrepProcessingModalOpen] = useState(false);
+  const [prepProcessingEditIdx, setPrepProcessingEditIdx] = useState(-1);
+  const [prepProcessingForm, setPrepProcessingForm] = useState({
+    name: "",
+    cost: "",
+    charge_type: "fixed",
+    unit: "",
+  });
+  const [detailPreparation, setDetailPreparation] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailProcessingModalOpen, setDetailProcessingModalOpen] = useState(false);
+  const [detailProcessingEditIdx, setDetailProcessingEditIdx] = useState(-1);
+  const [detailProcessingForm, setDetailProcessingForm] = useState({
+    name: "",
+    cost: "",
+    charge_type: "fixed",
+    unit: "",
+  });
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
   const [receivePreparationId, setReceivePreparationId] = useState("");
   const [receivePreparationName, setReceivePreparationName] = useState("");
@@ -86,6 +104,7 @@ export default function CafeCosting() {
   });
   const [previewResult, setPreviewResult] = useState(null);
   const [activeTab, setActiveTab] = useState("preparations");
+  const [preparationsViewMode, setPreparationsViewMode] = useState("cards");
 
   const loadAll = async () => {
     try {
@@ -108,6 +127,31 @@ export default function CafeCosting() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  useEffect(() => {
+    if (!preparationId) {
+      setDetailPreparation(null);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        setDetailLoading(true);
+        const res = await api.get(`/cafe/preparations/${encodeURIComponent(preparationId)}/`);
+        if (mounted) setDetailPreparation(res?.data || null);
+      } catch (error) {
+        if (mounted) {
+          setDetailPreparation(null);
+          alert(validateResErrors(error, "Ошибка загрузки заготовки"), true);
+        }
+      } finally {
+        if (mounted) setDetailLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [preparationId]);
 
   const productOptions = useMemo(
     () =>
@@ -211,6 +255,7 @@ export default function CafeCosting() {
   const openCreatePreparation = () => {
     setPrepEditingId("");
     setPrepForm(emptyPreparation);
+    setPrepProcessings([]);
     setPrepModalOpen(true);
   };
 
@@ -227,16 +272,83 @@ export default function CafeCosting() {
       stock_quantity: String(row?.stock_quantity || "0"),
       is_active: Boolean(row?.is_active),
     });
+    setPrepProcessings(
+      (Array.isArray(row?.processings) ? row.processings : []).map((it) => ({
+        id: String(it?.id || ""),
+        name: String(it?.name || ""),
+        cost: String(it?.cost || ""),
+        charge_type: it?.charge_type === "per_unit" ? "per_unit" : "fixed",
+        unit: String(it?.unit || ""),
+      })),
+    );
     setPrepModalOpen(true);
+  };
+
+  const openCreatePrepProcessingModal = () => {
+    setPrepProcessingEditIdx(-1);
+    setPrepProcessingForm({ name: "", cost: "", charge_type: "fixed", unit: "" });
+    setPrepProcessingModalOpen(true);
+  };
+
+  const openEditPrepProcessingModal = (idx, row) => {
+    setPrepProcessingEditIdx(idx);
+    setPrepProcessingForm({
+      name: String(row?.name || ""),
+      cost: String(row?.cost || ""),
+      charge_type: row?.charge_type === "per_unit" ? "per_unit" : "fixed",
+      unit: String(row?.unit || ""),
+    });
+    setPrepProcessingModalOpen(true);
+  };
+
+  const savePrepProcessingModal = (e) => {
+    e.preventDefault();
+    if (!String(prepProcessingForm.name || "").trim()) {
+      alert("Введите название обработки", true);
+      return;
+    }
+    const costNum = Number(String(prepProcessingForm.cost || "").replace(",", "."));
+    if (!Number.isFinite(costNum) || costNum < 0) {
+      alert("Стоимость обработки должна быть >= 0", true);
+      return;
+    }
+    setPrepProcessings((prev) => {
+      if (prepProcessingEditIdx >= 0) {
+        return prev.map((it, idx) =>
+          idx === prepProcessingEditIdx ? { ...it, ...prepProcessingForm } : it,
+        );
+      }
+      return [...prev, { ...emptyPreparationProcessing, ...prepProcessingForm }];
+    });
+    setPrepProcessingModalOpen(false);
+  };
+
+  const removePrepProcessingRow = (idx) => {
+    setPrepProcessings((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleSavePreparation = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
+      const normalizedProcessings = prepProcessings
+        .map((it) => ({
+          name: String(it?.name || "").trim(),
+          cost: String(it?.cost || "").trim(),
+          charge_type: it?.charge_type === "per_unit" ? "per_unit" : "fixed",
+          unit: String(it?.unit || "").trim(),
+        }))
+        .filter((it) => it.name && it.cost !== "");
+      const invalidProcessing = normalizedProcessings.some((it) => Number(it.cost) < 0);
+      if (invalidProcessing) {
+        alert("Стоимость обработки не может быть отрицательной", true);
+        setSaving(false);
+        return;
+      }
       const payload = {
         ...prepForm,
         source_product: prepForm.source_product || null,
+        processings: normalizedProcessings,
       };
       if (prepEditingId) {
         await api.patch(`/cafe/preparations/${encodeURIComponent(prepEditingId)}/`, payload);
@@ -253,13 +365,15 @@ export default function CafeCosting() {
   };
 
   const handleDeletePreparation = async (id) => {
-    if (!window.confirm("Удалить заготовку?")) return;
-    try {
-      await api.delete(`/cafe/preparations/${encodeURIComponent(id)}/`);
-      await loadAll();
-    } catch (error) {
-      alert(validateResErrors(error, "Ошибка удаления заготовки"), true);
-    }
+    confirm("Удалить заготовку?", async (ok) => {
+      if (!ok) return;
+      try {
+        await api.delete(`/cafe/preparations/${encodeURIComponent(id)}/`);
+        await loadAll();
+      } catch (error) {
+        alert(validateResErrors(error, "Ошибка удаления заготовки"), true);
+      }
+    });
   };
 
   const openReceivePreparation = (row) => {
@@ -325,49 +439,83 @@ export default function CafeCosting() {
     }
   };
 
-  const openCreateProcessing = () => {
-    setProcEditingId("");
-    setProcForm(emptyProcessing);
-    setProcModalOpen(true);
+  const openCreateDetailProcessing = () => {
+    setDetailProcessingEditIdx(-1);
+    setDetailProcessingForm({ name: "", cost: "", charge_type: "fixed", unit: "" });
+    setDetailProcessingModalOpen(true);
   };
 
-  const openEditProcessing = (row) => {
-    setProcEditingId(String(row?.id || ""));
-    setProcForm({
-      name: row?.name || "",
+  const openEditDetailProcessing = (idx, row) => {
+    setDetailProcessingEditIdx(idx);
+    setDetailProcessingForm({
+      name: String(row?.name || ""),
       cost: String(row?.cost || ""),
-      charge_type: row?.charge_type || "fixed",
-      unit: row?.unit || "",
-      is_active: Boolean(row?.is_active),
+      charge_type: row?.charge_type === "per_unit" ? "per_unit" : "fixed",
+      unit: String(row?.unit || ""),
     });
-    setProcModalOpen(true);
+    setDetailProcessingModalOpen(true);
   };
 
-  const handleSaveProcessing = async (e) => {
+  const saveDetailProcessings = async (nextRows) => {
+    if (!preparationId) return;
+    const normalized = (Array.isArray(nextRows) ? nextRows : [])
+      .map((it) => ({
+        name: String(it?.name || "").trim(),
+        cost: String(it?.cost || "").trim(),
+        charge_type: it?.charge_type === "per_unit" ? "per_unit" : "fixed",
+        unit: String(it?.unit || "").trim(),
+      }))
+      .filter((it) => it.name && it.cost !== "");
+    const invalid = normalized.some((it) => Number(it.cost) < 0);
+    if (invalid) {
+      alert("Стоимость обработки не может быть отрицательной", true);
+      return;
+    }
+    const { data } = await api.patch(
+      `/cafe/preparations/${encodeURIComponent(preparationId)}/`,
+      { processings: normalized },
+    );
+    setDetailPreparation(data || null);
+    await loadAll();
+  };
+
+  const handleSaveDetailProcessing = async (e) => {
     e.preventDefault();
+    if (!detailPreparation) return;
+    const currentRows = Array.isArray(detailPreparation?.processings)
+      ? detailPreparation.processings
+      : [];
+    const nextRows =
+      detailProcessingEditIdx >= 0
+        ? currentRows.map((it, idx) =>
+            idx === detailProcessingEditIdx ? { ...it, ...detailProcessingForm } : it,
+          )
+        : [...currentRows, detailProcessingForm];
     try {
       setSaving(true);
-      if (procEditingId) {
-        await api.patch(`/cafe/processing-types/${encodeURIComponent(procEditingId)}/`, procForm);
-      } else {
-        await api.post("/cafe/processing-types/", procForm);
-      }
-      setProcModalOpen(false);
-      await loadAll();
+      await saveDetailProcessings(nextRows);
+      setDetailProcessingModalOpen(false);
     } catch (error) {
-      alert(validateResErrors(error, "Ошибка сохранения типа обработки"), true);
+      alert(validateResErrors(error, "Ошибка сохранения обработки заготовки"), true);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteProcessing = async (id) => {
-    if (!window.confirm("Удалить тип обработки?")) return;
+  const handleDeleteDetailProcessing = async (idx) => {
+    if (!detailPreparation) return;
+    if (!window.confirm("Удалить обработку?")) return;
     try {
-      await api.delete(`/cafe/processing-types/${encodeURIComponent(id)}/`);
-      await loadAll();
+      setSaving(true);
+      const currentRows = Array.isArray(detailPreparation?.processings)
+        ? detailPreparation.processings
+        : [];
+      const nextRows = currentRows.filter((_, i) => i !== idx);
+      await saveDetailProcessings(nextRows);
     } catch (error) {
-      alert(validateResErrors(error, "Ошибка удаления типа обработки"), true);
+      alert(validateResErrors(error, "Ошибка удаления обработки заготовки"), true);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -432,13 +580,6 @@ export default function CafeCosting() {
             </button>
             <button
               type="button"
-              className={`cafe-costing-page__tab ${activeTab === "processing" ? "cafe-costing-page__tab--active" : ""}`}
-              onClick={() => setActiveTab("processing")}
-            >
-              Обработки
-            </button>
-            <button
-              type="button"
               className={`cafe-costing-page__tab ${activeTab === "preview" ? "cafe-costing-page__tab--active" : ""}`}
               onClick={() => setActiveTab("preview")}
             >
@@ -450,96 +591,197 @@ export default function CafeCosting() {
             <div className="cafe-costing-page__empty">Загрузка...</div>
           ) : (
             <>
-              {activeTab === "preparations" && (
+              {preparationId ? (
+                <section className="cafe-costing-page__section">
+                  <div className="cafe-costing-page__row cafe-costing-page__row--between">
+                    <h2>
+                      {detailLoading
+                        ? "Загрузка..."
+                        : `Заготовка: ${detailPreparation?.name || "—"}`}
+                    </h2>
+                    <button
+                      className="cafe-costing-page__btn"
+                      type="button"
+                      onClick={() => navigate("/crm/cafe/costing")}
+                    >
+                      Назад к списку
+                    </button>
+                  </div>
+                  <div className="cafe-costing-page__table-wrap">
+                    <table className="cafe-costing-page__table">
+                      <thead>
+                        <tr>
+                          <th>Название</th>
+                          <th>Ставка</th>
+                          <th>Тип</th>
+                          <th>Ед.</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(Array.isArray(detailPreparation?.processings)
+                          ? detailPreparation.processings
+                          : []
+                        ).map((p, idx) => (
+                          <tr key={String(p?.id || idx)}>
+                            <td>{p?.name || "—"}</td>
+                            <td>{p?.cost || "0"}</td>
+                            <td>{processingChargeTypeLabel(p?.charge_type)}</td>
+                            <td>{p?.unit || "—"}</td>
+                            <td className="cafe-costing-page__actions">
+                              <button
+                                type="button"
+                                onClick={() => openEditDetailProcessing(idx, p)}
+                              >
+                                Изм.
+                              </button>
+                              <button
+                                type="button"
+                                className="cafe-costing-page__danger-btn"
+                                onClick={() => handleDeleteDetailProcessing(idx)}
+                                title="Удалить"
+                                aria-label="Удалить"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="cafe-costing-page__row">
+                    <button
+                      className="cafe-costing-page__btn"
+                      type="button"
+                      onClick={openCreateDetailProcessing}
+                    >
+                      + Добавить обработку
+                    </button>
+                  </div>
+                </section>
+              ) : activeTab === "preparations" && (
                 <section className="cafe-costing-page__section">
                 <div className="cafe-costing-page__row cafe-costing-page__row--between">
                   <h2>Заготовки</h2>
-                  <button className="cafe-costing-page__btn" onClick={openCreatePreparation} type="button">
-                    + Заготовка
-                  </button>
+                  <div className="cafe-costing-page__row" style={{ marginTop: 0 }}>
+                    <div className="cafe-costing-page__view-toggle">
+                      <button
+                        type="button"
+                        className={`cafe-costing-page__view-btn ${
+                          preparationsViewMode === "cards"
+                            ? "cafe-costing-page__view-btn--active"
+                            : ""
+                        }`}
+                        onClick={() => setPreparationsViewMode("cards")}
+                      >
+                        Карточки
+                      </button>
+                      <button
+                        type="button"
+                        className={`cafe-costing-page__view-btn ${
+                          preparationsViewMode === "list"
+                            ? "cafe-costing-page__view-btn--active"
+                            : ""
+                        }`}
+                        onClick={() => setPreparationsViewMode("list")}
+                      >
+                        Список
+                      </button>
+                    </div>
+                    <button
+                      className="cafe-costing-page__btn"
+                      onClick={openCreatePreparation}
+                      type="button"
+                    >
+                      + Заготовка
+                    </button>
+                  </div>
                 </div>
-                <div className="cafe-costing-page__table-wrap">
-                  <table className="cafe-costing-page__table">
-                    <thead>
-                      <tr>
-                        <th>Название</th>
-                        <th>Выход</th>
-                        <th>Себестоимость ед.</th>
-                        <th>Остаток</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preparations.map((p) => (
-                        <tr key={p.id}>
-                          <td>{p.name}</td>
-                          <td>{p.output_quantity} {p.output_unit}</td>
-                          <td>{p.unit_cost}</td>
-                          <td>{p.stock_quantity}</td>
-                          <td className="cafe-costing-page__actions">
-                            <button type="button" onClick={() => openReceivePreparation(p)}>
-                              Приход
-                            </button>
-                            <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
-                            <button
-                              type="button"
-                              className="cafe-costing-page__danger-btn"
-                              onClick={() => handleDeletePreparation(p.id)}
-                              title="Удалить"
-                              aria-label="Удалить"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
+                {preparationsViewMode === "cards" ? (
+                  <div className="cafe-costing-page__prep-grid">
+                    {preparations.map((p) => (
+                      <article key={p.id} className="cafe-costing-page__prep-card">
+                        <h3 className="cafe-costing-page__prep-title">{p.name}</h3>
+                        <div className="cafe-costing-page__prep-stats">
+                          <span>Выход: {p.output_quantity} {p.output_unit}</span>
+                          <span>Себестоимость ед.: {p.unit_cost}</span>
+                          <span>Остаток: {p.stock_quantity}</span>
+                        </div>
+                        <div className="cafe-costing-page__actions">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/crm/cafe/costing/preparations/${encodeURIComponent(p.id)}`)
+                            }
+                          >
+                            Детали
+                          </button>
+                          <button type="button" onClick={() => openReceivePreparation(p)}>
+                            Приход
+                          </button>
+                          <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
+                          <button
+                            type="button"
+                            className="cafe-costing-page__danger-btn"
+                            onClick={() => handleDeletePreparation(p.id)}
+                            title="Удалить"
+                            aria-label="Удалить"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="cafe-costing-page__table-wrap">
+                    <table className="cafe-costing-page__table">
+                      <thead>
+                        <tr>
+                          <th>Название</th>
+                          <th>Выход</th>
+                          <th>Себестоимость ед.</th>
+                          <th>Остаток</th>
+                          <th />
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                </section>
-              )}
-
-              {activeTab === "processing" && (
-                <section className="cafe-costing-page__section">
-                <div className="cafe-costing-page__row cafe-costing-page__row--between">
-                  <h2>Типы обработки</h2>
-                  <button className="cafe-costing-page__btn" onClick={openCreateProcessing} type="button">
-                    + Тип обработки
-                  </button>
-                </div>
-                <div className="cafe-costing-page__table-wrap">
-                  <table className="cafe-costing-page__table">
-                    <thead>
-                      <tr>
-                        <th>Название</th>
-                        <th>Стоимость</th>
-                        <th>Тип</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {processingTypes.map((p) => (
-                        <tr key={p.id}>
-                          <td>{p.name}</td>
-                          <td>{p.cost}</td>
-                          <td>{processingChargeTypeLabel(p.charge_type)}</td>
-                          <td className="cafe-costing-page__actions">
-                            <button type="button" onClick={() => openEditProcessing(p)}>Изм.</button>
-                            <button
-                              type="button"
-                              className="cafe-costing-page__danger-btn"
-                              onClick={() => handleDeleteProcessing(p.id)}
-                              title="Удалить"
-                              aria-label="Удалить"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {preparations.map((p) => (
+                          <tr key={p.id}>
+                            <td>{p.name}</td>
+                            <td>{p.output_quantity} {p.output_unit}</td>
+                            <td>{p.unit_cost}</td>
+                            <td>{p.stock_quantity}</td>
+                            <td className="cafe-costing-page__actions">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(`/crm/cafe/costing/preparations/${encodeURIComponent(p.id)}`)
+                                }
+                              >
+                                Детали
+                              </button>
+                              <button type="button" onClick={() => openReceivePreparation(p)}>
+                                Приход
+                              </button>
+                              <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
+                              <button
+                                type="button"
+                                className="cafe-costing-page__danger-btn"
+                                onClick={() => handleDeletePreparation(p.id)}
+                                title="Удалить"
+                                aria-label="Удалить"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 </section>
               )}
 
@@ -784,6 +1026,60 @@ export default function CafeCosting() {
               placeholder="Например: 0"
             />
             </label>
+            <div className="cafe-costing-page__row cafe-costing-page__row--between">
+              <h4 style={{ margin: 0 }}>Обработки заготовки</h4>
+              <button
+                type="button"
+                className="cafe-costing-page__btn cafe-costing-page__btn--small"
+                onClick={openCreatePrepProcessingModal}
+              >
+                + Обработка
+              </button>
+            </div>
+            <div className="cafe-costing-page__table-wrap">
+              {prepProcessings.length === 0 ? (
+                <div className="cafe-costing-page__empty">Обработки не добавлены</div>
+              ) : (
+                <table className="cafe-costing-page__table">
+                  <thead>
+                    <tr>
+                      <th>Название</th>
+                      <th>Ставка</th>
+                      <th>Тип</th>
+                      <th>Ед.</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prepProcessings.map((pr, idx) => (
+                      <tr key={`prep-proc-${pr.id || "new"}-${idx}`}>
+                        <td>{pr.name || "—"}</td>
+                        <td>{pr.cost || "0"}</td>
+                        <td>{processingChargeTypeLabel(pr.charge_type)}</td>
+                        <td>{pr.unit || "—"}</td>
+                        <td className="cafe-costing-page__actions">
+                          <button
+                            type="button"
+                            onClick={() => openEditPrepProcessingModal(idx, pr)}
+                          >
+                            Изм.
+                          </button>
+                          <button
+                            type="button"
+                            className="cafe-costing-page__danger-btn"
+                            onClick={() => removePrepProcessingRow(idx)}
+                            title="Удалить"
+                            aria-label="Удалить"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
             <div className="cafe-costing-page__row">
               <button type="button" onClick={() => setPrepModalOpen(false)}>
                 Отмена
@@ -796,16 +1092,25 @@ export default function CafeCosting() {
         </div>
       )}
 
-      {procModalOpen && (
-        <div className="cafe-costing-page__overlay" onClick={() => setProcModalOpen(false)}>
-          <form className="cafe-costing-page__modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSaveProcessing}>
-            <h3>{procEditingId ? "Изменить обработку" : "Новая обработка"}</h3>
+      {detailProcessingModalOpen && (
+        <div
+          className="cafe-costing-page__overlay"
+          onClick={() => setDetailProcessingModalOpen(false)}
+        >
+          <form
+            className="cafe-costing-page__modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleSaveDetailProcessing}
+          >
+            <h3>{detailProcessingEditIdx >= 0 ? "Изменить обработку" : "Новая обработка"}</h3>
             <label className="cafe-costing-page__field">
               <span className="cafe-costing-page__field-label">Название обработки *</span>
               <input
               className="cafe-costing-page__input"
-              value={procForm.name}
-              onChange={(e) => setProcForm((prev) => ({ ...prev, name: e.target.value }))}
+              value={detailProcessingForm.name}
+              onChange={(e) =>
+                setDetailProcessingForm((prev) => ({ ...prev, name: e.target.value }))
+              }
               placeholder="Например: Жарка"
               required
             />
@@ -814,8 +1119,10 @@ export default function CafeCosting() {
               <span className="cafe-costing-page__field-label">Стоимость *</span>
               <input
               className="cafe-costing-page__input"
-              value={procForm.cost}
-              onChange={(e) => setProcForm((prev) => ({ ...prev, cost: e.target.value }))}
+              value={detailProcessingForm.cost}
+              onChange={(e) =>
+                setDetailProcessingForm((prev) => ({ ...prev, cost: e.target.value }))
+              }
               placeholder="Например: 15"
               required
             />
@@ -824,8 +1131,10 @@ export default function CafeCosting() {
               <span className="cafe-costing-page__field-label">Тип начисления</span>
               <select
               className="cafe-costing-page__input"
-              value={procForm.charge_type}
-              onChange={(e) => setProcForm((prev) => ({ ...prev, charge_type: e.target.value }))}
+              value={detailProcessingForm.charge_type}
+              onChange={(e) =>
+                setDetailProcessingForm((prev) => ({ ...prev, charge_type: e.target.value }))
+              }
             >
               <option value="fixed">Фиксированно</option>
               <option value="per_unit">За единицу</option>
@@ -835,13 +1144,15 @@ export default function CafeCosting() {
               <span className="cafe-costing-page__field-label">Единица (необязательно)</span>
               <input
               className="cafe-costing-page__input"
-              value={procForm.unit}
-              onChange={(e) => setProcForm((prev) => ({ ...prev, unit: e.target.value }))}
+              value={detailProcessingForm.unit}
+              onChange={(e) =>
+                setDetailProcessingForm((prev) => ({ ...prev, unit: e.target.value }))
+              }
               placeholder="Например: g или pcs"
             />
             </label>
             <div className="cafe-costing-page__row">
-              <button type="button" onClick={() => setProcModalOpen(false)}>
+              <button type="button" onClick={() => setDetailProcessingModalOpen(false)}>
                 Отмена
               </button>
               <button type="submit" disabled={saving}>
@@ -905,6 +1216,75 @@ export default function CafeCosting() {
               <button type="submit" disabled={saving}>
                 {saving ? "Сохранение..." : "Сделать приход"}
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {prepProcessingModalOpen && (
+        <div
+          className="cafe-costing-page__overlay"
+          onClick={() => setPrepProcessingModalOpen(false)}
+        >
+          <form
+            className="cafe-costing-page__modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={savePrepProcessingModal}
+          >
+            <h3>{prepProcessingEditIdx >= 0 ? "Изменить обработку" : "Новая обработка"}</h3>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Название обработки *</span>
+              <input
+                className="cafe-costing-page__input"
+                value={prepProcessingForm.name}
+                onChange={(e) =>
+                  setPrepProcessingForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Например: Перемол"
+                required
+              />
+            </label>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Ставка *</span>
+              <input
+                className="cafe-costing-page__input"
+                value={prepProcessingForm.cost}
+                onChange={(e) =>
+                  setPrepProcessingForm((prev) => ({ ...prev, cost: e.target.value }))
+                }
+                placeholder="Например: 100"
+                required
+              />
+            </label>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Тип начисления</span>
+              <select
+                className="cafe-costing-page__input"
+                value={prepProcessingForm.charge_type}
+                onChange={(e) =>
+                  setPrepProcessingForm((prev) => ({ ...prev, charge_type: e.target.value }))
+                }
+              >
+                <option value="fixed">Фиксированно</option>
+                <option value="per_unit">За единицу</option>
+              </select>
+            </label>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Единица (необязательно)</span>
+              <input
+                className="cafe-costing-page__input"
+                value={prepProcessingForm.unit}
+                onChange={(e) =>
+                  setPrepProcessingForm((prev) => ({ ...prev, unit: e.target.value }))
+                }
+                placeholder="Например: kg"
+              />
+            </label>
+            <div className="cafe-costing-page__row">
+              <button type="button" onClick={() => setPrepProcessingModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="submit">Сохранить</button>
             </div>
           </form>
         </div>
