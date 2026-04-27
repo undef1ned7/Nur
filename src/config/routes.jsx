@@ -625,6 +625,12 @@ export const crmRoutes = (profile) => [
         "can_view_cafe_calculation",
         profile,
       ),
+      createPermissionProtectedRoute(
+        "costing/preparations/:preparationId",
+        CafeCosting,
+        "can_view_cafe_calculation",
+        profile,
+      ),
       createProtectedRoute("kassa/*", CafeKassa),
       createProtectedRoute("clients", CafeClients),
       createProtectedRoute("tables", CafeTables),
