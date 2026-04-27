@@ -7,6 +7,11 @@ import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Costing.scss";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
+const processingChargeTypeLabel = (value) => {
+  if (value === "per_unit") return "За единицу";
+  if (value === "fixed") return "Фиксированно";
+  return "—";
+};
 
 const emptyPreparation = {
   name: "",
@@ -18,6 +23,11 @@ const emptyPreparation = {
   processing_cost: "",
   stock_quantity: "0",
   is_active: true,
+};
+const emptyReceiveForm = {
+  input_quantity: "",
+  output_quantity: "",
+  processing_cost: "",
 };
 
 const emptyProcessing = {
@@ -64,6 +74,10 @@ export default function CafeCosting() {
   const [procModalOpen, setProcModalOpen] = useState(false);
   const [procEditingId, setProcEditingId] = useState("");
   const [procForm, setProcForm] = useState(emptyProcessing);
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [receivePreparationId, setReceivePreparationId] = useState("");
+  const [receivePreparationName, setReceivePreparationName] = useState("");
+  const [receiveForm, setReceiveForm] = useState(emptyReceiveForm);
 
   const [previewForm, setPreviewForm] = useState({
     sale_price: "",
@@ -248,6 +262,69 @@ export default function CafeCosting() {
     }
   };
 
+  const openReceivePreparation = (row) => {
+    setReceivePreparationId(String(row?.id || ""));
+    setReceivePreparationName(String(row?.name || "Заготовка"));
+    setReceiveForm({
+      input_quantity: "",
+      output_quantity: "",
+      processing_cost: String(row?.processing_cost ?? ""),
+    });
+    setReceiveModalOpen(true);
+  };
+
+  const handleReceivePreparation = async (e) => {
+    e.preventDefault();
+    const preparationId = String(receivePreparationId || "");
+    if (!preparationId) return;
+
+    const inputQ = Number(String(receiveForm.input_quantity || "").replace(",", "."));
+    const outputQ = Number(String(receiveForm.output_quantity || "").replace(",", "."));
+    const processingCostRaw = String(receiveForm.processing_cost || "").trim();
+    const processingCostNum =
+      processingCostRaw === "" ? null : Number(processingCostRaw.replace(",", "."));
+
+    if (!Number.isFinite(inputQ) || inputQ <= 0) {
+      alert("Входное количество должно быть больше 0", true);
+      return;
+    }
+    if (!Number.isFinite(outputQ) || outputQ <= 0) {
+      alert("Выходное количество должно быть больше 0", true);
+      return;
+    }
+    if (outputQ > inputQ) {
+      alert("Выходное количество не может быть больше входного", true);
+      return;
+    }
+    if (processingCostNum !== null && (!Number.isFinite(processingCostNum) || processingCostNum < 0)) {
+      alert("Стоимость обработки не может быть отрицательной", true);
+      return;
+    }
+
+    const payload = {
+      input_quantity: String(inputQ),
+      output_quantity: String(outputQ),
+      ...(processingCostNum !== null
+        ? { processing_cost: String(processingCostNum) }
+        : {}),
+    };
+
+    try {
+      setSaving(true);
+      await api.post(
+        `/cafe/preparations/${encodeURIComponent(preparationId)}/receive/`,
+        payload,
+      );
+      setReceiveModalOpen(false);
+      await loadAll();
+      alert("Приход заготовки успешно выполнен");
+    } catch (error) {
+      alert(validateResErrors(error, "Ошибка при оприходовании заготовки"), true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openCreateProcessing = () => {
     setProcEditingId("");
     setProcForm(emptyProcessing);
@@ -400,6 +477,9 @@ export default function CafeCosting() {
                           <td>{p.unit_cost}</td>
                           <td>{p.stock_quantity}</td>
                           <td className="cafe-costing-page__actions">
+                            <button type="button" onClick={() => openReceivePreparation(p)}>
+                              Приход
+                            </button>
                             <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
                             <button
                               type="button"
@@ -442,7 +522,7 @@ export default function CafeCosting() {
                         <tr key={p.id}>
                           <td>{p.name}</td>
                           <td>{p.cost}</td>
-                          <td>{p.charge_type}</td>
+                          <td>{processingChargeTypeLabel(p.charge_type)}</td>
                           <td className="cafe-costing-page__actions">
                             <button type="button" onClick={() => openEditProcessing(p)}>Изм.</button>
                             <button
@@ -747,8 +827,8 @@ export default function CafeCosting() {
               value={procForm.charge_type}
               onChange={(e) => setProcForm((prev) => ({ ...prev, charge_type: e.target.value }))}
             >
-              <option value="fixed">Фиксированно (fixed)</option>
-              <option value="per_unit">За единицу (per_unit)</option>
+              <option value="fixed">Фиксированно</option>
+              <option value="per_unit">За единицу</option>
             </select>
             </label>
             <label className="cafe-costing-page__field">
@@ -766,6 +846,64 @@ export default function CafeCosting() {
               </button>
               <button type="submit" disabled={saving}>
                 {saving ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {receiveModalOpen && (
+        <div className="cafe-costing-page__overlay" onClick={() => setReceiveModalOpen(false)}>
+          <form
+            className="cafe-costing-page__modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleReceivePreparation}
+          >
+            <h3>Приход заготовки</h3>
+            <p className="cafe-costing-page__subtitle" style={{ margin: 0 }}>
+              {receivePreparationName}
+            </p>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Входное количество *</span>
+              <input
+                className="cafe-costing-page__input"
+                value={receiveForm.input_quantity}
+                onChange={(e) =>
+                  setReceiveForm((prev) => ({ ...prev, input_quantity: e.target.value }))
+                }
+                placeholder="Например: 5.0"
+                required
+              />
+            </label>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Выходное количество *</span>
+              <input
+                className="cafe-costing-page__input"
+                value={receiveForm.output_quantity}
+                onChange={(e) =>
+                  setReceiveForm((prev) => ({ ...prev, output_quantity: e.target.value }))
+                }
+                placeholder="Например: 4.7"
+                required
+              />
+            </label>
+            <label className="cafe-costing-page__field">
+              <span className="cafe-costing-page__field-label">Стоимость обработки</span>
+              <input
+                className="cafe-costing-page__input"
+                value={receiveForm.processing_cost}
+                onChange={(e) =>
+                  setReceiveForm((prev) => ({ ...prev, processing_cost: e.target.value }))
+                }
+                placeholder="Например: 10.00"
+              />
+            </label>
+            <div className="cafe-costing-page__row">
+              <button type="button" onClick={() => setReceiveModalOpen(false)}>
+                Отмена
+              </button>
+              <button type="submit" disabled={saving}>
+                {saving ? "Сохранение..." : "Сделать приход"}
               </button>
             </div>
           </form>
