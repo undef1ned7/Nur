@@ -52,26 +52,31 @@ const styles = StyleSheet.create({
     flex: 7,
     paddingRight: 6,
   },
-  dividerColumn: {
-    width: 18,
-    flexDirection: "row",
-    alignItems: "stretch",
-    justifyContent: "center",
+  dividerWrapper: {
+    width: 16,
+    alignItems: "center",
+    flexDirection: "column",
   },
-  dividerLine: {
+  dividerLineTop: {
     width: 1,
+    flex: 1,
     backgroundColor: "#000",
   },
-  dividerCenter: {
-    width: 12,
+  dividerLineBottom: {
+    width: 1,
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  dividerLetterBlock: {
+    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
     paddingVertical: 4,
   },
-  dividerCutLine: {
-    fontSize: 5.5,
-    letterSpacing: 0.5,
-    transform: "rotate(90deg)",
+  dividerLetter: {
+    fontSize: 5,
+    color: "#000",
+    lineHeight: 1.4,
+    textAlign: "center",
   },
   rightSection: {
     flex: 3,
@@ -318,7 +323,6 @@ export default function Ko1PdfDocument({ data }) {
         <View style={styles.leftSection}>
           <Text style={styles.metaSmall}>
             Унифицированная форма № КО-1{"\n"}
-            Утверждена постановлением Госкомстата России от 18.08.98 № 88
           </Text>
 
           <View style={styles.rowBetween}>
@@ -492,14 +496,16 @@ export default function Ko1PdfDocument({ data }) {
           </View>
         </View>
 
-        <View style={styles.dividerColumn}>
-          <View style={styles.dividerLine} />
-          <View style={styles.dividerCenter}>
-            <Text style={styles.dividerCutLine}>
-              Л И Н И Я О Т Р Е З А
-            </Text>
+        <View style={styles.dividerWrapper}>
+          <View style={styles.dividerLineTop} />
+          <View style={styles.dividerLetterBlock}>
+            {[..."Л И Н И Я  О Т Р Е З А"].map((ch, i) => (
+              <Text key={i} style={styles.dividerLetter}>
+                {ch === " " ? "\u00A0" : ch}
+              </Text>
+            ))}
           </View>
-          <View style={styles.dividerLine} />
+          <View style={styles.dividerLineBottom} />
         </View>
 
         <View style={styles.rightSection}>
@@ -510,9 +516,7 @@ export default function Ko1PdfDocument({ data }) {
           <Text style={styles.receiptText}>
             от &quot;{day}&quot; {monthName} {year} г.
           </Text>
-          <Text style={styles.receiptText}>
-            Принято от {data.receivedFrom}
-          </Text>
+          <Text style={styles.receiptText}>Принято от {data.receivedFrom}</Text>
           <Text style={styles.receiptText}>Основание: {data.basis}</Text>
           <Text style={styles.receiptText}>
             Сумма {rub} сом {kop} тыйын
