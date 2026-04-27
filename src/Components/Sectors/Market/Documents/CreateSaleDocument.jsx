@@ -25,6 +25,8 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
+import Ko1PdfDocument from "../../Warehouse/Documents/components/Ko1PdfDocument.jsx";
+import { numberToWords } from "../../../../utils/numberToWords.js";
 import "./CreateSaleDocument.scss";
 
 const CreateSaleDocument = () => {
@@ -574,6 +576,31 @@ const CreateSaleDocument = () => {
           <ReceiptPdfDocument data={receiptData} />
         ).toBlob();
         downloadBlob(blob, `receipt_${docNumber}.pdf`);
+      } else if (printType === "ko1") {
+        const ko1Data = {
+          organization: company?.name || "",
+          structuralUnit: "",
+          documentNumber: String(docNumber),
+          date: currentDate.toISOString().split("T")[0],
+          receivedFrom: selectedCounterparty?.name || "",
+          basis: comment || "Оплата по договору",
+          amountNumber: totals.total.toLocaleString("ru-RU", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+          amountWords: numberToWords(totals.total),
+          chiefAccountant:
+            userProfile?.full_name || userProfile?.name || "",
+          cashier: userProfile?.full_name || userProfile?.name || "",
+        };
+
+        const blob = await pdf(
+          <Ko1PdfDocument data={ko1Data} />
+        ).toBlob();
+        downloadBlob(
+          blob,
+          `ko1_${String(docNumber).replace(/[^\w.-]+/g, "_")}.pdf`,
+        );
       }
 
       // Очищаем корзину после успешного скачивания PDF
@@ -715,6 +742,9 @@ const CreateSaleDocument = () => {
                     </button>
                     <button onClick={() => handleSaveAndPrint("receipt")}>
                       Товарный чек
+                    </button>
+                    <button onClick={() => handleSaveAndPrint("ko1")}>
+                      ПКО (КО-1)
                     </button>
                   </div>
                 )}

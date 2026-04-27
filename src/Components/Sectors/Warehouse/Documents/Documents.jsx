@@ -46,11 +46,14 @@ import CreateSaleFromCartModal from "./components/CreateSaleFromCartModal";
 import ReceiptPreviewModal from "./components/ReceiptPreviewModal";
 import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
+import Ko1PreviewModal from "./components/Ko1PreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import Ko1PdfDocument from "./components/Ko1PdfDocument";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
+import { numberToWords } from "../../../../utils/numberToWords";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -108,6 +111,7 @@ const Documents = () => {
   const [showReconciliationModal, setShowReconciliationModal] = useState(false);
   const [previewReceiptId, setPreviewReceiptId] = useState(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState(null);
+  const [previewKo1Id, setPreviewKo1Id] = useState(null);
   const [editReceiptId, setEditReceiptId] = useState(null);
   const [editReceiptData, setEditReceiptData] = useState(null);
   const debounceTimerRef = useRef(null);
@@ -403,6 +407,37 @@ const Documents = () => {
     });
   }, [filteredDocuments, activeTab, currentPage]);
 
+  const ko1Data = useMemo(() => {
+    if (activeTab !== "ko1") return [];
+    return (filteredDocuments || [])
+      .filter((doc) => doc.doc_type === "SALE")
+      .map((doc, index) => {
+        const resolvedStatus = resolveDocumentStatus(doc);
+        return {
+          id: doc.id,
+          number: doc.number || getDocumentNumber(index, "ПКО"),
+          date: formatDocumentDateTime(doc.date || doc.created_at),
+          counterparty:
+            doc.counterparty?.name ||
+            doc.counterparty_display_name ||
+            doc.counterparty ||
+            "Без контрагента",
+          positions: doc.items?.length || 0,
+          amount: getDocumentAmount(doc),
+          discount_percent: doc.discount_percent ?? null,
+          discount_amount: doc.discount_amount ?? null,
+          status: getStatusLabel(resolvedStatus),
+          statusType: getStatusType(resolvedStatus),
+          rawStatus: resolvedStatus,
+          payment_kind: doc.payment_kind,
+          document: doc,
+          agentDisplay:
+            doc.agent_display?.trim?.() ||
+            (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
+        };
+      });
+  }, [filteredDocuments, activeTab, currentPage]);
+
   // Обновление URL только при изменении страницы (без поиска)
   useEffect(() => {
     const params = new URLSearchParams();
@@ -429,9 +464,11 @@ const Documents = () => {
     if (
       activeTab === "receipts" ||
       activeTab === "invoices" ||
-      activeTab === "agent_sales"
+      activeTab === "agent_sales" ||
+      activeTab === "ko1"
     ) {
-      const requestDocType = activeTab === "agent_sales" ? "SALE" : docType;
+      const requestDocType =
+        activeTab === "agent_sales" || activeTab === "ko1" ? "SALE" : docType;
       // Используем новый warehouse API
       const params = {
         page: currentPage,
@@ -451,6 +488,8 @@ const Documents = () => {
         return receiptsData;
       case "invoices":
         return invoicesData;
+      case "ko1":
+        return ko1Data;
       default:
         return [];
     }
@@ -478,6 +517,8 @@ const Documents = () => {
       setPreviewReceiptId(item.id);
     } else if (activeTab === "invoices") {
       setPreviewInvoiceId(item.id);
+    } else if (activeTab === "ko1") {
+      handlePreviewKo1(item);
     }
   };
 
@@ -509,9 +550,11 @@ const Documents = () => {
     if (
       activeTab === "receipts" ||
       activeTab === "invoices" ||
-      activeTab === "agent_sales"
+      activeTab === "agent_sales" ||
+      activeTab === "ko1"
     ) {
-      const requestDocType = activeTab === "agent_sales" ? "SALE" : docType;
+      const requestDocType =
+        activeTab === "agent_sales" || activeTab === "ko1" ? "SALE" : docType;
       const params = {
         page: currentPage,
         page_size: 100,
@@ -841,7 +884,9 @@ const Documents = () => {
     if (!item?.id) return;
 
     try {
-      if (activeTab === "invoices") {
+      if (activeTab === "ko1") {
+        await handlePrintKo1(item);
+      } else if (activeTab === "invoices") {
         // Для накладной используем warehouse API
         const result = await dispatch(getWarehouseDocumentById(item.id));
         if (getWarehouseDocumentById.fulfilled.match(result)) {
@@ -925,6 +970,85 @@ const Documents = () => {
 
   const handleDirectInvoicePrint = async (item) => {
     await handlePrint(item, { directPrint: true });
+  };
+
+  const downloadBlob = (blob, filename) => {
+    if (!window?.URL || !window?.document) return;
+    const url = window.URL.createObjectURL(blob);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  };
+
+  const buildKo1DataFromDocument = (doc) => {
+    const totalAmount = getDocumentAmount(doc);
+    return {
+      organization: company?.name || "",
+      structuralUnit: "",
+      documentNumber: String(doc.number || doc.id || ""),
+      date: doc.date || doc.created_at?.split("T")[0] || "",
+      receivedFrom:
+        doc.counterparty?.name ||
+        doc.counterparty_display_name ||
+        doc.counterparty ||
+        "",
+      basis: doc.comment || "Оплата по договору",
+      amountNumber: totalAmount.toLocaleString("ru-RU", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      amountWords: numberToWords(totalAmount),
+      chiefAccountant: profile?.full_name || profile?.name || "",
+      cashier: profile?.full_name || profile?.name || "",
+    };
+  };
+
+  const getKo1PdfBlob = async (item) => {
+    const result = await dispatch(getWarehouseDocumentById(item.id));
+    if (!getWarehouseDocumentById.fulfilled.match(result)) {
+      throw new Error("Не удалось загрузить данные документа");
+    }
+    const doc = result.payload;
+    const ko1Payload = buildKo1DataFromDocument(doc);
+    return pdf(<Ko1PdfDocument data={ko1Payload} />).toBlob();
+  };
+
+  const handlePreviewKo1 = async (item) => {
+    if (!item?.id) return;
+    setPreviewKo1Id(item.id);
+  };
+
+  const handleDownloadKo1 = async (item) => {
+    if (!item?.id) return;
+    try {
+      const blob = await getKo1PdfBlob(item);
+      const fileName = `ko1_${String(item.number || item.id).replace(
+        /[^\w.-]+/g,
+        "_",
+      )}.pdf`;
+      downloadBlob(blob, fileName);
+    } catch (error) {
+      console.error("Ошибка скачивания КО-1:", error);
+      alert(
+        "Ошибка скачивания: " + (error?.message || "Не удалось скачать КО-1"),
+        true,
+      );
+    }
+  };
+
+  const handlePrintKo1 = async (item) => {
+    if (!item?.id) return;
+    try {
+      const blob = await getKo1PdfBlob(item);
+      printInvoicePdfBlob(blob);
+    } catch (error) {
+      console.error("Ошибка печати КО-1:", error);
+      alert("Ошибка печати: " + (error?.message || "Не удалось печатать КО-1"));
+    }
   };
 
   const formatAmount = (amount) => {
@@ -1063,6 +1187,16 @@ const Documents = () => {
               Продажи по заявкам
             </button>
           )}
+          {docType === "SALE" && (
+            <button
+              className={`documents__tab ${
+                activeTab === "ko1" ? "documents__tab--active" : ""
+              }`}
+              onClick={() => setActiveTab("ko1")}
+            >
+              ПКО (КО-1)
+            </button>
+          )}
         </div>
         <div className="documents__view-toggle">
           <button
@@ -1108,6 +1242,19 @@ const Documents = () => {
                     </>
                   )}
                   {activeTab === "invoices" && (
+                    <>
+                      <th>Номер</th>
+                      <th>Дата</th>
+                      <th>Контрагент</th>
+                      {docType === "SALE" && <th>Агент</th>}
+                      <th>Позиций</th>
+                      <th>Сумма</th>
+                      <th>Скидка</th>
+                      <th>Статус</th>
+                      <th>Действия</th>
+                    </>
+                  )}
+                  {activeTab === "ko1" && (
                     <>
                       <th>Номер</th>
                       <th>Дата</th>
@@ -1345,6 +1492,60 @@ const Documents = () => {
                           </td>
                         </>
                       )}
+                      {activeTab === "ko1" && (
+                        <>
+                          <td>{item.number}</td>
+                          <td>{item.date}</td>
+                          <td>{item.counterparty}</td>
+                          {docType === "SALE" && (
+                            <td>{item.agentDisplay ?? "—"}</td>
+                          )}
+                          <td>{item.positions}</td>
+                          <td>{formatAmount(item.amount)} сом</td>
+                          <td>{formatDocumentDiscountCell(item)}</td>
+                          <td>
+                            <span
+                              className={`documents__status documents__status--${item.statusType}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="documents__actions">
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handlePreviewKo1(item)}
+                                title="Предварительный просмотр"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {isSaleDraftLikeStatus(item.rawStatus) && (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handleEditDraft(item)}
+                                  title="Редактировать"
+                                >
+                                  <Pencil size={18} />
+                                </button>
+                              )}
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handlePrintKo1(item)}
+                                title="Печать"
+                              >
+                                <Printer size={18} />
+                              </button>
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handleDownloadKo1(item)}
+                                title="Скачать"
+                              >
+                                <Download size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))
                 )}
@@ -1555,6 +1756,15 @@ const Documents = () => {
                         className="documents__action-btn"
                         onClick={() => handleDirectInvoicePrint(item)}
                         title="Сразу на печать"
+                      >
+                        <Download size={18} />
+                      </button>
+                    )}
+                    {activeTab === "ko1" && (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() => handleDownloadKo1(item)}
+                        title="Скачать"
                       >
                         <Download size={18} />
                       </button>
@@ -1788,6 +1998,14 @@ const Documents = () => {
           }
           onClose={() => setPreviewInvoiceId(null)}
           onEdit={handleEditFromPreview}
+        />
+      )}
+
+      {previewKo1Id && (
+        <Ko1PreviewModal
+          ko1Id={previewKo1Id}
+          document={ko1Data.find((item) => item.id === previewKo1Id)?.document}
+          onClose={() => setPreviewKo1Id(null)}
         />
       )}
 

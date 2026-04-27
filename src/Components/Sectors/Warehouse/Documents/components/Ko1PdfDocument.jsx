@@ -318,7 +318,6 @@ export default function Ko1PdfDocument({ data }) {
         <View style={styles.leftSection}>
           <Text style={styles.metaSmall}>
             Унифицированная форма № КО-1{"\n"}
-            Утверждена постановлением Госкомстата России от 18.08.98 № 88
           </Text>
 
           <View style={styles.rowBetween}>
@@ -495,9 +494,7 @@ export default function Ko1PdfDocument({ data }) {
         <View style={styles.dividerColumn}>
           <View style={styles.dividerLine} />
           <View style={styles.dividerCenter}>
-            <Text style={styles.dividerCutLine}>
-              Л И Н И Я О Т Р Е З А
-            </Text>
+            <Text style={styles.dividerCutLine}>Л И Н И Я О Т Р Е З А</Text>
           </View>
           <View style={styles.dividerLine} />
         </View>
@@ -510,9 +507,7 @@ export default function Ko1PdfDocument({ data }) {
           <Text style={styles.receiptText}>
             от &quot;{day}&quot; {monthName} {year} г.
           </Text>
-          <Text style={styles.receiptText}>
-            Принято от {data.receivedFrom}
-          </Text>
+          <Text style={styles.receiptText}>Принято от {data.receivedFrom}</Text>
           <Text style={styles.receiptText}>Основание: {data.basis}</Text>
           <Text style={styles.receiptText}>
             Сумма {rub} сом {kop} тыйын
