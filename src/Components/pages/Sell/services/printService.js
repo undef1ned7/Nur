@@ -270,20 +270,29 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const divider = "-".repeat(width);
   const codepage = opts.codepage || cfg.codepage;
   const enc = opts.encoder || getEncoder(codepage);
+  const emphasizeMarketReceipt = opts.receiptStyle === "market";
+  const hasText = (v) => {
+    const s = String(v ?? "").trim();
+    return s !== "" && s !== "—";
+  };
 
   const ekassaFields =
     payload?.ekassa_fiscal?.fields ||
     payload?.ekassa?.fields ||
     payload?.ekassa?.ekassa_payload?.data?.fields ||
     null;
-  const company = String(payload.company || "Компания");
-  const inn = String(payload.inn || "—");
-  const address = String(payload.address || "—");
-  const cashier = String(payload.cashier_name || "—");
+  const company = String(payload.company ?? "").trim();
+  const inn = String(payload.inn ?? "").trim();
+  const address = String(payload.address ?? "").trim();
+  const cashier = String(payload.cashier_name ?? "").trim();
 
-  const docNo = String(ekassaFields ? (f(ekassaFields, "1042") ?? payload.doc_no ?? "") : (payload.doc_no ?? ""));
-  const dt = String(ekassaFields ? (f(ekassaFields, "1012") ?? payload.created_at ?? "") : (payload.created_at ?? ""));
-  const shift = String(ekassaFields ? (f(ekassaFields, "1038") ?? "—") : "—");
+  const docNo = String(
+    ekassaFields ? (f(ekassaFields, "1042") ?? payload.doc_no ?? "") : (payload.doc_no ?? ""),
+  ).trim();
+  const dt = String(
+    ekassaFields ? (f(ekassaFields, "1012") ?? payload.created_at ?? "") : (payload.created_at ?? ""),
+  ).trim();
+  const shift = String(ekassaFields ? (f(ekassaFields, "1038") ?? "") : "").trim();
 
   const items = ekassaFields && Array.isArray(f(ekassaFields, "1059"))
     ? f(ekassaFields, "1059").map((it) => {
@@ -315,24 +324,24 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const paidCash = Math.max(0, total - paidCard);
   const kkm = String(
     ekassaFields
-      ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "—")
-      : (payload?.ekassa_fiscal?.kkm_reg_number ?? "—")
-  );
+      ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "")
+      : (payload?.ekassa_fiscal?.kkm_reg_number ?? ""),
+  ).trim();
   const fn = String(
     ekassaFields
-      ? (f(ekassaFields, "1041") ?? payload?.ekassa_fiscal?.fm_number ?? "—")
-      : (payload?.ekassa_fiscal?.fm_number ?? "—")
-  );
+      ? (f(ekassaFields, "1041") ?? payload?.ekassa_fiscal?.fm_number ?? "")
+      : (payload?.ekassa_fiscal?.fm_number ?? ""),
+  ).trim();
   const fd = String(
     ekassaFields
-      ? (f(ekassaFields, "1040") ?? payload?.ekassa_fiscal?.fd_number ?? "—")
-      : (payload?.ekassa_fiscal?.fd_number ?? "—")
-  );
+      ? (f(ekassaFields, "1040") ?? payload?.ekassa_fiscal?.fd_number ?? "")
+      : (payload?.ekassa_fiscal?.fd_number ?? ""),
+  ).trim();
   const fpd = String(
     ekassaFields
-      ? (f(ekassaFields, "1077") ?? payload?.ekassa_fiscal?.fpd ?? "—")
-      : (payload?.ekassa_fiscal?.fpd ?? "—")
-  );
+      ? (f(ekassaFields, "1077") ?? payload?.ekassa_fiscal?.fpd ?? "")
+      : (payload?.ekassa_fiscal?.fpd ?? ""),
+  ).trim();
   const qrLink = String(payload?.ekassa_fiscal?.link || payload?.ekassa?.link || "").trim();
 
   const chunks = [];
@@ -341,44 +350,94 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(ESC(0x1b, 0x74, codepage)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
+  if (emphasizeMarketReceipt) {
+    chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
+    chunks.push(enc("СПАСИБО ЗА ПОКУПКУ!\n"));
+    chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+  }
   chunks.push(enc("Контрольно-кассовый чек - Продажа\n"));
-  chunks.push(enc(company + "\n"));
-  chunks.push(enc(`ИНН ${inn}\n`));
-  chunks.push(enc(address + "\n"));
+  if (hasText(company)) chunks.push(enc(company + "\n"));
+  if (hasText(inn)) chunks.push(enc(`ИНН ${inn}\n`));
+  if (hasText(address)) chunks.push(enc(address + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x00)); // left
   chunks.push(enc(divider + "\n"));
-  chunks.push(enc(lr(`Чек № ${docNo}`, dt, width) + "\n"));
-  chunks.push(enc(lr("Кассир", cashier, width) + "\n"));
-  chunks.push(enc(lr("Смена", shift, width) + "\n"));
+  if (hasText(docNo) && hasText(dt)) {
+    chunks.push(enc(lr(`Чек № ${docNo}`, dt, width) + "\n"));
+  } else if (hasText(docNo)) {
+    chunks.push(enc(`Чек № ${docNo}\n`));
+  } else if (hasText(dt)) {
+    chunks.push(enc(`${dt}\n`));
+  }
+  if (hasText(cashier)) chunks.push(enc(lr("Кассир", cashier, width) + "\n"));
+  if (hasText(shift)) chunks.push(enc(lr("Смена", shift, width) + "\n"));
   chunks.push(enc(divider + "\n"));
   chunks.push(enc("СНО: Общий налоговый режим\n"));
   chunks.push(enc(divider + "\n"));
-  for (const it of items) {
+  for (const [index, it] of items.entries()) {
     const name = String(it.name ?? "Товар");
     const qty = Number(it.qty || 1);
     const price = Number(it.price || 0);
     const lineTotal = Number(it.total ?? qty * price);
-    chunks.push(enc(name + "\n"));
-    chunks.push(enc(lr(`${money(price)} x ${qty}`, money(lineTotal), width) + "\n"));
+    chunks.push(enc(`${index + 1}. ${name}\n`));
+    if (emphasizeMarketReceipt) {
+      chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
+      chunks.push(
+        enc(
+          lr(
+            `${money(price)} x ${qty} ед.`,
+            money(lineTotal),
+            width,
+          ) + "\n",
+        ),
+      );
+      chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+    } else {
+      chunks.push(enc(lr(`${money(price)} x ${qty} ед.`, money(lineTotal), width) + "\n"));
+    }
   }
 
   chunks.push(enc(divider + "\n"));
+  if (emphasizeMarketReceipt) {
+    chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
+  }
   chunks.push(enc(lr("Подытог", money(subtotal), width) + "\n"));
-  chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
-  chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
+  if (vat > 0) chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
+  if (nsp > 0) chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
+  if (emphasizeMarketReceipt) {
+    chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+  }
   chunks.push(enc(divider + "\n"));
-  chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
-  chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+  if (emphasizeMarketReceipt) {
+    chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
+  }
+  if (paidCash > 0) chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
+  if (paidCard > 0) chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+  if (emphasizeMarketReceipt) {
+    chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+  }
 
   chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   chunks.push(enc(lr("ИТОГО", money(total), width) + "\n"));
   chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
   chunks.push(enc(divider + "\n"));
-  chunks.push(enc(lr("ККМ №", kkm, width) + "\n"));
-  chunks.push(enc(lr("ФН №", fn, width) + "\n"));
-  chunks.push(enc(lr("ФД №", fd, width) + "\n"));
-  chunks.push(enc(lr("ФПД", fpd, width) + "\n"));
-  chunks.push(enc(divider + "\n"));
+  let hasFiscalRows = false;
+  if (hasText(kkm)) {
+    chunks.push(enc(lr("ККМ №", kkm, width) + "\n"));
+    hasFiscalRows = true;
+  }
+  if (hasText(fn)) {
+    chunks.push(enc(lr("ФН №", fn, width) + "\n"));
+    hasFiscalRows = true;
+  }
+  if (hasText(fd)) {
+    chunks.push(enc(lr("ФД №", fd, width) + "\n"));
+    hasFiscalRows = true;
+  }
+  if (hasText(fpd)) {
+    chunks.push(enc(lr("ФПД", fpd, width) + "\n"));
+    hasFiscalRows = true;
+  }
+  if (hasFiscalRows) chunks.push(enc(divider + "\n"));
   if (qrLink) {
     chunks.push(ESC(0x1b, 0x61, 0x01)); // center
     chunks.push(enc("Проверка чека\n"));
@@ -654,12 +713,45 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
     width: cfg.charsPerLine,
     codepage: cfg.codepage,
     encoder: cfg.encoder,
+    receiptStyle: options?.receiptStyle,
   });
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await dev.transferOut(outEP, chunk);
     }
   }
+}
+
+function unwrapPrintablePayload(source, depth = 0) {
+  if (depth > 3 || source == null) return source;
+  if (source instanceof Blob) return source;
+  if (Array.isArray(source?.items)) return source;
+  if (typeof source === "string") return source;
+  if (typeof source !== "object") return source;
+
+  const candidates = [
+    source.receipt,
+    source.checkoutResponse,
+    source.payload,
+    source.data,
+    source.result,
+    source.response,
+    source.body,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const unwrapped = unwrapPrintablePayload(candidate, depth + 1);
+    if (
+      unwrapped instanceof Blob ||
+      typeof unwrapped === "string" ||
+      Array.isArray(unwrapped?.items)
+    ) {
+      return unwrapped;
+    }
+  }
+
+  return source;
 }
 
 /* ---------- Минимальная печать PC866 (XP-N160II) ---------- */
@@ -706,21 +798,42 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
 
 /* ---------- Главная функция обработки ответа для печати ---------- */
 export async function handleCheckoutResponseForPrinting(res, options = {}) {
-  if (
-    res &&
-    typeof res === "object" &&
-    !(res instanceof Blob) &&
-    Array.isArray(res.items)
-  ) {
-    await printReceiptJSONViaUSB(res, options);
-    return;
-  }
-  if (res instanceof Blob) {
-    if (await looksLikePdf(res)) {
-      await printReceiptFromPdfUSB(res, options);
+  const printable = unwrapPrintablePayload(res);
+
+  if (typeof printable === "string") {
+    const text = printable.trim();
+    if (text.startsWith("data:application/pdf;base64,")) {
+      const b64 = text.split(",")[1] || "";
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      await printReceiptFromPdfUSB(new Blob([bin], { type: "application/pdf" }), options);
       return;
     }
-    const parsed = await tryParseJsonFromBlob(res);
+    try {
+      const json = JSON.parse(text);
+      if (json && Array.isArray(json.items)) {
+        await printReceiptJSONViaUSB(json, options);
+        return;
+      }
+    } catch {
+      // not json
+    }
+  }
+
+  if (
+    printable &&
+    typeof printable === "object" &&
+    !(printable instanceof Blob) &&
+    Array.isArray(printable.items)
+  ) {
+    await printReceiptJSONViaUSB(printable, options);
+    return;
+  }
+  if (printable instanceof Blob) {
+    if (await looksLikePdf(printable)) {
+      await printReceiptFromPdfUSB(printable, options);
+      return;
+    }
+    const parsed = await tryParseJsonFromBlob(printable);
     if (parsed?.json) {
       await printReceiptJSONViaUSB(parsed.json, options);
       return;
@@ -730,7 +843,7 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
       return;
     }
     // не PDF и не JSON — сохраним как файл (фолбэк)
-    const url = URL.createObjectURL(res);
+    const url = URL.createObjectURL(printable);
     const a = document.createElement("a");
     a.href = url;
     a.download = "receipt.pdf";
@@ -738,8 +851,8 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     URL.revokeObjectURL(url);
     throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
   }
-  if (res && typeof res === "object" && Array.isArray(res.items)) {
-    await printReceiptJSONViaUSB(res, options);
+  if (printable && typeof printable === "object" && Array.isArray(printable.items)) {
+    await printReceiptJSONViaUSB(printable, options);
     return;
   }
   throw new Error("Неизвестный формат ответа для печати");

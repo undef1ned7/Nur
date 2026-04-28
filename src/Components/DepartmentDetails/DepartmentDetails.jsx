@@ -64,6 +64,11 @@ const SECTOR_ACCESS_TYPES = {
       label: "Поставщики",
       backendKey: "can_view_market_supplier",
     },
+    {
+      value: "Возврат продаж сотрудником",
+      label: "Возврат продаж сотрудником",
+      backendKey: "can_view_market_employee_return",
+    },
   ],
   Барбершоп: [
     {

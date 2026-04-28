@@ -107,6 +107,7 @@ export const buildProductPayload = ({
     brand_name,
     category_name,
     price,
+    wholesale_price,
     quantity,
     client,
     purchase_price,
@@ -170,6 +171,10 @@ export const buildProductPayload = ({
   }
 
   const finalPrice = price && price.trim() !== "" ? price.toString() : "0";
+  const finalWholesalePrice =
+    wholesale_price && String(wholesale_price).trim() !== ""
+      ? String(wholesale_price)
+      : "0";
 
   // Определяем kind
   let kindValue = "product";
@@ -194,6 +199,7 @@ export const buildProductPayload = ({
     unit: marketData.unit || "шт",
     is_weight: isWeight,
     price: finalPrice,
+    wholesale_price: finalWholesalePrice,
     discount_percent: (marketData.discount || "0").toString(),
     country: marketData.country || "",
     expiration_date: marketData.expiryDate || null,

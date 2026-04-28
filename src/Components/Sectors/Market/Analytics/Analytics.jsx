@@ -181,6 +181,7 @@ const Analytics = () => {
     const tabMap = {
       sales: "sales",
       warehouse: "stock", // "warehouse" -> "stock" для API
+      purchases: "purchases",
       cashiers: "cashboxes", // "cashiers" -> "cashboxes" для API
       shifts: "shifts",
       products: "products",
@@ -218,7 +219,12 @@ const Analytics = () => {
         }
 
         // Добавляем фильтры в зависимости от вкладки
-        if (tab === "sales" || tab === "cashiers" || tab === "suppliers") {
+        if (
+          tab === "sales" ||
+          tab === "cashiers" ||
+          tab === "suppliers" ||
+          tab === "purchases"
+        ) {
           if (filters.cashbox) params.cashbox = filters.cashbox;
           if (filters.shift) params.shift = filters.shift;
           if (filters.cashier) params.cashier = filters.cashier;
@@ -226,7 +232,7 @@ const Analytics = () => {
             params.payment_method = filters.payment_method;
           if (filters.min_total) params.min_total = filters.min_total;
           if (filters.max_total) params.max_total = filters.max_total;
-          if (tab === "suppliers") {
+          if (tab === "suppliers" || tab === "purchases") {
             if (filters.purchase_date_from) {
               params.purchase_date_from = filters.purchase_date_from;
             }
@@ -627,15 +633,22 @@ const Analytics = () => {
           color: "#f7d617",
         },
         {
-          title: "Заканчиваются",
-          value: formatNumber(cards.low_stock_count || 0),
-          subtitle: "Требуют заказа",
+          title: "Общий остаток",
+          value: formatAnalyticsQty(
+            cards.total_stock_quantity ?? cards.total_units ?? 0,
+          ),
+          subtitle: "Сумма количеств всех товаров",
           icon: TrendingUp,
           color: "#f7d617",
         },
         {
-          title: "Оборачиваемость",
-          value: `${formatNumber(cards.turnover_days || 0)} дн.`,
+          title: "Товаров с нулём",
+          value: formatNumber(
+            cards.zero_stock_products_count ??
+              cards.zero_stock_count ??
+              cards.out_of_stock_count ??
+              0,
+          ),
           icon: BarChart3,
           color: "#f7d617",
         },
@@ -656,9 +669,9 @@ const Analytics = () => {
           ) || [],
       },
       lowStock:
-        tables.low_stock?.map((item) => ({
+        (tables.products_stock || tables.low_stock || []).map((item) => ({
           name: item.name,
-          stock: item.qty || 0,
+          stock: item.quantity ?? item.qty ?? 0,
           minimum: item.min || 0,
           status: translateLowStockStatus(item.status),
           statusType: normalizeLowStockStatusType(item.status),
@@ -1124,6 +1137,63 @@ const Analytics = () => {
     };
   }, [analyticsData, activeTab]);
 
+  const purchasesData = useMemo(() => {
+    if (!analyticsData || activeTab !== "purchases") {
+      return {
+        kpis: [
+          {
+            title: "SKU в закупках",
+            value: "0",
+            icon: Package,
+            color: "#f7d617",
+          },
+          {
+            title: "Ед. закуплено",
+            value: "0",
+            icon: ShoppingCart,
+            color: "#f7d617",
+          },
+          {
+            title: "Сумма закупок",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+        ],
+        bySupplier: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const tables = analyticsData.tables || {};
+
+    return {
+      kpis: [
+        {
+          title: "SKU в закупках",
+          value: formatNumber(cards.purchased_sku_count || 0),
+          icon: Package,
+          color: "#f7d617",
+        },
+        {
+          title: "Ед. закуплено",
+          value: formatAnalyticsQty(cards.purchased_units || 0),
+          icon: ShoppingCart,
+          color: "#f7d617",
+        },
+        {
+          title: "Сумма закупок",
+          value: formatNumber(cards.purchased_value || 0),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+      ],
+      bySupplier: tables.by_supplier || [],
+    };
+  }, [analyticsData, activeTab]);
+
   // Данные для вкладки "Сотрудники"
   const usersData = useMemo(() => {
     if (!analyticsData || activeTab !== "users") {
@@ -1404,7 +1474,8 @@ const Analytics = () => {
             {/* Фильтры для Sales и Cashiers */}
             {(activeTab === "sales" ||
               activeTab === "cashiers" ||
-              activeTab === "suppliers") && (
+              activeTab === "suppliers" ||
+              activeTab === "purchases") && (
               <>
                 <div className="analytics-page__filter-group">
                   <label>Способ оплаты</label>
@@ -1440,7 +1511,7 @@ const Analytics = () => {
                   />
                 </div>
 
-                {activeTab === "suppliers" && (
+                {(activeTab === "suppliers" || activeTab === "purchases") && (
                   <>
                     <div className="analytics-page__filter-group">
                       <label>Дата закупки от</label>
@@ -1533,6 +1604,7 @@ const Analytics = () => {
             {/* Лимит записей для детальных вкладок */}
             {(activeTab === "products" ||
               activeTab === "suppliers" ||
+              activeTab === "purchases" ||
               activeTab === "users" ||
               activeTab === "finance") && (
               <div className="analytics-page__filter-group">
@@ -1606,6 +1678,14 @@ const Analytics = () => {
           onClick={() => setActiveTab("warehouse")}
         >
           Склад
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "purchases" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("purchases")}
+        >
+          Закупки
         </button>
         <button
           className={`analytics-page__tab ${
@@ -1956,30 +2036,20 @@ const Analytics = () => {
 
           <div className="analytics-page__table-card">
             <h3 className="analytics-page__table-title">
-              Товары с низким остатком
+              Остатки товаров
             </h3>
             <table className="analytics-page__table">
               <thead>
                 <tr>
                   <th>Товар</th>
                   <th>Остаток</th>
-                  <th>Минимум</th>
-                  <th>Статус</th>
                 </tr>
               </thead>
               <tbody>
                 {warehouseData.lowStock.map((item, index) => (
                   <tr key={index}>
                     <td>{item.name}</td>
-                    <td>{item.stock} шт</td>
-                    <td>{item.minimum} шт</td>
-                    <td>
-                      <span
-                        className={`analytics-page__status analytics-page__status--${item.statusType}`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
+                    <td>{formatAnalyticsQty(item.stock)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2704,6 +2774,82 @@ const Analytics = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "purchases" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {purchasesData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__table-card analytics-page__table-card--scrollable">
+            <h3 className="analytics-page__table-title">Закупки по поставщикам</h3>
+            <div className="analytics-page__table-scroll analytics-page__table-scroll--suppliers">
+              <table className="analytics-page__table analytics-page__table--suppliers">
+                <thead>
+                  <tr>
+                    <th>Поставщик</th>
+                    <th>SKU</th>
+                    <th>Ед. закуплено</th>
+                    <th>Сумма закупок</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchasesData.bySupplier.length > 0 ? (
+                    purchasesData.bySupplier.map((row, idx) => (
+                      <tr key={row?.supplier_id || row?.id || row?.name || idx}>
+                        <td>
+                          {row?.supplier || row?.name || row?.supplier_name || "—"}
+                        </td>
+                        <td>{row?.purchased_sku_count ?? row?.sku_count ?? 0}</td>
+                        <td>
+                          {formatAnalyticsQty(
+                            row?.purchased_units ?? row?.units ?? 0,
+                          )}
+                        </td>
+                        <td>
+                          {formatCurrency(
+                            row?.purchased_value ?? row?.value ?? 0,
+                            0,
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

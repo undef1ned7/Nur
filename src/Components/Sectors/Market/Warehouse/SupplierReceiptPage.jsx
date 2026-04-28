@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { pdf } from "@react-pdf/renderer";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Download,
   PackageCheck,
   Plus,
   RefreshCw,
-  Search,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../api";
@@ -14,9 +15,8 @@ import AddProductPage from "../../../Deposits/Sklad/AddProductPage";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import InvoicePdfDocument from "../Documents/components/InvoicePdfDocument";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
-import { productSearchHaystackLower } from "../../../../../tools/productBarcode";
 import "./Warehouse.scss";
 import "./SupplierReceiptPage.scss";
 
@@ -85,6 +85,7 @@ const formatMoney = (value) =>
 export default function SupplierReceiptPage() {
   const navigate = useNavigate();
   const alert = useAlert();
+  const confirm = useConfirm();
 
   const [suppliers, setSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
@@ -97,7 +98,14 @@ export default function SupplierReceiptPage() {
 
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [modalProducts, setModalProducts] = useState([]);
+  const [modalProductsLoading, setModalProductsLoading] = useState(false);
+  const [modalProductsPage, setModalProductsPage] = useState(1);
+  const [modalProductsCount, setModalProductsCount] = useState(0);
+  const [modalProductsHasNext, setModalProductsHasNext] = useState(false);
+  const [modalProductsHasPrev, setModalProductsHasPrev] = useState(false);
+  const [productsModalOpen, setProductsModalOpen] = useState(false);
+  const [productsModalSearch, setProductsModalSearch] = useState("");
   const [qtyByProductId, setQtyByProductId] = useState({});
   const [priceByProductId, setPriceByProductId] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -174,6 +182,38 @@ export default function SupplierReceiptPage() {
     }
   };
 
+  const loadModalProducts = async (page = 1, searchValue = "") => {
+    try {
+      setModalProductsLoading(true);
+      const params = {
+        page,
+      };
+      const normalizedSearch = String(searchValue || "").trim();
+      if (normalizedSearch) {
+        params.search = normalizedSearch;
+      }
+      const res = await api.get("/main/products/list/", {
+        params,
+      });
+      const data = res?.data || {};
+      const nextProducts = Array.isArray(data?.results) ? data.results : [];
+      setModalProducts(nextProducts);
+      setModalProductsPage(Number(data?.page || page || 1));
+      setModalProductsCount(Number(data?.count || 0));
+      setModalProductsHasNext(Boolean(data?.next));
+      setModalProductsHasPrev(Boolean(data?.previous));
+    } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка при загрузке товаров");
+      alert(errorMessage, true);
+      setModalProducts([]);
+      setModalProductsCount(0);
+      setModalProductsHasNext(false);
+      setModalProductsHasPrev(false);
+    } finally {
+      setModalProductsLoading(false);
+    }
+  };
+
   const handleCreateSupplier = async () => {
     const full_name = String(createSupplierName || "").trim();
     const phone = String(createSupplierPhone || "").trim();
@@ -225,14 +265,17 @@ export default function SupplierReceiptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSupplierId]);
 
-  const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) => {
-      const haystack = productSearchHaystackLower(product);
-      return haystack.includes(query);
-    });
-  }, [products, search]);
+  useEffect(() => {
+    if (!productsModalOpen) return;
+    setProductsModalSearch("");
+    void loadModalProducts(1, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productsModalOpen]);
+
+  const tableProducts = useMemo(() => {
+    if (!selectedSupplierId) return [];
+    return products;
+  }, [products, selectedSupplierId]);
 
   const receiptItems = useMemo(
     () =>
@@ -301,6 +344,117 @@ export default function SupplierReceiptPage() {
       [productId]: nextValue,
     }));
   }, []);
+
+  const getSupplierIdFromProduct = useCallback((product) => {
+    if (!product || typeof product !== "object") return "";
+    const rawSupplier =
+      product.client ??
+      product.client_id ??
+      product.supplier ??
+      product.supplier_id ??
+      product.provider ??
+      product.provider_id;
+    if (!rawSupplier) return "";
+    if (typeof rawSupplier === "object") {
+      return String(rawSupplier.id || "").trim();
+    }
+    return String(rawSupplier).trim();
+  }, []);
+
+  const addProductToReceipt = useCallback(
+    async (productId, productData = null) => {
+      const normalizedProductId = String(productId || "").trim();
+      if (!normalizedProductId) return;
+      const supplierId = getSupplierIdFromProduct(productData);
+      const selectedId = String(selectedSupplierId || "").trim();
+      const productName = buildProductLabel(productData);
+
+      const askConfirm = (message) =>
+        new Promise((resolve) => {
+          confirm(message, (ok) => resolve(Boolean(ok)));
+        });
+
+      const ensureProductInCurrentList = () => {
+        if (!productData) return;
+        setProducts((prev) => {
+          const exists = prev.some(
+            (item) => String(item?.id || "") === normalizedProductId,
+          );
+          if (exists) return prev;
+          return [productData, ...prev];
+        });
+        setPriceByProductId((prev) => ({
+          ...prev,
+          [normalizedProductId]:
+            prev[normalizedProductId] ??
+            formatPriceInput(
+              productData?.purchase_price ?? productData?.price ?? "",
+            ),
+        }));
+      };
+
+      // Если поставщик в форме уже выбран, предлагаем привязать товар к нему
+      if (selectedId) {
+        const productSupplierId = String(supplierId || "").trim();
+        if (!productSupplierId) {
+          const shouldBind = await askConfirm(
+            `У товара "${productName}" не указан поставщик. Привязать товар к выбранному поставщику?`,
+          );
+          if (!shouldBind) return;
+          try {
+            await api.patch(`/main/products/${normalizedProductId}/`, {
+              client: selectedId,
+            });
+            ensureProductInCurrentList();
+          } catch (error) {
+            const errorMessage = validateResErrors(
+              error,
+              "Не удалось привязать товар к выбранному поставщику",
+            );
+            alert(errorMessage, true);
+            return;
+          }
+        } else if (productSupplierId !== selectedId) {
+          try {
+            await api.patch(`/main/products/${normalizedProductId}/`, {
+              client: selectedId,
+            });
+            ensureProductInCurrentList();
+          } catch (error) {
+            const errorMessage = validateResErrors(
+              error,
+              "Не удалось обновить поставщика у товара",
+            );
+            alert(errorMessage, true);
+            return;
+          }
+        }
+      } else {
+        // Если поставщик в форме не выбран, пробуем подставить из товара
+        if (!supplierId) {
+          alert(
+            "У выбранного товара не указан поставщик. Укажите поставщика в карточке товара.",
+            true,
+          );
+          return;
+        }
+        setSelectedSupplierId(String(supplierId));
+        ensureProductInCurrentList();
+      }
+
+      setQtyByProductId((prev) => ({
+        ...prev,
+        [normalizedProductId]: prev[normalizedProductId] || "1",
+      }));
+    },
+    [
+      alert,
+      confirm,
+      getSupplierIdFromProduct,
+      selectedSupplierId,
+      setQtyByProductId,
+    ],
+  );
 
   const handleClearQty = useCallback(() => {
     setQtyByProductId({});
@@ -502,19 +656,6 @@ export default function SupplierReceiptPage() {
               </div>
             </div>
 
-            <div className="market-receipt-page__field market-receipt-page__field--search">
-              <label className="market-receipt-page__label">Поиск по товарам</label>
-              <div className="market-receipt-page__search">
-                <Search size={16} />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Название, код, артикул, штрихкод"
-                  disabled={!selectedSupplierId}
-                />
-              </div>
-            </div>
           </div>
 
           <div className="market-receipt-page__summary">
@@ -537,6 +678,14 @@ export default function SupplierReceiptPage() {
           </div>
 
           <div className="market-receipt-page__actions">
+            <button
+              type="button"
+              className="market-receipt-page__secondary-button"
+              onClick={() => setProductsModalOpen(true)}
+              disabled={productsLoading}
+            >
+              Товары
+            </button>
             <button
               type="button"
               className="market-receipt-page__secondary-button"
@@ -576,15 +725,6 @@ export default function SupplierReceiptPage() {
               <Download size={16} />
               {downloadingInvoice ? "Скачиваем..." : "Скачать накладную"}
             </button>
-            <button
-              type="button"
-              className="market-receipt-page__primary-button"
-              onClick={handleSubmit}
-              disabled={!selectedSupplierId || receiptItems.length === 0 || submitting}
-            >
-              <PackageCheck size={16} />
-              {submitting ? "Сохраняем..." : "Оприходовать товары"}
-            </button>
           </div>
 
           {!selectedSupplierId ? (
@@ -593,7 +733,7 @@ export default function SupplierReceiptPage() {
             </div>
           ) : productsLoading ? (
             <div className="market-receipt-page__empty">Загрузка товаров...</div>
-          ) : filteredProducts.length === 0 ? (
+          ) : tableProducts.length === 0 ? (
             <div className="market-receipt-page__empty">
               {products.length === 0
                 ? "У выбранного поставщика пока нет товаров."
@@ -614,7 +754,7 @@ export default function SupplierReceiptPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProducts.map((product) => {
+                    {tableProducts.map((product) => {
                       const productId = String(product.id || "");
                       return (
                         <tr key={productId}>
@@ -654,7 +794,7 @@ export default function SupplierReceiptPage() {
               </div>
 
               <div className="market-receipt-page__cards">
-                {filteredProducts.map((product) => {
+                {tableProducts.map((product) => {
                   const productId = String(product.id || "");
                   return (
                     <div className="market-receipt-page__product-card" key={`card-${productId}`}>
@@ -716,6 +856,17 @@ export default function SupplierReceiptPage() {
               </div>
             </div>
           )}
+          <div className="market-receipt-page__actions market-receipt-page__submit-actions">
+            <button
+              type="button"
+              className="market-receipt-page__primary-button"
+              onClick={handleSubmit}
+              disabled={!selectedSupplierId || receiptItems.length === 0 || submitting}
+            >
+              <PackageCheck size={16} />
+              {submitting ? "Сохраняем..." : "Оприходовать товары"}
+            </button>
+          </div>
         </div>
       </DataContainer>
       {createSupplierOpen && (
@@ -779,6 +930,104 @@ export default function SupplierReceiptPage() {
                 alert("Товар создан и привязан к поставщику");
               }}
             />
+          </div>
+        </div>
+      )}
+      {productsModalOpen && (
+        <div
+          className="market-receipt-page__modal-overlay"
+          onClick={() => setProductsModalOpen(false)}
+        >
+          <div
+            className="market-receipt-page__modal-card market-receipt-page__modal-card--products"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="market-receipt-page__modal-title">Товары поставщика</h3>
+            <div className="market-receipt-page__field market-receipt-page__modal-search-row">
+              <input
+                className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                value={productsModalSearch}
+                onChange={(e) => setProductsModalSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void loadModalProducts(1, productsModalSearch);
+                  }
+                }}
+                placeholder="Название, код, артикул, штрихкод"
+              />
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={() => void loadModalProducts(1, productsModalSearch)}
+                disabled={modalProductsLoading}
+              >
+                Поиск
+              </button>
+            </div>
+            <div className="market-receipt-page__field market-receipt-page__modal-products-list">
+              {modalProductsLoading || productsLoading ? (
+                <div className="market-receipt-page__empty">Загрузка товаров...</div>
+              ) : modalProducts.length === 0 ? (
+                <div className="market-receipt-page__empty">Товары не найдены</div>
+              ) : (
+                <div className="market-receipt-page__modal-products-grid">
+                  {modalProducts.map((product) => {
+                    const productId = String(product?.id || "");
+                    return (
+                      <button
+                        key={`modal-product-${productId}`}
+                        type="button"
+                        className="market-receipt-page__modal-product-item"
+                        onClick={() => {
+                          addProductToReceipt(productId, product);
+                          setProductsModalOpen(false);
+                        }}
+                      >
+                        <span className="market-receipt-page__modal-product-title">
+                          {buildProductLabel(product)}
+                        </span>
+                        <span className="market-receipt-page__modal-product-code">
+                          {product.code || product.article || "—"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="market-receipt-page__actions market-receipt-page__modal-actions market-receipt-page__modal-pagination">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button market-receipt-page__pagination-button"
+                onClick={() => void loadModalProducts(modalProductsPage - 1, productsModalSearch)}
+                disabled={!modalProductsHasPrev || modalProductsLoading}
+                aria-label="Предыдущая страница"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="market-receipt-page__modal-hint">
+                Страница {modalProductsPage}, всего: {modalProductsCount}
+              </span>
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button market-receipt-page__pagination-button"
+                onClick={() => void loadModalProducts(modalProductsPage + 1, productsModalSearch)}
+                disabled={!modalProductsHasNext || modalProductsLoading}
+                aria-label="Следующая страница"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="market-receipt-page__actions">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={() => setProductsModalOpen(false)}
+              >
+                Закрыть
+              </button>
+            </div>
           </div>
         </div>
       )}

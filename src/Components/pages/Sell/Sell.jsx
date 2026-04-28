@@ -124,6 +124,8 @@ const Sell = () => {
   const currentUserRole = String(profile?.role || "").trim().toLowerCase();
   const isOwnerOrAdmin =
     currentUserRole === "owner" || currentUserRole === "admin";
+  const canMarketEmployeeReturn =
+    isOwnerOrAdmin || profile?.can_view_market_employee_return === true;
   const userParam = String(searchParams.get("user") || "").trim();
 
   const [showDetailSell, setShowDetailSell] = useState(false);
@@ -500,6 +502,7 @@ const Sell = () => {
 
   const canReturnSale = (sale) => {
     if (!isMarketCompany) return false;
+    if (!canMarketEmployeeReturn) return false;
     const status = String(sale?.status || "")
       .trim()
       .toLowerCase();

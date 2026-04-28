@@ -75,6 +75,11 @@ const MARKET_ACCESS_TYPES = [
     backendKey: "can_view_market_delete_cart_item",
   },
   {
+    value: "Возврат продаж сотрудником",
+    label: "Возврат продаж сотрудником",
+    backendKey: "can_view_market_employee_return",
+  },
+  {
     value: "Смены",
     label: "Смены",
     backendKey: "can_view_shifts",
@@ -380,6 +385,7 @@ const MARKET_CASHIER_SPECIAL_KEYS = new Set([
   "can_view_market_discount",
   "can_view_market_edit_price",
   "can_view_market_delete_cart_item",
+  "can_view_market_employee_return",
 ]);
 
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
@@ -531,6 +537,7 @@ const AccessList = ({
         allMenuPermissions.add("can_view_market_discount");
         allMenuPermissions.add("can_view_market_edit_price");
         allMenuPermissions.add("can_view_market_delete_cart_item");
+        allMenuPermissions.add("can_view_market_employee_return");
         allMenuPermissions.add("can_view_market_procurement");
         allMenuPermissions.add("can_view_market_supplier");
       }

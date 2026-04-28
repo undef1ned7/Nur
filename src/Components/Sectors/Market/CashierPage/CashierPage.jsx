@@ -54,6 +54,7 @@ import sleep from "../../../../../tools/sleep";
 import { useAlert } from "../../../../hooks/useDialog";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
+const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
 
 const normalizeHotkeyGroup = (value) => {
   const normalized = String(value || "").trim().toUpperCase();
@@ -237,6 +238,57 @@ const CashierPage = () => {
   }, [shifts, openShiftState]);
   const openShiftId = openShift?.id;
   const openShiftStatus = openShift?.status;
+  const [preferredWholesaleMode, setPreferredWholesaleMode] = useState(() => {
+    try {
+      return localStorage.getItem(MARKET_CASHIER_WHOLESALE_MODE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const isWholesaleMode =
+    currentSale?.is_wholesale !== undefined && currentSale?.is_wholesale !== null
+      ? Boolean(currentSale.is_wholesale)
+      : Boolean(preferredWholesaleMode);
+
+  const handleSwitchSaleMode = useCallback(
+    async (nextWholesale) => {
+      try {
+        if (!openShiftId) {
+          showAlert("warning", "Смена не открыта", "Сначала откройте смену");
+          return;
+        }
+
+        const nextMode = Boolean(nextWholesale);
+        setPreferredWholesaleMode(nextMode);
+        await dispatch(
+          startSale({
+            shift: openShiftId,
+            is_wholesale: nextMode,
+          }),
+        ).unwrap();
+      } catch (e) {
+        showAlert("error", "Ошибка", "Не удалось переключить режим продажи");
+      }
+    },
+    [dispatch, openShiftId],
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        MARKET_CASHIER_WHOLESALE_MODE_KEY,
+        String(Boolean(preferredWholesaleMode)),
+      );
+    } catch {
+      // ignore localStorage issues
+    }
+  }, [preferredWholesaleMode]);
+
+  useEffect(() => {
+    if (currentSale?.is_wholesale === undefined || currentSale?.is_wholesale === null)
+      return;
+    setPreferredWholesaleMode(Boolean(currentSale.is_wholesale));
+  }, [currentSale?.is_wholesale]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
@@ -464,6 +516,7 @@ const CashierPage = () => {
           startSale({
             discount_total: currentDiscount,
             shift: openShiftId,
+            is_wholesale: Boolean(preferredWholesaleMode),
           }),
         ).unwrap();
       } catch (error) {
@@ -478,6 +531,7 @@ const CashierPage = () => {
       startSale({
         ...payload,
         shift: openShiftId,
+        is_wholesale: Boolean(preferredWholesaleMode),
       }),
     );
   }, 600);
@@ -728,6 +782,7 @@ const CashierPage = () => {
               startSale({
                 discount_total: 0,
                 shift: openShiftId,
+                is_wholesale: Boolean(preferredWholesaleMode),
               }),
             ).unwrap();
             saleId = result?.id;
@@ -779,7 +834,11 @@ const CashierPage = () => {
         // Обновляем продажу после добавления товара
         try {
           await dispatch(
-            startSale({ discount_total: 0, shift: openShiftId }),
+            startSale({
+              discount_total: 0,
+              shift: openShiftId,
+              is_wholesale: Boolean(preferredWholesaleMode),
+            }),
           ).unwrap();
         } catch (e) {
           const msg = String(e?.message || e || "");
@@ -1505,8 +1564,14 @@ const CashierPage = () => {
 
   useEffect(() => {
     if (!openShiftId) return;
-    dispatch(startSale({ discount_total: 0, shift: openShiftId }));
-  }, [openShiftId]);
+    dispatch(
+      startSale({
+        discount_total: 0,
+        shift: openShiftId,
+        is_wholesale: Boolean(preferredWholesaleMode),
+      }),
+    );
+  }, [dispatch, openShiftId, preferredWholesaleMode]);
 
   const addToCartWithPackage = async (product, salePackageId = null) => {
     // Для весовых товаров при остатке < 1 добавляем весь остаток.
@@ -1531,7 +1596,11 @@ const CashierPage = () => {
       // Если продажа еще не создана, создаем её
       if (!saleId) {
         const result = await dispatch(
-          startSale({ discount_total: 0, shift: openShiftId }),
+          startSale({
+            discount_total: 0,
+            shift: openShiftId,
+            is_wholesale: Boolean(preferredWholesaleMode),
+          }),
         );
         if (result.type === "sale/start/rejected") {
           showAlert(
@@ -2136,7 +2205,11 @@ const CashierPage = () => {
           // Важно: создаем новую корзину БЕЗ скидки (discount_total: 0)
           if (openShiftId) {
             await dispatch(
-              startSale({ discount_total: 0, shift: openShiftId }),
+              startSale({
+                discount_total: 0,
+                shift: openShiftId,
+                is_wholesale: Boolean(preferredWholesaleMode),
+              }),
             );
             // Не вызываем refreshSale() здесь, так как он использует старую скидку из currentSale
             // startSale уже обновляет состояние продажи
@@ -2180,6 +2253,30 @@ const CashierPage = () => {
           </div>
         </div>
         <div className="cashier-page__header-right">
+          <div style={{ display: "flex", gap: 6, marginRight: 8 }}>
+            <button
+              className="cashier-page__close-shift-btn"
+              style={{
+                padding: "8px 10px",
+                backgroundColor: !isWholesaleMode ? "#f7d617" : "#f3f4f6",
+                color: !isWholesaleMode ? "#111827" : "#6b7280",
+              }}
+              onClick={() => handleSwitchSaleMode(false)}
+            >
+              Розница
+            </button>
+            <button
+              className="cashier-page__close-shift-btn"
+              style={{
+                padding: "8px 10px",
+                backgroundColor: isWholesaleMode ? "#f7d617" : "#f3f4f6",
+                color: isWholesaleMode ? "#111827" : "#6b7280",
+              }}
+              onClick={() => handleSwitchSaleMode(true)}
+            >
+              Опт
+            </button>
+          </div>
           {openShiftId && openShift?.status === "open" ? (
             <button
               className="cashier-page__close-shift-btn"
