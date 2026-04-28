@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Tags, Check, X, Save } from "lucide-react";
+import { Plus, Tags, Check, X, Save, Printer } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useConfirm } from "../../../../hooks/useDialog";
+import { useUser } from "../../../../store/slices/userSlice";
+import { numberToWords } from "../../../../utils/numberToWords";
 import SearchSection from "../../Market/Warehouse/components/SearchSection";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import MoneyDocumentCards from "./components/MoneyDocumentCards";
+import Ko1PdfDocument from "../Documents/components/Ko1PdfDocument";
 import { useSearch } from "../../Market/Warehouse/hooks/useSearch";
 import { usePagination } from "../../Market/Warehouse/hooks/usePagination";
 import {
@@ -25,6 +29,24 @@ const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
   " с";
 
+const parseAmount = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = String(value ?? "")
+    .replace(/\s/g, "")
+    .replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const formatKo1Date = (value) => {
+  if (!value) return new Date().toISOString().split("T")[0];
+  if (typeof value === "string") return value.split("T")[0];
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()))
+    return new Date().toISOString().split("T")[0];
+  return date.toISOString().split("T")[0];
+};
+
 /** 02.04.2026:00:35:20 */
 const fmtDate = (v) => {
   if (v == null || v === "") return "—";
@@ -35,7 +57,7 @@ const fmtDate = (v) => {
 };
 
 const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
 
 const initialForm = {
   cash_register: "",
@@ -48,6 +70,7 @@ const initialForm = {
 const MoneyDocumentsPage = () => {
   const { docType: docTypeParam } = useParams();
   const navigate = useNavigate();
+  const { company, profile } = useUser();
   const apiDocType = DOC_TYPE_FROM_PARAM[docTypeParam];
   const isValidType = Boolean(apiDocType);
 
@@ -66,6 +89,7 @@ const MoneyDocumentsPage = () => {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const [postingId, setPostingId] = useState(null); // id документа, для которого идёт проведение/отмена
+  const [printingId, setPrintingId] = useState(null);
   const [createAsPosted, setCreateAsPosted] = useState(true); // при создании: провести сразу или черновик
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -90,7 +114,7 @@ const MoneyDocumentsPage = () => {
       (r) =>
         (r.number ?? "").toLowerCase().includes(q) ||
         (r.comment ?? "").toLowerCase().includes(q) ||
-        (r.counterparty_display_name ?? "").toLowerCase().includes(q)
+        (r.counterparty_display_name ?? "").toLowerCase().includes(q),
     );
   }, [rows, debouncedSearchTerm]);
 
@@ -112,16 +136,16 @@ const MoneyDocumentsPage = () => {
     (newPage) => {
       handlePageChangeBase(newPage);
     },
-    [handlePageChangeBase]
+    [handlePageChangeBase],
   );
 
   const displayRows = useMemo(
     () =>
       filteredRows.slice(
         (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE
+        currentPage * PAGE_SIZE,
       ),
-    [filteredRows, currentPage]
+    [filteredRows, currentPage],
   );
   const hasNextPageClient = currentPage < totalPages;
   const hasPrevPageClient = currentPage > 1;
@@ -134,10 +158,12 @@ const MoneyDocumentsPage = () => {
     docTypeParam === "receipt"
       ? "Приход в кассу"
       : docTypeParam === "expense"
-      ? "Расход в кассу"
-      : "Денежные документы";
+        ? "Расход в кассу"
+        : "Денежные документы";
   const createLabel =
-    docTypeParam === "receipt" ? "Создать приход в кассу" : "Создать расход из кассы";
+    docTypeParam === "receipt"
+      ? "Создать приход в кассу"
+      : "Создать расход из кассы";
 
   const load = useCallback(async () => {
     if (!apiDocType) return;
@@ -169,7 +195,7 @@ const MoneyDocumentsPage = () => {
     try {
       const catData = await warehouseAPI.listMoneyCategories();
       setCategories(
-        catData?.results ?? (Array.isArray(catData) ? catData : [])
+        catData?.results ?? (Array.isArray(catData) ? catData : []),
       );
     } catch {
       setCategories([]);
@@ -185,13 +211,13 @@ const MoneyDocumentsPage = () => {
           warehouseAPI.listMoneyCategories(),
         ]);
         setCashRegisters(
-          cashData?.results ?? (Array.isArray(cashData) ? cashData : [])
+          cashData?.results ?? (Array.isArray(cashData) ? cashData : []),
         );
         setCounterparties(
-          cpData?.results ?? (Array.isArray(cpData) ? cpData : [])
+          cpData?.results ?? (Array.isArray(cpData) ? cpData : []),
         );
         setCategories(
-          catData?.results ?? (Array.isArray(catData) ? catData : [])
+          catData?.results ?? (Array.isArray(catData) ? catData : []),
         );
       } catch {
         // справочники опциональны для отображения страницы
@@ -320,7 +346,7 @@ const MoneyDocumentsPage = () => {
         }
       });
     },
-    [confirm, load]
+    [confirm, load],
   );
 
   const handleUnpost = useCallback(
@@ -344,10 +370,94 @@ const MoneyDocumentsPage = () => {
           } finally {
             setPostingId(null);
           }
-        }
+        },
       );
     },
-    [confirm, load]
+    [confirm, load],
+  );
+
+  const printPdfBlob = useCallback((blob) => {
+    if (typeof window === "undefined" || !window.URL || !window.document) {
+      throw new Error("Печать доступна только в браузере");
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const iframe = window.document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = url;
+    window.document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            iframe.remove();
+          }, 2000);
+        }
+      }, 200);
+    };
+  }, []);
+
+  const buildKo1DataFromMoneyDocument = useCallback(
+    (doc) => {
+      const amount = parseAmount(doc?.amount);
+      const counterparty =
+        doc?.counterparty?.name ||
+        doc?.counterparty?.full_name ||
+        doc?.counterparty_display_name ||
+        doc?.counterparty ||
+        "";
+
+      return {
+        organization: company?.name || "",
+        structuralUnit: "",
+        documentNumber: String(doc?.number || doc?.id || ""),
+        date: formatKo1Date(doc?.date || doc?.created_at),
+        receivedFrom: counterparty,
+        basis:
+          doc?.comment || doc?.payment_category_title || "Оплата по договору",
+        amountNumber: amount.toLocaleString("ru-RU", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        amountWords: numberToWords(amount),
+        chiefAccountant: profile?.full_name || profile?.name || "",
+        cashier: profile?.full_name || profile?.name || "",
+      };
+    },
+    [company?.name, profile?.full_name, profile?.name],
+  );
+
+  const handlePrintKo1 = useCallback(
+    async (row) => {
+      if (!row?.id) return;
+      setPrintingId(row.id);
+      try {
+        const doc = await warehouseAPI.getMoneyDocumentById(row.id);
+        const ko1Data = buildKo1DataFromMoneyDocument(doc || row);
+        const blob = await pdf(<Ko1PdfDocument data={ko1Data} />).toBlob();
+        printPdfBlob(blob);
+      } catch (err) {
+        console.error("Ошибка печати КО-1:", err);
+        const msg =
+          err?.message ||
+          err?.detail ||
+          (typeof err === "string" ? err : "Не удалось печатать КО-1");
+        window.alert("Ошибка печати: " + msg);
+      } finally {
+        setPrintingId(null);
+      }
+    },
+    [buildKo1DataFromMoneyDocument, printPdfBlob],
   );
 
   if (!isValidType) {
@@ -443,6 +553,16 @@ const MoneyDocumentsPage = () => {
                         className="money-documents-page__td-actions"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <button
+                          type="button"
+                          className="money-documents-page__action-btn money-documents-page__action-btn--print"
+                          onClick={() => handlePrintKo1(row)}
+                          disabled={printingId === row.id}
+                          title="Печать КО-1"
+                        >
+                          <Printer size={18} />
+                          {printingId === row.id ? "Печатается…" : "Печать"}
+                        </button>
                         {isDraft ? (
                           <button
                             type="button"
@@ -480,7 +600,9 @@ const MoneyDocumentsPage = () => {
             getRowNumber={getRowNumber}
             onPost={handlePost}
             onUnpost={handleUnpost}
+            onPrintKo1={handlePrintKo1}
             postingId={postingId}
+            printingId={printingId}
           />
         )}
 

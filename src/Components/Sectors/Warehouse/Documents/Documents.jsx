@@ -54,6 +54,7 @@ import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
 import { numberToWords } from "../../../../utils/numberToWords";
+import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -379,7 +380,7 @@ const Documents = () => {
   }, [filteredDocuments, activeTab, currentPage]);
 
   const invoicesData = useMemo(() => {
-    if (activeTab !== "invoices") return [];
+    if (activeTab !== "invoices" && activeTab !== "esf_xml") return [];
     return (filteredDocuments || []).map((doc, index) => {
       const resolvedStatus = resolveDocumentStatus(doc);
       return {
@@ -409,33 +410,31 @@ const Documents = () => {
 
   const ko1Data = useMemo(() => {
     if (activeTab !== "ko1") return [];
-    return (filteredDocuments || [])
-      .filter((doc) => doc.doc_type === "SALE")
-      .map((doc, index) => {
-        const resolvedStatus = resolveDocumentStatus(doc);
-        return {
-          id: doc.id,
-          number: doc.number || getDocumentNumber(index, "ПКО"),
-          date: formatDocumentDateTime(doc.date || doc.created_at),
-          counterparty:
-            doc.counterparty?.name ||
-            doc.counterparty_display_name ||
-            doc.counterparty ||
-            "Без контрагента",
-          positions: doc.items?.length || 0,
-          amount: getDocumentAmount(doc),
-          discount_percent: doc.discount_percent ?? null,
-          discount_amount: doc.discount_amount ?? null,
-          status: getStatusLabel(resolvedStatus),
-          statusType: getStatusType(resolvedStatus),
-          rawStatus: resolvedStatus,
-          payment_kind: doc.payment_kind,
-          document: doc,
-          agentDisplay:
-            doc.agent_display?.trim?.() ||
-            (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
-        };
-      });
+    return (filteredDocuments || []).map((doc, index) => {
+      const resolvedStatus = resolveDocumentStatus(doc);
+      return {
+        id: doc.id,
+        number: doc.number || getDocumentNumber(index, "ПКО"),
+        date: formatDocumentDateTime(doc.date || doc.created_at),
+        counterparty:
+          doc.counterparty?.name ||
+          doc.counterparty_display_name ||
+          doc.counterparty ||
+          "Без контрагента",
+        positions: doc.items?.length || 0,
+        amount: getDocumentAmount(doc),
+        discount_percent: doc.discount_percent ?? null,
+        discount_amount: doc.discount_amount ?? null,
+        status: getStatusLabel(resolvedStatus),
+        statusType: getStatusType(resolvedStatus),
+        rawStatus: resolvedStatus,
+        payment_kind: doc.payment_kind,
+        document: doc,
+        agentDisplay:
+          doc.agent_display?.trim?.() ||
+          (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
+      };
+    });
   }, [filteredDocuments, activeTab, currentPage]);
 
   // Обновление URL только при изменении страницы (без поиска)
@@ -464,11 +463,12 @@ const Documents = () => {
     if (
       activeTab === "receipts" ||
       activeTab === "invoices" ||
+      activeTab === "esf_xml" ||
       activeTab === "agent_sales" ||
       activeTab === "ko1"
     ) {
       const requestDocType =
-        activeTab === "agent_sales" || activeTab === "ko1" ? "SALE" : docType;
+        activeTab === "agent_sales" ? "SALE" : docType;
       // Используем новый warehouse API
       const params = {
         page: currentPage,
@@ -487,6 +487,7 @@ const Documents = () => {
       case "receipts":
         return receiptsData;
       case "invoices":
+      case "esf_xml":
         return invoicesData;
       case "ko1":
         return ko1Data;
@@ -515,7 +516,7 @@ const Documents = () => {
   const handleView = (item) => {
     if (activeTab === "receipts") {
       setPreviewReceiptId(item.id);
-    } else if (activeTab === "invoices") {
+    } else if (activeTab === "invoices" || activeTab === "esf_xml") {
       setPreviewInvoiceId(item.id);
     } else if (activeTab === "ko1") {
       handlePreviewKo1(item);
@@ -526,7 +527,10 @@ const Documents = () => {
     setEditReceiptId(item.id);
     setEditReceiptData({
       ...item,
-      documentType: activeTab === "invoices" ? "invoice" : "receipt",
+      documentType:
+        activeTab === "invoices" || activeTab === "esf_xml"
+          ? "invoice"
+          : "receipt",
     });
   };
 
@@ -541,7 +545,10 @@ const Documents = () => {
     setEditReceiptId(receiptData.id);
     setEditReceiptData({
       ...receiptData,
-      documentType: activeTab === "invoices" ? "invoice" : "receipt",
+      documentType:
+        activeTab === "invoices" || activeTab === "esf_xml"
+          ? "invoice"
+          : "receipt",
     });
   };
 
@@ -550,11 +557,12 @@ const Documents = () => {
     if (
       activeTab === "receipts" ||
       activeTab === "invoices" ||
+      activeTab === "esf_xml" ||
       activeTab === "agent_sales" ||
       activeTab === "ko1"
     ) {
       const requestDocType =
-        activeTab === "agent_sales" || activeTab === "ko1" ? "SALE" : docType;
+        activeTab === "agent_sales" ? "SALE" : docType;
       const params = {
         page: currentPage,
         page_size: 100,
@@ -849,6 +857,46 @@ const Documents = () => {
     };
   };
 
+  /** XML электронной счёт-фактуры (тот же состав полей, что при печати из формы документа). */
+  const buildEsfXmlStringFromDocument = (doc) => {
+    const inv = buildInvoiceDataFromDocument(doc);
+    if (!inv) return null;
+    const dateRaw = doc.date || doc.created_at;
+    const date = dateRaw ? new Date(dateRaw) : new Date();
+    const paymentType = doc.payment_kind === "cash" ? "cash" : "credit";
+    const buyer = inv.buyer
+      ? {
+          name: inv.buyer.name || "",
+          inn: inv.buyer.inn ? String(inv.buyer.inn) : undefined,
+          bankAccount: inv.buyer.score || undefined,
+        }
+      : undefined;
+    return buildArchiveInvoiceXml({
+      number: String(inv.document.number || doc.id || ""),
+      date,
+      currency: "KGS",
+      paymentType,
+      note: inv.document.comment || undefined,
+      seller: {
+        name: inv.seller.name || "",
+        inn: inv.seller.inn ? String(inv.seller.inn) : undefined,
+        bankAccount: inv.seller.score || undefined,
+        address: inv.seller.address || undefined,
+      },
+      buyer,
+      items: inv.items.map((item) => ({
+        name: item.name,
+        unit: item.unit || "шт",
+        quantity: Number(item.qty),
+        unitPrice: Number(item.unit_price),
+      })),
+      discountTotal:
+        Number(inv.totals.discount_total) > 0
+          ? Number(inv.totals.discount_total)
+          : undefined,
+    });
+  };
+
   const printInvoicePdfBlob = (blob) => {
     if (typeof window === "undefined" || !window.URL || !window.document) {
       throw new Error("Печать доступна только в браузере");
@@ -886,7 +934,7 @@ const Documents = () => {
     try {
       if (activeTab === "ko1") {
         await handlePrintKo1(item);
-      } else if (activeTab === "invoices") {
+      } else if (activeTab === "invoices" || activeTab === "esf_xml") {
         // Для накладной используем warehouse API
         const result = await dispatch(getWarehouseDocumentById(item.id));
         if (getWarehouseDocumentById.fulfilled.match(result)) {
@@ -1051,6 +1099,32 @@ const Documents = () => {
     }
   };
 
+  const handleDownloadEsfXml = async (item) => {
+    if (!item?.id) return;
+    try {
+      const result = await dispatch(getWarehouseDocumentById(item.id));
+      if (!getWarehouseDocumentById.fulfilled.match(result)) {
+        throw new Error("Не удалось загрузить документ");
+      }
+      const xmlString = buildEsfXmlStringFromDocument(result.payload);
+      if (!xmlString) {
+        throw new Error("Нет данных для XML");
+      }
+      const doc = result.payload;
+      const baseName = String(doc.number || item.id).replace(/[^\w.-]+/g, "_");
+      downloadBlob(
+        new Blob([xmlString], { type: "application/xml;charset=utf-8" }),
+        `invoice_${baseName}.xml`,
+      );
+    } catch (error) {
+      console.error("Ошибка скачивания XML:", error);
+      alert(
+        "Ошибка скачивания: " + (error?.message || "Не удалось скачать XML"),
+        true,
+      );
+    }
+  };
+
   const formatAmount = (amount) => {
     return parseFloat(amount || 0).toLocaleString("ru-RU", {
       minimumFractionDigits: 2,
@@ -1175,7 +1249,17 @@ const Documents = () => {
             }`}
             onClick={() => setActiveTab("invoices")}
           >
-            Накладные
+            {docType === "COMMERCIAL_OFFER"
+              ? "Коммерческие предложения"
+              : "Накладные"}
+          </button>
+          <button
+            className={`documents__tab ${
+              activeTab === "esf_xml" ? "documents__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab("esf_xml")}
+          >
+            Электронная счёт-фактура (XML)
           </button>
           {docType === "SALE" && (
             <button
@@ -1187,16 +1271,14 @@ const Documents = () => {
               Продажи по заявкам
             </button>
           )}
-          {docType === "SALE" && (
-            <button
-              className={`documents__tab ${
-                activeTab === "ko1" ? "documents__tab--active" : ""
-              }`}
-              onClick={() => setActiveTab("ko1")}
-            >
-              ПКО (КО-1)
-            </button>
-          )}
+          <button
+            className={`documents__tab ${
+              activeTab === "ko1" ? "documents__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab("ko1")}
+          >
+            ПКО (КО-1)
+          </button>
         </div>
         <div className="documents__view-toggle">
           <button
@@ -1241,7 +1323,7 @@ const Documents = () => {
                       <th>Действия</th>
                     </>
                   )}
-                  {activeTab === "invoices" && (
+                  {(activeTab === "invoices" || activeTab === "esf_xml") && (
                     <>
                       <th>Номер</th>
                       <th>Дата</th>
@@ -1388,7 +1470,7 @@ const Documents = () => {
                           </td>
                         </>
                       )}
-                      {activeTab === "invoices" && (
+                      {(activeTab === "invoices" || activeTab === "esf_xml") && (
                         <>
                           <td>{item.number}</td>
                           <td>{item.date}</td>
@@ -1433,8 +1515,16 @@ const Documents = () => {
                               </button>
                               <button
                                 className="documents__action-btn"
-                                onClick={() => handlePrint(item)}
-                                title="Печать"
+                                onClick={() =>
+                                  activeTab === "esf_xml"
+                                    ? handleDownloadEsfXml(item)
+                                    : handlePrint(item)
+                                }
+                                title={
+                                  activeTab === "esf_xml"
+                                    ? "Скачать XML"
+                                    : "Скачать PDF"
+                                }
                               >
                                 <Download size={18} />
                               </button>
@@ -1744,30 +1834,58 @@ const Documents = () => {
                         <Pencil size={18} />
                       </button>
                     )}
-                    <button
-                      className="documents__action-btn"
-                      onClick={() => handlePrint(item)}
-                      title="Печать"
-                    >
-                      <Printer size={18} />
-                    </button>
-                    {activeTab === "invoices" && (
+                    {activeTab === "receipts" && (
                       <button
                         className="documents__action-btn"
-                        onClick={() => handleDirectInvoicePrint(item)}
-                        title="Сразу на печать"
+                        onClick={() => handlePrint(item)}
+                        title="Печать"
                       >
-                        <Download size={18} />
+                        <Printer size={18} />
                       </button>
                     )}
+                    {(activeTab === "invoices" || activeTab === "esf_xml") && (
+                      <>
+                        <button
+                          className="documents__action-btn"
+                          onClick={() => handleDirectInvoicePrint(item)}
+                          title="Сразу на печать"
+                        >
+                          <Printer size={18} />
+                        </button>
+                        <button
+                          className="documents__action-btn"
+                          onClick={() =>
+                            activeTab === "esf_xml"
+                              ? handleDownloadEsfXml(item)
+                              : handlePrint(item)
+                          }
+                          title={
+                            activeTab === "esf_xml"
+                              ? "Скачать XML"
+                              : "Скачать PDF"
+                          }
+                        >
+                          <Download size={18} />
+                        </button>
+                      </>
+                    )}
                     {activeTab === "ko1" && (
-                      <button
-                        className="documents__action-btn"
-                        onClick={() => handleDownloadKo1(item)}
-                        title="Скачать"
-                      >
-                        <Download size={18} />
-                      </button>
+                      <>
+                        <button
+                          className="documents__action-btn"
+                          onClick={() => handlePrint(item)}
+                          title="Печать"
+                        >
+                          <Printer size={18} />
+                        </button>
+                        <button
+                          className="documents__action-btn"
+                          onClick={() => handleDownloadKo1(item)}
+                          title="Скачать"
+                        >
+                          <Download size={18} />
+                        </button>
+                      </>
                     )}
                     {isSaleDraftLikeStatus(item.rawStatus) &&
                       documentAllowsWarehousePosting(item.document) && (
@@ -1994,10 +2112,10 @@ const Documents = () => {
         <InvoicePreviewModal
           invoiceId={previewInvoiceId}
           document={
-            invoicesData.find((item) => item.id === previewInvoiceId)?.document
+            getCurrentData().find((item) => item.id === previewInvoiceId)
+              ?.document
           }
           onClose={() => setPreviewInvoiceId(null)}
-          onEdit={handleEditFromPreview}
         />
       )}
 
@@ -2013,7 +2131,11 @@ const Documents = () => {
         <ReceiptEditModal
           receiptId={editReceiptId}
           receiptData={editReceiptData}
-          documentType={activeTab === "invoices" ? "invoice" : "receipt"}
+          documentType={
+            activeTab === "invoices" || activeTab === "esf_xml"
+              ? "invoice"
+              : "receipt"
+          }
           onClose={() => {
             setEditReceiptId(null);
             setEditReceiptData(null);

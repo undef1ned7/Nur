@@ -1,9 +1,10 @@
 import React, { useMemo } from "react";
-import { Check, X } from "lucide-react";
+import { Check, X, Printer } from "lucide-react";
 import "./MoneyDocumentCards.scss";
 
 const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) + " с";
+  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
+  " с";
 
 /** 02.04.2026:00:35:20 */
 const fmtDate = (v) => {
@@ -15,12 +16,13 @@ const fmtDate = (v) => {
 };
 
 const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
 
 const MoneyDocumentCard = React.memo(
-  ({ doc, rowNumber, onPost, onUnpost, postingId }) => {
+  ({ doc, rowNumber, onPost, onUnpost, onPrintKo1, postingId, printingId }) => {
     const isDraft = doc.status === "DRAFT";
     const isBusy = postingId === doc.id;
+    const isPrinting = printingId === doc.id;
 
     return (
       <div className="money-document-card">
@@ -41,13 +43,28 @@ const MoneyDocumentCard = React.memo(
           </div>
         </div>
         <div className="money-document-card__bottom">
-          <div className="money-document-card__amount">{fmtMoney(doc.amount)}</div>
+          <div className="money-document-card__amount">
+            {fmtMoney(doc.amount)}
+          </div>
           <span
             className={`money-document-card__status money-document-card__status--${doc.status === "POSTED" ? "posted" : "draft"}`}
           >
             {statusLabel(doc.status)}
           </span>
-          <div className="money-document-card__actions" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="money-document-card__actions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="money-document-card__btn money-document-card__btn--print"
+              onClick={() => onPrintKo1(doc)}
+              disabled={isPrinting}
+              title="Печать КО-1"
+            >
+              <Printer size={16} />
+              {isPrinting ? "Печатается…" : "Печать"}
+            </button>
             {isDraft ? (
               <button
                 type="button"
@@ -78,7 +95,7 @@ const MoneyDocumentCard = React.memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 MoneyDocumentCard.displayName = "MoneyDocumentCard";
@@ -89,7 +106,9 @@ const MoneyDocumentCards = ({
   getRowNumber,
   onPost,
   onUnpost,
+  onPrintKo1,
   postingId,
+  printingId,
 }) => {
   const documentsData = useMemo(
     () =>
@@ -97,23 +116,15 @@ const MoneyDocumentCards = ({
         doc,
         rowNumber: getRowNumber(index, documents.length),
       })),
-    [documents, getRowNumber]
+    [documents, getRowNumber],
   );
 
   if (loading && documents.length === 0) {
-    return (
-      <div className="money-document-cards__loading">
-        Загрузка...
-      </div>
-    );
+    return <div className="money-document-cards__loading">Загрузка...</div>;
   }
 
   if (documents.length === 0 && !loading) {
-    return (
-      <div className="money-document-cards__empty">
-        Нет документов
-      </div>
-    );
+    return <div className="money-document-cards__empty">Нет документов</div>;
   }
 
   return (
@@ -131,7 +142,9 @@ const MoneyDocumentCards = ({
             rowNumber={rowNumber}
             onPost={onPost}
             onUnpost={onUnpost}
+            onPrintKo1={onPrintKo1}
             postingId={postingId}
+            printingId={printingId}
           />
         ))}
       </div>

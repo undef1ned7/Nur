@@ -63,7 +63,14 @@ export default defineConfig({
     server: {
         port: 3000,
         open: true,
-        allowedHosts: ["dd2836a80d13.ngrok-free.app"]
+        allowedHosts: ["dd2836a80d13.ngrok-free.app"],
+        proxy: {
+            '/media': {
+                target: 'https://app.nurcrm.kg',
+                changeOrigin: true,
+                secure: true,
+            },
+        },
     },
     build: {
         outDir: 'build',
