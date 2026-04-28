@@ -244,30 +244,96 @@ function lr(left, right, width = 32) {
   const spaces = Math.max(1, width - L.length - R.length);
   return L + " ".repeat(spaces) + R;
 }
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const fromTyiyn = (v) => toNum(v) / 100;
+const f = (fields, key) => (fields && Object.prototype.hasOwnProperty.call(fields, key) ? fields[key] : undefined);
+function buildEscPosQr(text) {
+  const value = String(text || "").trim();
+  if (!value) return [];
+  const utf8 = new TextEncoder().encode(value);
+  const len = utf8.length + 3;
+  const pL = len & 0xff;
+  const pH = (len >> 8) & 0xff;
+  return [
+    ESC(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x30), // ECC: M
+    ESC(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06), // module size
+    new Uint8Array([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30, ...utf8]), // store
+    ESC(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30), // print
+  ];
+}
 function buildReceiptFromJSON(payload, opts = {}) {
   const cfg = getEscposRuntimeConfig();
-  const width = opts.width || cfg.charsPerLine;
+  const width = Math.max(42, opts.width || cfg.charsPerLine);
   const divider = "-".repeat(width);
   const codepage = opts.codepage || cfg.codepage;
   const enc = opts.encoder || getEncoder(codepage);
 
-  const company = payload.company ?? "";
-  const docNo = payload.doc_no ?? "";
-  const dt = payload.created_at ?? "";
-  const cashier = payload.cashier_name ?? "";
+  const ekassaFields =
+    payload?.ekassa_fiscal?.fields ||
+    payload?.ekassa?.fields ||
+    payload?.ekassa?.ekassa_payload?.data?.fields ||
+    null;
+  const company = String(payload.company || "Компания");
+  const inn = String(payload.inn || "—");
+  const address = String(payload.address || "—");
+  const cashier = String(payload.cashier_name || "—");
 
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  const discount = Number(payload.discount || 0);
-  const tax = Number(payload.tax || 0);
-  const paidCash = Number(payload.paid_cash || 0);
-  const paidCard = Number(payload.paid_card || 0);
-  const change = Number(payload.change || 0);
+  const docNo = String(ekassaFields ? (f(ekassaFields, "1042") ?? payload.doc_no ?? "") : (payload.doc_no ?? ""));
+  const dt = String(ekassaFields ? (f(ekassaFields, "1012") ?? payload.created_at ?? "") : (payload.created_at ?? ""));
+  const shift = String(ekassaFields ? (f(ekassaFields, "1038") ?? "—") : "—");
 
-  const subtotal = items.reduce(
-    (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
-    0
+  const items = ekassaFields && Array.isArray(f(ekassaFields, "1059"))
+    ? f(ekassaFields, "1059").map((it) => {
+      const qty = toNum(it?.["1023"]) || 1;
+      // В ответах eKassa для Маркета часто:
+      // 1043 = сумма позиции, 1076 = цена за единицу.
+      const raw1043 = fromTyiyn(it?.["1043"]);
+      const raw1076 = fromTyiyn(it?.["1076"]);
+      const price = raw1076 > 0 ? raw1076 : (qty > 0 ? raw1043 / qty : raw1043);
+      const total = raw1043 > 0 ? raw1043 : price * qty;
+      return {
+        name: String(it?.["1030"] || "Товар"),
+        qty,
+        price,
+        total,
+      };
+    })
+    : (Array.isArray(payload.items) ? payload.items : []).map((it) => {
+      const qty = toNum(it.qty) || 1;
+      const price = toNum(it.price);
+      return { name: String(it.name || "Товар"), qty, price, total: qty * price };
+    });
+
+  const subtotal = ekassaFields ? fromTyiyn(f(ekassaFields, "1020")) : items.reduce((s, it) => s + toNum(it.total), 0);
+  const total = ekassaFields ? fromTyiyn(f(ekassaFields, "1031")) : subtotal;
+  const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : 0;
+  const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
+  const paidCard = ekassaFields ? fromTyiyn(f(ekassaFields, "1081")) : toNum(payload.paid_card);
+  const paidCash = Math.max(0, total - paidCard);
+  const kkm = String(
+    ekassaFields
+      ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "—")
+      : (payload?.ekassa_fiscal?.kkm_reg_number ?? "—")
   );
-  const total = subtotal - discount + tax;
+  const fn = String(
+    ekassaFields
+      ? (f(ekassaFields, "1041") ?? payload?.ekassa_fiscal?.fm_number ?? "—")
+      : (payload?.ekassa_fiscal?.fm_number ?? "—")
+  );
+  const fd = String(
+    ekassaFields
+      ? (f(ekassaFields, "1040") ?? payload?.ekassa_fiscal?.fd_number ?? "—")
+      : (payload?.ekassa_fiscal?.fd_number ?? "—")
+  );
+  const fpd = String(
+    ekassaFields
+      ? (f(ekassaFields, "1077") ?? payload?.ekassa_fiscal?.fpd ?? "—")
+      : (payload?.ekassa_fiscal?.fpd ?? "—")
+  );
+  const qrLink = String(payload?.ekassa_fiscal?.link || payload?.ekassa?.link || "").trim();
 
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
@@ -275,50 +341,56 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(ESC(0x1b, 0x74, codepage)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
-  if (company) chunks.push(enc(company + "\n"));
-  if (docNo) chunks.push(enc(`ЧЕК № ${docNo}\n`));
-  chunks.push(enc(divider + "\n"));
-  chunks.push(enc(divider + "\n"));
+  chunks.push(enc("Контрольно-кассовый чек - Продажа\n"));
+  chunks.push(enc(company + "\n"));
+  chunks.push(enc(`ИНН ${inn}\n`));
+  chunks.push(enc(address + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x00)); // left
-  if (dt) chunks.push(enc(`Дата: ${dt}\n`));
-  if (cashier) chunks.push(enc(`Кассир: ${cashier}\n`));
+  chunks.push(enc(divider + "\n"));
+  chunks.push(enc(lr(`Чек № ${docNo}`, dt, width) + "\n"));
+  chunks.push(enc(lr("Кассир", cashier, width) + "\n"));
+  chunks.push(enc(lr("Смена", shift, width) + "\n"));
+  chunks.push(enc(divider + "\n"));
+  chunks.push(enc("СНО: Общий налоговый режим\n"));
   chunks.push(enc(divider + "\n"));
   for (const it of items) {
-    const name = String(it.name ?? "");
-    const qty = Number(it.qty || 0);
+    const name = String(it.name ?? "Товар");
+    const qty = Number(it.qty || 1);
     const price = Number(it.price || 0);
+    const lineTotal = Number(it.total ?? qty * price);
     chunks.push(enc(name + "\n"));
-    chunks.push(
-      enc(lr(`${qty} x ${money(price)}`, money(qty * price), width) + "\n")
-    );
+    chunks.push(enc(lr(`${money(price)} x ${qty}`, money(lineTotal), width) + "\n"));
   }
 
   chunks.push(enc(divider + "\n"));
-  chunks.push(enc(lr("Промежуточный итог:", money(subtotal), width) + "\n"));
-  if (discount)
-    chunks.push(enc(lr("Скидка:", "-" + money(discount), width) + "\n"));
-  if (tax) chunks.push(enc(lr("Налог:", money(tax), width) + "\n"));
+  chunks.push(enc(lr("Подытог", money(subtotal), width) + "\n"));
+  chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
+  chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
+  chunks.push(enc(divider + "\n"));
+  chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
+  chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
 
   chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
-  chunks.push(enc(lr("ИТОГО:", money(total), width) + "\n"));
+  chunks.push(enc(lr("ИТОГО", money(total), width) + "\n"));
   chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
-
-  const havePayments = paidCash || paidCard || change;
-  if (havePayments) {
-    chunks.push(enc(divider + "\n"));
-    if (paidCash)
-      chunks.push(enc(lr("Наличными:", money(paidCash), width) + "\n"));
-    if (paidCard)
-      chunks.push(enc(lr("Картой:", money(paidCard), width) + "\n"));
-    if (change) chunks.push(enc(lr("Сдача:", money(change), width) + "\n"));
+  chunks.push(enc(divider + "\n"));
+  chunks.push(enc(lr("ККМ №", kkm, width) + "\n"));
+  chunks.push(enc(lr("ФН №", fn, width) + "\n"));
+  chunks.push(enc(lr("ФД №", fd, width) + "\n"));
+  chunks.push(enc(lr("ФПД", fpd, width) + "\n"));
+  chunks.push(enc(divider + "\n"));
+  if (qrLink) {
+    chunks.push(ESC(0x1b, 0x61, 0x01)); // center
+    chunks.push(enc("Проверка чека\n"));
+    for (const part of buildEscPosQr(qrLink)) {
+      chunks.push(part);
+    }
+    chunks.push(enc("\n"));
+    chunks.push(ESC(0x1b, 0x61, 0x00)); // left
   }
-
-  chunks.push(enc(divider + "\n"));
-  chunks.push(enc(divider + "\n"));
-  chunks.push(ESC(0x1b, 0x61, 0x01));
-  chunks.push(enc("Спасибо за покупку!\n\n"));
-  chunks.push(ESC(0x1d, 0x56, 0x00)); // полный рез
-  chunks.push(ESC(0x0a, 0x0a, 0x0a));
+  // Даем принтеру достаточно протянуть бумагу перед отрезом.
+  chunks.push(ESC(0x1b, 0x64, 0x06)); // feed 6 lines
+  chunks.push(ESC(0x1d, 0x56, 0x00)); // full cut
   return chunks;
 }
 
