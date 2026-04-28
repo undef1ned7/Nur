@@ -240,6 +240,7 @@ const AddProductPage = ({
     brand_name: "",
     category_name: "",
     price: "",
+    wholesale_price: "",
     quantity: "",
     client: "",
     purchase_price: "",
@@ -351,6 +352,7 @@ const AddProductPage = ({
             brand_name: product.brand_name || "",
             category_name: product.category_name || "",
             price: formatPrice3Decimals(product.price),
+            wholesale_price: formatPrice3Decimals(product.wholesale_price),
             quantity: product.quantity || "",
             client: product.client || "",
             purchase_price: formatPrice3Decimals(product.purchase_price),
@@ -466,6 +468,7 @@ const AddProductPage = ({
         brand_name: product.brand_name || "",
         category_name: product.category_name || "",
         price: formatPrice3DecimalsDup(product.price),
+        wholesale_price: formatPrice3DecimalsDup(product.wholesale_price),
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
         purchase_price: formatPrice3DecimalsDup(product.purchase_price),
@@ -1743,6 +1746,24 @@ const AddProductPage = ({
 
                   <div className="add-product-page__form-group">
                     <label className="add-product-page__label">
+                      Оптовая цена за 1 {marketData.unit || "ед."}
+                    </label>
+                    <div className="add-product-page__price-input">
+                      <input
+                        type="text"
+                        name="wholesale_price"
+                        placeholder="0.000"
+                        inputMode="decimal"
+                        className="add-product-page__input"
+                        value={newItemData.wholesale_price || ""}
+                        onChange={handleChange}
+                      />
+                      <span className="add-product-page__currency">P</span>
+                    </div>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
                       Количество *
                     </label>
                     <div className="add-product-page__price-input">
@@ -2630,6 +2651,23 @@ const MarketProductForm = ({
                 {fieldErrors.price && (
                   <p className="add-product-page__error">{fieldErrors.price}</p>
                 )}
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Оптовая цена (за 1 {marketData.unit || "ед."})
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="text"
+                    name="wholesale_price"
+                    className="market-product-form__input"
+                    value={newItemData.wholesale_price || ""}
+                    onChange={handleChange}
+                    placeholder="0.000"
+                    inputMode="decimal"
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">Скидка</label>

@@ -56,6 +56,7 @@ export const DEFAULT_NEW_ITEM_DATA = {
   brand_name: "",
   category_name: "",
   price: "",
+  wholesale_price: "",
   quantity: "",
   client: "",
   purchase_price: "",

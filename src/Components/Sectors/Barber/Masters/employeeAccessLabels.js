@@ -69,6 +69,11 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         backendKey: "can_view_market_delete_cart_item",
       },
       {
+        value: "Возврат продаж сотрудником",
+        label: "Возврат продаж сотрудником",
+        backendKey: "can_view_market_employee_return",
+      },
+      {
         value: "Смены",
         label: "Смены",
         backendKey: "can_view_shifts",

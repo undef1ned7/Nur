@@ -13,6 +13,14 @@ const processingChargeTypeLabel = (value) => {
   if (value === "fixed") return "Фиксированно";
   return "—";
 };
+const formatNumber = (value, maxFractionDigits = 3) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return value ?? "—";
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxFractionDigits,
+  }).format(num);
+};
 
 const emptyPreparation = {
   name: "",
@@ -536,6 +544,9 @@ export default function CafeCosting() {
       ingredients: prev.ingredients.filter((_, i) => i !== idx),
     }));
   };
+  const openPreparationDetails = (id) => {
+    navigate(`/crm/cafe/costing/preparations/${encodeURIComponent(id)}`);
+  };
 
   const handlePreview = async () => {
     try {
@@ -701,30 +712,51 @@ export default function CafeCosting() {
                 {preparationsViewMode === "cards" ? (
                   <div className="cafe-costing-page__prep-grid">
                     {preparations.map((p) => (
-                      <article key={p.id} className="cafe-costing-page__prep-card">
+                      <article
+                        key={p.id}
+                        className="cafe-costing-page__prep-card cafe-costing-page__prep-card--clickable"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openPreparationDetails(p.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openPreparationDetails(p.id);
+                          }
+                        }}
+                      >
                         <h3 className="cafe-costing-page__prep-title">{p.name}</h3>
                         <div className="cafe-costing-page__prep-stats">
-                          <span>Выход: {p.output_quantity} {p.output_unit}</span>
-                          <span>Себестоимость ед.: {p.unit_cost}</span>
-                          <span>Остаток: {p.stock_quantity}</span>
+                          <span>Выход: {formatNumber(p.output_quantity)} {p.output_unit}</span>
+                          <span>Себестоимость ед.: {formatNumber(p.unit_cost)}</span>
+                          <span>Остаток: {formatNumber(p.stock_quantity)}</span>
                         </div>
                         <div className="cafe-costing-page__actions">
                           <button
                             type="button"
-                            onClick={() =>
-                              navigate(`/crm/cafe/costing/preparations/${encodeURIComponent(p.id)}`)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReceivePreparation(p);
+                            }}
                           >
-                            Детали
-                          </button>
-                          <button type="button" onClick={() => openReceivePreparation(p)}>
                             Приход
                           </button>
-                          <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditPreparation(p);
+                            }}
+                          >
+                            Изм.
+                          </button>
                           <button
                             type="button"
                             className="cafe-costing-page__danger-btn"
-                            onClick={() => handleDeletePreparation(p.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePreparation(p.id);
+                            }}
                             title="Удалить"
                             aria-label="Удалить"
                           >
@@ -748,28 +780,41 @@ export default function CafeCosting() {
                       </thead>
                       <tbody>
                         {preparations.map((p) => (
-                          <tr key={p.id}>
+                          <tr
+                            key={p.id}
+                            className="cafe-costing-page__table-row--clickable"
+                            onClick={() => openPreparationDetails(p.id)}
+                          >
                             <td>{p.name}</td>
-                            <td>{p.output_quantity} {p.output_unit}</td>
-                            <td>{p.unit_cost}</td>
-                            <td>{p.stock_quantity}</td>
+                            <td>{formatNumber(p.output_quantity)} {p.output_unit}</td>
+                            <td>{formatNumber(p.unit_cost)}</td>
+                            <td>{formatNumber(p.stock_quantity)}</td>
                             <td className="cafe-costing-page__actions">
                               <button
                                 type="button"
-                                onClick={() =>
-                                  navigate(`/crm/cafe/costing/preparations/${encodeURIComponent(p.id)}`)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReceivePreparation(p);
+                                }}
                               >
-                                Детали
-                              </button>
-                              <button type="button" onClick={() => openReceivePreparation(p)}>
                                 Приход
                               </button>
-                              <button type="button" onClick={() => openEditPreparation(p)}>Изм.</button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditPreparation(p);
+                                }}
+                              >
+                                Изм.
+                              </button>
                               <button
                                 type="button"
                                 className="cafe-costing-page__danger-btn"
-                                onClick={() => handleDeletePreparation(p.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePreparation(p.id);
+                                }}
                                 title="Удалить"
                                 aria-label="Удалить"
                               >

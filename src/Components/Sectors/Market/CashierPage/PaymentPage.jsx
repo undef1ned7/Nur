@@ -204,7 +204,10 @@ const PaymentPage = ({
 
   const printReceiptSmart = async (payload) => {
     try {
-      await handleCheckoutResponseForPrinting(payload, { interactive: false });
+      await handleCheckoutResponseForPrinting(payload, {
+        interactive: false,
+        receiptStyle: "market",
+      });
       return true;
     } catch (err) {
       console.warn(
@@ -217,7 +220,10 @@ const PaymentPage = ({
       if (!connected) return false;
 
       try {
-        await handleCheckoutResponseForPrinting(payload, { interactive: false });
+        await handleCheckoutResponseForPrinting(payload, {
+          interactive: false,
+          receiptStyle: "market",
+        });
         return true;
       } catch (err2) {
         console.warn("[PaymentPage] Повторная печать не удалась:", err2);
@@ -416,7 +422,15 @@ const PaymentPage = ({
             // Важно: сначала печатаем из checkout JSON (в нем есть ekassa/ekassa_fiscal),
             // чтобы применился наш новый формат ККМ.
             if (result.payload) {
-              const ok = await printReceiptSmart(result.payload);
+              let ok = await printReceiptSmart(result.payload);
+              if (!ok) {
+                const receiptResult = await dispatch(
+                  getProductCheckout(saleIdForReceipt)
+                );
+                if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+                  ok = await printReceiptSmart(receiptResult.payload);
+                }
+              }
               if (!ok) {
                 showAlert(
                   "warning",

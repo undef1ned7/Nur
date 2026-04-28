@@ -17,6 +17,7 @@ export const useProductFormState = (isEditMode = false) => {
     brand_name: "",
     category_name: "",
     price: "",
+    wholesale_price: "",
     quantity: "",
     client: "",
     purchase_price: "",
