@@ -383,28 +383,31 @@ const PaymentPage = ({
         // Пытаемся автоматически распечатать чек только если принтер подключен
         if (isPrinterConnected) {
           try {
-            const receiptResult = await dispatch(
-              getProductCheckout(saleIdForReceipt)
-            );
-
-            if (
-              receiptResult.type === "products/getProductCheckout/fulfilled"
-            ) {
-              try {
-                await handleCheckoutResponseForPrinting(receiptResult.payload);
-              } catch (printError) {
-                // Ошибка печати не блокирует продажу
-                console.warn("Печать чека не удалась:", printError);
-                // Не показываем ошибку пользователю, только логируем
-              }
-            } else if (result.payload) {
-              // Если не удалось получить чек отдельно, пытаемся использовать данные из checkout
+            // Сначала печатаем из checkout JSON (там ekassa/ekassa_fiscal),
+            // чтобы использовать новый формат ККМ.
+            if (result.payload) {
               try {
                 await handleCheckoutResponseForPrinting(result.payload);
               } catch (printError) {
                 // Ошибка печати не блокирует продажу
                 console.warn("Печать чека не удалась:", printError);
                 // Не показываем ошибку пользователю, только логируем
+              }
+            } else {
+              const receiptResult = await dispatch(
+                getProductCheckout(saleIdForReceipt)
+              );
+
+              if (
+                receiptResult.type === "products/getProductCheckout/fulfilled"
+              ) {
+                try {
+                  await handleCheckoutResponseForPrinting(receiptResult.payload);
+                } catch (printError) {
+                  // Ошибка печати не блокирует продажу
+                  console.warn("Печать чека не удалась:", printError);
+                  // Не показываем ошибку пользователю, только логируем
+                }
               }
             }
           } catch (receiptError) {
@@ -478,23 +481,25 @@ const PaymentPage = ({
 
     setPrinting(true);
     try {
-      // Пытаемся получить чек с сервера
-      const receiptResult = await dispatch(
-        getProductCheckout(receiptData.saleId)
-      );
-
-      if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-        // Используем сервис печати для обработки ответа
-        await handleCheckoutResponseForPrinting(receiptResult.payload);
-      } else if (receiptData.checkoutResponse) {
-        // Если не удалось получить чек, пытаемся использовать данные из checkout
+      // Для повторной печати в приоритете checkoutResponse (JSON с ekassa),
+      // чтобы не уходить в старый формат серверного PDF.
+      if (receiptData.checkoutResponse) {
         await handleCheckoutResponseForPrinting(receiptData.checkoutResponse);
       } else {
-        showAlert(
-          "error",
-          "Ошибка печати",
-          "Не удалось получить данные чека для печати"
+        // Фолбэк: получаем чек с сервера
+        const receiptResult = await dispatch(
+          getProductCheckout(receiptData.saleId)
         );
+        if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+          // Используем сервис печати для обработки ответа
+          await handleCheckoutResponseForPrinting(receiptResult.payload);
+        } else {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось получить данные чека для печати"
+          );
+        }
       }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);

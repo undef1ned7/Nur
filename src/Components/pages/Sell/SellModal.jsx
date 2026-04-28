@@ -37,6 +37,7 @@ import { useProducts } from "../../../store/slices/productSlice";
 import { fetchAgentProductsAsync } from "../../../store/creators/productCreators";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import { useAlert } from "../../../hooks/useDialog";
+import { handleCheckoutResponseForPrinting as printViaSharedService } from "./services/printService";
 
 /* =========================
    0) Фильтрация (остатки у агента)
@@ -419,42 +420,7 @@ async function tryParseJsonFromBlob(blob) {
 }
 
 async function handleCheckoutResponseForPrinting(res) {
-  if (
-    res &&
-    typeof res === "object" &&
-    !(res instanceof Blob) &&
-    Array.isArray(res.items)
-  ) {
-    await printReceiptJSONViaUSB(res);
-    return;
-  }
-  if (res instanceof Blob) {
-    if (await looksLikePdf(res)) {
-      await printReceiptFromPdfUSB(res);
-      return;
-    }
-    const parsed = await tryParseJsonFromBlob(res);
-    if (parsed?.json) {
-      await printReceiptJSONViaUSB(parsed.json);
-      return;
-    }
-    if (parsed?.pdfBlob && (await looksLikePdf(parsed.pdfBlob))) {
-      await printReceiptFromPdfUSB(parsed.pdfBlob);
-      return;
-    }
-    const url = URL.createObjectURL(res);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "receipt.pdf";
-    a.click();
-    URL.revokeObjectURL(url);
-    throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
-  }
-  if (res && typeof res === "object" && Array.isArray(res.items)) {
-    await printReceiptJSONViaUSB(res);
-    return;
-  }
-  throw new Error("Неизвестный формат ответа для печати");
+  await printViaSharedService(res);
 }
 
 /* ---------- WebUSB ---------- */

@@ -413,21 +413,9 @@ const PaymentPage = ({
           // - сначала "тихо" на сохранённый/разрешённый принтер
           // - если печать не удалась — показываем окно выбора USB‑принтера и повторяем попытку
           try {
-            const receiptResult = await dispatch(
-              getProductCheckout(saleIdForReceipt)
-            );
-
-            if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-              const ok = await printReceiptSmart(receiptResult.payload);
-              if (!ok) {
-                showAlert(
-                  "warning",
-                  "Печать",
-                  "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
-                );
-              }
-            } else if (result.payload) {
-              // Если не удалось получить чек отдельно, пытаемся использовать данные из checkout
+            // Важно: сначала печатаем из checkout JSON (в нем есть ekassa/ekassa_fiscal),
+            // чтобы применился наш новый формат ККМ.
+            if (result.payload) {
               const ok = await printReceiptSmart(result.payload);
               if (!ok) {
                 showAlert(
@@ -435,6 +423,20 @@ const PaymentPage = ({
                   "Печать",
                   "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
                 );
+              }
+            } else {
+              const receiptResult = await dispatch(
+                getProductCheckout(saleIdForReceipt)
+              );
+              if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+                const ok = await printReceiptSmart(receiptResult.payload);
+                if (!ok) {
+                  showAlert(
+                    "warning",
+                    "Печать",
+                    "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+                  );
+                }
               }
             }
           } catch (receiptError) {
@@ -485,22 +487,9 @@ const PaymentPage = ({
 
     setPrinting(true);
     try {
-      // Пытаемся получить чек с сервера
-      const receiptResult = await dispatch(
-        getProductCheckout(receiptData.saleId)
-      );
-
-      if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-        const ok = await printReceiptSmart(receiptResult.payload);
-        if (!ok) {
-          showAlert(
-            "error",
-            "Ошибка печати",
-            "Не удалось распечатать чек. Проверьте принтер и повторите."
-          );
-        }
-      } else if (receiptData.checkoutResponse) {
-        // Если не удалось получить чек, пытаемся использовать данные из checkout
+      // Для повторной печати в приоритете checkoutResponse (JSON с ekassa),
+      // а не серверный PDF, чтобы формат был новым.
+      if (receiptData.checkoutResponse) {
         const ok = await printReceiptSmart(receiptData.checkoutResponse);
         if (!ok) {
           showAlert(
@@ -510,11 +499,26 @@ const PaymentPage = ({
           );
         }
       } else {
-        showAlert(
-          "error",
-          "Ошибка печати",
-          "Не удалось получить данные чека для печати"
+        // Фолбэк: пытаемся получить чек с сервера
+        const receiptResult = await dispatch(
+          getProductCheckout(receiptData.saleId)
         );
+        if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+          const ok = await printReceiptSmart(receiptResult.payload);
+          if (!ok) {
+            showAlert(
+              "error",
+              "Ошибка печати",
+              "Не удалось распечатать чек. Проверьте принтер и повторите."
+            );
+          }
+        } else {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось получить данные чека для печати"
+          );
+        }
       }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);

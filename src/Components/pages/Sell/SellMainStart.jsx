@@ -12,6 +12,7 @@ import {
   addCustomItem,
   createDeal,
   getProductCheckout, // будем получать PDF/JSON для печати
+  getReceiptJson,
   deleteProductInCart,
   deleteSale,
 } from "../../../store/creators/saleThunk";
@@ -961,7 +962,14 @@ const SellMainStart = () => {
 
       if (withReceipt && result?.sale_id) {
         try {
-          const resp = await run(getProductCheckout(result.sale_id));
+          // Для /crm/sell сначала берем JSON чека (новый ККМ формат),
+          // и только потом фолбэк на getProductCheckout (blob/pdf).
+          let resp = null;
+          try {
+            resp = await run(getReceiptJson(result.sale_id));
+          } catch {
+            resp = await run(getProductCheckout(result.sale_id));
+          }
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
           console.error("Печать чека не удалась:", e);
@@ -1094,7 +1102,11 @@ const SellMainStart = () => {
             cash_received: 0,
           };
           const result = await run(productCheckout(checkoutParams));
-          printingResult = await run(getProductCheckout(result?.sale_id));
+          try {
+            printingResult = await run(getReceiptJson(result?.sale_id));
+          } catch {
+            printingResult = await run(getProductCheckout(result?.sale_id));
+          }
 
         }
       } else if (debt === "Предоплата") {
@@ -1140,7 +1152,11 @@ const SellMainStart = () => {
           };
           await dispatch(createDeal(dealPayload)).unwrap();
           const result = await run(productCheckout(checkoutParams));
-          printingResult = await run(getProductCheckout(result?.sale_id));
+          try {
+            printingResult = await run(getReceiptJson(result?.sale_id));
+          } catch {
+            printingResult = await run(getProductCheckout(result?.sale_id));
+          }
 
         }
       }
