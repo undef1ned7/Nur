@@ -6,7 +6,7 @@ import { pdf } from "@react-pdf/renderer";
 import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./InvoicePdfDocument";
-import CommercialOfferPdfDocument from "./CommercialOfferPdfDocument";
+import CommercialOfferPreviewModal from "./CommercialOfferPreviewModal";
 
 import "./InvoicePreviewModal.scss";
 import { useAlert } from "../../../../../hooks/useDialog";
@@ -266,10 +266,9 @@ const InvoicePreviewModal = ({
       }
 
       try {
-        const PdfDocument = isCommercialOfferData(previewSourceData)
-          ? CommercialOfferPdfDocument
-          : InvoicePdfDocument;
-        const blob = await pdf(<PdfDocument data={previewSourceData} />).toBlob();
+        const blob = await pdf(
+          <InvoicePdfDocument data={previewSourceData} />,
+        ).toBlob();
         objectUrl = window.URL.createObjectURL(blob);
         if (mounted) {
           setPreviewUrl(objectUrl);
@@ -314,15 +313,8 @@ const InvoicePreviewModal = ({
 
       if (!data) throw new Error("Нет данных для генерации PDF");
 
-      // Генерация PDF из JSON
-      const PdfDocument = isCommercialOfferData(data)
-        ? CommercialOfferPdfDocument
-        : InvoicePdfDocument;
-      const blob = await pdf(<PdfDocument data={data} />).toBlob();
-
-      const fileName = isCommercialOfferData(data)
-        ? `commercial_offer_${data?.document?.number || invoiceId}.pdf`
-        : `invoice_${data?.document?.number || invoiceId}.pdf`;
+      const blob = await pdf(<InvoicePdfDocument data={data} />).toBlob();
+      const fileName = `invoice_${data?.document?.number || invoiceId}.pdf`;
       downloadBlob(blob, fileName);
     } catch (printError) {
       console.error("Ошибка при генерации PDF:", printError);
@@ -373,6 +365,17 @@ const InvoicePreviewModal = ({
     );
   }
 
+  if (isCommercialOfferData(invoiceData || previewSourceData || initialDocument)) {
+    return (
+      <CommercialOfferPreviewModal
+        invoiceId={invoiceId}
+        invoiceData={invoiceData || previewSourceData || initialInvoiceData}
+        document={initialDocument}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <div className="invoice-preview-modal-overlay" onClick={onClose}>
       <div
@@ -381,9 +384,7 @@ const InvoicePreviewModal = ({
       >
         <div className="invoice-preview-modal__header">
           <h2 className="invoice-preview-modal__title">
-            {isCommercialOfferData(invoiceData)
-              ? "Предварительный просмотр коммерческого предложения"
-              : "Предварительный просмотр накладной"}
+            Предварительный просмотр накладной
           </h2>
           <button className="invoice-preview-modal__close" onClick={onClose}>
             <X size={24} />
@@ -393,11 +394,7 @@ const InvoicePreviewModal = ({
         <div className="invoice-preview-modal__content">
           {previewUrl ? (
             <iframe
-              title={
-                isCommercialOfferData(invoiceData)
-                  ? "Предпросмотр коммерческого предложения"
-                  : "Предпросмотр накладной"
-              }
+              title="Предпросмотр накладной"
               src={previewUrl}
               style={{ width: "100%", height: "100%", border: "none" }}
             />

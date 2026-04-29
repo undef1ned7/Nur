@@ -101,11 +101,6 @@ const getImageSource = (image) => {
 const toAbsoluteImageUrl = (src) => {
   if (!src || /^(data:|blob:)/i.test(src)) return src || "";
 
-  // Если это URL нашего продакшн сервера — заменяем на локальный прокси
-  if (/^https?:\/\/app\.nurcrm\.kg\/media\//i.test(src)) {
-    return src.replace(/^https?:\/\/app\.nurcrm\.kg/i, "");
-  }
-
   if (/^https?:\/\//i.test(src)) return src;
 
   const base =
@@ -143,8 +138,7 @@ const fetchImageAsDataUrl = async (src) => {
       resolve(url);
     };
 
-    // Добавляем cache-bust чтобы обойти кеш без CORS заголовков
-    img.src = url + (url.includes("?") ? "&" : "?") + "_cb=" + Date.now();
+    img.src = url;
   });
 };
 
@@ -2300,7 +2294,6 @@ const CreateSaleDocument = () => {
           return { ...item, imageDataUrl: "" };
         }
 
-        // Попытка 1: Canvas конвертация (обходит CORS через img tag)
         try {
           const dataUrl = await fetchImageAsDataUrl(rawSrc);
           if (dataUrl && dataUrl.startsWith("data:")) {
@@ -2310,8 +2303,7 @@ const CreateSaleDocument = () => {
           // ignore
         }
 
-        // Попытка 2: передать URL напрямую (react-pdf worker может загрузить)
-        return { ...item, imageDataUrl: rawSrc };
+        return { ...item, imageDataUrl: "" };
       }),
     );
   };
