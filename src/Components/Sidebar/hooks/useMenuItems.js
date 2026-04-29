@@ -2,7 +2,6 @@ import { useMemo, useCallback } from "react";
 import { MENU_CONFIG } from "../config/menuConfig";
 import { HIDE_RULES } from "../config/hideRules";
 import { useMenuPermissions } from "./useMenuPermissions";
-import { menuIcons } from "../config/menuIcons";
 import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig";
 import { isStartPlan } from "../../../utils/subscriptionPlan";
 
@@ -10,7 +9,23 @@ import { isStartPlan } from "../../../utils/subscriptionPlan";
  * Хук для сборки финального списка пунктов меню
  */
 export const useMenuItems = (company, sector, tariff, profile = null) => {
-  const { hasPermission, isAllowed } = useMenuPermissions();
+  const { hasPermission, isAllowed, companyAllows } = useMenuPermissions();
+  const hasMenuAccess = useCallback(
+    (item) => {
+      if (!item?.permission) return true;
+      switch (item.permissionModel) {
+        case "user":
+          return hasPermission(item.permission) === true;
+        case "company":
+          return companyAllows(company, item.permission) === true;
+        case "mixed":
+          return isAllowed(company, item.permission);
+        default:
+          return hasPermission(item.permission) === true;
+      }
+    },
+    [company, hasPermission, isAllowed, companyAllows],
+  );
   /**
    * Вычисляет скрытые элементы на основе правил
    */
@@ -123,105 +138,38 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
    * Получает дополнительные услуги
    */
   const getAdditionalServices = useCallback(() => {
-    const companyAllows = (perm) => {
-      if (!company) return undefined;
-      if (Object.prototype.hasOwnProperty.call(company, perm)) {
-        return company[perm] === true;
-      }
-      return undefined;
-    };
-
-    const isAllowedForPerm = (perm) => {
-      const userOk = hasPermission(perm);
-      const companyOk = companyAllows(perm);
-      if (companyOk === false) return false;
-      return userOk || companyOk === true;
-    };
-
-    // Доступ к группе
-    const groupAllowed = isAllowedForPerm("can_view_additional_services");
-
-    // Фильтруем дочерние пункты по совокупному правилу
-    let children = MENU_CONFIG.additional.filter((item) => {
-      // Для "Печать штрих-кодов" и "Интеграция с весами" проверяем ТОЛЬКО права пользователя (profile)
-      // они должны отображаться только если can_view === true у пользователя
-      if (
-        item.permission === "can_view_market_label" ||
-        item.permission === "can_view_market_scales"
-      ) {
-        // Проверяем ТОЛЬКО права пользователя (profile), игнорируя настройки компании
-        return hasPermission(item.permission) === true;
-      }
-      // Для WhatsApp, Instagram, Telegram, Документы проверяем ТОЛЬКО права компании
-      // их разрешения находятся в company, а не в profile
-      if (
-        item.permission === "can_view_whatsapp" ||
-        item.permission === "can_view_instagram" ||
-        item.permission === "can_view_telegram" ||
-        item.permission === "can_view_documents"
-      ) {
-        // Проверяем ТОЛЬКО права компании
-        return companyAllows(item.permission) === true;
-      }
-      // Для остальных используем стандартную проверку (пользователь ИЛИ компания)
-      return isAllowedForPerm(item.permission);
-    });
-
-    // Если нет ни одного индивидуально доступного, но есть групповое право
-    if (children.length === 0 && groupAllowed) {
-      children = MENU_CONFIG.additional.filter((item) => {
-        // Для "Печать штрих-кодов" и "Интеграция с весами" НЕ используем fallback
-        // они должны проверяться только через hasPermission (profile)
-        if (
-          item.permission === "can_view_market_label" ||
-          item.permission === "can_view_market_scales"
-        ) {
-          return false; // Исключаем из fallback
-        }
-        // Для WhatsApp, Instagram, Telegram, Документы проверяем компанию в fallback
-        if (
-          item.permission === "can_view_whatsapp" ||
-          item.permission === "can_view_instagram" ||
-          item.permission === "can_view_telegram" ||
-          item.permission === "can_view_documents"
-        ) {
-          return companyAllows(item.permission) === true;
-        }
-        // Для остальных используем fallback: показываем если компания не запретила
-        return companyAllows(item.permission) !== false;
-      });
-    }
+    const baseItems = MENU_CONFIG.additional.filter(hasMenuAccess);
 
     // Получаем динамические дополнительные услуги из конфигурации
-    const dynamicServices = getAdditionalServicesForMenu({
+    const dynamicServicesRaw = getAdditionalServicesForMenu({
       hasPermission,
-      isAllowed: isAllowedForPerm,
+      isAllowed: (perm) => isAllowed(company, perm),
+      companyAllows: (perm) => companyAllows(company, perm),
       company,
       tariff,
       sector: company?.sector?.name,
+      profile,
+    });
+    const dynamicServices = dynamicServicesRaw.map((service) => {
+      if (service?.id && service?.to === "/crm/additional-services") {
+        return {
+          ...service,
+          to: `/crm/additional-services?service=${service.id}`,
+        };
+      }
+      return service;
     });
 
-    // Добавляем динамические услуги, если их еще нет
+    const merged = [...baseItems];
     dynamicServices.forEach((service) => {
-      const exists = children.some(
-        (c) => c.to === service.to || c.label === service.label
-      );
+      const exists = merged.some((item) => item.to === service.to);
       if (!exists) {
-        children.push(service);
+        merged.push(service);
       }
     });
 
-    // Если нет прав ни на группу, ни на дочерние — ничего не показывать
-    if (!groupAllowed && children.length === 0) return null;
-
-    return {
-      label: "Доп услуги",
-      to: "/crm/additional-services",
-      icon: menuIcons.clipboard, // Используем иконку из menuIcons
-      implemented: true,
-      children,
-    };
-  }, [hasPermission, company, tariff, profile]);
+    return merged.filter((item) => item.implemented !== false);
+  }, [hasPermission, company, tariff, profile, isAllowed, hasMenuAccess, companyAllows]);
 
   /**
    * Собирает финальный список меню
@@ -230,9 +178,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     let items = [];
 
     // Основные пункты меню
-    let basicItems = MENU_CONFIG.basic.filter((item) =>
-      hasPermission(item.permission)
-    );
+    let basicItems = MENU_CONFIG.basic.filter(hasMenuAccess);
     // if (tariff !== "Старт") {
     //   if (company.industry.name !== 'Парикмахерские' && company.industry.name !== 'Производство') {
     //   }
@@ -260,14 +206,14 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     }
 
     // Добавляем дополнительные услуги перед "Настройки"
-    if (additionalServices) {
+    if (additionalServices.length > 0) {
       const settingsIndex = items.findIndex(
         (item) => item.label === "Настройки"
       );
       if (settingsIndex !== -1) {
-        items.splice(settingsIndex, 0, additionalServices);
+        items.splice(settingsIndex, 0, ...additionalServices);
       } else {
-        items.push(additionalServices);
+        items.push(...additionalServices);
       }
     }
 

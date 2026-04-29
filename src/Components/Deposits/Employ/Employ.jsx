@@ -534,6 +534,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
 export default function EmployeeTable() {
   const dispatch = useDispatch();
+  const alert = useAlert();
   const {
     list: employees,
     loading: loading1,
@@ -585,6 +586,23 @@ export default function EmployeeTable() {
       label: "Владелец",
     },
   ];
+
+  const isStartTariff = String(tariff || company?.subscription_plan?.name || "")
+    .trim()
+    .toLowerCase() === "старт";
+  const isMarketSector = (() => {
+    const sectorName = String(sector || company?.sector?.name || "")
+      .trim()
+      .toLowerCase();
+    return sectorName === "магазин" || sectorName === "цветочный магазин";
+  })();
+  const hasOwnerInList = employees.some((employee) => employee.role === "owner");
+  const totalEmployeesWithOwner = employees.length + (hasOwnerInList ? 0 : 1);
+  const canAddEmployeeByStartPlan = !(
+    isStartTariff &&
+    isMarketSector &&
+    totalEmployeesWithOwner >= 3
+  );
 
   useEffect(() => {
     const params = {
@@ -785,7 +803,17 @@ export default function EmployeeTable() {
           <button className="employee__export">Экспорт</button>
           <button
             className="employee__add"
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              if (!canAddEmployeeByStartPlan) {
+                alert(
+                  "На тарифе Старт для Маркета можно иметь максимум 3 сотрудников, включая владельца.",
+                  true,
+                );
+                return;
+              }
+              setShowAddModal(true);
+            }}
+            disabled={!canAddEmployeeByStartPlan}
           >
             <Plus size={16} style={{ marginRight: "4px" }} /> Добавить
             сотрудника

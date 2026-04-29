@@ -214,7 +214,7 @@ export default function CommercialOfferPdfDocument({ data }) {
             <Text style={[s.th, s.cQty]}>Кол-во</Text>
             <Text style={[s.th, s.cUnit]}>Ед.</Text>
             <Text style={[s.th, s.cPrice]}>Цена</Text>
-            <Text style={[s.th, s.cSum, { borderRightWidth: 0 }]}>Сум</Text>
+            <Text style={[s.th, s.cSum, { borderRightWidth: 0 }]}>Сом</Text>
           </View>
           {items.map((item, index) => {
             const qty = Number(item.qty || item.quantity || 0);

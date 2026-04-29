@@ -1,16 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { submitAdditionalServicesRequest } from "../../../api/additionalServices";
+import { ADDITIONAL_SERVICES_CONFIG } from "../../Sidebar/config/additionalServicesConfig";
+import { SERVICE_IDS } from "../../../config/additionalServiceIds";
 import "./SocialModal.scss";
-import {
-  FaInstagram,
-  FaTelegram,
-  FaWhatsapp,
-  FaWarehouse,
-  FaBarcode,
-  FaCashRegister,
-} from "react-icons/fa";
-import { MdDocumentScanner } from "react-icons/md";
 
 const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,60 +16,19 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
     return name === "consulting" || sector === "Консалтинг";
   }, [company]);
 
-  // Карта всех поддерживаемых сервисов
+  // Карта сервисов строится из единого конфига услуг
   const serviceMap = useMemo(
-    () => ({
-      whatsapp: {
-        title: "WhatsApp",
-        description:
-          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-        icon: <FaWhatsapp />,
-      },
-      telegram: {
-        title: "Telegram",
-        description:
-          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-        icon: <FaTelegram />,
-      },
-      instagram: {
-        title: "Instagram",
-        description:
-          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-        icon: <FaInstagram />,
-      },
-      documents: {
-        title: "Документы",
-        description:
-          "Создание и хранение договоров, счётов и актов. Шаблоны, статусы и быстрые отправки клиентам.",
-        icon: <MdDocumentScanner />,
-      },
-      warehouse: {
-        title: "Склад",
-        description:
-          "Учет услуг/материалов для консалтинга: приход/расход, остатки, партии и связь с продажами.",
-        icon: <FaWarehouse />,
-        // доступен только в консалтинге
-        requiresConsulting: true,
-      },
-      "barcode-print": {
-        title: "Печать штрих-кодов",
-        description:
-          "Подключение отдельной страницы для печати штрих-кодов с предпросмотром этикетки и поддержкой принтера.",
-        icon: <FaBarcode />,
-      },
-      scales: {
-        title: "Интеграция с весами",
-        description:
-          "Подключение страницы для отправки товарной номенклатуры на торговые весы.",
-        icon: <FaBarcode />,
-      },
-      "cashier-interface": {
-        title: "Интерфейс кассира",
-        description:
-          "Подключение интерфейса кассира для быстрой продажи, оформления оплат и работы с чеками.",
-        icon: <FaCashRegister />,
-      },
-    }),
+    () =>
+      ADDITIONAL_SERVICES_CONFIG.reduce((acc, service) => {
+        const IconComponent = service?.displayMeta?.icon;
+        acc[service.id] = {
+          title: service?.displayMeta?.title || service.label || "Сервис",
+          description: service?.displayMeta?.description || "Описание услуги",
+          icon: IconComponent ? <IconComponent /> : "🔗",
+          requiresConsulting: service.id === SERVICE_IDS.WAREHOUSE,
+        };
+        return acc;
+      }, {}),
     []
   );
 

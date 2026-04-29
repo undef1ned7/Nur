@@ -99,6 +99,12 @@ export const MENU_CONFIG = {
       implemented: true,
     },
     {
+      label: "Доп услуги",
+      to: "/crm/additional-services",
+      icon: menuIcons.clipboard,
+      implemented: true,
+    },
+    {
       label: "Настройки",
       to: "/crm/set",
       icon: menuIcons.cog,
@@ -365,7 +371,6 @@ export const MENU_CONFIG = {
 
     // Магазин
     market: [
-
       {
         label: "История",
         to: "/crm/market/history",
@@ -784,45 +789,57 @@ export const MENU_CONFIG = {
   // Дополнительные услуги
   additional: [
     {
+      id: "whatsapp",
       label: "WhatsApp",
       to: "/crm/",
       icon: menuIcons.comments,
       permission: "can_view_whatsapp",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "instagram",
       label: "Instagram",
       to: "/crm/instagram",
       icon: menuIcons.instagramIcon,
       permission: "can_view_instagram",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "telegram",
       label: "Telegram",
       to: "/crm/",
       icon: menuIcons.comments,
       permission: "can_view_telegram",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "documents",
       label: "Документы",
       to: "/crm/documents",
       icon: menuIcons.documentScanner,
       permission: "can_view_documents",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "barcode-print",
       label: "Печать штрих-кодов",
       to: "/crm/barcodes",
       icon: menuIcons.documentScanner,
       permission: "can_view_market_label",
+      permissionModel: "user",
       implemented: true,
     },
     {
+      id: "scales",
       label: "Интеграция с весами",
       to: "/crm/scales",
       icon: menuIcons.scale,
       permission: "can_view_market_scales",
+      permissionModel: "user",
       implemented: true,
     },
   ],
