@@ -48,6 +48,7 @@ import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import Ko1PreviewModal from "./components/Ko1PreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import CommercialOfferPdfDocument from "./components/CommercialOfferPdfDocument";
 import Ko1PdfDocument from "./components/Ko1PdfDocument";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
@@ -928,6 +929,32 @@ const Documents = () => {
     };
   };
 
+  const getInvoiceLikePdfBlob = async (item) => {
+    const result = await dispatch(getWarehouseDocumentById(item.id));
+    if (!getWarehouseDocumentById.fulfilled.match(result)) {
+      throw new Error("Не удалось загрузить данные накладной");
+    }
+
+    const doc = result.payload;
+    const invoiceData = buildInvoiceDataFromDocument(doc);
+    if (!invoiceData) {
+      throw new Error("Нет данных для генерации PDF");
+    }
+
+    const isCommercialOffer = doc?.doc_type === "COMMERCIAL_OFFER";
+    const blob = await pdf(
+      isCommercialOffer ? (
+        <CommercialOfferPdfDocument data={invoiceData} />
+      ) : (
+        <InvoicePdfDocument data={invoiceData} />
+      ),
+    ).toBlob();
+
+    const filePrefix = isCommercialOffer ? "commercial_offer" : "invoice";
+    const fileName = `${filePrefix}_${invoiceData?.document?.number || item.id}.pdf`;
+    return { blob, fileName };
+  };
+
   const handlePrint = async (item, options = {}) => {
     if (!item?.id) return;
 
@@ -935,36 +962,11 @@ const Documents = () => {
       if (activeTab === "ko1") {
         await handlePrintKo1(item);
       } else if (activeTab === "invoices" || activeTab === "esf_xml") {
-        // Для накладной используем warehouse API
-        const result = await dispatch(getWarehouseDocumentById(item.id));
-        if (getWarehouseDocumentById.fulfilled.match(result)) {
-          const doc = result.payload;
-          const invoiceData = buildInvoiceDataFromDocument(doc);
-
-          if (!invoiceData) {
-            throw new Error("Нет данных для генерации PDF");
-          }
-
-          const blob = await pdf(
-            <InvoicePdfDocument data={invoiceData} />,
-          ).toBlob();
-          if (options.directPrint) {
-            printInvoicePdfBlob(blob);
-          } else {
-            const fileName = `invoice_${
-              invoiceData?.document?.number || item.id
-            }.pdf`;
-            const url = window.URL.createObjectURL(blob);
-            const a = window.document.createElement("a");
-            a.href = url;
-            a.download = fileName;
-            window.document.body.appendChild(a);
-            a.click();
-            window.document.body.removeChild(a);
-            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-          }
+        const { blob, fileName } = await getInvoiceLikePdfBlob(item);
+        if (options.directPrint) {
+          printInvoicePdfBlob(blob);
         } else {
-          throw new Error("Не удалось загрузить данные накладной");
+          downloadBlob(blob, fileName);
         }
       } else {
         // Для чека печатаем через USB принтер
