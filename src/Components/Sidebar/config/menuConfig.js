@@ -99,6 +99,12 @@ export const MENU_CONFIG = {
       implemented: true,
     },
     {
+      label: "Доп услуги",
+      to: "/crm/additional-services",
+      icon: menuIcons.clipboard,
+      implemented: true,
+    },
+    {
       label: "Настройки",
       to: "/crm/set",
       icon: menuIcons.cog,
@@ -270,6 +276,122 @@ export const MENU_CONFIG = {
       //   implemented: true,
       // },
     ],
+    services: [
+      {
+        label: "Аналитика",
+        to: "/crm/services/cash-reports",
+        icon: menuIcons.chartBar,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Клиенты",
+        to: "/crm/services/clients",
+        icon: menuIcons.filePerson,
+        permission: "can_view_barber_clients",
+        implemented: true,
+      },
+      {
+        label: "Документы клиентов",
+        to: "/crm/services/client-documents",
+        icon: menuIcons.fileText,
+        permission: "can_view_document",
+        implemented: true,
+      },
+      {
+        label: "Услуги",
+        to: "/crm/services/services",
+        icon: menuIcons.tags,
+        permission: "can_view_barber_services",
+        implemented: true,
+      },
+      {
+        label: "История",
+        to: "/crm/services/history",
+        icon: menuIcons.clipboard,
+        permission: "can_view_barber_history",
+        implemented: true,
+      },
+      {
+        label: "Записи",
+        to: "/crm/services/records",
+        icon: menuIcons.calendar,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
+        label: "Заявки",
+        to: "/crm/services/requests",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/services/masters",
+        icon: menuIcons.user,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+    ],
+    dentistry: [
+      {
+        label: "Аналитика",
+        to: "/crm/dentistry/cash-reports",
+        icon: menuIcons.chartBar,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Клиенты",
+        to: "/crm/dentistry/clients",
+        icon: menuIcons.filePerson,
+        permission: "can_view_barber_clients",
+        implemented: true,
+      },
+      {
+        label: "Документы клиентов",
+        to: "/crm/dentistry/client-documents",
+        icon: menuIcons.fileText,
+        permission: "can_view_document",
+        implemented: true,
+      },
+      {
+        label: "Услуги",
+        to: "/crm/dentistry/services",
+        icon: menuIcons.tags,
+        permission: "can_view_barber_services",
+        implemented: true,
+      },
+      {
+        label: "История",
+        to: "/crm/dentistry/history",
+        icon: menuIcons.clipboard,
+        permission: "can_view_barber_history",
+        implemented: true,
+      },
+      {
+        label: "Записи",
+        to: "/crm/dentistry/records",
+        icon: menuIcons.calendar,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
+        label: "Заявки",
+        to: "/crm/dentistry/requests",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/dentistry/masters",
+        icon: menuIcons.user,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+    ],
 
     // Гостиница
     hostel: [
@@ -365,7 +487,6 @@ export const MENU_CONFIG = {
 
     // Магазин
     market: [
-
       {
         label: "История",
         to: "/crm/market/history",
@@ -784,45 +905,57 @@ export const MENU_CONFIG = {
   // Дополнительные услуги
   additional: [
     {
+      id: "whatsapp",
       label: "WhatsApp",
       to: "/crm/",
       icon: menuIcons.comments,
       permission: "can_view_whatsapp",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "instagram",
       label: "Instagram",
       to: "/crm/instagram",
       icon: menuIcons.instagramIcon,
       permission: "can_view_instagram",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "telegram",
       label: "Telegram",
       to: "/crm/",
       icon: menuIcons.comments,
       permission: "can_view_telegram",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "documents",
       label: "Документы",
       to: "/crm/documents",
       icon: menuIcons.documentScanner,
       permission: "can_view_documents",
+      permissionModel: "company",
       implemented: true,
     },
     {
+      id: "barcode-print",
       label: "Печать штрих-кодов",
       to: "/crm/barcodes",
       icon: menuIcons.documentScanner,
       permission: "can_view_market_label",
+      permissionModel: "user",
       implemented: true,
     },
     {
+      id: "scales",
       label: "Интеграция с весами",
       to: "/crm/scales",
       icon: menuIcons.scale,
       permission: "can_view_market_scales",
+      permissionModel: "user",
       implemented: true,
     },
   ],

@@ -136,7 +136,37 @@
   }
 
   &__button {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &--primary {
+      background: #ffd600;
+      color: #111;
+      border-color: #ffd600;
+
+      &:hover {
+        filter: brightness(0.95);
+      }
+    }
+
+    &--secondary {
+      background: #fff;
+      color: #111;
+      border-color: #d9d9d9;
+
+      &:hover {
+        border-color: #ffd600;
+        background: #fffdf1;
+      }
+    }
   }
 }
 

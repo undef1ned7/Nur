@@ -6,6 +6,7 @@ import { pdf } from "@react-pdf/renderer";
 import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./InvoicePdfDocument";
+import CommercialOfferPreviewModal from "./CommercialOfferPreviewModal";
 
 import "./InvoicePreviewModal.scss";
 import { useAlert } from "../../../../../hooks/useDialog";
@@ -26,6 +27,10 @@ const InvoicePreviewModal = ({
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+
+  const isCommercialOfferData = (data) =>
+    data?.doc_type === "COMMERCIAL_OFFER" ||
+    data?.document?.doc_type === "COMMERCIAL_OFFER";
 
   // Функция для преобразования warehouse документа в формат для PDF
   const transformWarehouseDocument = (doc) => {
@@ -83,6 +88,9 @@ const InvoicePreviewModal = ({
           const lineTotal = price * qty;
           return {
             id: item.id,
+            product_image_url: item.product_image_url || "",
+            image_url: item.product_image_url || item.image_url || "",
+            imageDataUrl: item.product_image_url || item.image_url || "",
             name:
               item.product_name ??
               item.product?.name ??
@@ -103,6 +111,29 @@ const InvoicePreviewModal = ({
             discount_percent: Number(item.discount_percent || 0),
             discount_amount: Number(item.discount_amount || 0),
             price_before_discount: String(price.toFixed(2)),
+            description:
+              item.product?.characteristics?.description ??
+              item.product?.description ??
+              item.description ??
+              item.product_description ??
+              "",
+            product_description:
+              item.product?.characteristics?.description ??
+              item.product?.description ??
+              item.description ??
+              item.product_description ??
+              "",
+            product_characteristics:
+              item.product_characteristics ??
+              item.product?.product_characteristics ??
+              item.product?.characteristics ??
+              item.characteristics ??
+              null,
+            characteristics:
+              item.product_characteristics ??
+              item.product?.characteristics ??
+              item.characteristics ??
+              null,
           };
         })
       : [];
@@ -133,7 +164,10 @@ const InvoicePreviewModal = ({
       document: {
         type: doc.doc_type?.toLowerCase() || "sale_invoice",
         doc_type: doc.doc_type || "SALE",
-        title: "Накладная",
+        title:
+          doc.doc_type === "COMMERCIAL_OFFER"
+            ? "Коммерческое предложение"
+            : "Накладная",
         id: doc.id,
         number: doc.number || "",
         date: doc.date || doc.created_at?.split("T")[0] || "",
@@ -279,9 +313,7 @@ const InvoicePreviewModal = ({
 
       if (!data) throw new Error("Нет данных для генерации PDF");
 
-      // Генерация PDF из JSON
       const blob = await pdf(<InvoicePdfDocument data={data} />).toBlob();
-
       const fileName = `invoice_${data?.document?.number || invoiceId}.pdf`;
       downloadBlob(blob, fileName);
     } catch (printError) {
@@ -333,10 +365,21 @@ const InvoicePreviewModal = ({
     );
   }
 
+  if (isCommercialOfferData(invoiceData || previewSourceData || initialDocument)) {
+    return (
+      <CommercialOfferPreviewModal
+        invoiceId={invoiceId}
+        invoiceData={invoiceData || previewSourceData || initialInvoiceData}
+        document={initialDocument}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <div className="invoice-preview-modal-overlay" onClick={onClose}>
       <div
-        className="invoice-preview-modal !h-[100%]"
+        className="invoice-preview-modal h-full!"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="invoice-preview-modal__header">

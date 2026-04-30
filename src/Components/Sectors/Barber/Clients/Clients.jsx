@@ -19,7 +19,7 @@ export const Clients = () => {
               activeTab === "barber" ? "barberclient__tab--active" : ""
             }`}
           >
-            Клиенты барбершоп
+            Клиенты
           </button>
           <button
             type="button"

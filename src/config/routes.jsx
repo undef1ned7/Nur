@@ -430,6 +430,16 @@ export const publicRoutes = [
     path="/barber/:company_slug/booking"
     element={<OnlineBooking />}
   />,
+  <Route
+    key="/services/:company_slug/booking"
+    path="/services/:company_slug/booking"
+    element={<OnlineBooking />}
+  />,
+  <Route
+    key="/dentistry/:company_slug/booking"
+    path="/dentistry/:company_slug/booking"
+    element={<OnlineBooking />}
+  />,
 
   <Route
     key="/submit-application"
@@ -506,6 +516,26 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("barber/client-documents", BarberClientDocuments),
   createProtectedRoute("barber/cash-reports", BarberAnalitika),
   createProtectedRoute("barber/requests", BarberRequests),
+  createProtectedRoute("services/services", BarberServices),
+  createProtectedRoute("services/warehouse", Sklad),
+  createProtectedRoute("services/masters", MastersTabs),
+  createProtectedRoute("services/history", BarberHistory),
+  createProtectedRoute("services/documents", BarberDocuments),
+  createProtectedRoute("services/records", Recorda),
+  createProtectedRoute("services/clients", BarberClients),
+  createProtectedRoute("services/client-documents", BarberClientDocuments),
+  createProtectedRoute("services/cash-reports", BarberAnalitika),
+  createProtectedRoute("services/requests", BarberRequests),
+  createProtectedRoute("dentistry/services", BarberServices),
+  createProtectedRoute("dentistry/warehouse", Sklad),
+  createProtectedRoute("dentistry/masters", MastersTabs),
+  createProtectedRoute("dentistry/history", BarberHistory),
+  createProtectedRoute("dentistry/documents", BarberDocuments),
+  createProtectedRoute("dentistry/records", Recorda),
+  createProtectedRoute("dentistry/clients", BarberClients),
+  createProtectedRoute("dentistry/client-documents", BarberClientDocuments),
+  createProtectedRoute("dentistry/cash-reports", BarberAnalitika),
+  createProtectedRoute("dentistry/requests", BarberRequests),
 
   // Hostel routes
   createProtectedRoute("hostel/rooms", RoomsHalls),

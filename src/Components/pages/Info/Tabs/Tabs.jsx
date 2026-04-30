@@ -76,7 +76,7 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
 
   // Определяем, является ли сфера "барбершоп"
   const isBarberSector = useMemo(() => {
-    return sectorName === "барбершоп" || sectorName === "салон красоты" || sectorName.includes("барбер") || sectorName.includes("парикмахер");
+    return sectorName === "барбершоп" || sectorName === "услуги" || sectorName === "стоматология" || sectorName === "салон красоты" || sectorName.includes("барбер") || sectorName.includes("парикмахер");
   }, [sectorName]);
 
   // Определяем, является ли сфера "кафе"

@@ -32,6 +32,7 @@ import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import Ko1PdfDocument from "./components/Ko1PdfDocument.jsx";
+import CommercialOfferPdfDocument from "./components/CommercialOfferPdfDocument.jsx";
 import { numberToWords } from "../../../../utils/numberToWords.js";
 import {
   fetchWarehouseCounterparties,
@@ -66,6 +67,96 @@ const VALID_DOC_TYPES = [
   "TRANSFER",
   "COMMERCIAL_OFFER",
 ];
+
+const getProductImages = (product) => {
+  if (!product) return [];
+  const images = Array.isArray(product.images) ? product.images : [];
+  const fallbackImage =
+    product.product_image_url ||
+    product.image_url ||
+    product.image ||
+    product.primary_image_url ||
+    product.primary_image ||
+    product.photo_url ||
+    product.photo ||
+    "";
+  return fallbackImage ? [...images, fallbackImage] : images;
+};
+
+const getImageSource = (image) => {
+  if (!image) return "";
+  if (typeof image === "string") return image;
+  return (
+    image.product_image_url ||
+    image.image_url ||
+    image.image ||
+    image.url ||
+    image.preview ||
+    image.photo_url ||
+    image.photo ||
+    ""
+  );
+};
+
+const toAbsoluteImageUrl = (src) => {
+  if (!src || /^(data:|blob:)/i.test(src)) return src || "";
+
+  if (/^https?:\/\//i.test(src)) return src;
+
+  const base =
+    import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
+    (typeof window !== "undefined" ? window.location.origin : "");
+  if (!base) return src;
+  return `${base}${src.startsWith("/") ? "" : "/"}${src}`;
+};
+
+const fetchImageAsDataUrl = async (src) => {
+  const url = toAbsoluteImageUrl(src);
+  if (!url || url.startsWith("data:")) return url;
+
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        resolve(dataUrl);
+      } catch (e) {
+        // Canvas tainted — пробуем без crossOrigin
+        resolve("");
+      }
+    };
+
+    img.onerror = () => {
+      // Если crossOrigin не работает — пробуем прямой URL в react-pdf.
+      resolve(url);
+    };
+
+    img.src = url;
+  });
+};
+
+const getProductCharacteristicText = (product) => {
+  if (!product) return "";
+  const ch = product.product_characteristics || product.characteristics || {};
+  const parts = [];
+
+  if (ch.height_cm) parts.push(`Высота: ${ch.height_cm} см`);
+  if (ch.width_cm) parts.push(`Ширина: ${ch.width_cm} см`);
+  if (ch.depth_cm) parts.push(`Глубина: ${ch.depth_cm} см`);
+  if (ch.factual_weight_kg) parts.push(`Вес: ${ch.factual_weight_kg} кг`);
+
+  const description = ch.description || product.description || "";
+  if (description) parts.push(String(description));
+
+  return parts.join("; ");
+};
 
 /** Остаток 0 с учётом строк из API (например "0.000"). */
 const isZeroStockQty = (quantity) => Number(quantity ?? 0) === 0;
@@ -1189,6 +1280,21 @@ const CreateSaleDocument = () => {
                 typeof it.product === "object" && it.product != null
                   ? (it.product?.article ?? it.article ?? it.product_article)
                   : (it.article ?? it.product_article ?? "");
+              const productObject =
+                typeof it.product === "object" && it.product != null
+                  ? it.product
+                  : null;
+              const characteristics =
+                productObject?.characteristics ??
+                it.product_characteristics ??
+                it.characteristics ??
+                null;
+              const description =
+                productObject?.description ??
+                productObject?.characteristics?.description ??
+                it.description ??
+                it.product_description ??
+                "";
               return {
                 id: it.id || `item-${Date.now()}-${idx}`,
                 productId: productId,
@@ -1207,6 +1313,16 @@ const CreateSaleDocument = () => {
                     ? Number(it.effective_discount_percent)
                     : undefined,
                 article: article ? String(article) : "",
+                images: getProductImages(productObject),
+                description,
+                product_description: description,
+                characteristics,
+                characteristic: getProductCharacteristicText(
+                  productObject || {
+                    description,
+                    characteristics,
+                  },
+                ),
                 addedAt: it.created_at || new Date().toISOString(),
                 created_at: it.created_at,
               };
@@ -1687,6 +1803,13 @@ const CreateSaleDocument = () => {
           discount: 0,
           discount_percent: 0,
           article: product.article || "",
+          images: getProductImages(product),
+          description:
+            product.characteristics?.description || product.description || "",
+          product_description:
+            product.characteristics?.description || product.description || "",
+          characteristics: product.characteristics || null,
+          characteristic: getProductCharacteristicText(product),
           addedAt: new Date().toISOString(),
         };
         setCartItems((prev) => [...prev, newItem]);
@@ -2153,6 +2276,38 @@ const CreateSaleDocument = () => {
     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   };
 
+  const prepareCommercialOfferItems = async (items) => {
+    return Promise.all(
+      items.map(async (item) => {
+        // Приоритет: product_image_url из API ответа (самый надёжный источник)
+        const rawSrc =
+          item.product_image_url ||
+          item.image_url ||
+          getImageSource(
+            Array.isArray(item.images) && item.images.length > 0
+              ? item.images.find((img) => img?.is_primary) || item.images[0]
+              : null,
+          ) ||
+          "";
+
+        if (!rawSrc) {
+          return { ...item, imageDataUrl: "" };
+        }
+
+        try {
+          const dataUrl = await fetchImageAsDataUrl(rawSrc);
+          if (dataUrl && dataUrl.startsWith("data:")) {
+            return { ...item, imageDataUrl: dataUrl };
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        return { ...item, imageDataUrl: "" };
+      }),
+    );
+  };
+
   // Сохранение и печать
   const handleSaveAndPrint = async (printType) => {
     // Используем ту же валидацию, что и для handleSave
@@ -2274,13 +2429,46 @@ const CreateSaleDocument = () => {
       const docDiscountPercent = Number(doc.discount_percent || 0);
       const docDiscountAmountFixed = Number(doc.discount_amount || 0);
 
+      const cartItemByProductId = new Map(
+        cartItems.map((item) => [
+          String(item.productId ?? item.product_id ?? item.product ?? ""),
+          item,
+        ]),
+      );
+
       const items = Array.isArray(doc.items)
         ? doc.items.map((item) => {
             const price = Number(item.price || 0);
             const qty = Number(item.qty || 0);
             const lineTotal = price * qty;
+            const productObject =
+              typeof item.product === "object" && item.product != null
+                ? item.product
+                : null;
+            const productId =
+              productObject?.id ??
+              productObject?.uuid ??
+              item.product_id ??
+              (productObject ? "" : item.product) ??
+              "";
+            const cartItem = cartItemByProductId.get(String(productId)) || {};
+            const characteristics =
+              productObject?.characteristics ??
+              item.product_characteristics ??
+              item.characteristics ??
+              cartItem.characteristics ??
+              null;
+            const description =
+              productObject?.characteristics?.description ??
+              productObject?.description ??
+              item.description ??
+              item.product_description ??
+              cartItem.description ??
+              cartItem.product_description ??
+              "";
             return {
               id: item.id,
+              product_id: productId,
               name:
                 item.product_name ??
                 item.product?.name ??
@@ -2300,6 +2488,38 @@ const CreateSaleDocument = () => {
                     item.product_article ??
                     "",
                 ).trim() || "",
+              images:
+                item.product_image_url
+                  ? [item.product_image_url]
+                  : getProductImages(productObject).length > 0
+                  ? getProductImages(productObject)
+                  : cartItem.images || [],
+              product_image_url:
+                item.product_image_url ||
+                productObject?.product_image_url ||
+                cartItem.product_image_url ||
+                "",
+              image_url:
+                item.product_image_url ||
+                productObject?.product_image_url ||
+                cartItem.image_url ||
+                "",
+              description,
+              product_description: description,
+              product_characteristics:
+                item.product_characteristics ||
+                productObject?.product_characteristics ||
+                characteristics,
+              characteristics,
+              characteristic:
+                getProductCharacteristicText(
+                  productObject || {
+                    description,
+                    characteristics,
+                  },
+                ) ||
+                cartItem.characteristic ||
+                "",
               discount_percent: Number(item.discount_percent || 0),
               discount_amount: Number(item.discount_amount || 0),
               price_before_discount: String(price.toFixed(2)),
@@ -2468,6 +2688,62 @@ const CreateSaleDocument = () => {
           <ReceiptPdfDocument data={receiptData} />,
         ).toBlob();
         downloadBlob(blob, `receipt_${docNumber}.pdf`);
+      } else if (printType === "commercial_offer") {
+        const commercialOfferItems = await prepareCommercialOfferItems(items);
+        const commercialOfferData = {
+          document: {
+            type: "commercial_offer",
+            title: "Коммерческое предложение",
+            id: doc.id,
+            number: docNumber,
+            date: currentDate.toISOString().split("T")[0],
+            datetime: doc.date || currentDate.toISOString(),
+            created_at: doc.created_at || currentDate.toISOString(),
+            discount_percent: docDiscountPercent,
+            discount_amount: docDiscountCombined,
+            discount_total: docDiscountCombined,
+            comment: doc.comment ?? "",
+          },
+          seller: {
+            id: company?.id || "",
+            name: company?.name || "",
+            inn: company?.inn || "",
+            okpo: company?.okpo || "",
+            score: company?.score || "",
+            bik: company?.bik || "",
+            address: company?.address || "",
+            phone: company?.phone || null,
+            email: company?.email || null,
+          },
+          buyer: selectedCounterparty
+            ? {
+                id: selectedCounterparty.id,
+                name: selectedCounterparty.name || buyerName || "",
+                inn: selectedCounterparty.inn || "",
+                address: selectedCounterparty.address || "",
+                phone: selectedCounterparty.phone || null,
+                email: selectedCounterparty.email || null,
+              }
+            : buyerName
+              ? { id: "", name: buyerName }
+              : null,
+          items: commercialOfferItems,
+          totals: {
+            subtotal: String(subtotal.toFixed(2)),
+            discount_total: String(totalDiscount.toFixed(2)),
+            tax_total: "0.00",
+            total: String(total.toFixed(2)),
+          },
+          warehouse: warehouseName,
+        };
+
+        const blob = await pdf(
+          <CommercialOfferPdfDocument data={commercialOfferData} />,
+        ).toBlob();
+        downloadBlob(
+          blob,
+          `commercial_offer_${String(docNumber).replace(/[^\w.-]+/g, "_")}.pdf`,
+        );
       } else if (printType === "esf_xml") {
         const xmlString = buildArchiveInvoiceXml({
           number: String(docNumber),
@@ -2513,22 +2789,18 @@ const CreateSaleDocument = () => {
           structuralUnit: "",
           documentNumber: String(docNumber),
           date: currentDate.toISOString().split("T")[0],
-          receivedFrom:
-            selectedCounterparty?.name || buyerName || "",
+          receivedFrom: selectedCounterparty?.name || buyerName || "",
           basis: doc.comment || comment || "Оплата по договору",
           amountNumber: total.toLocaleString("ru-RU", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           }),
           amountWords: numberToWords(total),
-          chiefAccountant:
-            userProfile?.full_name || userProfile?.name || "",
+          chiefAccountant: userProfile?.full_name || userProfile?.name || "",
           cashier: userProfile?.full_name || userProfile?.name || "",
         };
 
-        const blob = await pdf(
-          <Ko1PdfDocument data={ko1Data} />,
-        ).toBlob();
+        const blob = await pdf(<Ko1PdfDocument data={ko1Data} />).toBlob();
         downloadBlob(
           blob,
           `ko1_${String(docNumber).replace(/[^\w.-]+/g, "_")}.pdf`,
@@ -2556,7 +2828,8 @@ const CreateSaleDocument = () => {
           ? formatApiError(
               error?.response?.data || error?.payload || error?.error,
             )
-          : error?.message || "Не удалось сохранить документ или сформировать файл";
+          : error?.message ||
+            "Не удалось сохранить документ или сформировать файл";
       alert("Ошибка: " + errorMessage);
     }
   };
@@ -3008,6 +3281,13 @@ const CreateSaleDocument = () => {
                     <button onClick={() => handleSaveAndPrint("receipt")}>
                       Товарный чек
                     </button>
+                    {docType === "COMMERCIAL_OFFER" && (
+                      <button
+                        onClick={() => handleSaveAndPrint("commercial_offer")}
+                      >
+                        Коммерческое предложение
+                      </button>
+                    )}
                     <button onClick={() => handleSaveAndPrint("esf_xml")}>
                       Электронная счёт-фактура (XML)
                     </button>

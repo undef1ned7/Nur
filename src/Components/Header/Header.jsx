@@ -12,35 +12,45 @@ import NotificationModal from "../NotificationModal/NotificationModal";
 import "./Header.scss";
 
 const pageTitles = {
-  "/": "Вход",
+  "/": "Главная",
+  "/login": "Вход",
   "/register": "Регистрация",
+  "/submit-application": "Заявка",
+  "/get-application-list": "Заявки",
+
   "/crm/registration": "Регистрация",
   "/crm/obzor": "Обзор",
   "/crm/vitrina": "Витрины",
   "/crm/employ": "Сотрудники",
+  "/crm/employ/market": "Сотрудник",
   "/crm/zakaz": "Закупки",
   "/crm/sklad": "Склад",
+  "/crm/sklad/add-product": "Товар",
   "/crm/raspisanie": "Расписание",
-  "/crm/sklad-accounting": "Складской учет",
+  "/crm/sklad-accounting": "Складской учёт",
   "/crm/analytics": "Аналитика",
   "/crm/set": "Настройки",
+  "/crm/pos-print-settings": "Печать чеков",
   "/crm/debts": "Долги",
+  "/crm/pending": "Ожидание",
+  "/crm/logistics": "Логистика",
+  "/crm/logistics-analytics": "Аналитика логистики",
+  "/crm/sector": "Сфера",
+  "/crm/contact": "Контакты",
+  "/crm/additional-services": "Доп. услуги",
+  "/crm/shifts": "Смены",
+  "/crm/branch": "Филиалы",
+  "/crm/barcodes": "Штрихкоды",
+  "/crm/scales": "Весы",
+  "/crm/departament/analytics": "Аналитика отдела",
 
-  // --- добавлено ---
-  // Базовые
   "/crm/sell": "Продажа",
   "/crm/sell/start": "Продажа",
   "/crm/kassa": "Касса",
   "/crm/clients": "Клиенты",
   "/crm/departments": "Отделы",
-  "/crm/brand-category": "Бренд и Категория",
+  "/crm/brand-category": "Бренд и категория",
 
-  // Строительная сфера
-  "/crm/building/work": "Строительный отдел",
-  "/crm/building/objects": "Квартиры",
-  "/crm/building/employees": "Сотрудники",
-
-  // Барбершоп
   "/crm/barber/clients": "Клиенты",
   "/crm/barber/services": "Услуги",
   "/crm/barber/masters": "Сотрудники",
@@ -48,33 +58,85 @@ const pageTitles = {
   "/crm/barber/records": "Записи",
   "/crm/barber/requests": "Заявки",
   "/crm/barber/cash-reports": "Аналитика",
+  "/crm/barber/warehouse": "Склад",
+  "/crm/barber/client-documents": "Документы клиентов",
 
-  // Гостиница
+  "/crm/services/clients": "Клиенты",
+  "/crm/services/services": "Услуги",
+  "/crm/services/masters": "Сотрудники",
+  "/crm/services/history": "История",
+  "/crm/services/records": "Записи",
+  "/crm/services/requests": "Заявки",
+  "/crm/services/cash-reports": "Аналитика",
+  "/crm/services/warehouse": "Склад",
+  "/crm/services/documents": "Документы",
+  "/crm/services/client-documents": "Документы клиентов",
+
+  "/crm/dentistry/clients": "Клиенты",
+  "/crm/dentistry/services": "Услуги",
+  "/crm/dentistry/masters": "Сотрудники",
+  "/crm/dentistry/history": "История",
+  "/crm/dentistry/records": "Записи",
+  "/crm/dentistry/requests": "Заявки",
+  "/crm/dentistry/cash-reports": "Аналитика",
+  "/crm/dentistry/warehouse": "Склад",
+  "/crm/dentistry/documents": "Документы",
+  "/crm/dentistry/client-documents": "Документы клиентов",
+
   "/crm/hostel/rooms": "Комнаты",
   "/crm/hostel/bookings": "Бронирования",
   "/crm/hostel/bar": "Бар",
   "/crm/hostel/clients": "Клиенты",
   "/crm/hostel/analytics": "Аналитика",
   "/crm/hostel/kassa": "Касса",
+  "/crm/hostel/documents": "Документы",
+  "/crm/hostel/warehouse": "Склад",
 
-  // Школа
   "/crm/school/students": "Ученики",
   "/crm/school/groups": "Направления",
   "/crm/school/lessons": "Уроки",
   "/crm/school/teachers": "Сотрудники",
   "/crm/school/leads": "Заявки",
   "/crm/school/invoices": "Аналитика",
+  "/crm/school/documents": "Документы",
 
-  // Магазин
   "/crm/market/bar": "Бар",
   "/crm/market/history": "История",
   "/crm/market/analytics": "Аналитика",
+  "/crm/market/cashier": "Касса",
+  "/crm/market/categories": "Категории",
+  "/crm/market/procurement": "Закупки",
+  "/crm/market/procurement/receipt": "Приёмка",
+  "/crm/market/suppliers": "Поставщики",
+  "/crm/market/documents": "Документы",
+  "/crm/market/documents/create": "Новый документ",
 
-  // Кафе
+  "/crm/building/analytics": "Аналитика",
+  "/crm/building/cash-register": "Касса",
+  "/crm/building/cash-register/treaty": "Договор",
+  "/crm/building/cash-register/salary-payroll": "Ведомость",
+  "/crm/building/clients": "Клиенты",
+  "/crm/building/clients/suppliers": "Поставщик",
+  "/crm/building/clients/contractors": "Подрядчик",
+  "/crm/building/employees": "Сотрудники",
+  "/crm/building/notification": "Уведомления",
+  "/crm/building/work": "Работы",
+  "/crm/building/procurement": "Закупки",
+  "/crm/building/projects": "Жилые комплексы",
+  "/crm/building/drawings": "Чертежи",
+  "/crm/building/salary": "Зарплата",
+  "/crm/building/salary/employee": "Сотрудник",
+  "/crm/building/salary/payroll": "Ведомость",
+  "/crm/building/sell": "Продажа",
+  "/crm/building/stock": "Склад",
+  "/crm/building/stock/transfer": "Перемещение",
+  "/crm/building/treaty": "Договоры",
+
   "/crm/cafe/analytics": "Аналитика выплат",
   "/crm/cafe/menu": "Меню",
+  "/crm/cafe/menu/item": "Позиция меню",
   "/crm/cafe/orders": "Заказы",
-  "/crm/cafe/orders/history": "Заказы",
+  "/crm/cafe/orders/history": "История заказов",
   "/crm/cafe/payroll": "Зарплата",
   "/crm/cafe/purchasing": "Закупки",
   "/crm/cafe/reports": "Отчёты",
@@ -83,23 +145,82 @@ const pageTitles = {
   "/crm/cafe/stock": "Склад",
   "/crm/cafe/tables": "Столы",
   "/crm/cafe/kassa": "Касса",
+  "/crm/cafe/documents": "Документы",
+  "/crm/cafe/cook": "Кухня",
+  "/crm/cafe/inventory": "Инвентаризация",
+  "/crm/cafe/costing": "Калькуляция",
+  "/crm/cafe/costing/preparations": "Заготовка",
+
+  "/crm/consulting/client": "Клиенты",
+  "/crm/consulting/client-requests": "Заявки",
+  "/crm/consulting/kassa": "Касса",
+  "/crm/consulting/teachers": "Сотрудники",
+  "/crm/consulting/analytics": "Аналитика",
+  "/crm/consulting/bookings": "Бронирования",
+  "/crm/consulting/salary": "Зарплата",
+  "/crm/consulting/sale": "Продажа",
+  "/crm/consulting/services": "Услуги",
+
+  "/crm/warehouse/warehouses": "Склады",
+  "/crm/warehouse/analytics": "Аналитика",
+  "/crm/warehouse/clients": "Клиенты",
+  "/crm/warehouse/documents": "Документы",
+  "/crm/warehouse/documents/create": "Новый документ",
+  "/crm/warehouse/documents/edit": "Редактирование документа",
+  "/crm/warehouse/documents/money": "Денежные документы",
+  "/crm/warehouse/agents": "Агенты",
+  "/crm/warehouse/movements": "Движения",
+  "/crm/warehouse/products": "Товары",
+  "/crm/warehouse/stocks": "Остатки",
+  "/crm/warehouse/agent-stocks": "Остатки агента",
+  "/crm/warehouse/stocks/add-product": "Товар",
+  "/crm/warehouse/kassa": "Касса",
+  "/crm/warehouse/supply": "Поставки",
+  "/crm/warehouse/write_offs": "Списания",
+  "/crm/warehouse/brands": "Бренды",
+  "/crm/warehouse/categories": "Категории",
+  "/crm/warehouse/payment_categories": "Статьи оплат",
+  "/crm/warehouse/counterparties": "Контрагенты",
 
   "/crm/production/warehouse": "Склад",
+  "/crm/production/warehouse/add-product": "Готовая продукция",
   "/crm/production/analytics": "Аналитика",
+  "/crm/production/agents": "Агенты",
+  "/crm/production/catalog": "Каталог",
+  "/crm/production/request": "Заявки",
+  "/crm/production/sell": "Продажа",
+  "/crm/production/sell/start": "Продажа",
 
-  // Доп. услуги
+  "/crm/pilorama/warehouse": "Склад",
+
   "/crm/instagram": "Instagram",
   "/crm/documents": "Документы",
-  // ВНИМАНИЕ: один и тот же путь для WhatsApp и Telegram
   "/crm/": "Каналы",
-  "/crm/building/projects": "Жилые комплексы",
 };
+
+function resolvePageTitle(pathname) {
+  const exact = pageTitles[pathname];
+  if (exact) return exact;
+
+  let bestKey = "";
+  let bestTitle = null;
+  for (const key of Object.keys(pageTitles)) {
+    if (key === "/") continue;
+    if (pathname === key || pathname.startsWith(`${key}/`)) {
+      if (key.length > bestKey.length) {
+        bestKey = key;
+        bestTitle = pageTitles[key];
+      }
+    }
+  }
+  return bestTitle ?? "NurCRM";
+}
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const title = pageTitles[location.pathname] || "NurCRM";
+  const title = resolvePageTitle(location.pathname);
   const dispatch = useDispatch();
 
   const { list: notifications } = useSelector((state) => state.notification);

@@ -10,7 +10,21 @@ export const HIDE_RULES = [
     },
   },
   {
-    when: { tariff: "Старт", sectorNotIn: ["Кафе"] },
+    when: { tariff: "Старт", sectorIn: ["Магазин", "Цветочный магазин"] },
+    hide: {
+      labels: [
+        "Обзор",
+        "Закупки",
+        "Бронирование",
+        "Клиенты",
+        "Отделы",
+        "Аналитика Отделов",
+        "Филиалы",
+      ],
+    },
+  },
+  {
+    when: { tariff: "Старт", sectorNotIn: ["Кафе", "Магазин", "Цветочный магазин"] },
     hide: {
       labels: [
         "Обзор",
@@ -127,6 +141,36 @@ export const HIDE_RULES = [
     },
   },
   {
+    when: { sector: "Услуги" },
+    hide: {
+      toIncludes: [
+        "crm/employ",
+        "crm/clients",
+        "crm/analytics",
+        "/crm/brand-category",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
+  },
+  {
+    when: { sector: "Стоматология" },
+    hide: {
+      toIncludes: [
+        "crm/employ",
+        "crm/clients",
+        "crm/analytics",
+        "/crm/brand-category",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
+  },
+  {
     when: { sector: "Школа" },
     hide: {
       toIncludes: [
@@ -172,7 +216,6 @@ export const HIDE_RULES = [
         "/crm/debts",
         "/crm/brand-category",
         "/crm/branch",
-        "/crm/additional-services",
         "/crm/clients",
         "/crm/employ",
       ],

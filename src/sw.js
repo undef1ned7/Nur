@@ -1,7 +1,12 @@
 /* eslint-disable no-restricted-globals */
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
-import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from "workbox-strategies";
+import {
+  CacheFirst,
+  NetworkFirst,
+  NetworkOnly,
+  StaleWhileRevalidate,
+} from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
 // Precache build assets injected by vite-plugin-pwa
@@ -23,6 +28,12 @@ registerRoute(
   new StaleWhileRevalidate({
     cacheName: "assets",
   })
+);
+
+// External media should bypass CacheFirst to avoid no-response from empty cache.
+registerRoute(
+  ({ url }) => url.href.startsWith("https://app.nurcrm.kg/media/"),
+  new NetworkOnly()
 );
 
 // Images: cache-first with expiration

@@ -1,4 +1,9 @@
-import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  NavLink,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
 // Маппинг path (из URL сайдбара) в doc_type для подсветки при создании документа
 const DOC_TYPE_PATH_TO_API = {
@@ -10,6 +15,7 @@ const DOC_TYPE_PATH_TO_API = {
   receipt: "RECEIPT",
   write_off: "WRITE_OFF",
   transfer: "TRANSFER",
+  commercial_offer: "COMMERCIAL_OFFER",
 };
 
 /**
@@ -29,7 +35,9 @@ const MenuItem = ({
   const isDocumentsSection =
     to?.includes("warehouse/documents") && children?.length > 0;
   const createPageDocType = searchParams.get("doc_type");
-  const isOnCreatePage = location.pathname.includes("warehouse/documents/create");
+  const isOnCreatePage = location.pathname.includes(
+    "warehouse/documents/create",
+  );
 
   // Проверяем настройку автоматического закрытия сайдбара
   const shouldCloseOnClick = () => {
@@ -76,7 +84,7 @@ const MenuItem = ({
     to === "/crm/warehouse/brands" &&
     brandCategoryPaths.some(
       (path) =>
-        location.pathname === path || location.pathname.startsWith(path + "/")
+        location.pathname === path || location.pathname.startsWith(path + "/"),
     );
 
   return (
