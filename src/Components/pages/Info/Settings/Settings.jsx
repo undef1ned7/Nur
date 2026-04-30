@@ -1584,6 +1584,8 @@ const Settings = () => {
   const isBarberSector = useMemo(() => {
     return (
       sectorName === "барбершоп" ||
+      sectorName === "услуги" ||
+      sectorName === "стоматология" ||
       sectorName === "салон красоты" ||
       sectorName.includes("барбер") ||
       sectorName.includes("парикмахер")

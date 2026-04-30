@@ -328,10 +328,14 @@ const SECTOR_ACCESS_TYPES = {
 // Функция для получения всех доступных permissions на основе сектора
 const getAllAccessTypes = (sectorName, tariff = null) => {
   const basicAccess = [...BASIC_ACCESS_TYPES];
+  const normalizedSectorName =
+    sectorName === "Услуги" || sectorName === "Стоматология"
+      ? "Барбершоп"
+      : sectorName;
 
   // Для тарифа "Старт" — только базовые; кафе дополняем сектором без кухни
   if (tariff === "Старт") {
-    if (sectorName === "Кафе") {
+    if (normalizedSectorName === "Кафе") {
       const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
         (a) => a.backendKey !== "can_view_cafe_cook",
       );
@@ -340,7 +344,7 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
     return basicAccess;
   }
 
-  const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
+  const sectorAccess = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
   return [...basicAccess, ...sectorAccess];
 };
 

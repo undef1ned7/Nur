@@ -56,6 +56,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
 import { numberToWords } from "../../../../utils/numberToWords";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
+import { prepareItemsWithImages } from "./utils/prepareItemsWithImages";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -804,6 +805,13 @@ const Documents = () => {
             discount_percent: Number(item.discount_percent || 0),
             discount_amount: Number(item.discount_amount || 0),
             price_before_discount: String(price.toFixed(2)),
+            images: item.product_image_url
+              ? [item.product_image_url]
+              : Array.isArray(item.images)
+                ? item.images
+                : [],
+            product_image_url: item.product_image_url || "",
+            image_url: item.product_image_url || item.image_url || "",
           };
         })
       : [];
@@ -942,17 +950,23 @@ const Documents = () => {
     }
 
     const isCommercialOffer = doc?.doc_type === "COMMERCIAL_OFFER";
-    const blob = await pdf(
-      isCommercialOffer ? (
-        <CommercialOfferPdfDocument data={invoiceData} />
-      ) : (
-        <InvoicePdfDocument data={invoiceData} />
-      ),
-    ).toBlob();
+    if (isCommercialOffer) {
+      const itemsWithImages = await prepareItemsWithImages(invoiceData.items || []);
+      const dataWithImages = { ...invoiceData, items: itemsWithImages };
+      const blob = await pdf(
+        <CommercialOfferPdfDocument data={dataWithImages} />,
+      ).toBlob();
+      return {
+        blob,
+        fileName: `commercial_offer_${invoiceData?.document?.number || item.id}.pdf`,
+      };
+    }
 
-    const filePrefix = isCommercialOffer ? "commercial_offer" : "invoice";
-    const fileName = `${filePrefix}_${invoiceData?.document?.number || item.id}.pdf`;
-    return { blob, fileName };
+    const blob = await pdf(<InvoicePdfDocument data={invoiceData} />).toBlob();
+    return {
+      blob,
+      fileName: `invoice_${invoiceData?.document?.number || item.id}.pdf`,
+    };
   };
 
   const handlePrint = async (item, options = {}) => {
@@ -1511,7 +1525,7 @@ const Documents = () => {
                               <button
                                 className="documents__action-btn"
                                 onClick={() => handleDirectInvoicePrint(item)}
-                                title="Сразу на печать"
+                                title=""
                               >
                                 <Printer size={18} />
                               </button>

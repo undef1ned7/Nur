@@ -6,6 +6,8 @@ import { setSector, resetSector } from "../../store/slices/sectorSlice";
 
 const OPTIONS = [
   { id: "barber", title: "Барбершоп", desc: "Запись, услуги, мастера" },
+  { id: "services", title: "Услуги", desc: "Запись, услуги, мастера" },
+  { id: "dentistry", title: "Стоматология", desc: "Запись, услуги, мастера" },
   { id: "hostel", title: "Гостиница", desc: "Комнаты, заезды, гости" },
   { id: "school", title: "Школа", desc: "Ученики, группы, уроки" },
 ];

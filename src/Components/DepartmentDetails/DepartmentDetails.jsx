@@ -319,6 +319,10 @@ const isOwner = (u) =>
 // Функция для получения всех доступных permissions на основе сектора и тарифа
 const getAllAccessTypes = (sectorName, tariff = null) => {
   console.log("getAllAccessTypes - sectorName:", sectorName, "tariff:", tariff);
+  const normalizedSectorName =
+    sectorName === "Услуги" || sectorName === "Стоматология"
+      ? "Барбершоп"
+      : sectorName;
 
   let basicAccess = [...BASIC_ACCESS_TYPES];
 
@@ -344,7 +348,7 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
     );
 
     // Кафе в «Старт»: секторные права без кухни (повар/KDS)
-    if (sectorName === "Кафе") {
+    if (normalizedSectorName === "Кафе") {
       const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
         (a) => a.backendKey !== "can_view_cafe_cook",
       );
@@ -354,7 +358,7 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
     return basicAccess;
   }
 
-  const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
+  const sectorAccess = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
   const result = [...basicAccess, ...sectorAccess];
   console.log("getAllAccessTypes - Other tariff, result:", result);
   return result;

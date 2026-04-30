@@ -387,7 +387,11 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
   
   const getAllAccessTypes = (sectorName) => {
     const basicAccess = [...BASIC_ACCESS_TYPES];
-    const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
+    const normalizedSectorName =
+      sectorName === "Услуги" || sectorName === "Стоматология"
+        ? "Барбершоп"
+        : sectorName;
+    const sectorAccess = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
     return [...basicAccess, ...sectorAccess];
   };
   

@@ -141,6 +141,36 @@ export const HIDE_RULES = [
     },
   },
   {
+    when: { sector: "Услуги" },
+    hide: {
+      toIncludes: [
+        "crm/employ",
+        "crm/clients",
+        "crm/analytics",
+        "/crm/brand-category",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
+  },
+  {
+    when: { sector: "Стоматология" },
+    hide: {
+      toIncludes: [
+        "crm/employ",
+        "crm/clients",
+        "crm/analytics",
+        "/crm/brand-category",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
+  },
+  {
     when: { sector: "Школа" },
     hide: {
       toIncludes: [

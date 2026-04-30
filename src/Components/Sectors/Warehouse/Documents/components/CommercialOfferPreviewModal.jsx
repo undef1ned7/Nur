@@ -6,6 +6,7 @@ import { pdf } from "@react-pdf/renderer";
 import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
 import CommercialOfferPdfDocument from "./CommercialOfferPdfDocument";
+import { prepareItemsWithImages } from "../utils/prepareItemsWithImages";
 
 import "./InvoicePreviewModal.scss";
 import { useAlert } from "../../../../../hooks/useDialog";
@@ -176,44 +177,6 @@ const CommercialOfferPreviewModal = ({
       warehouse: warehouseName,
       warehouse_to: warehouseToName,
     };
-  };
-
-  const prepareItemsWithImages = async (items) => {
-    return Promise.all(
-      items.map(async (item) => {
-        const rawSrc = item.product_image_url || item.image_url || "";
-        if (!rawSrc) return { ...item, imageDataUrl: "" };
-
-        try {
-          const dataUrl = await new Promise((resolve) => {
-            const img = new window.Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => {
-              try {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.naturalWidth || img.width;
-                canvas.height = img.naturalHeight || img.height;
-                canvas.getContext("2d").drawImage(img, 0, 0);
-                resolve(canvas.toDataURL("image/jpeg", 0.85));
-              } catch (e) {
-                resolve("");
-              }
-            };
-            img.onerror = () => resolve("");
-            img.src = rawSrc;
-          });
-          return {
-            ...item,
-            imageDataUrl:
-              typeof dataUrl === "string" && dataUrl.startsWith("data:")
-                ? dataUrl
-                : "",
-          };
-        } catch (e) {
-          return { ...item, imageDataUrl: "" };
-        }
-      }),
-    );
   };
 
   const downloadBlob = (blob, filename) => {

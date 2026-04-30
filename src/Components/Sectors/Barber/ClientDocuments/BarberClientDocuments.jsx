@@ -231,8 +231,7 @@ const BarberClientDocuments = () => {
       <header className="barber-client-docs__head">
         <h1 className="barber-client-docs__title">Документы клиентов</h1>
         <p className="barber-client-docs__subtitle">
-          Файлы в карточке клиента барбершопа: загрузка, комментарий, замена и
-          удаление.
+          Файлы в карточке клиента: загрузка, комментарий, замена и удаление.
         </p>
       </header>
 
@@ -513,9 +512,7 @@ const BarberClientDocuments = () => {
                     type="file"
                     className="barber-client-docs__fileInputNative"
                     aria-label="Выбрать новый файл"
-                    onChange={(ev) =>
-                      setEditFile(ev.target.files?.[0] || null)
-                    }
+                    onChange={(ev) => setEditFile(ev.target.files?.[0] || null)}
                     disabled={editBusy}
                   />
                   <label
