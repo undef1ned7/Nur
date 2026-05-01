@@ -12,9 +12,16 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  CalendarRange,
+  Tag,
+  Download,
 } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import { useUser } from "../../../../store/slices/userSlice";
+import { numberToWords } from "../../../../utils/numberToWords";
+import Ko1PdfDocument from "../Documents/components/Ko1PdfDocument.jsx";
 import "../../../Deposits/Kassa/kassa.scss";
 import "./WarehouseKassa.scss";
 
@@ -27,6 +34,36 @@ const money = (v) =>
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("ru-RU") : "—");
 const statusLabel = (s) =>
   s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
+
+const parseAmount = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = String(value ?? "")
+    .replace(/\s/g, "")
+    .replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const formatKo1Date = (value) => {
+  if (!value) return new Date().toISOString().split("T")[0];
+  if (typeof value === "string") return value.split("T")[0];
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()))
+    return new Date().toISOString().split("T")[0];
+  return date.toISOString().split("T")[0];
+};
+
+const triggerPdfDownload = (blob, filename) => {
+  if (typeof window === "undefined" || !window.URL) return;
+  const url = window.URL.createObjectURL(blob);
+  const a = window.document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  window.document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};
 
 /* ──────────────────────────────── Запросы кассы (inbox) ──────────────────────────────── */
 const CashRequestsInbox = () => {
@@ -466,6 +503,7 @@ const CashRegisterList = () => {
 const CashRegisterDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { company, profile } = useUser();
   const [operations, setOperations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -478,6 +516,10 @@ const CashRegisterDetail = () => {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentFilterId, setAgentFilterId] = useState("");
   const [counterpartyFilterId, setCounterpartyFilterId] = useState("");
+  const [dateFromFilter, setDateFromFilter] = useState("");
+  const [dateToFilter, setDateToFilter] = useState("");
+  const [categoryFilterId, setCategoryFilterId] = useState("");
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [docs, setDocs] = useState([]);
   const [docsCount, setDocsCount] = useState(0);
   const [docsLoading, setDocsLoading] = useState(false);
@@ -493,6 +535,7 @@ const CashRegisterDetail = () => {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createAsPosted, setCreateAsPosted] = useState(true);
+  const [ko1DownloadingId, setKo1DownloadingId] = useState(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -569,6 +612,24 @@ const CashRegisterDetail = () => {
   const receipts = operations?.receipts ?? [];
   const expenses = operations?.expenses ?? [];
 
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        agentFilterId ||
+        counterpartyFilterId ||
+        dateFromFilter ||
+        dateToFilter ||
+        categoryFilterId,
+      ),
+    [
+      agentFilterId,
+      counterpartyFilterId,
+      dateFromFilter,
+      dateToFilter,
+      categoryFilterId,
+    ],
+  );
+
   useEffect(() => {
     if (!id) return;
     const params = {
@@ -586,6 +647,15 @@ const CashRegisterDetail = () => {
     }
     if (counterpartyFilterId) {
       params.counterparty = counterpartyFilterId;
+    }
+    if (dateFromFilter) {
+      params.date_from = dateFromFilter;
+    }
+    if (dateToFilter) {
+      params.date_to = dateToFilter;
+    }
+    if (categoryFilterId) {
+      params.payment_category = categoryFilterId;
     }
     setDocsLoading(true);
     setDocsError("");
@@ -606,13 +676,29 @@ const CashRegisterDetail = () => {
       .finally(() => {
         setDocsLoading(false);
       });
-  }, [id, activeTab, agentFilterId, counterpartyFilterId, currentPage]);
+  }, [
+    id,
+    activeTab,
+    agentFilterId,
+    counterpartyFilterId,
+    dateFromFilter,
+    dateToFilter,
+    categoryFilterId,
+    currentPage,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(docsCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, agentFilterId, counterpartyFilterId]);
+  }, [
+    activeTab,
+    agentFilterId,
+    counterpartyFilterId,
+    dateFromFilter,
+    dateToFilter,
+    categoryFilterId,
+  ]);
 
   const fromItem = docsCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const toItem = Math.min(currentPage * PAGE_SIZE, docsCount);
@@ -640,8 +726,8 @@ const CashRegisterDetail = () => {
 
   const submitMoneyDoc = async (docType) => {
     const amountNum = Number(String(form.amount || "").replace(",", "."));
-    if (!form.counterparty?.trim() || !form.payment_category?.trim()) {
-      setCreateError("Выберите контрагента и категорию");
+    if (!form.payment_category?.trim()) {
+      setCreateError("Выберите категорию");
       return;
     }
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -654,7 +740,7 @@ const CashRegisterDetail = () => {
       const payload = {
         doc_type: docType,
         cash_register: id,
-        counterparty: form.counterparty.trim(),
+        counterparty: form.counterparty?.trim() || null,
         payment_category: form.payment_category.trim(),
         amount: amountNum,
         comment: (form.comment || "").trim(),
@@ -676,6 +762,64 @@ const CashRegisterDetail = () => {
       setCreating(false);
     }
   };
+
+  const buildKo1DataFromMoneyDocument = useCallback(
+    (doc) => {
+      const amount = parseAmount(doc?.amount);
+      const counterparty =
+        doc?.counterparty?.name ||
+        doc?.counterparty?.full_name ||
+        doc?.counterparty_display_name ||
+        doc?.counterparty ||
+        "";
+
+      return {
+        doc_type: doc?.doc_type,
+        organization: company?.name || "",
+        structuralUnit: "",
+        documentNumber: String(doc?.number || doc?.id || ""),
+        date: formatKo1Date(doc?.date || doc?.created_at),
+        receivedFrom: counterparty,
+        basis:
+          doc?.comment || doc?.payment_category_title || "Оплата по договору",
+        amountNumber: amount.toLocaleString("ru-RU", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        amountWords: numberToWords(amount),
+        chiefAccountant: profile?.full_name || profile?.name || "",
+        cashier: profile?.full_name || profile?.name || "",
+      };
+    },
+    [company?.name, profile?.full_name, profile?.name],
+  );
+
+  const handleDownloadKo1 = useCallback(
+    async (row) => {
+      if (!row?.id) return;
+      setKo1DownloadingId(row.id);
+      try {
+        const doc = await warehouseAPI.getMoneyDocumentById(row.id);
+        const ko1Data = buildKo1DataFromMoneyDocument(doc || row);
+        const blob = await pdf(<Ko1PdfDocument data={ko1Data} />).toBlob();
+        const safeName = String(row.number || row.id).replace(
+          /[^\w.\-]+/g,
+          "_",
+        );
+        triggerPdfDownload(blob, `KO-1_${safeName}.pdf`);
+      } catch (err) {
+        console.error("Ошибка скачивания КО-1:", err);
+        const msg =
+          err?.message ||
+          err?.detail ||
+          (typeof err === "string" ? err : "Не удалось сформировать КО-1");
+        window.alert("Ошибка: " + msg);
+      } finally {
+        setKo1DownloadingId(null);
+      }
+    },
+    [buildKo1DataFromMoneyDocument],
+  );
 
   if (!id) {
     return (
@@ -759,80 +903,151 @@ const CashRegisterDetail = () => {
 
       {error && <div className="kassa__alert kassa__alert--error">{error}</div>}
 
-      <div className="warehouse-kassa__filters-wrap">
-        <div className="warehouse-kassa__filters">
-          <div className="warehouse-kassa__filters-head">
-            <Filter size={18} className="warehouse-kassa__filters-icon" />
-            <span className="warehouse-kassa__filters-title">Фильтры</span>
-            {(agentFilterId || counterpartyFilterId) && (
-              <button
-                type="button"
-                className="warehouse-kassa__filters-reset"
-                onClick={() => {
-                  setAgentFilterId("");
-                  setCounterpartyFilterId("");
-                }}
-                title="Сбросить фильтры"
-              >
-                <RotateCcw size={14} />
-                Сбросить
-              </button>
-            )}
-          </div>
-          <div className="warehouse-kassa__filter-row">
-            <div className="warehouse-kassa__filter-group">
-              <label className="warehouse-kassa__filter-label">
-                <User size={14} />
-                Агент
-              </label>
-              <select
-                className="warehouse-kassa__filter-select"
-                value={agentFilterId}
-                onChange={(e) => {
-                  setAgentFilterId(e.target.value);
-                  setCounterpartyFilterId("");
-                }}
-                disabled={agentsLoading}
-                title="Фильтр по агенту"
-              >
-                <option value="">Все агенты</option>
-                {agentsList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="warehouse-kassa__filter-group">
-              <label className="warehouse-kassa__filter-label">
-                <Users size={14} />
-                Контрагент
-              </label>
-              <select
-                className="warehouse-kassa__filter-select"
-                value={counterpartyFilterId}
-                onChange={(e) => setCounterpartyFilterId(e.target.value)}
-                title="Фильтр по контрагенту"
-              >
-                <option value="">Все контрагенты</option>
-                {counterparties.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? c.full_name ?? c.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="warehouse-kassa__filters-count">
-              <span className="warehouse-kassa__filters-count-value">
-                {docsCount}
+      <div className="warehouse-kassa__filters-bar">
+        <button
+          type="button"
+          className={`warehouse-kassa__filters-toggle ${
+            filtersPanelOpen ? "warehouse-kassa__filters-toggle--open" : ""
+          } ${hasActiveFilters ? "warehouse-kassa__filters-toggle--has-active" : ""}`}
+          onClick={() => setFiltersPanelOpen((open) => !open)}
+          aria-expanded={filtersPanelOpen}
+          title={filtersPanelOpen ? "Скрыть фильтры" : "Показать фильтры"}
+        >
+          <Filter size={18} className="warehouse-kassa__filters-toggle-icon" />
+          <span>Фильтры</span>
+          {hasActiveFilters && (
+            <span className="warehouse-kassa__filters-toggle-dot" aria-hidden />
+          )}
+        </button>
+      </div>
+
+      {filtersPanelOpen && (
+        <div className="warehouse-kassa__filters-wrap">
+          <div className="warehouse-kassa__filters">
+            <div className="warehouse-kassa__filters-head">
+              <span className="warehouse-kassa__filters-title">
+                Настройка фильтров
               </span>
-              <span className="warehouse-kassa__filters-count-label">
-                записей
-              </span>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="warehouse-kassa__filters-reset"
+                  onClick={() => {
+                    setAgentFilterId("");
+                    setCounterpartyFilterId("");
+                    setDateFromFilter("");
+                    setDateToFilter("");
+                    setCategoryFilterId("");
+                  }}
+                  title="Сбросить фильтры"
+                >
+                  <RotateCcw size={14} />
+                  Сбросить
+                </button>
+              )}
+            </div>
+            <div className="warehouse-kassa__filter-row">
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <User size={14} />
+                  Агент
+                </label>
+                <select
+                  className="warehouse-kassa__filter-select"
+                  value={agentFilterId}
+                  onChange={(e) => {
+                    setAgentFilterId(e.target.value);
+                    setCounterpartyFilterId("");
+                  }}
+                  disabled={agentsLoading}
+                  title="Фильтр по агенту"
+                >
+                  <option value="">Все агенты</option>
+                  {agentsList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <Users size={14} />
+                  Контрагент
+                </label>
+                <select
+                  className="warehouse-kassa__filter-select"
+                  value={counterpartyFilterId}
+                  onChange={(e) => setCounterpartyFilterId(e.target.value)}
+                  title="Фильтр по контрагенту"
+                >
+                  <option value="">Все контрагенты</option>
+                  {counterparties.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name ?? c.full_name ?? c.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="warehouse-kassa__filters-count">
+                <span className="warehouse-kassa__filters-count-value">
+                  {docsCount}
+                </span>
+                <span className="warehouse-kassa__filters-count-label">
+                  записей
+                </span>
+              </div>
+            </div>
+            <div className="warehouse-kassa__filter-row warehouse-kassa__filter-row--secondary">
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <CalendarRange size={14} />
+                  Дата с
+                </label>
+                <input
+                  type="date"
+                  className="warehouse-kassa__filter-date"
+                  value={dateFromFilter}
+                  onChange={(e) => setDateFromFilter(e.target.value)}
+                  title="Начало периода"
+                />
+              </div>
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <CalendarRange size={14} />
+                  Дата по
+                </label>
+                <input
+                  type="date"
+                  className="warehouse-kassa__filter-date"
+                  value={dateToFilter}
+                  onChange={(e) => setDateToFilter(e.target.value)}
+                  title="Конец периода"
+                />
+              </div>
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <Tag size={14} />
+                  Категория платежа
+                </label>
+                <select
+                  className="warehouse-kassa__filter-select"
+                  value={categoryFilterId}
+                  onChange={(e) => setCategoryFilterId(e.target.value)}
+                  title="Фильтр по категории"
+                >
+                  <option value="">Все категории</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title ?? c.name ?? c.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="kassa-table-container">
         {docsLoading ? (
@@ -840,7 +1055,10 @@ const CashRegisterDetail = () => {
             Загрузка…
           </div>
         ) : docsError ? (
-          <div className="kassa__alert kassa__alert--error" style={{ padding: 40 }}>
+          <div
+            className="kassa__alert kassa__alert--error"
+            style={{ padding: 40 }}
+          >
             {docsError}
           </div>
         ) : !docs.length ? (
@@ -860,6 +1078,7 @@ const CashRegisterDetail = () => {
                     <th>Категория</th>
                     <th>Сумма</th>
                     <th>Статус</th>
+                    <th className="warehouse-kassa__ko1-col">КО-1</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -874,6 +1093,20 @@ const CashRegisterDetail = () => {
                       <td>{row.payment_category_title ?? "—"}</td>
                       <td>{money(row.amount)}</td>
                       <td>{statusLabel(row.status)}</td>
+                      <td className="warehouse-kassa__ko1-col">
+                        <button
+                          type="button"
+                          className="warehouse-kassa__ko1-btn kassa__btn kassa__btn--secondary"
+                          onClick={() => handleDownloadKo1(row)}
+                          disabled={ko1DownloadingId === row.id}
+                          title="Скачать КО-1 (PDF)"
+                        >
+                          <Download size={16} />
+                          {ko1DownloadingId === row.id
+                            ? "Печатается…"
+                            : "Печать КО-1"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -944,7 +1177,7 @@ const CashRegisterDetail = () => {
               </div>
             )}
             <div className="kassa-modal__section">
-              <label className="kassa-modal__label">Контрагент *</label>
+              <label className="kassa-modal__label">Контрагент</label>
               <select
                 className="kassa-modal__input"
                 value={form.counterparty}
@@ -1058,7 +1291,7 @@ const CashRegisterDetail = () => {
               </div>
             )}
             <div className="kassa-modal__section">
-              <label className="kassa-modal__label">Контрагент *</label>
+              <label className="kassa-modal__label">Контрагент</label>
               <select
                 className="kassa-modal__input"
                 value={form.counterparty}

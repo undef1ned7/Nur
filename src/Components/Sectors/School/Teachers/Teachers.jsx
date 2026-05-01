@@ -1077,6 +1077,8 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
 import "./Teachers.scss";
 import api from "../../../../api";
+import { useUser } from "../../../../store/slices/userSlice";
+import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
 
 /* ===== API ===== */
 const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
@@ -1159,6 +1161,7 @@ const isEmailValid = (email) => {
 };
 
 const SchoolTeachers = () => {
+  const { company } = useUser();
   /* ===== tabs ===== */
   const [tab, setTab] = useState("employees"); // 'employees' | 'roles'
 
@@ -1488,7 +1491,15 @@ const SchoolTeachers = () => {
     if (!roleChoiceKeys.has(roleChoice))
       return setEmpErr("Выберите доступную роль.");
 
-    const payload = { email, first_name, last_name };
+    const accessDefaults = getNewEmployeeAccessDefaults(
+      company?.sector?.name,
+    );
+    const payload = {
+      email,
+      first_name,
+      last_name,
+      ...accessDefaults,
+    };
     if (roleChoice.startsWith("sys:")) {
       payload.role = roleChoice.slice(4); // 'admin' | 'owner'
       payload.custom_role = null;
@@ -1500,7 +1511,21 @@ const SchoolTeachers = () => {
     setEmpSaving(true);
     setEmpErr("");
     try {
-      await api.post(EMPLOYEES_CREATE_URL, payload);
+      const { data } = await api.post(EMPLOYEES_CREATE_URL, payload);
+      const newId = data?.id;
+      if (newId) {
+        try {
+          await api.patch(EMPLOYEE_ITEM_URL(newId), accessDefaults);
+        } catch (syncErr) {
+          console.error(syncErr);
+          setEmpErr(
+            pickApiError(
+              syncErr,
+              "Сотрудник создан, но доступ к настройкам не применился автоматически. Задайте доступы вручную.",
+            ),
+          );
+        }
+      }
       await fetchEmployees();
       setEmpCreateOpen(false);
       setEmpForm(emptyEmp);

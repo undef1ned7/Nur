@@ -11,6 +11,8 @@ import {
 } from "react-icons/fa";
 import "./Teachers.scss";
 import api from "../../../../api";
+import { useUser } from "../../../../store/slices/userSlice";
+import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
 
 /* ===== API ===== */
 const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
@@ -153,6 +155,7 @@ const S_PER_PAGE = 10;
 const SL_PER_PAGE = 10;
 
 function ConsultingSchoolTeachers() {
+  const { company } = useUser();
   /* ===== tabs ===== */
   const [tab, setTab] = useState("employees"); // 'employees' | 'roles'
 
@@ -635,12 +638,16 @@ function ConsultingSchoolTeachers() {
       return setEmpErr("Процент должен быть числом от 0 до 100.");
 
     const commissionValue = Number(pctParsed.toFixed(2));
+    const accessDefaults = getNewEmployeeAccessDefaults(
+      company?.sector?.name,
+    );
     const payload = {
       email,
       first_name,
       last_name,
       commission_percent: commissionValue,
       commission: commissionValue,
+      ...accessDefaults,
     };
     if (roleChoice.startsWith("sys:")) {
       payload.role = roleChoice.slice(4);
@@ -653,7 +660,21 @@ function ConsultingSchoolTeachers() {
     setEmpSaving(true);
     setEmpErr("");
     try {
-      await api.post(EMPLOYEES_CREATE_URL, payload);
+      const { data } = await api.post(EMPLOYEES_CREATE_URL, payload);
+      const newId = data?.id;
+      if (newId) {
+        try {
+          await api.patch(EMPLOYEE_ITEM_URL(newId), accessDefaults);
+        } catch (syncErr) {
+          console.error(syncErr);
+          setEmpErr(
+            pickApiError(
+              syncErr,
+              "Сотрудник создан, но доступ к настройкам не применился автоматически. Задайте доступы вручную.",
+            ),
+          );
+        }
+      }
       await fetchEmployees();
     } catch (err) {
       console.error(err);

@@ -190,7 +190,7 @@ export const ADDITIONAL_SERVICES_CONFIG = [
     id: SERVICE_IDS.CASHIER,
     type: "navigational",
     label: "Интерфейс кассира",
-    to: "/crm/additional-services",
+    to: "/crm/market/cashier",
     icon: menuIcons.cashRegister,
     implemented: true,
     conditions: {

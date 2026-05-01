@@ -285,8 +285,8 @@ const MoneyDocumentsPage = () => {
     const counterparty = form.counterparty?.trim();
     const payment_category = form.payment_category?.trim();
     const amount = String(form.amount ?? "").trim();
-    if (!cash_register || !counterparty || !payment_category || !amount) {
-      setCreateError("Заполните кассу, контрагента, категорию и сумму");
+    if (!cash_register || !payment_category || !amount) {
+      setCreateError("Заполните кассу, категорию и сумму");
       return;
     }
     const amountNum = Number(amount.replace(/\s/g, "").replace(",", "."));
@@ -299,7 +299,7 @@ const MoneyDocumentsPage = () => {
       const created = await warehouseAPI.createMoneyDocument({
         doc_type: apiDocType,
         cash_register,
-        counterparty,
+        counterparty: counterparty || null,
         payment_category,
         amount: amountNum,
         comment: form.comment?.trim() || "",
@@ -418,6 +418,7 @@ const MoneyDocumentsPage = () => {
         "";
 
       return {
+        doc_type: doc?.doc_type,
         organization: company?.name || "",
         structuralUnit: "",
         documentNumber: String(doc?.number || doc?.id || ""),
@@ -786,14 +787,13 @@ const MoneyDocumentsPage = () => {
                 </select>
               </div>
               <div className="money-documents-page__field">
-                <label htmlFor="money-doc-counterparty">Контрагент *</label>
+                <label htmlFor="money-doc-counterparty">Контрагент</label>
                 <select
                   id="money-doc-counterparty"
                   value={form.counterparty}
                   onChange={(e) =>
                     handleFormChange("counterparty", e.target.value)
                   }
-                  required
                 >
                   <option value="">введите</option>
                   {counterparties.map((c) => (
