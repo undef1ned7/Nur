@@ -774,6 +774,7 @@ const CashRegisterDetail = () => {
         "";
 
       return {
+        doc_type: doc?.doc_type,
         organization: company?.name || "",
         structuralUnit: "",
         documentNumber: String(doc?.number || doc?.id || ""),

@@ -316,6 +316,13 @@ function safe(v) {
 export default function Ko1PdfDocument({ data }) {
   const { day, monthName, year } = parseYmd(data.date);
   const { rub, kop } = splitRubKop(data.amountNumber);
+  const isExpense = data.doc_type === "MONEY_EXPENSE";
+  const headerTitle = isExpense
+    ? "РАСХОДНЫЙ КАССОВЫЙ ОРДЕР"
+    : "ПРИХОДНЫЙ КАССОВЫЙ ОРДЕР";
+  const orderLinkPhrase = isExpense
+    ? "расходному кассовому ордеру"
+    : "приходному кассовому ордеру";
 
   return (
     <Document>
@@ -362,7 +369,7 @@ export default function Ko1PdfDocument({ data }) {
             </View>
           )}
 
-          <Text style={styles.headerTitle}>ПРИХОДНЫЙ КАССОВЫЙ ОРДЕР</Text>
+          <Text style={styles.headerTitle}>{headerTitle}</Text>
 
           <View style={styles.rowBetween}>
             <Text style={styles.label}>Номер документа</Text>
@@ -511,7 +518,7 @@ export default function Ko1PdfDocument({ data }) {
         <View style={styles.rightSection}>
           <Text style={styles.receiptTitle}>КВИТАНЦИЯ</Text>
           <Text style={styles.receiptText}>
-            к приходному кассовому ордеру № {safe(data.documentNumber)}
+            к {orderLinkPhrase} № {safe(data.documentNumber)}
           </Text>
           <Text style={styles.receiptText}>
             от &quot;{day}&quot; {monthName} {year} г.
