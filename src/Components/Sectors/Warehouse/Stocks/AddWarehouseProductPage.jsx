@@ -75,7 +75,7 @@ const AddWarehouseProductPage = () => {
   const categories = useSelector((state) => state.warehouse.categories || []);
 
   const warehousesLoading = useSelector(
-    (state) => state.warehouse.loading || false
+    (state) => state.warehouse.loading || false,
   );
 
   // Состояние для выбора склада
@@ -138,7 +138,7 @@ const AddWarehouseProductPage = () => {
       root.querySelectorAll("form").forEach((f) => {
         try {
           f.setAttribute("autocomplete", "off");
-        } catch { }
+        } catch {}
       });
       // инпуты/текстовые поля
       root.querySelectorAll("input, textarea").forEach((el) => {
@@ -148,7 +148,7 @@ const AddWarehouseProductPage = () => {
           el.setAttribute("autocapitalize", "none");
           el.setAttribute("spellcheck", "false");
           el.setAttribute("autosave", "off");
-        } catch { }
+        } catch {}
       });
     };
 
@@ -289,7 +289,9 @@ const AddWarehouseProductPage = () => {
       setWarehouseGroupsLoading(true);
       setWarehouseGroupsError(null);
       try {
-        const { data } = await api.get(`/warehouse/${selectedWarehouse}/groups/`);
+        const { data } = await api.get(
+          `/warehouse/${selectedWarehouse}/groups/`,
+        );
         const list = Array.isArray(data) ? data : data?.results || [];
         if (!cancelled) setWarehouseGroups(list);
       } catch (e) {
@@ -354,7 +356,7 @@ const AddWarehouseProductPage = () => {
     });
     for (const [k, arr] of byParent.entries()) {
       arr.sort((a, b) =>
-        String(a?.name || "").localeCompare(String(b?.name || ""))
+        String(a?.name || "").localeCompare(String(b?.name || "")),
       );
       byParent.set(k, arr);
     }
@@ -409,9 +411,9 @@ const AddWarehouseProductPage = () => {
             product_group:
               String(
                 product?.product_group?.id ??
-                product?.product_group?.uuid ??
-                product?.product_group ??
-                ""
+                  product?.product_group?.uuid ??
+                  product?.product_group ??
+                  "",
               ) || "",
             price: product.price || "",
             quantity: product.quantity || "",
@@ -471,9 +473,9 @@ const AddWarehouseProductPage = () => {
           console.error("Ошибка при загрузке товара:", error);
           showAlert(
             "Ошибка при загрузке товара: " +
-            (error.message || JSON.stringify(error)),
+              (error.message || JSON.stringify(error)),
             "error",
-            "Ошибка"
+            "Ошибка",
           );
         } finally {
           setLoadingProduct(false);
@@ -509,9 +511,9 @@ const AddWarehouseProductPage = () => {
         product_group:
           String(
             product?.product_group?.id ??
-            product?.product_group?.uuid ??
-            product?.product_group ??
-            ""
+              product?.product_group?.uuid ??
+              product?.product_group ??
+              "",
           ) || "",
         price: product.price || "",
         quantity: "", // Очищаем количество для нового товара
@@ -645,8 +647,8 @@ const AddWarehouseProductPage = () => {
     // Нормализуем наценку: если не заполнена, считаем её 0
     const normalizedMarkup =
       marketData.markup !== undefined &&
-        marketData.markup !== null &&
-        String(marketData.markup).trim() !== ""
+      marketData.markup !== null &&
+      String(marketData.markup).trim() !== ""
         ? String(marketData.markup)
         : "0";
 
@@ -893,14 +895,14 @@ const AddWarehouseProductPage = () => {
         // /warehouse/products/{productId}/
         const response = await api.patch(
           `/warehouse/products/${productId}/`,
-          payload
+          payload,
         );
         product = response.data;
       } else {
         // Режим создания - используем warehouse API
         const response = await api.post(
           `/warehouse/${selectedWarehouse}/products/`,
-          payload
+          payload,
         );
         product = response.data;
       }
@@ -925,12 +927,12 @@ const AddWarehouseProductPage = () => {
         const kitPackages =
           itemType === "kit"
             ? (marketData.kitProducts || [])
-              .filter((p) => p.id)
-              .map((p) => ({
-                name: p.name || "",
-                quantity_in_package: Number(p.quantity || 1),
-                unit: p.unit || marketData.unit || "шт",
-              }))
+                .filter((p) => p.id)
+                .map((p) => ({
+                  name: p.name || "",
+                  quantity_in_package: Number(p.quantity || 1),
+                  unit: p.unit || marketData.unit || "шт",
+                }))
             : [];
 
         const packagesPayload =
@@ -943,16 +945,16 @@ const AddWarehouseProductPage = () => {
           try {
             await api.post(
               `/warehouse/products/${targetProductId}/packages/`,
-              packagesPayload
+              packagesPayload,
             );
           } catch (_) {
             await Promise.allSettled(
               packagesPayload.map((pkg) =>
                 api.post(
                   `/warehouse/products/${targetProductId}/packages/`,
-                  pkg
-                )
-              )
+                  pkg,
+                ),
+              ),
             );
           }
         }
@@ -1016,7 +1018,7 @@ const AddWarehouseProductPage = () => {
             statusRu: debt,
             amount: totalAmount,
             debtMonths: Number(debtMonths),
-          })
+          }),
         ).unwrap();
       }
 
@@ -1029,7 +1031,7 @@ const AddWarehouseProductPage = () => {
             amount: totalAmount,
             prepayment: Number(amount),
             debtMonths: Number(debtMonths),
-          })
+          }),
         ).unwrap();
       }
 
@@ -1049,14 +1051,14 @@ const AddWarehouseProductPage = () => {
                 cashbox: cashboxId,
                 type: "expense",
                 name: name || product?.name || "Новый товар",
-                amount: amountForCash,
+                amount: Number(amountForCash).toFixed(2),
                 source_cashbox_flow_id: product.id,
                 source_business_operation_id: "Склад",
                 status:
                   company?.subscription_plan?.name === "Старт"
                     ? "approved"
                     : "pending",
-              })
+              }),
             ).unwrap();
           } catch (cashError) {
             console.warn("Ошибка при создании денежного потока:", cashError);
@@ -1071,7 +1073,7 @@ const AddWarehouseProductPage = () => {
             title: newItemData?.name,
             statusRu: "Продажа",
             amount: totalAmount,
-          })
+          }),
         ).unwrap();
       }
 
@@ -1088,7 +1090,7 @@ const AddWarehouseProductPage = () => {
       showAlert(
         isEditMode ? "Товар успешно обновлен!" : "Товар успешно добавлен!",
         "success",
-        "Успех"
+        "Успех",
       );
       setTimeout(() => {
         const { path, state } = getBackNavigation();
@@ -1096,12 +1098,11 @@ const AddWarehouseProductPage = () => {
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
-      const errorMessage = validateResErrors(err, 'Ошибка при добавлении товара')
-      showAlert(
-        errorMessage,
-        "error",
-        "Ошибка"
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при добавлении товара",
       );
+      showAlert(errorMessage, "error", "Ошибка");
     }
   };
 
@@ -1137,7 +1138,7 @@ const AddWarehouseProductPage = () => {
       showAlert(
         `Ошибка при создании поставщика: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -1150,7 +1151,7 @@ const AddWarehouseProductPage = () => {
     }
     try {
       const brand = await dispatch(
-        createWarehouseBrandAsync({ name: newBrand.name.trim() })
+        createWarehouseBrandAsync({ name: newBrand.name.trim() }),
       ).unwrap();
       dispatch(fetchWarehouseBrandsAsync());
       setShowBrandInputs(false);
@@ -1166,7 +1167,7 @@ const AddWarehouseProductPage = () => {
       showAlert(
         `Ошибка при создании бренда: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -1179,7 +1180,7 @@ const AddWarehouseProductPage = () => {
     }
     try {
       const category = await dispatch(
-        createWarehouseCategoryAsync({ name: newCategory.name.trim() })
+        createWarehouseCategoryAsync({ name: newCategory.name.trim() }),
       ).unwrap();
       dispatch(fetchWarehouseCategoriesAsync());
       setShowCategoryInputs(false);
@@ -1195,7 +1196,7 @@ const AddWarehouseProductPage = () => {
       showAlert(
         `Ошибка при создании категории: ${e.message || JSON.stringify(e)}`,
         "error",
-        "Ошибка"
+        "Ошибка",
       );
     }
   };
@@ -1219,7 +1220,7 @@ const AddWarehouseProductPage = () => {
     if (!isEditMode && !newItemData.barcode) {
       // Генерируем 12 случайных цифр
       const randomDigits = Array.from({ length: 12 }, () =>
-        Math.floor(Math.random() * 10)
+        Math.floor(Math.random() * 10),
       ).join("");
 
       // Вычисляем контрольную сумму
@@ -1289,7 +1290,7 @@ const AddWarehouseProductPage = () => {
   const generateBarcode = () => {
     // Генерируем 12 случайных цифр
     const randomDigits = Array.from({ length: 12 }, () =>
-      Math.floor(Math.random() * 10)
+      Math.floor(Math.random() * 10),
     ).join("");
 
     // Вычисляем контрольную сумму
@@ -1306,7 +1307,7 @@ const AddWarehouseProductPage = () => {
     handleMarketDataChange("kitSearchTerm", searchTerm);
     if (searchTerm.trim()) {
       const filtered = products.filter((p) =>
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setKitSearchResults(filtered.slice(0, 10));
       setShowKitSearch(true);
@@ -1336,7 +1337,7 @@ const AddWarehouseProductPage = () => {
   // Удаление товара из комплекта
   const removeProductFromKit = (productId) => {
     const updatedKitProducts = marketData.kitProducts.filter(
-      (p) => p.id !== productId
+      (p) => p.id !== productId,
     );
     setMarketData((prev) => ({
       ...prev,
@@ -1348,7 +1349,7 @@ const AddWarehouseProductPage = () => {
   // Обновление количества товара в комплекте
   const handleUpdateKitProductQuantity = (productId, quantity) => {
     const updatedKitProducts = marketData.kitProducts.map((p) =>
-      p.id === productId ? { ...p, quantity: parseFloat(quantity) || 1 } : p
+      p.id === productId ? { ...p, quantity: parseFloat(quantity) || 1 } : p,
     );
     setMarketData((prev) => ({
       ...prev,
@@ -1424,16 +1425,18 @@ const AddWarehouseProductPage = () => {
           {!isEditMode && !loadingProduct && (
             <div className="add-product-page__tabs">
               <button
-                className={`add-product-page__tab  text-[12px] md:text-[14px] ${activeTab === 0 ? "add-product-page__tab--active" : ""
-                  }`}
+                className={`add-product-page__tab  text-[12px] md:text-[14px] ${
+                  activeTab === 0 ? "add-product-page__tab--active" : ""
+                }`}
                 onClick={() => setActiveTab(0)}
               >
                 <Package size={18} />
                 Ввод вручную
               </button>
               <button
-                className={`add-product-page__tab  text-[12px] md:text-[14px] py-2.5 px-3 md:py-3 md:px-6 ${activeTab === 1 ? "add-product-page__tab--active" : ""
-                  }`}
+                className={`add-product-page__tab  text-[12px] md:text-[14px] py-2.5 px-3 md:py-3 md:px-6 ${
+                  activeTab === 1 ? "add-product-page__tab--active" : ""
+                }`}
                 onClick={() => setActiveTab(1)}
               >
                 <Scan size={18} />
@@ -1472,7 +1475,7 @@ const AddWarehouseProductPage = () => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
                     "success",
-                    "Успех"
+                    "Успех",
                   );
                   setTimeout(() => {
                     const { path, state } = getBackNavigation();
@@ -1563,10 +1566,11 @@ const AddWarehouseProductPage = () => {
                   </label>
                   <div className="add-product-page__type-selector">
                     <button
-                      className={`add-product-page__type-card ${productType === "piece"
+                      className={`add-product-page__type-card ${
+                        productType === "piece"
                           ? "add-product-page__type-card--active"
                           : ""
-                        }`}
+                      }`}
                       onClick={() => {
                         setProductType("piece");
                         setNewItemData((prev) => ({
@@ -1579,10 +1583,11 @@ const AddWarehouseProductPage = () => {
                       <span>Штучный товар</span>
                     </button>
                     <button
-                      className={`add-product-page__type-card ${productType === "weight"
+                      className={`add-product-page__type-card ${
+                        productType === "weight"
                           ? "add-product-page__type-card--active"
                           : ""
-                        }`}
+                      }`}
                       onClick={() => {
                         setProductType("weight");
                         setNewItemData((prev) => ({
@@ -2250,7 +2255,7 @@ const MarketProductForm = ({
       root.querySelectorAll("form").forEach((f) => {
         try {
           f.setAttribute("autocomplete", "off");
-        } catch { }
+        } catch {}
       });
       // инпуты/текстовые поля
       root.querySelectorAll("input, textarea").forEach((el) => {
@@ -2260,7 +2265,7 @@ const MarketProductForm = ({
           el.setAttribute("autocapitalize", "none");
           el.setAttribute("spellcheck", "false");
           el.setAttribute("autosave", "off");
-        } catch { }
+        } catch {}
       });
     };
 
@@ -2306,7 +2311,7 @@ const MarketProductForm = ({
   const handleUpdatePackaging = (id, field, value) => {
     const currentPackagings = marketData.packagings || [];
     const updatedPackagings = currentPackagings.map((p) =>
-      p.id === id ? { ...p, [field]: value } : p
+      p.id === id ? { ...p, [field]: value } : p,
     );
     handleMarketDataChange("packagings", updatedPackagings);
   };
@@ -2316,7 +2321,7 @@ const MarketProductForm = ({
     const currentPackagings = marketData.packagings || [];
     handleMarketDataChange(
       "packagings",
-      currentPackagings.filter((p) => p.id !== id)
+      currentPackagings.filter((p) => p.id !== id),
     );
   };
 
@@ -2327,7 +2332,7 @@ const MarketProductForm = ({
     }
     const searchLower = countrySearchTerm.toLowerCase();
     return countries.filter((country) =>
-      country.name.toLowerCase().includes(searchLower)
+      country.name.toLowerCase().includes(searchLower),
     );
   }, [countrySearchTerm]);
 
@@ -2337,7 +2342,6 @@ const MarketProductForm = ({
     setShowCountryDropdown(false);
     setCountrySearchTerm("");
   };
-
 
   // Автоматический расчет цены продажи для комплекта при изменении состава
   useEffect(() => {
@@ -2433,10 +2437,11 @@ const MarketProductForm = ({
       {!isEditMode && (
         <div className="market-product-form__type-selector">
           <button
-            className={`market-product-form__type-card ${itemType === "product"
+            className={`market-product-form__type-card ${
+              itemType === "product"
                 ? "market-product-form__type-card--active"
                 : ""
-              }`}
+            }`}
             onClick={() => setItemType("product")}
           >
             <h3 className="text-center">Товар</h3>
@@ -2445,18 +2450,20 @@ const MarketProductForm = ({
             </p>
           </button>
           <button
-            className={`market-product-form__type-card ${itemType === "service"
+            className={`market-product-form__type-card ${
+              itemType === "service"
                 ? "market-product-form__type-card--active"
                 : ""
-              }`}
+            }`}
             onClick={() => setItemType("service")}
           >
             <h3 className="text-center">Услуга</h3>
             <p className="text-center">Продукт, не имеющий остатка на складе</p>
           </button>
           <button
-            className={`market-product-form__type-card ${itemType === "kit" ? "market-product-form__type-card--active" : ""
-              }`}
+            className={`market-product-form__type-card ${
+              itemType === "kit" ? "market-product-form__type-card--active" : ""
+            }`}
             onClick={() => setItemType("kit")}
           >
             <h3 className="text-center">Комплект</h3>
@@ -2603,7 +2610,7 @@ const MarketProductForm = ({
               e.preventDefault();
               e.stopPropagation();
               const files = Array.from(e.dataTransfer.files || []).filter((f) =>
-                f.type.startsWith("image/")
+                f.type.startsWith("image/"),
               );
               const newImages = files.map((file, idx) => ({
                 file,
@@ -2669,7 +2676,7 @@ const MarketProductForm = ({
                         prev.map((it, i) => ({
                           ...it,
                           is_primary: i === idx,
-                        }))
+                        })),
                       );
                     }}
                   >
@@ -2818,11 +2825,7 @@ const MarketProductForm = ({
             value={newItemData.product_group}
             onChange={handleChange}
             disabled={!selectedWarehouse}
-            title={
-              !selectedWarehouse
-                ? "Сначала выберите склад"
-                : "Загрузка…"
-            }
+            title={!selectedWarehouse ? "Сначала выберите склад" : "Загрузка…"}
           >
             <option value="">Без группы</option>
             {groupOptions?.map((o) => (
@@ -2831,7 +2834,6 @@ const MarketProductForm = ({
               </option>
             ))}
           </select>
-
         </div>
       </div>
 
@@ -2875,7 +2877,7 @@ const MarketProductForm = ({
                       itemType === "product"
                         ? "isWeightProduct"
                         : "isFractionalService",
-                      e.target.checked
+                      e.target.checked,
                     )
                   }
                 />
@@ -2907,7 +2909,7 @@ const MarketProductForm = ({
                         handleUpdatePackaging(
                           packaging.id,
                           "name",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                     />
@@ -2925,7 +2927,7 @@ const MarketProductForm = ({
                           handleUpdatePackaging(
                             packaging.id,
                             "quantity",
-                            e.target.value
+                            e.target.value,
                           )
                         }
                       />
@@ -2971,44 +2973,44 @@ const MarketProductForm = ({
       {/* Добавить PLU код - показывается для весового товара или дробной услуги */}
       {((itemType === "product" && marketData.isWeightProduct) ||
         (itemType === "service" && marketData.isFractionalService)) && (
-          <div className="market-product-form__section">
-            <div className="market-product-form__form-group">
-              <label className="market-product-form__label">
-                Добавить PLU код
-              </label>
-              <div className="market-product-form__plu-input-wrapper">
-                <input
-                  type="text"
-                  className="market-product-form__input"
-                  placeholder="Введите PLU код"
-                  value={marketData.plu}
-                  onChange={(e) => handleMarketDataChange("plu", e.target.value)}
-                />
-                <div className="market-product-form__help-wrapper">
-                  <button
-                    type="button"
-                    className="market-product-form__help-btn"
-                    onMouseEnter={() => setShowPluTooltip(true)}
-                    onMouseLeave={() => setShowPluTooltip(false)}
-                  >
-                    <HelpCircle size={20} />
-                  </button>
-                  {showPluTooltip && (
-                    <div className="market-product-form__tooltip">
-                      <p>
-                        PLU код применяется в весах с печатью этикетки содержащей
-                        информацию о весе товара. Формат штрих-кода для настройки
-                        весов: undefined PPPPP WWWWW S где: PPPPP - PLU код
-                        товара; WWWWW - вес товара в тысячных единицах; S -
-                        контрольная сумма
-                      </p>
-                    </div>
-                  )}
-                </div>
+        <div className="market-product-form__section">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              Добавить PLU код
+            </label>
+            <div className="market-product-form__plu-input-wrapper">
+              <input
+                type="text"
+                className="market-product-form__input"
+                placeholder="Введите PLU код"
+                value={marketData.plu}
+                onChange={(e) => handleMarketDataChange("plu", e.target.value)}
+              />
+              <div className="market-product-form__help-wrapper">
+                <button
+                  type="button"
+                  className="market-product-form__help-btn"
+                  onMouseEnter={() => setShowPluTooltip(true)}
+                  onMouseLeave={() => setShowPluTooltip(false)}
+                >
+                  <HelpCircle size={20} />
+                </button>
+                {showPluTooltip && (
+                  <div className="market-product-form__tooltip">
+                    <p>
+                      PLU код применяется в весах с печатью этикетки содержащей
+                      информацию о весе товара. Формат штрих-кода для настройки
+                      весов: undefined PPPPP WWWWW S где: PPPPP - PLU код
+                      товара; WWWWW - вес товара в тысячных единицах; S -
+                      контрольная сумма
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       {/* Характеристики товара */}
       <div className="market-product-form__section">
@@ -3103,8 +3105,9 @@ const MarketProductForm = ({
                 </div>
                 <ChevronDown
                   size={20}
-                  className={`market-product-form__country-chevron ${showCountryDropdown ? "open" : ""
-                    }`}
+                  className={`market-product-form__country-chevron ${
+                    showCountryDropdown ? "open" : ""
+                  }`}
                 />
               </div>
               {showCountryDropdown && (
@@ -3124,10 +3127,11 @@ const MarketProductForm = ({
                       filteredCountries.map((country) => (
                         <div
                           key={country.code}
-                          className={`market-product-form__country-item ${marketData.country === country.name
+                          className={`market-product-form__country-item ${
+                            marketData.country === country.name
                               ? "selected"
                               : ""
-                            }`}
+                          }`}
                           onClick={() => handleSelectCountry(country.name)}
                         >
                           <span className="market-product-form__country-flag">
@@ -3611,7 +3615,7 @@ const MarketProductForm = ({
                         onChange={(e) =>
                           handleUpdateKitProductQuantity(
                             product.id,
-                            e.target.value
+                            e.target.value,
                           )
                         }
                       />

@@ -246,7 +246,11 @@ const createPermissionProtectedRoute = (
     path={path}
     element={
       <ProtectedRoute>
-        {profile?.[permissionKey] ? <Component /> : <Navigate to="/crm/cafe/menu" replace />}
+        {profile?.[permissionKey] ? (
+          <Component />
+        ) : (
+          <Navigate to="/crm/cafe/menu" replace />
+        )}
       </ProtectedRoute>
     }
     {...props}

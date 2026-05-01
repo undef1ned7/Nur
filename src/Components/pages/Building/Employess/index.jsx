@@ -17,6 +17,7 @@ import DeleteEmployeeModal from "./modals/DeleteEmployeeModal";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import "./Employess.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
 /* ===================== API endpoints ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
 const EMPLOYEES_CREATE_URL = "/users/employees/create/";
@@ -592,13 +593,16 @@ const Masters = () => {
       return;
     }
     const email = normalizeEmail(empForm.email);
+    const accessDefaults = getNewEmployeeAccessDefaults(
+      company?.sector?.name,
+    );
     const payload = {
       email,
       first_name: empForm.first_name.trim(),
       last_name: empForm.last_name.trim(),
       phone_number: empForm.phone_number.trim(),
       track_number: empForm.track_number.trim(),
-      can_view_settings: true, // Автоматически даем доступ к настройкам
+      ...accessDefaults,
     };
     if (empForm.roleChoice.startsWith("sys:"))
       payload.role = empForm.roleChoice.slice(4);
@@ -609,6 +613,20 @@ const Masters = () => {
     setEmpAlerts([]);
     try {
       const { data } = await api.post(EMPLOYEES_CREATE_URL, payload);
+      const newId = data?.id;
+      if (newId) {
+        try {
+          await api.patch(EMPLOYEE_ITEM_URL(newId), accessDefaults);
+        } catch (syncErr) {
+          console.error(syncErr);
+          setPageNotice(
+            pickApiError(
+              syncErr,
+              "Сотрудник создан, но доступ к настройкам не применился автоматически. Откройте «Доступы» и сохраните вручную.",
+            ),
+          );
+        }
+      }
       await fetchEmployees();
       setEmployData(data);
       setOpenLogin(true);

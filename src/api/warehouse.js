@@ -2293,6 +2293,7 @@ export const deleteMoneyCategory = async (id) => {
  * 5.2 Денежные документы (приход MONEY_RECEIPT / расход MONEY_EXPENSE)
  * Статусы: DRAFT | POSTED
  */
+/** @param {Object} params - cash_register, doc_type, agent, counterparty, payment_category, date_from, date_to, page, page_size */
 export const listMoneyDocuments = async (params = {}) => {
   try {
     const response = await api.get("warehouse/money/documents/", { params });
