@@ -31,13 +31,24 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     openDropdownRef.current = openDropdown;
   }, [openDropdown]);
 
-  // Раскрывать подменю «Документы» на странице документов, закрывать при уходе
+  // Раскрывать подменю «Документы» / «Доп услуги» на соответствующих страницах
   useEffect(() => {
-    if (location.pathname.includes("warehouse/documents")) {
+    const p = location.pathname;
+    if (p.includes("warehouse/documents")) {
       setOpenDropdown((prev) => (prev === "Документы" ? prev : "Документы"));
-    } else {
-      setOpenDropdown(null);
+      return;
     }
+    if (
+      p.startsWith("/crm/additional-services") ||
+      p.startsWith("/crm/instagram") ||
+      p.startsWith("/crm/documents") ||
+      p.startsWith("/crm/barcodes") ||
+      p.startsWith("/crm/scales")
+    ) {
+      setOpenDropdown((prev) => (prev === "Доп услуги" ? prev : "Доп услуги"));
+      return;
+    }
+    setOpenDropdown(null);
   }, [location.pathname]);
 
   const currentTariff = tariff || company?.subscription_plan?.name || "Старт";
@@ -62,6 +73,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         const isWarehouseDocuments = pathname.includes("warehouse/documents");
         const isDocumentsDropdownOpen = currentOpen === "Документы";
         if (isWarehouseDocuments && isDocumentsDropdownOpen) return;
+
+        const isAdditionalPaths =
+          pathname.startsWith("/crm/additional-services") ||
+          pathname.startsWith("/crm/instagram") ||
+          pathname.startsWith("/crm/documents") ||
+          pathname.startsWith("/crm/barcodes") ||
+          pathname.startsWith("/crm/scales");
+        if (isAdditionalPaths && currentOpen === "Доп услуги") return;
 
         setOpenDropdown(null);
       }

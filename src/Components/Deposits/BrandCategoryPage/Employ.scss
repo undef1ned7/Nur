@@ -143,43 +143,60 @@
   }
 }
 
+/* Модалка бренд/категория: без translateX(-50%) из em-sheet-up — иначе съезжает с центра */
+@keyframes brand-category-modal-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .brandSection {
   .edit-modal {
     font-family: "Inter", sans-serif;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100dvh;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-height: 100dvh;
     display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
 
     &__overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100dvh;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       background: rgba(0, 0, 0, 0.35);
-      z-index: 100;
+      z-index: 0;
     }
 
     &__content {
+      position: relative;
       height: fit-content;
       background: #fff;
-      z-index: 100;
-      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
-      padding: 24px 16px;
+      z-index: 1;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      padding: 16px 14px;
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
-      left: 50%;
-      bottom: 0;
-      max-height: 92vh;
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
-      animation: em-sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) 0.02s both;
+      left: auto;
+      bottom: auto;
+      max-height: min(420px, calc(100dvh - 48px));
+      width: min(340px, calc(100vw - 32px));
+      /* Явное скругление + обрезка контента; !important — перебить глобальные .edit-modal__content из других scss */
+      border-radius: 18px !important;
+      overflow: hidden;
+      animation: brand-category-modal-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
       @include ifmobile  {
         height: fit-content;
+        max-height: calc(100dvh - 32px);
       }
     }
 
@@ -189,10 +206,10 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
 
       h3 {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: #1a1a1a;
       }
@@ -204,22 +221,20 @@
     }
 
     .brand-category-page__edit-modal-content {
-      overflow-y: auto;
-      border-radius: 16px;
+      border-radius: 18px !important;
+      overflow: hidden;
       background: #fff;
-      box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
-      padding: 24px 16px;
+      box-shadow: none;
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
-      min-width: 300px;
-      min-height: 50dvh;
-      margin: auto;
+      min-width: 0;
+      min-height: 0;
+      margin: 0;
       .edit-modal__header {
         display: flex;
         h3 {
           @include ifmobile {
-            font-size: 16px;
+            font-size: 15px;
             text-align: center;
           }
         }
@@ -228,21 +243,24 @@
       .edit-modal__footer {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: 8px;
         flex-wrap: wrap;
-        margin-top: auto;
+        margin-top: 12px;
         button {
           flex: 1;
+          min-height: 36px;
+          padding: 8px 12px;
+          font-size: 13px;
         }
       }
     }
     &__section {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       border-bottom: 1px solid #eee;
-      padding-bottom: 16px;
-      margin-bottom: 16px;
+      padding-bottom: 12px;
+      margin-bottom: 0;
 
       label {
         font-size: 14px;

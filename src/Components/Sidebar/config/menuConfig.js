@@ -99,12 +99,6 @@ export const MENU_CONFIG = {
       implemented: true,
     },
     {
-      label: "Доп услуги",
-      to: "/crm/additional-services",
-      icon: menuIcons.clipboard,
-      implemented: true,
-    },
-    {
       label: "Настройки",
       to: "/crm/set",
       icon: menuIcons.cog,

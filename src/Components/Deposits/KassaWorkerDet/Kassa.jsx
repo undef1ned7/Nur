@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import {
@@ -24,6 +24,8 @@ import { validateResErrors } from "../../../../tools/validateResErrors";
 import api from "../../../api";
 import Loading from "../../common/Loading/Loading";
 import DataContainer from "../../common/DataContainer/DataContainer";
+
+const CASHFLOWS_PAGE_SIZE = 100;
 
 const KassaDet = () => {
   const { id } = useParams();
@@ -80,8 +82,12 @@ const KassaDet = () => {
 
   const [filterSearch, setFilterSearch] = useState("");
   const [debouncedFilterSearch, setDebouncedFilterSearch] = useState("");
-  const [flowsList, setFlowsList] = useState(null); // null = из cashboxDetails, иначе результат API
+  const [flowsList, setFlowsList] = useState([]);
   const [flowsLoading, setFlowsLoading] = useState(false);
+  const [flowsPage, setFlowsPage] = useState(1);
+  const [flowsHasNext, setFlowsHasNext] = useState(false);
+  const [flowsTotalCount, setFlowsTotalCount] = useState(null);
+  const filtersSigRef = useRef("");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedFilterSearch(filterSearch), 400);
@@ -135,22 +141,21 @@ const KassaDet = () => {
     }
   }, [cashboxId]);
 
-  // --- Загрузка потоков через API (поиск и тип через бэк) ---
-  const fetchCashflowsFromApi = async (search, type) => {
-    if (!cashboxId) return;
-    setFlowsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("cashbox", cashboxId);
-      params.set("page_size", "1000");
-      if (search && search.trim()) params.set("search", search.trim());
-      if (type && type !== "all") params.set("type", type);
-      const baseUrl = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
-      const allFlows = [];
-      let currentUrl = baseUrl;
-      let guard = 0;
-      while (currentUrl && guard < 100) {
-        const response = await fetch(currentUrl, {
+  const loadCashflowsPage = useCallback(
+    async (page) => {
+      if (!cashboxId) return;
+      if (activeFlowType === "pending" || activeFlowType === "reports") return;
+      setFlowsLoading(true);
+      try {
+        const search = (debouncedFilterSearch || "").trim();
+        const params = new URLSearchParams();
+        params.set("cashbox", cashboxId);
+        params.set("page_size", String(CASHFLOWS_PAGE_SIZE));
+        params.set("page", String(Math.max(1, page)));
+        if (search) params.set("search", search);
+        if (activeFlowType && activeFlowType !== "all") params.set("type", activeFlowType);
+        const url = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
+        const response = await fetch(url, {
           headers: {
             Authorization: "Bearer " + localStorage.getItem("accessToken"),
           },
@@ -159,30 +164,44 @@ const KassaDet = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         const flows = Array.isArray(data) ? data : data.results || [];
-        allFlows.push(...flows);
-        currentUrl = data.next || null;
-        guard += 1;
+        const pageNum = Math.max(1, page);
+        const count = typeof data.count === "number" ? data.count : null;
+        setFlowsList(flows);
+        setFlowsTotalCount(count);
+        setFlowsHasNext(
+          Boolean(data.next) ||
+            (count != null && pageNum * CASHFLOWS_PAGE_SIZE < count) ||
+            (count == null && flows.length === CASHFLOWS_PAGE_SIZE),
+        );
+      } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка при загрузке потоков. ");
+        alert(errorMessage, true);
+        setFlowsList([]);
+        setFlowsTotalCount(null);
+        setFlowsHasNext(false);
+      } finally {
+        setFlowsLoading(false);
       }
-      setFlowsList(allFlows);
-    } catch (err) {
-      const errorMessage = validateResErrors(err, "Ошибка при загрузке потоков. ")
-      alert(errorMessage, true);
-      setFlowsList([]);
-    } finally {
-      setFlowsLoading(false);
-    }
-  };
+    },
+    [cashboxId, debouncedFilterSearch, activeFlowType],
+  );
 
   useEffect(() => {
     if (!cashboxId) return;
+    if (activeFlowType === "pending" || activeFlowType === "reports") return;
+
     const search = (debouncedFilterSearch || "").trim();
-    if (!search && activeFlowType === "all") {
-      setFlowsList(null);
-      return;
+    const sig = `${cashboxId}|${search}|${activeFlowType}`;
+    const filtersChanged = filtersSigRef.current !== sig;
+    if (filtersChanged) {
+      filtersSigRef.current = sig;
+      if (flowsPage !== 1) {
+        setFlowsPage(1);
+        return;
+      }
     }
-    fetchCashflowsFromApi(search, activeFlowType);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cashboxId, debouncedFilterSearch, activeFlowType]);
+    void loadCashflowsPage(flowsPage);
+  }, [cashboxId, debouncedFilterSearch, activeFlowType, flowsPage, loadCashflowsPage]);
 
   const handleAddCashbox = async () => {
     if (!newCashbox.name || !newCashbox.amount) {
@@ -200,8 +219,9 @@ const KassaDet = () => {
         })
       ).unwrap();
 
-      setFlowsList(null);
-      fetchCashboxDetails(cashboxId);
+      setFlowsPage(1);
+      await fetchCashboxDetails(cashboxId);
+      await loadCashflowsPage(1);
       setShowAddCashboxModal(false);
       setNewCashbox({ name: "", amount: 0, type: "expense" });
     } catch (err) {
@@ -267,10 +287,8 @@ const KassaDet = () => {
   };
 
   // --- ЛОГИКА ФИЛЬТРАЦИИ ---
-  // flowsList !== null — данные пришли с бэка по поиску/типу; иначе — из cashboxDetails
-  // Всегда фильтруем по типу таба (все / приход / расход) и по статусу
-  const rawFlows =
-    flowsList !== null ? flowsList : cashboxDetails?.cashflows || [];
+  // Список движений — с API (пагинация page_size=100); фильтр по статусу на клиенте
+  const rawFlows = flowsList;
   const filteredCashflows = rawFlows.filter(
     (flow) =>
       (activeFlowType === "all" || flow.type === activeFlowType) &&
@@ -283,7 +301,7 @@ const KassaDet = () => {
     setFilterSearch("");
     setDebouncedFilterSearch("");
     setActiveFlowType("all");
-    setFlowsList(null);
+    setFlowsPage(1);
     setShowFilter(false);
   };
 
@@ -891,6 +909,33 @@ const KassaDet = () => {
                 </div>
               )}
             </div>
+            {!flowsLoading &&
+              (filteredCashflows.length > 0 || flowsPage > 1 || flowsHasNext) && (
+                <div className="kassa-pagination" role="navigation" aria-label="Страницы движений">
+                  <button
+                    type="button"
+                    className="kassa__btn kassa__btn--secondary"
+                    disabled={flowsPage <= 1 || flowsLoading}
+                    onClick={() => setFlowsPage((p) => Math.max(1, p - 1))}
+                  >
+                    Назад
+                  </button>
+                  <span className="kassa-pagination__info">
+                    Страница {flowsPage}
+                    {flowsTotalCount != null
+                      ? ` · ${flowsTotalCount} записей`
+                      : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="kassa__btn kassa__btn--secondary"
+                    disabled={!flowsHasNext || flowsLoading}
+                    onClick={() => setFlowsPage((p) => p + 1)}
+                  >
+                    Вперёд
+                  </button>
+                </div>
+              )}
           </DataContainer>
 
         </>

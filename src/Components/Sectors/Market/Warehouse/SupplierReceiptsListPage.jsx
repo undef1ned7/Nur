@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
@@ -26,6 +26,28 @@ const fmtNum = (value) =>
     maximumFractionDigits: 2,
   });
 
+const receiptItemLabel = (it) => {
+  if (!it || typeof it !== "object") return "—";
+  const p = it.product;
+  if (p && typeof p === "object") {
+    return (
+      p.product_name ||
+      p.name ||
+      p.title ||
+      p.article ||
+      p.barcode ||
+      "—"
+    );
+  }
+  return (
+    it.product_name ||
+    it.name ||
+    it.title ||
+    it.product_title ||
+    (it.product != null ? `Товар #${it.product}` : "—")
+  );
+};
+
 export default function SupplierReceiptsListPage() {
   const navigate = useNavigate();
   const alert = useAlert();
@@ -38,6 +60,42 @@ export default function SupplierReceiptsListPage() {
   const [createSupplierSaving, setCreateSupplierSaving] = useState(false);
   const [receipts, setReceipts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [detailReceipt, setDetailReceipt] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openReceiptDetail = async (row) => {
+    if (!row) return;
+    const rowId = row.id ?? row.uuid;
+    setDetailLoading(false);
+    setDetailReceipt(row);
+    const existing = Array.isArray(row.items) ? row.items : [];
+    if (existing.length > 0 || rowId == null || rowId === "") return;
+    try {
+      setDetailLoading(true);
+      const { data } = await api.get(
+        `/main/suppliers/receipts/${encodeURIComponent(String(rowId))}/`,
+      );
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.lines)
+          ? data.lines
+          : [];
+      setDetailReceipt((prev) =>
+        prev && String(prev.id ?? prev.uuid) === String(rowId)
+          ? { ...prev, ...data, items }
+          : prev,
+      );
+    } catch {
+      /* оставляем строку из списка; в модалке будет текст про отсутствие позиций */
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeReceiptDetail = () => {
+    setDetailReceipt(null);
+    setDetailLoading(false);
+  };
   const emptyFilters = useMemo(
     () => ({
       supplier_id: "",
@@ -279,7 +337,6 @@ export default function SupplierReceiptsListPage() {
               <table className="market-receipt-page__table">
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>Поставщик</th>
                     <th>Создал</th>
                     <th>Дата</th>
@@ -288,15 +345,27 @@ export default function SupplierReceiptsListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {receipts.map((row) => {
+                  {receipts.map((row, rowIdx) => {
+                    const rowKey = row.id ?? row.uuid ?? `receipt-row-${rowIdx}`;
                     const items = Array.isArray(row.items) ? row.items : [];
                     const total = items.reduce(
                       (sum, it) => sum + Number(it.qty || 0) * Number(it.purchase_price || 0),
                       0,
                     );
                     return (
-                      <tr key={row.id}>
-                        <td>{row.id}</td>
+                      <tr
+                        key={rowKey}
+                        className="market-receipt-page__table-row--clickable"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => void openReceiptDetail(row)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            void openReceiptDetail(row);
+                          }
+                        }}
+                      >
                         <td>{row.supplier_name || "—"}</td>
                         <td>{row.created_by_name || "—"}</td>
                         <td>{fmtDateTime(row.created_at)}</td>
@@ -311,6 +380,96 @@ export default function SupplierReceiptsListPage() {
           )}
         </div>
       </DataContainer>
+      {detailReceipt && (
+        <div
+          className="market-receipt-page__modal-overlay"
+          onClick={closeReceiptDetail}
+          role="presentation"
+        >
+          <div
+            className="market-receipt-page__modal-card market-receipt-page__modal-card--detail"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="receipt-detail-title"
+          >
+            <div className="market-receipt-page__detail-head">
+              <h3 id="receipt-detail-title" className="market-receipt-page__modal-title">
+                Позиции прихода
+              </h3>
+              <button
+                type="button"
+                className="market-receipt-page__detail-close"
+                onClick={closeReceiptDetail}
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="market-receipt-page__detail-meta">
+              <span>
+                <strong>Поставщик:</strong> {detailReceipt.supplier_name || "—"}
+              </span>
+              <span>
+                <strong>Создал:</strong> {detailReceipt.created_by_name || "—"}
+              </span>
+              <span>
+                <strong>Дата:</strong> {fmtDateTime(detailReceipt.created_at)}
+              </span>
+            </div>
+            {detailLoading ? (
+              <p className="market-receipt-page__detail-empty">Загрузка позиций…</p>
+            ) : (() => {
+              const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
+              if (items.length === 0) {
+                return (
+                  <p className="market-receipt-page__detail-empty">Нет позиций для отображения.</p>
+                );
+              }
+              return (
+                <div className="market-receipt-page__detail-table-wrap">
+                  <table className="market-receipt-page__detail-table">
+                    <thead>
+                      <tr>
+                        <th>№</th>
+                        <th>Наименование</th>
+                        <th>Кол-во</th>
+                        <th>Цена закупки</th>
+                        <th>Сумма</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((it, idx) => {
+                        const qty = Number(it.qty || 0);
+                        const price = Number(it.purchase_price || 0);
+                        const line = qty * price;
+                        return (
+                            <tr key={`${detailReceipt.id ?? detailReceipt.uuid}-${idx}`}>
+                            <td>{idx + 1}</td>
+                            <td>{receiptItemLabel(it)}</td>
+                            <td>{fmtNum(qty)}</td>
+                            <td>{fmtNum(price)}</td>
+                            <td>{fmtNum(line)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+            <div className="market-receipt-page__actions">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={closeReceiptDetail}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {createSupplierOpen && (
         <div className="market-receipt-page__modal-overlay" onClick={() => setCreateSupplierOpen(false)}>
           <div className="market-receipt-page__modal-card" onClick={(e) => e.stopPropagation()}>

@@ -243,6 +243,22 @@
   }
 }
 
+.kassa-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 0 4px 8px;
+
+  &__info {
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+}
+
 /* Карточки касс */
 .kassa-cards-wrapper {
   padding: 20px;

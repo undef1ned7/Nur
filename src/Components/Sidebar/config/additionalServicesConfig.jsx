@@ -192,6 +192,8 @@ export const ADDITIONAL_SERVICES_CONFIG = [
     label: "Интерфейс кассира",
     to: "/crm/market/cashier",
     icon: menuIcons.cashRegister,
+    permission: "can_view_cashier",
+    permissionModel: "user",
     implemented: true,
     conditions: {
       customCheck: ({ tariff, sector }) => {
@@ -391,13 +393,14 @@ const filterAdditionalServices = (params) => {
 export const getAdditionalServicesForMenu = (params) =>
   filterAdditionalServices(params)
     .filter((service) => service.type === "navigational")
-    .filter((service) =>
-      checkPermissionAccess({
+    .filter((service) => {
+      if (!service.permission) return false;
+      return checkPermissionAccess({
         ...resolveFilterParams(params),
         permission: service.permission,
         permissionModel: service.permissionModel,
-      }),
-    )
+      });
+    })
     .map((service) => ({
       id: service.id,
       type: service.type,
