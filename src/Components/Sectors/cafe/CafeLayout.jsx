@@ -45,7 +45,8 @@ export default function CafeLayout() {
   const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
   const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
   const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
-  const RECENT_ORDER_AGE_MS = 3 * 60 * 1000; // consider orders from last 3 minutes for auto-print
+  /** Только для заказов из poll GET /cafe/orders/?page_size=50&ordering=-created_at — отсечка по полю created_at. */
+  const POLL_CAFE_ORDERS_LIST_MAX_AGE_MS = 5 * 60 * 1000;
   /** Skip kitchen "diff" right after create when snapshot not written yet (avoids second slip vs order_created). */
   const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
@@ -1037,13 +1038,20 @@ export default function CafeLayout() {
       }
       const list = res?.data?.results ?? res?.data ?? [];
       if (!Array.isArray(list)) return;
-      const cutoff = Date.now() - RECENT_ORDER_AGE_MS;
+      const cutoff = Date.now() - POLL_CAFE_ORDERS_LIST_MAX_AGE_MS;
       for (const o of list) {
         const oid = String(o?.id ?? "");
         if (!oid) continue;
         const created = o?.created_at ?? o?.date;
         const createdMs = created ? new Date(created).getTime() : 0;
         if (createdMs < cutoff) continue;
+
+        // Чек по опросу списка: только недавние по created_at из этого ответа API
+        if (isPaidStatusRef.current(o)) {
+          await printReceiptForOrderRef.current(oid);
+          continue;
+        }
+
         if (printedOrdersRef.current.has(oid)) continue;
         if (printingOrdersRef.current.has(oid)) continue;
         await printKitchenTicketsForOrder(oid);
