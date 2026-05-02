@@ -468,10 +468,11 @@ export const createDeal = createAsyncThunk(
       title,
       statusRu,
       amount,
-      debtMonths,
+      debtDays,
+      debtMonths, // legacy: если debtDays не передан, конвертируем месяцы в дни (×30)
       prepayment,
       first_due_date, // <=== ДОБАВИЛИ
-    }, // prepayment и debtMonths могут приходить вместе
+    }, // prepayment и срок долга могут приходить вместе
     { rejectWithValue },
   ) => {
     try {
@@ -487,9 +488,26 @@ export const createDeal = createAsyncThunk(
       };
 
       if (kind === "debt") {
-        // 1) ВСЕГДА отправляем debt_months (даже если 0)
-        const monthsNum = Number(debtMonths);
-        payload.debt_months = Number.isFinite(monthsNum) ? monthsNum : 0;
+        let debtDaysNum = NaN;
+        if (
+          debtDays !== undefined &&
+          debtDays !== null &&
+          debtDays !== ""
+        ) {
+          debtDaysNum = Number(debtDays);
+        } else if (
+          debtMonths !== undefined &&
+          debtMonths !== null &&
+          debtMonths !== ""
+        ) {
+          const monthsNum = Number(debtMonths);
+          if (Number.isFinite(monthsNum)) {
+            debtDaysNum = Math.round(monthsNum * 30);
+          }
+        }
+        payload.debt_days = Number.isFinite(debtDaysNum)
+          ? Math.max(0, Math.round(debtDaysNum))
+          : 0;
 
         // 2) Если пришла предоплата (режим "Предоплата") — шлём prepayment
         if (
