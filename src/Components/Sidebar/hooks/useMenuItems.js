@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { MENU_CONFIG } from "../config/menuConfig";
+import { menuIcons } from "../config/menuIcons";
 import { HIDE_RULES } from "../config/hideRules";
 import { useMenuPermissions } from "./useMenuPermissions";
 import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig";
@@ -142,7 +143,26 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
    * Получает дополнительные услуги
    */
   const getAdditionalServices = useCallback(() => {
-    const baseItems = MENU_CONFIG.additional.filter(hasMenuAccess);
+    /** Для сайдбара: company-флаги сами по себе не открывают пункт — нужно явное право у профиля (кроме mixed через isAllowed). */
+    const additionalSidebarAccess = (item) => {
+      if (!item?.permission) return false;
+      if (profile?.role === "owner") {
+        return isAllowed(company, item.permission);
+      }
+      const userOk = hasPermission(item.permission) === true;
+      const companyFlag = companyAllows(company, item.permission);
+      const companyOk = companyFlag === true;
+      const model = item.permissionModel || "mixed";
+      if (model === "company") {
+        return userOk && companyOk;
+      }
+      if (model === "user") {
+        return userOk;
+      }
+      return isAllowed(company, item.permission);
+    };
+
+    const baseItems = MENU_CONFIG.additional.filter(additionalSidebarAccess);
 
     // Получаем динамические дополнительные услуги из конфигурации
     const dynamicServicesRaw = getAdditionalServicesForMenu({
@@ -172,8 +192,10 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       }
     });
 
-    return merged.filter((item) => item.implemented !== false);
-  }, [hasPermission, company, tariff, profile, isAllowed, hasMenuAccess, companyAllows]);
+    return merged
+      .filter((item) => item.implemented !== false)
+      .filter(additionalSidebarAccess);
+  }, [hasPermission, company, tariff, profile, isAllowed, companyAllows]);
 
   /**
    * Собирает финальный список меню
@@ -209,15 +231,34 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       }
     }
 
-    // Добавляем дополнительные услуги перед "Настройки"
-    if (additionalServices.length > 0) {
-      const settingsIndex = items.findIndex(
-        (item) => item.label === "Настройки"
-      );
+    // «Доп услуги»: один пункт с подменю (children), как раньше; без услуг — ссылка на хаб
+    const settingsIndex = items.findIndex((item) => item.label === "Настройки");
+    const passesHideRules = (entry) => {
+      if (!entry?.implemented) return false;
+      if (hiddenByRules.labels.has(entry.label)) return false;
+      if (
+        hiddenByRules.toIncludes.length > 0 &&
+        typeof entry.to === "string" &&
+        hiddenByRules.toIncludes.some((p) => entry.to.includes(p))
+      ) {
+        return false;
+      }
+      return true;
+    };
+    const additionalChildren = additionalServices.filter(passesHideRules);
+    // Показываем «Доп услуги» только при наличии хотя бы одной услуги с доступом (не хаб «вслепую»)
+    if (additionalChildren.length > 0) {
+      const additionalServicesItem = {
+        label: "Доп услуги",
+        to: "/crm/additional-services",
+        icon: menuIcons.clipboard,
+        implemented: true,
+        children: additionalChildren,
+      };
       if (settingsIndex !== -1) {
-        items.splice(settingsIndex, 0, ...additionalServices);
+        items.splice(settingsIndex, 0, additionalServicesItem);
       } else {
-        items.push(...additionalServices);
+        items.push(additionalServicesItem);
       }
     }
 

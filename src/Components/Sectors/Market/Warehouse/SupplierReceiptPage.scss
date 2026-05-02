@@ -320,6 +320,119 @@
     max-height: calc(100vh - 24px);
   }
 
+  &__modal-card--detail {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 24px);
+  }
+
+  &__table-row--clickable {
+    cursor: pointer;
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: #f8fafc;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--primary-dark, #d4b800);
+      outline-offset: -2px;
+    }
+  }
+
+  &__detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    .market-receipt-page__modal-title {
+      margin: 0;
+    }
+  }
+
+  &__detail-close {
+    flex-shrink: 0;
+    border: none;
+    background: #f1f5f9;
+    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+
+    &:hover {
+      background: #e2e8f0;
+    }
+  }
+
+  &__detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text);
+
+    strong {
+      font-weight: 600;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+  }
+
+  &__detail-empty {
+    margin: 12px 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  &__detail-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    max-height: min(420px, 55vh);
+    overflow-y: auto;
+  }
+
+  &__detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    td:nth-child(2) {
+      white-space: normal;
+      word-break: break-word;
+    }
+  }
+
   &__modal-title {
     margin: 0 0 12px;
     font-size: 18px;
