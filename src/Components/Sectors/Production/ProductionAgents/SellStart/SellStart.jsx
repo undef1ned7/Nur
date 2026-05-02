@@ -576,6 +576,38 @@ const normalizeCatalogProducts = (data) => {
   }));
 };
 
+/** Сегодня (локально) 00:00 → выбранная дата 00:00, разница в календарных днях. */
+const countCalendarDaysFromToday = (endIso) => {
+  if (!endIso || typeof endIso !== "string") return NaN;
+  const parts = endIso.split("-").map((x) => parseInt(x, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return NaN;
+  const [y, m, d] = parts;
+  const end = new Date(y, m - 1, d);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return Math.round((end - start) / 86400000);
+};
+
+const tomorrowYmd = () => {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  const y = t.getFullYear();
+  const mo = String(t.getMonth() + 1).padStart(2, "0");
+  const da = String(t.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${da}`;
+};
+
+/** Дата через один календарный месяц от сегодня (локально), формат YYYY-MM-DD. */
+const oneMonthFromTodayYmd = () => {
+  const t = new Date();
+  t.setMonth(t.getMonth() + 1);
+  const y = t.getFullYear();
+  const mo = String(t.getMonth() + 1).padStart(2, "0");
+  const da = String(t.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${da}`;
+};
+
 const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
@@ -591,7 +623,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const isMarketPosMode = useMainProductsList && !isPilorama;
   const start = isMarketPosMode ? marketStart : agentStart;
   const [clientId, setClientId] = useState("");
-  const [debtMonths, setDebtMonths] = useState("");
+  const [debtDueDate, setDebtDueDate] = useState(() => oneMonthFromTodayYmd());
   const [form, setForm] = useState({
     full_name: "",
     phone: "",
@@ -1827,22 +1859,26 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           });
           return;
         }
-        if (!debtMonths || Number(debtMonths) <= 0) {
+        const termDays = countCalendarDaysFromToday(debtDueDate);
+        if (!debtDueDate || !Number.isFinite(termDays) || termDays < 1) {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга",
+            message:
+              "Укажите дату окончания срока долга (не раньше завтра, минимум 1 день)",
           });
           return;
         }
       }
 
       if (debt === "Долги") {
-        if (!debtMonths || Number(debtMonths) <= 0) {
+        const termDays = countCalendarDaysFromToday(debtDueDate);
+        if (!debtDueDate || !Number.isFinite(termDays) || termDays < 1) {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга",
+            message:
+              "Укажите дату окончания срока долга (не раньше завтра, минимум 1 день)",
           });
           return;
         }
@@ -1850,6 +1886,10 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
       if (clientId) {
         const totalForDeal = isPilorama ? currentTotal : start?.total;
+        const termDaysForDeal =
+          debt === "Долги" || debt === "Предоплата"
+            ? countCalendarDaysFromToday(debtDueDate)
+            : NaN;
         await dispatch(
           createDeal({
             clientId: clientId,
@@ -1857,9 +1897,9 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
             statusRu: debt,
             amount: totalForDeal,
             prepayment: debt === "Предоплата" ? Number(amount) : undefined,
-            debtMonths:
+            debtDays:
               debt === "Долги" || debt === "Предоплата"
-                ? Number(debtMonths)
+                ? termDaysForDeal
                 : undefined,
           }),
         ).unwrap();
@@ -1985,11 +2025,13 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         });
         return;
       }
-      if (!debtMonths || Number(debtMonths) <= 0) {
+      const termDays = countCalendarDaysFromToday(debtDueDate);
+      if (!debtDueDate || !Number.isFinite(termDays) || termDays < 1) {
         setAlert({
           open: true,
           type: "error",
-          message: "Введите корректный срок долга",
+          message:
+            "Укажите дату окончания срока долга (не раньше завтра, минимум 1 день)",
         });
         return;
       }
@@ -2067,6 +2109,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       if (paymentMethod === "debt" && clientId) {
         const initialPaid = Math.max(0, initialPaymentNumber || 0);
         const remainingDebt = Math.max(0, totalNumber - initialPaid);
+        const debtTermDays = countCalendarDaysFromToday(debtDueDate);
 
         try {
           if (
@@ -2088,7 +2131,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
               statusRu: initialPaid > 0 ? "Предоплата" : "Долги",
               amount: totalNumber,
               prepayment: initialPaid > 0 ? initialPaid : undefined,
-              debtMonths: Number(debtMonths || 1),
+              debtDays: debtTermDays,
               first_due_date: firstPaymentDate,
             }),
           ).unwrap();
@@ -2847,14 +2890,13 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                       />
                     </div>
                     <div className="sellstart-cashier__payment-field">
-                      <label>Срок долга (мес.)</label>
+                      <label>Дата окончания срока долга</label>
                       <input
-                        type="number"
-                        min="1"
-                        value={debtMonths}
-                        onChange={(e) => setDebtMonths(e.target.value)}
+                        type="date"
+                        min={tomorrowYmd()}
+                        value={debtDueDate}
+                        onChange={(e) => setDebtDueDate(e.target.value)}
                         className="sellstart-cashier__discount-input"
-                        placeholder="1"
                       />
                     </div>
                   </>
@@ -3608,23 +3650,25 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
-                <label htmlFor="">Срок долга (мес.) </label>
+                <label>Дата окончания срока долга</label>
                 <input
-                  type="text"
+                  type="date"
+                  min={tomorrowYmd()}
                   className="sell__header-input"
-                  value={debtMonths}
-                  onChange={(e) => setDebtMonths(e.target.value)}
+                  value={debtDueDate}
+                  onChange={(e) => setDebtDueDate(e.target.value)}
                 />
               </>
             )}
             {debt === "Долги" && (
               <>
-                <label htmlFor="">Срок долга (мес.) </label>
+                <label>Дата окончания срока долга</label>
                 <input
-                  type="text"
+                  type="date"
+                  min={tomorrowYmd()}
                   className="sell__header-input"
-                  value={debtMonths}
-                  onChange={(e) => setDebtMonths(e.target.value)}
+                  value={debtDueDate}
+                  onChange={(e) => setDebtDueDate(e.target.value)}
                 />
               </>
             )}

@@ -49,7 +49,7 @@ const PaymentPage = ({
       return false;
     }
   });
-  const [debtMonths, setDebtMonths] = useState(1); // Количество месяцев для рассрочки
+  const [debtDays, setDebtDays] = useState(30); // Срок в днях до погашения / графика
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -321,14 +321,12 @@ const PaymentPage = ({
           try {
             // Для тарифа "Старт" создаем запись в /main/debts/
             if (company?.subscription_plan?.name === "Старт") {
-              // Вычисляем дату платежа: добавляем debtMonths месяцев к текущей дате
+              // Дата платежа: текущая дата + debtDays календарных дней
               const currentDate = new Date();
-              const dueDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() +
-                (typeof debtMonths === "number" ? debtMonths : 1),
-                currentDate.getDate()
-              );
+              const dueDate = new Date(currentDate);
+              const daysAdd =
+                typeof debtDays === "number" && debtDays >= 1 ? debtDays : 30;
+              dueDate.setDate(dueDate.getDate() + daysAdd);
               const dueDateString = dueDate.toISOString().split("T")[0]; // Формат YYYY-MM-DD
 
               try {
@@ -370,7 +368,8 @@ const PaymentPage = ({
                   }`,
                 statusRu: "Долги",
                 amount: total,
-                debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
+                debtDays:
+                  typeof debtDays === "number" && debtDays >= 1 ? debtDays : 30,
                 first_due_date: null, // Можно добавить поле для выбора даты
               })
             ).unwrap();
@@ -653,7 +652,7 @@ const PaymentPage = ({
         // Если это поле ввода суммы, разрешаем Enter для принятия оплаты
         if (
           activeElement.className?.includes("payment-page__amount-input") ||
-          activeElement.className?.includes("payment-page__debt-months-input")
+          activeElement.className?.includes("payment-page__debt-days-input")
         ) {
           // Enter в поле ввода суммы также принимает оплату
           if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -864,36 +863,35 @@ const PaymentPage = ({
                   {total.toFixed(2)}
                 </div>
               </div>
-              <div className="payment-page__debt-months">
-                <label className="payment-page__debt-months-label">
-                  Срок рассрочки (месяцев):
+              <div className="payment-page__debt-days">
+                <label className="payment-page__debt-days-label">
+                  Срок рассрочки (дней):
                 </label>
                 <input
                   type="text"
-                  className="payment-page__debt-months-input"
-                  value={debtMonths}
+                  className="payment-page__debt-days-input"
+                  value={debtDays}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Разрешаем пустое значение во время ввода
                     if (value === "") {
-                      setDebtMonths("");
+                      setDebtDays("");
                       return;
                     }
                     const numValue = parseInt(value, 10);
-                    // Если это валидное число, устанавливаем его (минимум 1)
                     if (!isNaN(numValue)) {
-                      setDebtMonths(Math.max(1, numValue));
+                      setDebtDays(Math.max(1, numValue));
                     }
                   }}
                   onBlur={(e) => {
-                    // При потере фокуса валидируем значение
                     const value = parseInt(e.target.value, 10);
                     if (isNaN(value) || value < 1) {
-                      setDebtMonths(1);
+                      setDebtDays(30);
                     }
                   }}
                   min="1"
                   step="1"
+                  inputMode="numeric"
+                  autoComplete="off"
                 />
               </div>
               <div className="payment-page__total-debt">
