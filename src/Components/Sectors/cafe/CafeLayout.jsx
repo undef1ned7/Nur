@@ -37,11 +37,17 @@ export default function CafeLayout() {
   const printingKitchenDiffRef = useRef(new Set()); // orderId -> diff printing now
   const retryTimersRef = useRef(new Map()); // orderId -> timeoutId
   const notifiedOrdersRef = useRef(new Set()); // orderId -> notified once on this device (cook page)
+  const printKitchenTicketsForOrderRef = useRef(() => Promise.resolve());
+  const printReceiptForOrderRef = useRef(() => Promise.resolve());
+  const printKitchenDiffTicketsForOrderRef = useRef(() => Promise.resolve());
+  const isPaidStatusRef = useRef(() => false);
   const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
   const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
   const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
   const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
   const RECENT_ORDER_AGE_MS = 3 * 60 * 1000; // consider orders from last 3 minutes for auto-print
+  /** Skip kitchen "diff" right after create when snapshot not written yet (avoids second slip vs order_created). */
+  const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
   const TAKEAWAY_LABEL = "С собой";
@@ -705,14 +711,14 @@ export default function CafeLayout() {
     }
   };
 
+  const isCancelledOrderStatus = useCallback((order) => {
+    const s = String(order?.status || "").toLowerCase().trim();
+    return ["cancelled", "canceled", "отменен", "отменён"].includes(s);
+  }, []);
+
   const shouldPrintKitchenDiffForStatus = useCallback(
     (order) => {
-      const s = String(order?.status || "")
-        .toLowerCase()
-        .trim();
       if (isPaidStatus(order)) return false;
-      if (["cancelled", "canceled", "отменен", "отменён"].includes(s))
-        return false;
       return true;
     },
     [isPaidStatus],
@@ -754,11 +760,11 @@ export default function CafeLayout() {
           oldMap.set(mid, { qty, title });
         }
 
+        const isCancelled = isCancelledOrderStatus(detail);
         const allMenuIds = Array.from(
           new Set([...Array.from(oldMap.keys()), ...Array.from(newMap.keys())]),
         );
         if (!allMenuIds.length) {
-          // nothing to diff; still store snapshot
           const snapObj = {};
           for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
           writeOrderItemsSnapshot(oid, {
@@ -770,43 +776,113 @@ export default function CafeLayout() {
         }
 
         const kitchensMap = await ensureKitchensMap();
+        const menuToKitchen = new Map();
+        const addedByKitchen = new Map();
+        const removedByKitchen = new Map();
 
-        // Resolve kitchen for each menu item id (cached)
-        const menuToKitchen = new Map(); // mid -> kid
-        for (const mid of allMenuIds) {
-          // eslint-disable-next-line no-await-in-loop
-          const kid = await resolveMenuKitchenId(mid);
-          if (kid) menuToKitchen.set(mid, String(kid));
-        }
+        if (isCancelled) {
+          try {
+            if (localStorage.getItem(`cafe_kitchen_cancel_printed_${oid}`)) {
+              writeOrderItemsSnapshot(oid, {
+                orderId: oid,
+                savedAt: Date.now(),
+                items: {},
+              });
+              return;
+            }
+          } catch {}
 
-        const addedByKitchen = new Map(); // kid -> [{name, qty}]
-        const removedByKitchen = new Map(); // kid -> [{name, qty}]
-
-        for (const mid of allMenuIds) {
-          const kid = menuToKitchen.get(mid);
-          if (!kid) continue;
-
-          const oldQty = oldMap.get(mid)?.qty ?? 0;
-          const newQty = newMap.get(mid)?.qty ?? 0;
-          if (oldQty === newQty) continue;
-
-          const title =
-            newMap.get(mid)?.title || oldMap.get(mid)?.title || "Позиция";
-
-          if (newQty > oldQty) {
-            const qty = Math.max(1, Number(newQty - oldQty) || 0);
-            if (!addedByKitchen.has(kid)) addedByKitchen.set(kid, []);
-            addedByKitchen.get(kid).push({ name: String(title), qty });
-          } else {
-            const qty = Math.max(1, Number(oldQty - newQty) || 0);
+          const sourceMap = oldMap.size > 0 ? oldMap : newMap;
+          const mids = Array.from(sourceMap.keys());
+          if (!mids.length) {
+            writeOrderItemsSnapshot(oid, {
+              orderId: oid,
+              savedAt: Date.now(),
+              items: {},
+            });
+            return;
+          }
+          for (const mid of mids) {
+            // eslint-disable-next-line no-await-in-loop
+            const kid = await resolveMenuKitchenId(mid);
+            if (kid) menuToKitchen.set(mid, String(kid));
+          }
+          for (const [mid, meta] of sourceMap.entries()) {
+            const kid = menuToKitchen.get(mid);
+            if (!kid) continue;
+            const qty = Math.max(1, Number(meta.qty) || 1);
             if (!removedByKitchen.has(kid)) removedByKitchen.set(kid, []);
-            removedByKitchen.get(kid).push({ name: String(title), qty });
+            removedByKitchen
+              .get(kid)
+              .push({ name: String(meta.title || "Позиция"), qty });
+          }
+        } else {
+          for (const mid of allMenuIds) {
+            // eslint-disable-next-line no-await-in-loop
+            const kid = await resolveMenuKitchenId(mid);
+            if (kid) menuToKitchen.set(mid, String(kid));
+          }
+
+          for (const mid of allMenuIds) {
+            const kid = menuToKitchen.get(mid);
+            if (!kid) continue;
+
+            const oldQty = oldMap.get(mid)?.qty ?? 0;
+            const newQty = newMap.get(mid)?.qty ?? 0;
+            if (oldQty === newQty) continue;
+
+            const title =
+              newMap.get(mid)?.title || oldMap.get(mid)?.title || "Позиция";
+
+            if (newQty > oldQty) {
+              const qty = Math.max(1, Number(newQty - oldQty) || 0);
+              if (!addedByKitchen.has(kid)) addedByKitchen.set(kid, []);
+              addedByKitchen.get(kid).push({ name: String(title), qty });
+            } else {
+              const qty = Math.max(1, Number(oldQty - newQty) || 0);
+              if (!removedByKitchen.has(kid)) removedByKitchen.set(kid, []);
+              removedByKitchen.get(kid).push({ name: String(title), qty });
+            }
           }
         }
 
         if (!addedByKitchen.size && !removedByKitchen.size) {
-          // no changes
+          if (isCancelled) {
+            writeOrderItemsSnapshot(oid, {
+              orderId: oid,
+              savedAt: Date.now(),
+              items: {},
+            });
+          }
           return;
+        }
+
+        const prevItemsEmpty =
+          !prevSnap?.items ||
+          typeof prevSnap.items !== "object" ||
+          Object.keys(prevSnap.items).length === 0;
+        if (
+          !isCancelled &&
+          prevItemsEmpty &&
+          addedByKitchen.size > 0 &&
+          removedByKitchen.size === 0
+        ) {
+          const createdRaw =
+            detail?.created_at || detail?.date || detail?.created;
+          const createdMs = createdRaw ? new Date(createdRaw).getTime() : 0;
+          if (
+            createdMs > 0 &&
+            Date.now() - createdMs < KITCHEN_DIFF_INITIAL_SKIP_MS
+          ) {
+            const snapObj = {};
+            for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
+            writeOrderItemsSnapshot(oid, {
+              orderId: oid,
+              savedAt: Date.now(),
+              items: snapObj,
+            });
+            return;
+          }
         }
 
         const dtRaw =
@@ -824,6 +900,7 @@ export default function CafeLayout() {
           "";
         const diffDocNo =
           tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
+        const slipsSectionLabel = isCancelled ? "ОТМЕНА" : "ИЗМЕНЕНИЕ";
 
         let diffKitchenWaiterName = pickCafeOrderWaiterName(detail);
         if (!diffKitchenWaiterName) {
@@ -841,7 +918,7 @@ export default function CafeLayout() {
 
           const payload = {
             company: localStorage.getItem("company_name") || "КУХНЯ",
-            doc_no: `${label} | ${diffDocNo} | ИЗМЕНЕНИЕ`,
+            doc_no: `${label} | ${diffDocNo} | ${slipsSectionLabel}`,
             created_at: dt,
             cashier_name: cashier,
             waiter_name: diffKitchenWaiterName,
@@ -876,14 +953,28 @@ export default function CafeLayout() {
           await printOne(kid, "УБРАТЬ", items);
         }
 
+        if (isCancelled) {
+          try {
+            localStorage.setItem(`cafe_kitchen_cancel_printed_${oid}`, "true");
+          } catch {}
+        }
+
         // Update snapshot only after successful diff print
         const snapObj = {};
-        for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
-        writeOrderItemsSnapshot(oid, {
-          orderId: oid,
-          savedAt: Date.now(),
-          items: snapObj,
-        });
+        if (isCancelled) {
+          writeOrderItemsSnapshot(oid, {
+            orderId: oid,
+            savedAt: Date.now(),
+            items: {},
+          });
+        } else {
+          for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
+          writeOrderItemsSnapshot(oid, {
+            orderId: oid,
+            savedAt: Date.now(),
+            items: snapObj,
+          });
+        }
       } catch (e) {
         console.error("Auto kitchen diff print error:", e);
       } finally {
@@ -905,10 +996,31 @@ export default function CafeLayout() {
       resolveTableLabelFromOrder,
       shouldAutoPrintNow,
       shouldPrintKitchenDiffForStatus,
+      isCancelledOrderStatus,
       TAKEAWAY_LABEL,
       writeOrderItemsSnapshot,
     ],
   );
+
+  printKitchenTicketsForOrderRef.current = printKitchenTicketsForOrder;
+  printReceiptForOrderRef.current = printReceiptForOrder;
+  printKitchenDiffTicketsForOrderRef.current = printKitchenDiffTicketsForOrder;
+  isPaidStatusRef.current = isPaidStatus;
+
+  const tryConsumeWsOrderCreatedKitchenDedupe = (orderId) => {
+    const oid = String(orderId || "");
+    if (!oid) return false;
+    try {
+      const k = `cafe_ws_order_created_kitchen_${oid}`;
+      const prev = sessionStorage.getItem(k);
+      const now = Date.now();
+      if (prev && now - Number(prev) < 30_000) return false;
+      sessionStorage.setItem(k, String(now));
+      return true;
+    } catch {
+      return true;
+    }
+  };
 
   // Fallback: poll recent orders and print kitchen tickets for any unprinted (when order was created from another device, e.g. phone)
   const pollRecentOrdersAndPrint = useCallback(async () => {
@@ -958,7 +1070,7 @@ export default function CafeLayout() {
         setNotificationOptions({ variant: "waiter", sticky: true });
       }
     }
-
+    
     // Auto print to kitchen printers on order created (for the device that has printers configured)
     if (type === "order_created") {
       // Notify cook (only on Kitchen page)
@@ -977,9 +1089,11 @@ export default function CafeLayout() {
 
       const orderId = data?.order?.id;
       if (orderId) {
+        if (!tryConsumeWsOrderCreatedKitchenDedupe(orderId)) return;
         shouldAutoPrintNow()
           .then((enabled) => {
-            if (enabled) printKitchenTicketsForOrder(orderId);
+            if (enabled)
+              printKitchenTicketsForOrderRef.current(String(orderId));
           })
           .catch(() => {});
       }
@@ -989,22 +1103,15 @@ export default function CafeLayout() {
     if (type === "order_updated") {
       const updatedOrder = data?.order;
       const orderId = updatedOrder?.id;
-      if (orderId && isPaidStatus(updatedOrder)) {
-        printReceiptForOrder(orderId);
+      if (orderId && isPaidStatusRef.current(updatedOrder)) {
+        void printReceiptForOrderRef.current(orderId);
       }
       // Auto print kitchen diff on order edit (added/removed items)
-      if (orderId && !isPaidStatus(updatedOrder)) {
-        printKitchenDiffTicketsForOrder(orderId);
+      if (orderId && !isPaidStatusRef.current(updatedOrder)) {
+        void printKitchenDiffTicketsForOrderRef.current(orderId);
       }
     }
-  }, [
-    orders?.lastMessage,
-    profile?.id,
-    isCookPage,
-    isPaidStatus,
-    printReceiptForOrder,
-    printKitchenDiffTicketsForOrder,
-  ]);
+  }, [orders?.lastMessage, profile?.id, isCookPage]);
 
   // Fallback polling: when order is created from another device (e.g. phone), this device (notebook) may not get WebSocket event — poll recent orders and print
   useEffect(() => {
