@@ -777,47 +777,47 @@ const Orders = () => {
 
   const printOrder = useCallback(
     async (order) => {
-      if (!order?.id) return;
-      if (printingId) return;
-      if (!acquireReceiptPrintLock(order.id)) return;
-      setPrintingId(order.id);
-      try {
-        await checkPrinterConnection().catch(() => false);
-        // Для чека берем актуальный detail заказа, чтобы не потерять comment в items.
-        const detailedOrder = await api
-          .get(`/cafe/orders/${order.id}/`)
-          .then((r) => r?.data || null)
-          .catch(() => null);
-        const sourceOrder = detailedOrder ? { ...order, ...detailedOrder } : order;
+      // if (!order?.id) return;
+      // if (printingId) return;
+      // if (!acquireReceiptPrintLock(order.id)) return;
+      // setPrintingId(order.id);
+      // try {
+      //   await checkPrinterConnection().catch(() => false);
+      //   // Для чека берем актуальный detail заказа, чтобы не потерять comment в items.
+      //   const detailedOrder = await api
+      //     .get(`/cafe/orders/${order.id}/`)
+      //     .then((r) => r?.data || null)
+      //     .catch(() => null);
+      //   const sourceOrder = detailedOrder ? { ...order, ...detailedOrder } : order;
 
-        let payload = buildPrintPayload(sourceOrder);
-        if (!String(payload.waiter_name || "").trim()) {
-          const w = await fetchCafeWaiterLabelByEmployeeId(sourceOrder?.waiter);
-          if (w) payload = { ...payload, waiter_name: w };
-        }
+      //   let payload = buildPrintPayload(sourceOrder);
+      //   if (!String(payload.waiter_name || "").trim()) {
+      //     const w = await fetchCafeWaiterLabelByEmployeeId(sourceOrder?.waiter);
+      //     if (w) payload = { ...payload, waiter_name: w };
+      //   }
 
-        // Receipt printer (cashier)
-        const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
-        if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
-        const parsed = parsePrinterBinding(receiptBinding);
-        if (parsed.kind === "ip") {
-          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
-        } else if (parsed.kind === "usb") {
-          await setActivePrinterByKey(parsed.usbKey);
-          await printOrderReceiptJSONViaUSB(payload);
-        } else {
-          throw new Error("Некорректная настройка принтера кассы");
-        }
-        try {
-          localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
-        } catch { }
-      } catch (e) {
-        const errorMessage = validateResErrors(e, "Ошибка при печати чека");
-        alert(errorMessage, true);
-      } finally {
-        setPrintingId(null);
-        releaseReceiptPrintLock(order.id);
-      }
+      //   // Receipt printer (cashier)
+      //   const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+      //   if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+      //   const parsed = parsePrinterBinding(receiptBinding);
+      //   if (parsed.kind === "ip") {
+      //     await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+      //   } else if (parsed.kind === "usb") {
+      //     await setActivePrinterByKey(parsed.usbKey);
+      //     await printOrderReceiptJSONViaUSB(payload);
+      //   } else {
+      //     throw new Error("Некорректная настройка принтера кассы");
+      //   }
+      //   try {
+      //     localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
+      //   } catch { }
+      // } catch (e) {
+      //   const errorMessage = validateResErrors(e, "Ошибка при печати чека");
+      //   alert(errorMessage, true);
+      // } finally {
+      //   setPrintingId(null);
+      //   releaseReceiptPrintLock(order.id);
+      // }
     },
     [buildPrintPayload, printingId]
   );
@@ -1319,7 +1319,7 @@ const Orders = () => {
 
         // Печать на кухню не должна держать saving: иначе кнопки «Редактировать» / «Оплатить»
         // у всех карточек остаются disabled, пока USB/Wi‑Fi не ответят.
-        void autoPrintKitchenTickets(res?.data?.id).catch(() => {});
+        // void autoPrintKitchenTickets(res?.data?.id).catch(() => {});
       } else {
         const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;
