@@ -6,8 +6,7 @@ import { useMenuPermissions } from "./Components/Sidebar/hooks/useMenuPermission
 import { useDebounce } from "./hooks/useDebounce";
 import { useAlert } from "./hooks/useDialog";
 
-
-const BASE_ROUTES = ['/srm/set']
+const BASE_ROUTES = ["/srm/set"];
 
 const ProtectedRoute = ({ children }) => {
   const { company, companyLoading, profile, tariff, sector } = useUser();
@@ -67,11 +66,10 @@ const ProtectedRoute = ({ children }) => {
   // Пока грузим компанию — ждём
   if (companyLoading) {
     return <div>Загрузка...</div>;
-
   }
   // Если компания не пришла → редирект
   if (!company?.end_date) {
-    alert('Срок действия компании не установлен', true);
+    alert("Срок действия компании не установлен", true);
     return <Navigate to="/" replace />;
   }
 
@@ -83,7 +81,7 @@ const ProtectedRoute = ({ children }) => {
   now.setHours(0, 0, 0, 0);
 
   if (endDate < now) {
-    alert('Срок действия компании истек', true);
+    alert("Срок действия компании истек", true);
     return <Navigate to="/" replace />;
   }
 

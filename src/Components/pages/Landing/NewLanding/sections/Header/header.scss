@@ -1,0 +1,77 @@
+.newHeader {
+  &__container {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    padding: 20px 0;
+  }
+  &__left {
+    display: flex;
+    align-items: end;
+    column-gap: 47px;
+  }
+  &__logo {
+    width: 120px;
+    img {
+      width: 100%;
+    }
+  }
+  &__menu {
+    display: flex;
+    align-items: center;
+    column-gap: 30px;
+
+    &-item {
+      font-family: "Manrope", system-ui, sans-serif;
+      font-weight: 400;
+      font-style: Regular;
+      font-size: 16px;
+      leading-trim: NONE;
+      line-height: 20px;
+      letter-spacing: 0%;
+      cursor: pointer;
+
+      &:hover {
+        color: #007bff;
+      }
+      &.active {
+        color: #f2b705;
+      }
+    }
+  }
+  &__right {
+    display: flex;
+    align-items: center;
+    column-gap: 21px;
+  }
+  &__lang {
+    display: flex;
+    column-gap: 4px;
+    button {
+      cursor: pointer;
+      font-family: "Manrope", system-ui, sans-serif;
+      font-weight: normal;
+      font-style: Regular;
+      font-size: 16px;
+      leading-trim: NONE;
+      line-height: 20px;
+      letter-spacing: 0%;
+      &.active {
+        color: #f2b705;
+      }
+    }
+  }
+  &__contacts {
+    display: flex;
+    column-gap: 3px;
+    a {
+      font-family: "Manrope", system-ui, sans-serif;
+      font-weight: 400;
+      font-style: Regular;
+      font-size: 16px;
+      leading-trim: NONE;
+      line-height: 20px;
+      letter-spacing: 0%;
+    }
+  }
+}
