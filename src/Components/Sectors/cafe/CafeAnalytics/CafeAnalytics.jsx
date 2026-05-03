@@ -13,6 +13,7 @@ import {
   FaReceipt,
   FaExclamationTriangle,
   FaCoins,
+  FaPrint,
 } from "react-icons/fa";
 import {
   Chart,
@@ -27,6 +28,12 @@ import {
 } from "chart.js";
 import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import api from "../../../../api";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  checkPrinterConnection,
+  printFinanceCashReportToReceiptPrinter,
+} from "../Orders/OrdersPrintService";
 import { registerPdfFonts } from "../../../../pdf/registerFonts";
 import "./CafeAnalytics.scss";
 import { CafeAnalyticsModal, CafeAnalyticsModalContent } from "./CafeAnalyticsModals";
@@ -169,6 +176,24 @@ const addDays = (d, days) => {
   const x = new Date(d);
   x.setDate(x.getDate() + days);
   return x;
+};
+
+const CAFE_ANALYTICS_DATE_FILTER_LS_KEY = "cafe_analytics_date_filter_v1";
+
+const isIsoDateString = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim());
+
+const readSavedCafeAnalyticsDateFilter = () => {
+  try {
+    const raw = localStorage.getItem(CAFE_ANALYTICS_DATE_FILTER_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const from = String(parsed?.dateFrom || "").trim();
+    const to = String(parsed?.dateTo || "").trim();
+    if (!isIsoDateString(from) || !isIsoDateString(to)) return null;
+    return { dateFrom: from, dateTo: to };
+  } catch {
+    return null;
+  }
 };
 
 const clampRangeDays = (fromStr, toStr, maxDays = 62) => {
@@ -553,6 +578,7 @@ const normalizeWaiterSalaryRows = (data) => {
 /* ===== component ===== */
 const CafeAnalytics = () => {
   const { tariff, company } = useUser();
+  const alert = useAlert();
   const hideKitchenStaffKpi = useMemo(
     () => isStartPlan(tariff || company?.subscription_plan?.name),
     [tariff, company?.subscription_plan?.name],
@@ -564,8 +590,14 @@ const CafeAnalytics = () => {
   const [loading, setLoading] = useState(false);
 
   // дефолт: последние 14 дней (включительно)
-  const [dateFrom, setDateFrom] = useState(() => isoDate(addDays(new Date(), -13)));
-  const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
+  const [dateFrom, setDateFrom] = useState(() => {
+    const saved = readSavedCafeAnalyticsDateFilter();
+    return saved?.dateFrom || isoDate(addDays(new Date(), -13));
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    const saved = readSavedCafeAnalyticsDateFilter();
+    return saved?.dateTo || isoDate(new Date());
+  });
 
   // данные
   const [salesSummary, setSalesSummary] = useState({
@@ -878,6 +910,18 @@ const CafeAnalytics = () => {
     fetchRevenueSeries();
   }, [fetchAll, fetchRevenueSeries]);
 
+  useEffect(() => {
+    if (!isIsoDateString(dateFrom) || !isIsoDateString(dateTo)) return;
+    try {
+      localStorage.setItem(
+        CAFE_ANALYTICS_DATE_FILTER_LS_KEY,
+        JSON.stringify({ dateFrom, dateTo })
+      );
+    } catch {
+      // ignore localStorage write errors
+    }
+  }, [dateFrom, dateTo]);
+
   // Chart.js mount/update
   useEffect(() => {
     const canvas = chartRef.current;
@@ -992,6 +1036,28 @@ const CafeAnalytics = () => {
     }
   };
   const closeModal = () => setModalKey(null);
+
+  const handlePrintFinanceCashReport = useCallback(async () => {
+    try {
+      await checkPrinterConnection().catch(() => false);
+      const orgName =
+        company?.name ||
+        company?.title ||
+        (typeof localStorage !== "undefined"
+          ? localStorage.getItem("company_name")
+          : "") ||
+        "";
+      await printFinanceCashReportToReceiptPrinter({
+        dateFrom,
+        dateTo,
+        incomeBreakdown: financeBlock?.income_breakdown,
+        incomeItems: financeBlock?.income_items,
+        company: orgName || undefined,
+      });
+    } catch (e) {
+      alert(validateResErrors(e, "Ошибка печати отчёта на кассу"), true);
+    }
+  }, [alert, company?.name, company?.title, dateFrom, dateTo, financeBlock]);
 
   const modalTitle = useMemo(() => {
     if (modalKey === "revenue") return "Выручка";
@@ -1510,7 +1576,24 @@ const CafeAnalytics = () => {
       </div>
 
       {/* Modal */}
-      <CafeAnalyticsModal open={!!modalKey} title={modalTitle} subtitle={modalSubtitle} onClose={closeModal}>
+      <CafeAnalyticsModal
+        open={!!modalKey}
+        title={modalTitle}
+        subtitle={modalSubtitle}
+        onClose={closeModal}
+        headActions={
+          modalKey === "finance" ? (
+            <button
+              type="button"
+              className="cafeAnalytics__modalHeadBtn"
+              onClick={handlePrintFinanceCashReport}
+            >
+              <FaPrint aria-hidden />
+              <span>Отчёт на кассу</span>
+            </button>
+          ) : null
+        }
+      >
         <CafeAnalyticsModalContent
           modalKey={modalKey}
           revenueTotal={revenueTotal}
