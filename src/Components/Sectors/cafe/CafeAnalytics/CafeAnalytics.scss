@@ -522,7 +522,6 @@
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
     gap: 12px;
     background: #fff;
     flex-shrink: 0;
@@ -532,6 +531,43 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__modalHeadActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__modalHeadBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    color: #0b1220;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.12s;
+    white-space: nowrap;
+
+    svg {
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    &:hover {
+      background: #f9fafb;
+    }
+    &:active {
+      transform: translateY(1px);
+    }
   }
 
   &__modalTitle {

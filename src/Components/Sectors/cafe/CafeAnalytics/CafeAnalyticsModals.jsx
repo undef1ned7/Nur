@@ -34,7 +34,7 @@ const pickStatusLabel = (s) => {
 };
 
 /* ===== Modal shell ===== */
-const CafeAnalyticsModal = ({ open, title, subtitle, onClose, children }) => {
+const CafeAnalyticsModal = ({ open, title, subtitle, onClose, headActions, children }) => {
   useEffect(() => {
     if (!open) return undefined;
 
@@ -68,6 +68,7 @@ const CafeAnalyticsModal = ({ open, title, subtitle, onClose, children }) => {
             <div className="cafeAnalytics__modalTitle">{title}</div>
             {subtitle ? <div className="cafeAnalytics__modalSub">{subtitle}</div> : null}
           </div>
+          {headActions ? <div className="cafeAnalytics__modalHeadActions">{headActions}</div> : null}
           <button className="cafeAnalytics__modalClose" onClick={onClose} type="button" aria-label="Закрыть">
             <FaTimes />
           </button>

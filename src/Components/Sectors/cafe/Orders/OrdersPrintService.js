@@ -480,8 +480,148 @@ function buildPrettyReceiptFromJSON(payload) {
   return chunks;
 }
 
+function financeToNum(v) {
+  if (v == null) return 0;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
 
-export async function printOrderReceiptJSONViaUSB(payload) {
+/** Короткая подпись способа оплаты для узкого чека (1 строка). */
+function financeShortPayMethod(x) {
+  const code = String(x?.payment_method || x?.method || "").toLowerCase().trim();
+  if (code === "cash") return "Нал";
+  if (code === "card") return "Карта";
+  if (code === "transfer") return "Перевод";
+  if (code === "mixed") return "Смеш.";
+  const lbl = String(x?.payment_method_label || "").trim();
+  if (/налич/i.test(lbl)) return "Нал";
+  if (/безнал/i.test(lbl) || /карт/i.test(lbl)) return "Карта";
+  if (/перевод/i.test(lbl)) return "Перевод";
+  if (lbl) return lbl.length > 7 ? `${lbl.slice(0, 6)}…` : lbl;
+  return code ? code.slice(0, 6) : "—";
+}
+
+/** Дата/время в одну короткую цепочку: 03.05 16:37 */
+function financeFmtLineDate(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso).slice(0, 11);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  } catch {
+    return String(iso || "").slice(0, 11);
+  }
+}
+
+/**
+ * ESC/POS: отчёт на кассу по данным GET /cafe/analytics/finance/
+ * (income_breakdown, income_items).
+ */
+function buildFinanceCashReportChunks({
+  dateFrom = "",
+  dateTo = "",
+  incomeBreakdown = [],
+  incomeItems = [],
+  company = "КАФЕ",
+} = {}) {
+  const width = PRINT_WIDTH;
+  const line = "-".repeat(width);
+  const enc = getEncoder(CODEPAGE);
+
+  const fmtShort = (iso) => {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16);
+      return d.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return String(iso || "").slice(0, 16);
+    }
+  };
+
+  const chunks = [];
+  chunks.push(ESC(0x1b, 0x40));
+  chunks.push(ESC(0x1b, 0x52, 0x07));
+  chunks.push(ESC(0x1b, 0x74, CODEPAGE));
+
+  chunks.push(ESC(0x1b, 0x61, 0x01));
+  chunks.push(enc("ОТЧЕТ НА КАССУ\n"));
+  chunks.push(enc("Финансы, аналитика\n"));
+  chunks.push(ESC(0x1b, 0x61, 0x00));
+  chunks.push(enc(line + "\n"));
+
+  const org = String(company || "").trim() || "КАФЕ";
+  chunks.push(enc(`${org}\n`));
+  if (dateFrom || dateTo) {
+    chunks.push(enc(`Период: ${dateFrom || "…"} — ${dateTo || "…"}\n`));
+  }
+  chunks.push(enc(line + "\n"));
+
+  chunks.push(ESC(0x1b, 0x45, 0x01));
+  chunks.push(enc("Итого по способам оплаты\n"));
+  chunks.push(ESC(0x1b, 0x45, 0x00));
+
+  const breakdown = Array.isArray(incomeBreakdown) ? incomeBreakdown : [];
+  if (!breakdown.length) {
+    chunks.push(enc("Нет данных\n"));
+  } else {
+    for (const x of breakdown) {
+      const label = String(x.method_label || x.label || x.method || "—").trim();
+      const cnt = Math.round(financeToNum(x.count ?? x.orders_count ?? x.transactions));
+      const tot = money(financeToNum(x.total ?? x.amount ?? x.sum));
+      chunks.push(enc(lrSafe(`${label}  (${cnt} шт.)`, `${tot} сом`, width) + "\n"));
+    }
+  }
+
+  chunks.push(enc(line + "\n"));
+  chunks.push(ESC(0x1b, 0x45, 0x01));
+  chunks.push(enc("Операции (доход)\n"));
+  chunks.push(ESC(0x1b, 0x45, 0x00));
+
+  const items = Array.isArray(incomeItems) ? incomeItems.slice() : [];
+  items.sort((a, b) => {
+    const ta = new Date(a?.paid_at || a?.created_at || 0).getTime();
+    const tb = new Date(b?.paid_at || b?.created_at || 0).getTime();
+    return tb - ta;
+  });
+
+  if (!items.length) {
+    chunks.push(enc("Нет операций\n"));
+  } else {
+    chunks.push(enc(`Всего: ${items.length}\n`));
+    for (const x of items) {
+      const dt = financeFmtLineDate(x.paid_at || x.created_at || x.date);
+      const method = financeShortPayMethod(x);
+      const hasTbl =
+        x.table_number != null && String(x.table_number).trim() !== "";
+      const tblSuf = hasTbl ? ` c${x.table_number}` : "";
+      const amt = money(financeToNum(x.amount ?? x.total ?? x.sum));
+      const kind = String(x.kind || "").trim();
+      const kindSuf =
+        kind && kind !== "order_payment" ? ` ${kind.slice(0, 5)}` : "";
+
+      const leftCore = `${dt} ${method}${tblSuf}${kindSuf}`;
+      chunks.push(enc(lrSafe(leftCore, `${amt} сом`, width) + "\n"));
+    }
+  }
+
+  chunks.push(enc(line + "\n"));
+  chunks.push(enc(`Напечатано: ${fmtShort(new Date().toISOString())}\n`));
+
+  chunks.push(ESC(0x1b, 0x64, 0x06));
+  chunks.push(ESC(0x1d, 0x56, 0x00));
+
+  return chunks;
+}
+
+async function transferUsbEscPosParts(parts) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
 
   const state = await ensureUsbReadyAuto();
@@ -493,12 +633,92 @@ export async function printOrderReceiptJSONViaUSB(payload) {
 
   const { outEP } = await openUsbDevice(usbState.dev);
 
-  const parts = buildPrettyReceiptFromJSON(payload);
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await usbState.dev.transferOut(outEP, chunk);
     }
   }
+}
+
+/**
+ * Отправка готовых ESC/POS-блоков на принтер кассы
+ * (localStorage `cafe_receipt_printer`: usb/… или ip/… через bridge).
+ */
+async function sendEscPosToCafeReceiptPrinter(parts) {
+  const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+  if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+  const parsed = parsePrinterBinding(receiptBinding);
+  if (parsed.kind === "ip") {
+    const combinedData = combineDataParts(parts);
+    const bridgeUrl =
+      localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
+    let r;
+    try {
+      r = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip: parsed.ip,
+          port: parsed.port,
+          data: u8ToBase64(combinedData),
+          timeoutMs: 2000,
+        }),
+      });
+    } catch (bridgeErr) {
+      throw new Error(
+        `Печать недоступна: не отвечает bridge/агент (npm run printer-bridge из корня репо или python main.py в tools/printer-agent). Без них на чек попадут HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
+      );
+    }
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      throw new Error(
+        `Printer-bridge ответил ${r.status}. ${errText ? errText.slice(0, 100) : ""}`
+      );
+    }
+    return true;
+  }
+  if (parsed.kind === "usb") {
+    await setActivePrinterByKey(parsed.usbKey);
+    await transferUsbEscPosParts(parts);
+    return true;
+  }
+  throw new Error("Некорректная настройка принтера кассы");
+}
+
+/** Печать отчёта на кассу по данным финансовой аналитики кафе. */
+export async function printFinanceCashReportToReceiptPrinter({
+  dateFrom = "",
+  dateTo = "",
+  incomeBreakdown = [],
+  incomeItems = [],
+  company,
+} = {}) {
+  let org = "";
+  if (company != null) {
+    const c = String(company).trim();
+    if (c) org = c;
+  }
+  if (!org) {
+    try {
+      org = String(localStorage.getItem("company_name") || "").trim();
+    } catch {
+      org = "";
+    }
+  }
+  if (!org) org = "КАФЕ";
+  const parts = buildFinanceCashReportChunks({
+    dateFrom,
+    dateTo,
+    incomeBreakdown,
+    incomeItems,
+    company: org,
+  });
+  await sendEscPosToCafeReceiptPrinter(parts);
+}
+
+export async function printOrderReceiptJSONViaUSB(payload) {
+  const parts = buildPrettyReceiptFromJSON(payload);
+  await transferUsbEscPosParts(parts);
 }
 
 export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
