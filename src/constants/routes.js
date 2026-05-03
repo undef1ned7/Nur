@@ -3,6 +3,7 @@ export const ALLOWED_PATHS_WITHOUT_TOKEN = [
   "/login",
   "/register",
   "/",
+  "/new-landing",
   "/submit-application",
   "/get-application-list",
 

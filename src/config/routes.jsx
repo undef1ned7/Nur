@@ -217,6 +217,7 @@ import BuildingLayout, {
   BuildingDrawings,
   BuildingEmployees,
 } from "../Components/pages/Building";
+import NewLanding from "../Components/pages/Landing/NewLanding/NewLanding";
 
 /**
  * Создает защищенный роут
@@ -416,6 +417,7 @@ const WarehouseAnalyticsRoute = () => {
 export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/" path="/" element={<Landing />} />,
+  <Route key="/new-landing" path="/new-landing" element={<NewLanding />} />,
   <Route key="/register" path="/register" element={<Register />} />,
 
   // Public routes
