@@ -667,6 +667,7 @@ export default function CafeLayout() {
           items: (kitItems || []).map((it) => ({
             name: String(it.menu_item_title || it.title || "Позиция"),
             qty: Math.max(1, Number(it.quantity) || 1),
+            comment: String(it.comment || "").trim(),
             // price not needed for kitchen ticket
           })),
         };

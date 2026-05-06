@@ -256,11 +256,15 @@ const PaymentPage = ({
         paymentMethodApi = "debt"; // Отправляем как долг
       }
 
-      // Проверяем (и при необходимости запрашиваем) подключение принтера ДО выполнения checkout.
-      // Здесь всегда вызываем интерактивное подключение, чтобы при отсутствии принтера
-      // браузер показал стандартное окно выбора USB‑устройства.
-      console.log("[PaymentPage] Проверка принтера перед оплатой (интерактивно)...");
-      const isPrinterConnected = await ensurePrinterConnectedInteractively();
+      // Сначала проверяем подключение тихо, без окна.
+      // Если принтер не найден — спрашиваем подключение через системный диалог.
+      let isPrinterConnected = await checkPrinterConnection();
+      if (!isPrinterConnected) {
+        console.log(
+          "[PaymentPage] Принтер не найден автоматически, открываем диалог подключения..."
+        );
+        isPrinterConnected = await ensurePrinterConnectedInteractively();
+      }
       console.log("[PaymentPage] Результат проверки принтера перед оплатой:", {
         isPrinterConnected,
       });
