@@ -661,7 +661,7 @@ async function sendEscPosToCafeReceiptPrinter(parts) {
           ip: parsed.ip,
           port: parsed.port,
           data: u8ToBase64(combinedData),
-          timeoutMs: 2000,
+          timeoutMs: 7000,
         }),
       });
     } catch (bridgeErr) {
@@ -669,13 +669,19 @@ async function sendEscPosToCafeReceiptPrinter(parts) {
         `Печать недоступна: не отвечает bridge/агент (npm run printer-bridge из корня репо или python main.py в tools/printer-agent). Без них на чек попадут HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
       );
     }
+    if (r.ok) {
+      const result = await r.json().catch(() => null);
+      if (result && result.success === false) {
+        throw new Error(result.error || "Агент печати вернул ошибку");
+      }
+      return true;
+    }
     if (!r.ok) {
       const errText = await r.text().catch(() => "");
       throw new Error(
         `Printer-bridge ответил ${r.status}. ${errText ? errText.slice(0, 100) : ""}`
       );
     }
-    return true;
   }
   if (parsed.kind === "usb") {
     await setActivePrinterByKey(parsed.usbKey);
@@ -824,7 +830,7 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
           ip,
           port,
           data: u8ToBase64(combinedData),
-          timeoutMs: 2000,
+          timeoutMs: 7000,
         }),
       });
     } catch (bridgeErr) {
@@ -832,7 +838,13 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
         `Печать недоступна: не отвечает bridge/агент (npm run printer-bridge из корня репо или python main.py в tools/printer-agent). Без них на чек попадут HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
       );
     }
-    if (r.ok) return true;
+    if (r.ok) {
+      const result = await r.json().catch(() => null);
+      if (result && result.success === false) {
+        throw new Error(result.error || "Агент печати вернул ошибку");
+      }
+      return true;
+    }
 
     const errText = await r.text().catch(() => "");
     throw new Error(
