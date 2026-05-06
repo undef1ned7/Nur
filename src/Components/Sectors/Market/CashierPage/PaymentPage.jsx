@@ -296,9 +296,13 @@ const PaymentPage = ({
       // Окно выбора будет показано только если печать реально не удалась.
       // Если включено "Без чека" — не проверяем принтер, не печатаем и не показываем запросы печати.
       const shouldPrintReceipt = !withoutCheck;
-      const isPrinterConnected = shouldPrintReceipt
-        ? await checkPrinterConnection()
-        : false;
+      let isPrinterConnected = false;
+      if (shouldPrintReceipt) {
+        isPrinterConnected = await checkPrinterConnection();
+        if (!isPrinterConnected) {
+          isPrinterConnected = await ensurePrinterConnectedInteractively();
+        }
+      }
 
       // Выполняем checkout
       // Передаем bool: true только если принтер подключен
