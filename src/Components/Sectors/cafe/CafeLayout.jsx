@@ -40,6 +40,7 @@ export default function CafeLayout() {
   const printKitchenTicketsForOrderRef = useRef(() => Promise.resolve());
   const printReceiptForOrderRef = useRef(() => Promise.resolve());
   const printKitchenDiffTicketsForOrderRef = useRef(() => Promise.resolve());
+  const printQueueRef = useRef(Promise.resolve()); // global single-lane print queue
   const isPaidStatusRef = useRef(() => false);
   const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
   const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
@@ -51,6 +52,7 @@ export default function CafeLayout() {
   const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
+  const PRINT_QUEUE_DELAY_MS = 400;
   const TAKEAWAY_LABEL = "С собой";
   const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -179,7 +181,7 @@ export default function CafeLayout() {
     return m;
   }, [tables]);
 
-  const fullName = useCallback(
+const fullName = useCallback(
     (u = {}) =>
       [u?.last_name || "", u?.first_name || ""]
         .filter(Boolean)
@@ -348,6 +350,17 @@ export default function CafeLayout() {
     ],
   );
 
+  const enqueuePrintJob = useCallback(async (job) => {
+    const run = async () => {
+      await new Promise((resolve) => setTimeout(resolve, PRINT_QUEUE_DELAY_MS));
+      return job();
+    };
+    const next = printQueueRef.current.then(run, run);
+    // Keep the queue chain alive even after failures
+    printQueueRef.current = next.catch(() => {});
+    return next;
+  }, [PRINT_QUEUE_DELAY_MS]);
+
   const printReceiptForOrder = useCallback(
     async (orderId) => {
       const oid = String(orderId || "");
@@ -384,10 +397,14 @@ export default function CafeLayout() {
         };
         const parsed = parsePrinterBinding(receiptBinding);
         if (parsed.kind === "ip") {
-          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+          await enqueuePrintJob(() =>
+            printViaWiFiSimple(payload, parsed.ip, parsed.port),
+          );
         } else if (parsed.kind === "usb") {
-          await setActivePrinterByKey(parsed.usbKey);
-          await printOrderReceiptJSONViaUSB(payload);
+          await enqueuePrintJob(async () => {
+            await setActivePrinterByKey(parsed.usbKey);
+            await printOrderReceiptJSONViaUSB(payload);
+          });
         }
 
         printedReceiptsRef.current.add(oid);
@@ -401,7 +418,7 @@ export default function CafeLayout() {
         releaseReceiptPrintLock(oid);
       }
     },
-    [buildReceiptPayload],
+    [buildReceiptPayload, enqueuePrintJob],
   );
 
   const readKitchenPrinterMap = () => {
@@ -706,12 +723,15 @@ export default function CafeLayout() {
 
         if (parsed.kind === "ip") {
           // eslint-disable-next-line no-await-in-loop
-          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+          await enqueuePrintJob(() =>
+            printViaWiFiSimple(payload, parsed.ip, parsed.port),
+          );
         } else if (parsed.kind === "usb") {
           // eslint-disable-next-line no-await-in-loop
-          await setActivePrinterByKey(parsed.usbKey);
-          // eslint-disable-next-line no-await-in-loop
-          await printOrderReceiptJSONViaUSB(payload);
+          await enqueuePrintJob(async () => {
+            await setActivePrinterByKey(parsed.usbKey);
+            await printOrderReceiptJSONViaUSB(payload);
+          });
         }
       }
 
@@ -970,10 +990,14 @@ export default function CafeLayout() {
           };
 
           if (parsed.kind === "ip") {
-            await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+            await enqueuePrintJob(() =>
+              printViaWiFiSimple(payload, parsed.ip, parsed.port),
+            );
           } else if (parsed.kind === "usb") {
-            await setActivePrinterByKey(parsed.usbKey);
-            await printOrderReceiptJSONViaUSB(payload);
+            await enqueuePrintJob(async () => {
+              await setActivePrinterByKey(parsed.usbKey);
+              await printOrderReceiptJSONViaUSB(payload);
+            });
           }
         };
 
@@ -1033,6 +1057,7 @@ export default function CafeLayout() {
       isCancelledOrderStatus,
       TAKEAWAY_LABEL,
       writeOrderItemsSnapshot,
+      enqueuePrintJob,
     ],
   );
 
