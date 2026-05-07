@@ -214,9 +214,7 @@ const PaymentPage = ({
         "[PaymentPage] Печать не удалась, запрашиваем выбор USB-принтера:",
         err
       );
-      const connected = await ensurePrinterConnectedInteractively({
-        forceChoose: true,
-      });
+      const connected = await ensurePrinterConnectedInteractively();
       if (!connected) return false;
 
       try {

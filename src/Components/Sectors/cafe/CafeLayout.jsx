@@ -560,6 +560,20 @@ export default function CafeLayout() {
     return map;
   }, []);
 
+  const orderItemsSignature = useCallback((items) => {
+    const arr = Array.isArray(items) ? items : [];
+    const chunks = arr.map((it) => {
+      const menuId = String(
+        it?.menu_item || it?.menu_item_id || it?.menuItem || "",
+      );
+      const qty = Math.max(1, Number(it?.quantity) || 1);
+      const comment = String(it?.comment || "").trim();
+      return `${menuId}:${qty}:${comment}`;
+    });
+    chunks.sort();
+    return chunks.join("|");
+  }, []);
+
   const printKitchenTicketsForOrder = async (orderId, attempt = 0) => {
     const oid = String(orderId || "");
     if (!oid) return;
@@ -592,12 +606,30 @@ export default function CafeLayout() {
     };
 
     try {
-      const detail = await api
+      let detail = await api
         .get(`/cafe/orders/${encodeURIComponent(oid)}/`)
         .then((r) => r?.data || null);
       if (!detail) {
         scheduleRetry("no-detail");
         return;
+      }
+
+      // Часто сразу после order_created позиции докатываются по частям.
+      // Коротко ждём "стабилизацию" состава, чтобы печатать одним чеком на кухню.
+      let stableSig = orderItemsSignature(detail?.items);
+      for (let i = 0; i < 2; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        // eslint-disable-next-line no-await-in-loop
+        const nextDetail = await api
+          .get(`/cafe/orders/${encodeURIComponent(oid)}/`)
+          .then((r) => r?.data || null)
+          .catch(() => null);
+        if (!nextDetail) break;
+        const nextSig = orderItemsSignature(nextDetail?.items);
+        detail = nextDetail;
+        if (nextSig === stableSig) break;
+        stableSig = nextSig;
       }
 
       const items = Array.isArray(detail?.items) ? detail.items : [];
