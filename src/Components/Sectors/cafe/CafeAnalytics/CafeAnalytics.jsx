@@ -799,7 +799,7 @@ const CafeAnalytics = () => {
       ] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
-          .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 10 } })
+          .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 500 } })
           .catch(() => ({ data: [] })),
         api.get("/cafe/analytics/sales/categories/", { params }).catch(() => ({ data: [] })),
         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
