@@ -316,12 +316,21 @@ function buildReceiptFromJSON(payload, opts = {}) {
       return { name: String(it.name || "Товар"), qty, price, total: qty * price };
     });
 
-  const subtotal = ekassaFields ? fromTyiyn(f(ekassaFields, "1020")) : items.reduce((s, it) => s + toNum(it.total), 0);
-  const total = ekassaFields ? fromTyiyn(f(ekassaFields, "1031")) : subtotal;
-  const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : 0;
+  const subtotal = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1020"))
+    : items.reduce((s, it) => s + toNum(it.total), 0);
+  const discount = ekassaFields ? 0 : Math.max(0, toNum(payload.discount));
+  const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : toNum(payload.tax);
   const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
-  const paidCard = ekassaFields ? fromTyiyn(f(ekassaFields, "1081")) : toNum(payload.paid_card);
-  const paidCash = Math.max(0, total - paidCard);
+  const total = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1031"))
+    : Math.max(0, subtotal - discount + vat);
+  const paidCard = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1081"))
+    : Math.max(0, toNum(payload.paid_card));
+  const paidCash = ekassaFields
+    ? Math.max(0, total - paidCard)
+    : Math.max(0, toNum(payload.paid_cash));
   const kkm = String(
     ekassaFields
       ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "")
@@ -401,6 +410,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   }
   chunks.push(enc(lr("Подытог", money(subtotal), width) + "\n"));
+  if (discount > 0) chunks.push(enc(lr("Скидка", `-${money(discount)}`, width) + "\n"));
   if (vat > 0) chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
   if (nsp > 0) chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
   if (emphasizeMarketReceipt) {
