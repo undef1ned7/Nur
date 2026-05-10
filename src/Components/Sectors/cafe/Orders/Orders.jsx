@@ -502,7 +502,7 @@ const Orders = () => {
       totalCount: data.count
     }))
     setOrders(full);
-  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff, ordersPagination.currentPage]);
+  }, [debouncedOrderSearchQuery, waiterFilter, isStaff, ordersPagination.currentPage]);
   useEffect(() => {
     fetchMenu(1)
   }, [selectedCategoryFilter])
@@ -558,8 +558,36 @@ const Orders = () => {
       const prevById = new Map(prev.map((o) => [String(o.id), o]));
       return socketOpenOrders.map((so) => {
         const p = prevById.get(String(so.id));
-        if (!p) return so;
+        if (!p) {
+          // New order from WS — fetch full detail in background and update
+          api.get(`/cafe/orders/${so.id}/`)
+            .then((r) => {
+              const detail = r?.data;
+              if (!detail) return;
+              setOrders((cur) =>
+                cur.map((o) => String(o.id) === String(so.id) ? { ...so, ...detail } : o)
+              );
+            })
+            .catch(() => {});
+          return so;
+        }
         const merged = { ...p, ...so };
+
+        // Preserve table field from REST detail if WS sends null/undefined
+        if (
+          (so.table === null || so.table === undefined) &&
+          p.table !== null && p.table !== undefined && p.table !== ""
+        ) {
+          merged.table = p.table;
+        }
+        // Also preserve table_id
+        if (
+          (so.table_id === null || so.table_id === undefined) &&
+          p.table_id !== null && p.table_id !== undefined && p.table_id !== ""
+        ) {
+          merged.table_id = p.table_id;
+        }
+        // Already preserves items — keep that logic as is
         const pItems = Array.isArray(p.items) ? p.items : [];
         const sItems = Array.isArray(so.items) ? so.items : [];
         if (pItems.length > 0 && sItems.length === 0) {
@@ -590,7 +618,7 @@ const Orders = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
 
-  const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const tablesMap = useMemo(() => new Map(tables.map((t) => [String(t.id), t])), [tables]);
   const waiters = useMemo(
     () =>
       employees

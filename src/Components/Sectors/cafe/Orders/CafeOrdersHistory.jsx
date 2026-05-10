@@ -346,7 +346,7 @@ const CafeOrderHistory = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
 
-  const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const tablesMap = useMemo(() => new Map(tables.map((t) => [String(t.id), t])), [tables]);
 
   const menuMap = useMemo(() => {
     const m = new Map();
