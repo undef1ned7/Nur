@@ -107,16 +107,21 @@ const hasNestedOrderRequiredError = (err) => {
     if (!orderErr) return false;
     if (Array.isArray(orderErr)) {
       return orderErr.some((msg) =>
-        String(msg || "").toLowerCase().includes("обязательное поле"),
+        String(msg || "")
+          .toLowerCase()
+          .includes("обязательное поле"),
       );
     }
-    return String(orderErr || "").toLowerCase().includes("обязательное поле");
+    return String(orderErr || "")
+      .toLowerCase()
+      .includes("обязательное поле");
   });
 };
 
 const newIdempotencyKey = () => {
   try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID();
   } catch {
     /* ignore */
   }
@@ -141,7 +146,9 @@ const PAY_CHECKOUT_METHODS = [
 ];
 
 const normalizePaymentMethod = (v) => {
-  const m = String(v || "").trim().toLowerCase();
+  const m = String(v || "")
+    .trim()
+    .toLowerCase();
   if (["наличные", "нал", "cash"].includes(m)) return "cash";
   if (["карта", "card"].includes(m)) return "card";
   if (["перевод", "transfer"].includes(m)) return "transfer";
@@ -151,8 +158,9 @@ const normalizePaymentMethod = (v) => {
 };
 
 const pickClientLabel = (c) =>
-  String(c?.full_name || c?.name || c?.title || c?.company_name || "Без имени").trim() ||
-  "Без имени";
+  String(
+    c?.full_name || c?.name || c?.title || c?.company_name || "Без имени",
+  ).trim() || "Без имени";
 
 /** Заголовок позиции в UI / печати (меню или услуга). */
 const orderItemTitle = (it) => {
@@ -238,7 +246,7 @@ const acquireKitchenPrintLock = (orderId) => {
 const releaseKitchenPrintLock = (orderId) => {
   try {
     localStorage.removeItem(kitchenPrintLockKey(orderId));
-  } catch { }
+  } catch {}
 };
 
 const readReceiptPrintLock = (orderId) => {
@@ -273,16 +281,15 @@ const acquireReceiptPrintLock = (orderId) => {
 const releaseReceiptPrintLock = (orderId) => {
   try {
     localStorage.removeItem(receiptPrintLockKey(orderId));
-  } catch { }
+  } catch {}
 };
 
-const statusFilterOptions =
-  [
-    { value: "", label: "Все статусы" },
-    { value: "open", label: "Открыт" },
-    { value: "closed", label: "Закрыт" },
-    { value: "cancelled", label: "Отменен" },
-  ]
+const statusFilterOptions = [
+  { value: "", label: "Все статусы" },
+  { value: "open", label: "Открыт" },
+  { value: "closed", label: "Закрыт" },
+  { value: "cancelled", label: "Отменен" },
+];
 
 /* =========================================================
    Orders
@@ -301,17 +308,17 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [waiterFilter, setWaiterFilter] = useState(null);
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
-    { value: null, label: 'Все сотрудники' }
-  ])
+    { value: null, label: "Все сотрудники" },
+  ]);
 
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(null);
   const [ordersPagination, setOrderPagination] = useState({
     totalPages: 0,
     currentPage: 1,
     limit: 100,
-    totalCount: 0
-  })
-  const { socketOrders } = useOutletContext()
+    totalCount: 0,
+  });
+  const { socketOrders } = useOutletContext();
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -327,14 +334,14 @@ const Orders = () => {
 
   const { isStaff, userRole, userData, userId } = useMemo(() => {
     const userRole = profile?.role || "";
-    const isStaff = !(profile?.role === 'owner' || profile?.role === 'admin');
+    const isStaff = !(profile?.role === "owner" || profile?.role === "admin");
     return {
       userData: profile,
       userRole,
       userId: profile.id,
-      isStaff
-    }
-  }, [profile])
+      isStaff,
+    };
+  }, [profile]);
   const [printingId, setPrintingId] = useState(null);
 
   // Cash/receipt printer binding is configured in Settings (Настройки → Печать).
@@ -345,16 +352,25 @@ const Orders = () => {
   const [openSelectId, setOpenSelectId] = useState(null);
 
   /* ===== API ===== */
-  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
+  const fetchTables = async () =>
+    setTables(listFrom(await api.get("/cafe/tables/")));
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
-    setWaiterOptionsFilter(prevOptions => {
-      const staticOption = prevOptions[0] || ({ value: null, label: 'Все официанты' });
-      const options = arr.filter(el => !(el.role === 'owner' || el.role === 'admin')).map(el => ({ value: el.id, label: el.first_name + ' ' + el.last_name }))
-      options.unshift(staticOption)
-      return options
-    })
+    setWaiterOptionsFilter((prevOptions) => {
+      const staticOption = prevOptions[0] || {
+        value: null,
+        label: "Все официанты",
+      };
+      const options = arr
+        .filter((el) => !(el.role === "owner" || el.role === "admin"))
+        .map((el) => ({
+          value: el.id,
+          label: el.first_name + " " + el.last_name,
+        }));
+      options.unshift(staticOption);
+      return options;
+    });
     setEmployees(arr.map(normalizeEmployee));
   };
 
@@ -372,22 +388,22 @@ const Orders = () => {
   const fetchMenu = async (page = 1) => {
     setMenuLoading(true);
     const params = {
-      category: selectedCategoryFilter
-    }
+      category: selectedCategoryFilter,
+    };
     if (page > 1) {
-      params['page'] = page
+      params["page"] = page;
     }
     try {
       const res = await api.get("/cafe/menu-items/", {
-        params
+        params,
       });
       const data = res?.data || {};
       // Сохраняем полный объект пагинации или массив
-      const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
+      const itemsData = data?.results ? data : Array.isArray(data) ? data : [];
       setMenuItems(data?.results ? data : itemsData);
 
       // Извлекаем массив для кэша
-      const arr = Array.isArray(itemsData) ? itemsData : (data?.results || []);
+      const arr = Array.isArray(itemsData) ? itemsData : data?.results || [];
       for (const m of arr) {
         menuCacheRef.current.set(String(m.id), {
           ...m,
@@ -403,46 +419,53 @@ const Orders = () => {
   };
 
   // Обработчик смены страницы меню
-  const handleMenuPageChange = useCallback(async (newPage, searchQuery = "") => {
-    if (newPage < 1) return;
+  const handleMenuPageChange = useCallback(
+    async (newPage, searchQuery = "") => {
+      if (newPage < 1) return;
 
-    // Всегда загружаем данные с сервера (с поиском или без)
-    setMenuLoading(true);
-    try {
-      const params = {
-        page: newPage,
-      };
+      // Всегда загружаем данные с сервера (с поиском или без)
+      setMenuLoading(true);
+      try {
+        const params = {
+          page: newPage,
+        };
 
-      // Добавляем параметр поиска, если он есть
-      if (searchQuery && searchQuery.trim().length > 0) {
-        params.search = searchQuery.trim();
+        // Добавляем параметр поиска, если он есть
+        if (searchQuery && searchQuery.trim().length > 0) {
+          params.search = searchQuery.trim();
+        }
+
+        const res = await api.get("/cafe/menu-items/", { params });
+        const data = res?.data || {};
+
+        // Сохраняем полный объект пагинации (с count, next, previous, results)
+        // или массив, если это не объект пагинации
+        const itemsData = data?.results
+          ? data
+          : Array.isArray(data)
+            ? data
+            : [];
+        setMenuItems(itemsData);
+
+        // Обновляем кэш
+        const arr = Array.isArray(itemsData) ? itemsData : data?.results || [];
+        for (const m of arr) {
+          menuCacheRef.current.set(String(m.id), {
+            ...m,
+            kitchen: m.kitchen ?? null,
+          });
+        }
+
+        setMenuCurrentPage(newPage);
+      } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка загрузке меню");
+        alert(errorMessage, true);
+      } finally {
+        setMenuLoading(false);
       }
-
-      const res = await api.get("/cafe/menu-items/", { params });
-      const data = res?.data || {};
-
-      // Сохраняем полный объект пагинации (с count, next, previous, results)
-      // или массив, если это не объект пагинации
-      const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
-      setMenuItems(itemsData);
-
-      // Обновляем кэш
-      const arr = Array.isArray(itemsData) ? itemsData : (data?.results || []);
-      for (const m of arr) {
-        menuCacheRef.current.set(String(m.id), {
-          ...m,
-          kitchen: m.kitchen ?? null,
-        });
-      }
-
-      setMenuCurrentPage(newPage);
-    } catch (err) {
-      const errorMessage = validateResErrors(err, "Ошибка загрузке меню");
-      alert(errorMessage, true);
-    } finally {
-      setMenuLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const fetchCashboxes = async () => {
     try {
@@ -471,8 +494,8 @@ const Orders = () => {
         api
           .get(`/cafe/orders/${id}/`)
           .then((r) => ({ id, data: r.data }))
-          .catch(() => null)
-      )
+          .catch(() => null),
+      ),
     );
 
     return list.map((o) => {
@@ -484,28 +507,33 @@ const Orders = () => {
   const fetchOrders = useCallback(async () => {
     const params = {
       search: debouncedOrderSearchQuery,
-      status: 'open',
-      waiter: waiterFilter
-    }
+      status: "open",
+      waiter: waiterFilter,
+    };
     if (isStaff) {
-      params['waiter'] = userId
+      params["waiter"] = userId;
     }
     const response = await api.get("/cafe/orders/", {
-      params
-    })
+      params,
+    });
     const base = listFrom(response) || [];
     const full = await hydrateOrdersDetails(base);
     const { data } = response;
-    setOrderPagination(prev => ({
+    setOrderPagination((prev) => ({
       ...prev,
       totalPages: Math.ceil(data.count / prev.limit),
-      totalCount: data.count
-    }))
+      totalCount: data.count,
+    }));
     setOrders(full);
-  }, [debouncedOrderSearchQuery, waiterFilter, isStaff, ordersPagination.currentPage]);
+  }, [
+    debouncedOrderSearchQuery,
+    waiterFilter,
+    isStaff,
+    ordersPagination.currentPage,
+  ]);
   useEffect(() => {
-    fetchMenu(1)
-  }, [selectedCategoryFilter])
+    fetchMenu(1);
+  }, [selectedCategoryFilter]);
   useEffect(() => {
     try {
       attachUsbListenersOnce();
@@ -514,7 +542,11 @@ const Orders = () => {
     }
     (async () => {
       try {
-        await Promise.all([fetchEmployees(), fetchKitchens(), fetchCashboxes()]);
+        await Promise.all([
+          fetchEmployees(),
+          fetchKitchens(),
+          fetchCashboxes(),
+        ]);
       } catch (e) {
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
@@ -525,78 +557,138 @@ const Orders = () => {
     (async () => {
       try {
         await fetchTables();
-        setForm(prev => ({ ...prev, table: '' }))
+        setForm((prev) => ({ ...prev, table: "" }));
       } catch (e) {
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       }
     })();
-  }, [socketOrders?.orders])
+  }, [socketOrders?.orders]);
+
+  const mergeOrders = (p, so) => {
+    const merged = { ...p, ...so };
+    if ((so.table === null || so.table === undefined) && p.table) {
+      merged.table = p.table;
+    }
+    if ((so.table_id === null || so.table_id === undefined) && p.table_id) {
+      merged.table_id = p.table_id;
+    }
+    if (
+      (so.table_number === null || so.table_number === undefined) &&
+      p.table_number
+    ) {
+      merged.table_number = p.table_number;
+    }
+    const pItems = Array.isArray(p.items) ? p.items : [];
+    const sItems = Array.isArray(so.items) ? so.items : [];
+    if (pItems.length > 0 && sItems.length === 0) {
+      merged.items = pItems;
+    }
+    return merged;
+  };
 
   // Синхронизация данных из сокетов с локальным состоянием
   useEffect(() => {
     if (!socketOrders?.orders || !Array.isArray(socketOrders.orders)) return;
 
     // Фильтруем только открытые заказы (как в fetchOrders)
-    const socketOpenOrders = socketOrders.orders.filter(order => {
-      const status = String(order.status || '').toLowerCase();
-      return status === 'open' && !order.is_paid;
+    const socketOpenOrders = socketOrders.orders.filter((order) => {
+      const status = String(order.status || "").toLowerCase();
+      return status === "open" && !order.is_paid;
     });
 
     // Обновляем локальное состояние только если есть изменения
     setOrders((prev) => {
+      const socketById = new Map(
+        socketOpenOrders.map((o) => [String(o.id), o]),
+      );
+      const prevById = new Map(prev.map((o) => [String(o.id), o]));
+
+      // If WS sends a partial list (not all orders) — only update/add
+      // those orders, do not remove orders that are missing from WS list
+      const isPartialUpdate = socketOpenOrders.length < prev.length;
+
+      if (isPartialUpdate) {
+        // Update existing orders that are in WS payload
+        const updated = prev.map((p) => {
+          const so = socketById.get(String(p.id));
+          if (!so) return p;
+          return mergeOrders(p, so);
+        });
+
+        // Add new orders from WS that are not yet in prev
+        const prevIds = new Set(prev.map((o) => String(o.id)));
+        socketOpenOrders.forEach((so) => {
+          if (!prevIds.has(String(so.id))) {
+            api
+              .get(`/cafe/orders/${so.id}/`)
+              .then((r) => {
+                const detail = r?.data;
+                if (!detail) return;
+                setOrders((cur) => {
+                  const exists = cur.some(
+                    (o) => String(o.id) === String(so.id),
+                  );
+                  if (exists) {
+                    // Order already in list (added as partial WS object) — update it with full detail
+                    return cur.map((o) =>
+                      String(o.id) === String(so.id) ? { ...so, ...detail } : o,
+                    );
+                  }
+                  return [{ ...so, ...detail }, ...cur];
+                });
+              })
+              .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+          }
+        });
+
+        return updated;
+      }
+
+      // Full list from WS — full replace with merge
       const prevIds = new Set(prev.map((o) => String(o.id)));
       const socketIds = new Set(socketOpenOrders.map((o) => String(o.id)));
 
-      if (
+      // Check if sets are identical (same ids, same size)
+      const setsIdentical =
         prevIds.size === socketIds.size &&
-        [...prevIds].every((id) => socketIds.has(id))
-      ) {
-        return prev;
+        [...prevIds].every((id) => socketIds.has(id));
+
+      // Even if ids are identical, still merge to catch field updates
+      // (status, balance_due, items, etc.)
+      if (setsIdentical) {
+        return prev.map((p) => {
+          const so = socketById.get(String(p.id));
+          if (!so) return p;
+          return mergeOrders(p, so);
+        });
       }
 
-      const prevById = new Map(prev.map((o) => [String(o.id), o]));
       return socketOpenOrders.map((so) => {
         const p = prevById.get(String(so.id));
         if (!p) {
-          // New order from WS — fetch full detail in background and update
-          api.get(`/cafe/orders/${so.id}/`)
+          api
+            .get(`/cafe/orders/${so.id}/`)
             .then((r) => {
               const detail = r?.data;
               if (!detail) return;
-              setOrders((cur) =>
-                cur.map((o) => String(o.id) === String(so.id) ? { ...so, ...detail } : o)
-              );
+              setOrders((cur) => {
+                const exists = cur.some((o) => String(o.id) === String(so.id));
+                if (exists) {
+                  return cur.map((o) =>
+                    String(o.id) === String(so.id) ? { ...so, ...detail } : o,
+                  );
+                }
+                return [{ ...so, ...detail }, ...cur];
+              });
             })
             .catch(() => {});
           return so;
         }
-        const merged = { ...p, ...so };
-
-        // Preserve table field from REST detail if WS sends null/undefined
-        if (
-          (so.table === null || so.table === undefined) &&
-          p.table !== null && p.table !== undefined && p.table !== ""
-        ) {
-          merged.table = p.table;
-        }
-        // Also preserve table_id
-        if (
-          (so.table_id === null || so.table_id === undefined) &&
-          p.table_id !== null && p.table_id !== undefined && p.table_id !== ""
-        ) {
-          merged.table_id = p.table_id;
-        }
-        // Already preserves items — keep that logic as is
-        const pItems = Array.isArray(p.items) ? p.items : [];
-        const sItems = Array.isArray(so.items) ? so.items : [];
-        if (pItems.length > 0 && sItems.length === 0) {
-          merged.items = pItems;
-        }
-        return merged;
+        return mergeOrders(p, so);
       });
     });
-  }, [socketOrders?.orders])
+  }, [socketOrders?.orders]);
 
   useEffect(() => {
     setLoading(true);
@@ -609,8 +701,8 @@ const Orders = () => {
       } finally {
         setLoading(false);
       }
-    })(); 
-  }, [fetchOrders]) 
+    })();
+  }, [fetchOrders]);
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -618,13 +710,16 @@ const Orders = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
 
-  const tablesMap = useMemo(() => new Map(tables.map((t) => [String(t.id), t])), [tables]);
+  const tablesMap = useMemo(
+    () => new Map(tables.map((t) => [String(t.id), t])),
+    [tables],
+  );
   const waiters = useMemo(
     () =>
       employees
-        .filter(el => !(el?.role === 'owner' || el?.role === 'admin'))
+        .filter((el) => !(el?.role === "owner" || el?.role === "admin"))
         .map((u) => ({ id: u.id, name: fullName(u) })),
-    [employees]
+    [employees],
   );
 
   const waiterIdLabelMap = useMemo(() => {
@@ -641,7 +736,9 @@ const Orders = () => {
   const kitchensMap = useMemo(() => {
     const m = new Map();
     (kitchens || []).forEach((k) => {
-      const title = String(k?.title || k?.name || k?.kitchen_title || "Кухня").trim();
+      const title = String(
+        k?.title || k?.name || k?.kitchen_title || "Кухня",
+      ).trim();
       const number = k?.number ?? k?.kitchen_number;
       const label = `${title}${number !== undefined && number !== null && number !== "" ? ` №${number}` : ""}`;
       m.set(String(k?.id), { ...k, label });
@@ -652,26 +749,34 @@ const Orders = () => {
   const menuMap = useMemo(() => {
     const m = new Map();
     // Извлекаем массив из объекта пагинации или используем как массив
-    const itemsArray = menuItems?.results || (Array.isArray(menuItems) ? menuItems : []);
+    const itemsArray =
+      menuItems?.results || (Array.isArray(menuItems) ? menuItems : []);
     itemsArray.forEach((mi) =>
       m.set(String(mi.id), {
         title: mi.title,
         price: toNum(mi.price),
         image_url: mi.image_url || "",
         kitchen: mi.kitchen ?? null,
-      })
+      }),
     );
     return m;
   }, [menuItems]);
 
   const menuImageUrl = (id) => {
     const key = String(id ?? "");
-    return menuMap.get(key)?.image_url || (menuCacheRef.current.get(key)?.image_url ?? "");
+    return (
+      menuMap.get(key)?.image_url ||
+      (menuCacheRef.current.get(key)?.image_url ?? "")
+    );
   };
 
   const getMenuKitchenId = (menuId) => {
     const key = String(menuId ?? "");
-    return menuMap.get(key)?.kitchen ?? menuCacheRef.current.get(key)?.kitchen ?? null;
+    return (
+      menuMap.get(key)?.kitchen ??
+      menuCacheRef.current.get(key)?.kitchen ??
+      null
+    );
   };
 
   const busyTableIds = useMemo(() => {
@@ -690,7 +795,7 @@ const Orders = () => {
   const visibleOrders = useMemo(() => {
     return roleFiltered;
   }, [roleFiltered]);
-
+  // console.log(visibleOrders);
 
   const linePrice = (it) => {
     const lk = String(it?.line_kind || "menu").toLowerCase();
@@ -704,7 +809,10 @@ const Orders = () => {
 
   const calcTotals = (o) => {
     const items = Array.isArray(o.items) ? o.items : [];
-    const total = items.reduce((s, it) => s + linePrice(it) * (Number(it.quantity) || 0), 0);
+    const total = items.reduce(
+      (s, it) => s + linePrice(it) * (Number(it.quantity) || 0),
+      0,
+    );
     const count = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
     return { count, total };
   };
@@ -736,7 +844,9 @@ const Orders = () => {
   const buildPrintPayload = useCallback(
     (order) => {
       const tableLabel = resolveTableLabel(order, tablesMap);
-      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const dt = formatReceiptDate(
+        order?.created_at || order?.date || order?.created,
+      );
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
 
@@ -760,7 +870,7 @@ const Orders = () => {
         })),
       };
     },
-    [tablesMap, userData, waiterIdLabelMap]
+    [tablesMap, userData, waiterIdLabelMap],
   );
 
   const printOrder = useCallback(
@@ -776,7 +886,9 @@ const Orders = () => {
           .get(`/cafe/orders/${order.id}/`)
           .then((r) => r?.data || null)
           .catch(() => null);
-        const sourceOrder = detailedOrder ? { ...order, ...detailedOrder } : order;
+        const sourceOrder = detailedOrder
+          ? { ...order, ...detailedOrder }
+          : order;
 
         let payload = buildPrintPayload(sourceOrder);
         if (!String(payload.waiter_name || "").trim()) {
@@ -785,8 +897,10 @@ const Orders = () => {
         }
 
         // Receipt printer (cashier)
-        const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
-        if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+        const receiptBinding =
+          localStorage.getItem("cafe_receipt_printer") || "";
+        if (!receiptBinding)
+          throw new Error("Не настроен принтер кассы (чековый аппарат)");
         const parsed = parsePrinterBinding(receiptBinding);
         if (parsed.kind === "ip") {
           await printViaWiFiSimple(payload, parsed.ip, parsed.port);
@@ -807,14 +921,16 @@ const Orders = () => {
         releaseReceiptPrintLock(order.id);
       }
     },
-    [buildPrintPayload, printingId]
+    [buildPrintPayload, printingId],
   );
 
   /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
-    ({ order, kitchenId, kitchenLabel, items }, label = 'КАССАА') => {
+    ({ order, kitchenId, kitchenLabel, items }, label = "КАССАА") => {
       const tableLabel = resolveTableLabel(order, tablesMap);
-      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const dt = formatReceiptDate(
+        order?.created_at || order?.date || order?.created,
+      );
       const cashier = fullName(userData || {});
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
@@ -840,7 +956,7 @@ const Orders = () => {
         })),
       };
     },
-    [tablesMap, userData, waiterIdLabelMap]
+    [tablesMap, userData, waiterIdLabelMap],
   );
 
   const getKitchenPrinterKey = useCallback(
@@ -851,17 +967,17 @@ const Orders = () => {
       const k = kitchensMap.get(kid);
       const direct = String(
         k?.printer_key ||
-        k?.printerKey ||
-        k?.printer ||
-        k?.printer_id ||
-        k?.printerId ||
-        ""
+          k?.printerKey ||
+          k?.printer ||
+          k?.printer_id ||
+          k?.printerId ||
+          "",
       ).trim();
       if (direct) return direct;
       const ls = readKitchenPrinterMap();
       return String(ls?.[kid] || "").trim();
     },
-    [kitchensMap]
+    [kitchensMap],
   );
 
   const autoPrintKitchenTickets = useCallback(
@@ -869,12 +985,15 @@ const Orders = () => {
       if (!createdOrderId) return;
       if (!isAutoKitchenPrintEnabled()) return;
       try {
-        if (localStorage.getItem(`cafe_kitchen_printed_${createdOrderId}`)) return;
-      } catch { }
+        if (localStorage.getItem(`cafe_kitchen_printed_${createdOrderId}`))
+          return;
+      } catch {}
       if (!acquireKitchenPrintLock(createdOrderId)) return;
 
       try {
-        const detail = await api.get(`/cafe/orders/${createdOrderId}/`).then((r) => r?.data || null);
+        const detail = await api
+          .get(`/cafe/orders/${createdOrderId}/`)
+          .then((r) => r?.data || null);
         if (!detail) return;
 
         const items = Array.isArray(detail?.items) ? detail.items : [];
@@ -894,7 +1013,10 @@ const Orders = () => {
 
         if (!groups.size) return;
 
-        let kitchenWaiterName = pickCafeOrderWaiterName(detail, waiterIdLabelMap);
+        let kitchenWaiterName = pickCafeOrderWaiterName(
+          detail,
+          waiterIdLabelMap,
+        );
         if (!kitchenWaiterName) {
           kitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
             detail?.waiter,
@@ -913,12 +1035,15 @@ const Orders = () => {
           // }
 
           const payload = {
-            ...buildKitchenTicketPayload({
-              order: detail,
-              kitchenId,
-              kitchenLabel,
-              items: kitItems,
-            }, 'КУХНЯ'),
+            ...buildKitchenTicketPayload(
+              {
+                order: detail,
+                kitchenId,
+                kitchenLabel,
+                items: kitItems,
+              },
+              "КУХНЯ",
+            ),
             waiter_name: kitchenWaiterName,
           };
 
@@ -929,12 +1054,19 @@ const Orders = () => {
             await setActivePrinterByKey(parsed.usbKey);
             await printOrderReceiptJSONViaUSB(payload);
           } else {
-            console.warn("Kitchen print skipped: invalid printer binding for kitchen", kitchenId, printerKey);
+            console.warn(
+              "Kitchen print skipped: invalid printer binding for kitchen",
+              kitchenId,
+              printerKey,
+            );
           }
         }
         try {
-          localStorage.setItem(`cafe_kitchen_printed_${createdOrderId}`, "true");
-        } catch { }
+          localStorage.setItem(
+            `cafe_kitchen_printed_${createdOrderId}`,
+            "true",
+          );
+        } catch {}
       } catch (e) {
         console.error("Auto kitchen print error:", e);
         // Ошибка отправки чека на кухню
@@ -949,7 +1081,7 @@ const Orders = () => {
       getMenuKitchenId,
       kitchensMap,
       waiterIdLabelMap,
-    ]
+    ],
   );
 
   /* ===== модалка create/edit ===== */
@@ -1088,9 +1220,9 @@ const Orders = () => {
             id: it.id,
             line_kind: "menu",
             menu_item: mid,
-        title: it.menu_item_title || it.title,
-        price: linePrice(it),
-        quantity: Number(it.quantity) || 1,
+            title: it.menu_item_title || it.title,
+            price: linePrice(it),
+            quantity: Number(it.quantity) || 1,
             comment: it.comment || "",
             is_rejected: !!it.is_rejected,
             rejection_reason: it.rejection_reason || "",
@@ -1119,7 +1251,9 @@ const Orders = () => {
 
     setForm((prev) => {
       const ex = prev.items.find(
-        (i) => String(i.line_kind || "menu") !== "service" && String(i.menu_item) === idStr
+        (i) =>
+          String(i.line_kind || "menu") !== "service" &&
+          String(i.menu_item) === idStr,
       );
       if (ex) {
         return {
@@ -1131,7 +1265,7 @@ const Orders = () => {
                   quantity:
                     (i.quantity === "" ? 0 : Number(i.quantity) || 0) + 1,
                 }
-              : i
+              : i,
           ),
         };
       }
@@ -1176,7 +1310,9 @@ const Orders = () => {
     const next = parseLineQtyDigits(raw);
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) => (i._key === lineKey ? { ...i, quantity: next } : i)),
+      items: prev.items.map((i) =>
+        i._key === lineKey ? { ...i, quantity: next } : i,
+      ),
     }));
   };
 
@@ -1184,7 +1320,9 @@ const Orders = () => {
     setForm((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        i._key === lineKey ? { ...i, comment: String(raw || "").slice(0, 500) } : i,
+        i._key === lineKey
+          ? { ...i, comment: String(raw || "").slice(0, 500) }
+          : i,
       ),
     }));
   };
@@ -1198,7 +1336,7 @@ const Orders = () => {
               ...i,
               quantity: (i.quantity === "" ? 0 : Number(i.quantity) || 0) + 1,
             }
-          : i
+          : i,
       ),
     }));
   };
@@ -1213,10 +1351,10 @@ const Orders = () => {
                 ...i,
                 quantity: Math.max(
                   0,
-                  (i.quantity === "" ? 0 : Number(i.quantity) || 0) - 1
+                  (i.quantity === "" ? 0 : Number(i.quantity) || 0) - 1,
                 ),
               }
-            : i
+            : i,
         )
         .filter((el) => Number(el.quantity) > 0),
     }));
@@ -1249,8 +1387,6 @@ const Orders = () => {
     }
   };
 
-
-
   const saveForm = async (e) => {
     e.preventDefault();
     if (!form.items.length) return;
@@ -1269,7 +1405,11 @@ const Orders = () => {
         else if (isStaff) basePayload.waiter = userId;
         let res;
         try {
-          res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
+          res = await postWithWaiterFallback(
+            "/cafe/orders/",
+            basePayload,
+            "post",
+          );
         } catch (createErr) {
           // Некоторые бэкенды требуют items[].order даже при создании заказа.
           // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
@@ -1284,7 +1424,11 @@ const Orders = () => {
           const createdOrderId = created?.data?.id;
           if (!createdOrderId) throw createErr;
 
-          const patchPayload = normalizeOrderPayload(form, false, createdOrderId);
+          const patchPayload = normalizeOrderPayload(
+            form,
+            false,
+            createdOrderId,
+          );
           if (startPlan) delete patchPayload.waiter;
           await postWithWaiterFallback(
             `/cafe/orders/${createdOrderId}/`,
@@ -1311,7 +1455,11 @@ const Orders = () => {
       } else {
         const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;
-        await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
+        await postWithWaiterFallback(
+          `/cafe/orders/${editingId}/`,
+          payload,
+          "patch",
+        );
       }
 
       setModalOpen(false);
@@ -1329,17 +1477,19 @@ const Orders = () => {
     }
   };
 
-
-
   const createCashflowIncome = async (order, amount) => {
-    const firstKey = cashboxId || String(cashboxes?.[0]?.id || cashboxes?.[0]?.uuid || "");
-    if (!firstKey) throw new Error("Нет кассы. Создайте кассу в разделе «Кассы».");
+    const firstKey =
+      cashboxId || String(cashboxes?.[0]?.id || cashboxes?.[0]?.uuid || "");
+    if (!firstKey)
+      throw new Error("Нет кассы. Создайте кассу в разделе «Кассы».");
     if (!cashboxId) setCashboxId(firstKey);
 
     const t = tablesMap.get(order?.table);
     const tableLabel = resolveTableLabel(order, tablesMap);
     const name =
-      tableLabel === TAKEAWAY_LABEL ? `Оплата: ${TAKEAWAY_LABEL}` : `Оплата стол ${t?.number ?? tableLabel}`;
+      tableLabel === TAKEAWAY_LABEL
+        ? `Оплата: ${TAKEAWAY_LABEL}`
+        : `Оплата стол ${t?.number ?? tableLabel}`;
 
     const res = await api.post("/construction/cashflows/", {
       cashbox: firstKey,
@@ -1360,7 +1510,6 @@ const Orders = () => {
       alert(errorMessage, true);
     }
   };
-
 
   /* ===== ОПЛАТА: POST /cafe/orders/<id>/pay/ и /pay-debt/ ===== */
   const [payOpen, setPayOpen] = useState(false);
@@ -1454,8 +1603,8 @@ const Orders = () => {
       /* ignore */
     }
     await fetchOrders();
-      setPayOpen(false);
-      setPayOrder(null);
+    setPayOpen(false);
+    setPayOrder(null);
   };
 
   const submitCheckoutPay = async () => {
@@ -1464,14 +1613,19 @@ const Orders = () => {
     const order = payOrder;
     const discount_amount = numStr(toNum(payForm.discountAmount));
     const due = checkoutDue(order, payForm.discountAmount);
-    const clientId = String(payForm.clientId || getOrderClientId(order) || "").trim();
+    const clientId = String(
+      payForm.clientId || getOrderClientId(order) || "",
+    ).trim();
 
     let payload = {};
     const pm = payForm.paymentMethod;
 
     if (pm === "debt") {
       if (!clientId) {
-        alert("Укажите гостя: для оплаты в долг нужен client_id (выберите гостя).", true);
+        alert(
+          "Укажите гостя: для оплаты в долг нужен client_id (выберите гостя).",
+          true,
+        );
         return;
       }
       if (payForm.usePrepaid) {
@@ -1537,27 +1691,33 @@ const Orders = () => {
     }
   };
 
-
-
   /* options */
   const tableOptions = useMemo(() => {
     const opts = (tables || [])
-      .filter((t) => !busyTableIds.has(t.id) || String(t.id) === String(form.table))
+      .filter(
+        (t) => !busyTableIds.has(t.id) || String(t.id) === String(form.table),
+      )
       .map((t) => ({
         value: String(t.id),
         label: `Стол ${t.number}${t.places ? ` • ${t.places} мест` : ""}`,
         search: `стол ${t.number} ${t.places || ""}`.trim(),
       }));
     // value="" -> backend получит table=null (см. normalizeOrderPayload + toId)
-    return [{ value: "", label: TAKEAWAY_LABEL, search: "с собой собой takeaway" }, ...opts];
+    return [
+      { value: "", label: TAKEAWAY_LABEL, search: "с собой собой takeaway" },
+      ...opts,
+    ];
   }, [tables, busyTableIds, form.table]);
 
   const waiterOptions = useMemo(() => {
-    return [{ value: "", label: "— Без официанта —", search: "без официанта" }, ...waiters.map((w) => ({
-      value: String(w.id),
-      label: w.name,
-      search: w.name,
-    }))];
+    return [
+      { value: "", label: "— Без официанта —", search: "без официанта" },
+      ...waiters.map((w) => ({
+        value: String(w.id),
+        label: w.name,
+        search: w.name,
+      })),
+    ];
   }, [waiters]);
 
   const clientOptions = useMemo(() => {
@@ -1569,23 +1729,35 @@ const Orders = () => {
   }, [clients]);
 
   const payClientOptions = useMemo(() => {
-    const base = [{ value: "", label: "— Не выбран —", search: "" }, ...clientOptions];
+    const base = [
+      { value: "", label: "— Не выбран —", search: "" },
+      ...clientOptions,
+    ];
     const selectedId = String(payForm.clientId || "").trim();
     if (!selectedId) return base;
     if (base.some((o) => String(o.value) === selectedId)) return base;
 
-    const orderClient = payOrder?.client && typeof payOrder.client === "object" ? payOrder.client : null;
-    const fallbackLabel = orderClient ? pickClientLabel(orderClient) : `Клиент ${selectedId}`;
-    return [{ value: selectedId, label: fallbackLabel, search: fallbackLabel }, ...base];
+    const orderClient =
+      payOrder?.client && typeof payOrder.client === "object"
+        ? payOrder.client
+        : null;
+    const fallbackLabel = orderClient
+      ? pickClientLabel(orderClient)
+      : `Клиент ${selectedId}`;
+    return [
+      { value: selectedId, label: fallbackLabel, search: fallbackLabel },
+      ...base,
+    ];
   }, [clientOptions, payForm.clientId, payOrder]);
-
 
   return (
     <section className="cafeOrders">
       <div className="cafeOrders__header">
         <div>
           <h2 className="cafeOrders__title">Заказы</h2>
-          <div className="cafeOrders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
+          <div className="cafeOrders__subtitle">
+            После оплаты заказ исчезает здесь и появляется в кассе как приход.
+          </div>
         </div>
         <div className="cafeOrders__actions">
           <div className="cafeOrders__search">
@@ -1598,108 +1770,146 @@ const Orders = () => {
             />
           </div>
           {userRole == "owner" && !startPlan && (
-              <div className="cafeOrders__filter">
-                <SearchableCombobox
-                  value={waiterFilter}
-                  onChange={setWaiterFilter}
-                  options={waiterOptionsFilter}
-                  placeholder="Сотрудники"
-                  classNamePrefix="cafeOrders__combo"
-                />
-              </div>)
-          }
-
+            <div className="cafeOrders__filter">
+              <SearchableCombobox
+                value={waiterFilter}
+                onChange={setWaiterFilter}
+                options={waiterOptionsFilter}
+                placeholder="Сотрудники"
+                classNamePrefix="cafeOrders__combo"
+              />
+            </div>
+          )}
 
           {userRole === "повара" ? null : (
-            <button className="cafeOrders__btn cafeOrders__btn--primary" onClick={openCreate} type="button">
+            <button
+              className="cafeOrders__btn cafeOrders__btn--primary"
+              onClick={openCreate}
+              type="button"
+            >
               <FaPlus /> Новый заказ
             </button>
           )}
         </div>
       </div>
       <DataContainer>
-
         <div className="cafeOrders__list">
           {loading && <div className="cafeOrders__alert">Загрузка…</div>}
-          {
-            visibleOrders.map((o) => {
-              const tableLabel = resolveTableLabel(o, tablesMap);
-              const totals = calcTotals(o);
-              const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
-              const isTakeaway = tableLabel === TAKEAWAY_LABEL;
-              const debtDue = toNum(o.balance_due);
-              const showPayActions =
-                String(o.status || "").toLowerCase() === "open" &&
-                (!o.is_paid || debtDue > 0);
+          {visibleOrders.map((o) => {
+            const tableLabel = resolveTableLabel(o, tablesMap);
+            const totals = calcTotals(o);
+            const orderDate = formatReceiptDate(
+              o.created_at || o.date || o.created,
+            );
+            const isTakeaway = tableLabel === TAKEAWAY_LABEL;
+            const debtDue = toNum(o.balance_due);
+            const showPayActions =
+              String(o.status || "").toLowerCase() === "open" &&
+              (!o.is_paid || debtDue > 0);
 
-              const items = Array.isArray(o.items) ? o.items : [];
-              const expanded = expandedOrders.has(String(o.id));
-              const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
-              const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
-              return (
-                <article key={o.id} className="cafeOrders__receipt relative">
-                  <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
-                  <div className="cafeOrders__receiptHeader">
-                    <div className="cafeOrders__receiptTable">
-                      {isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`}
-                    </div>
-                    {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
+            const items = Array.isArray(o.items) ? o.items : [];
+            const expanded = expandedOrders.has(String(o.id));
+            const sliceItems = expanded
+              ? items
+              : items.slice(0, CARD_ITEMS_LIMIT);
+            const rest = Math.max(
+              0,
+              items.length - Math.min(items.length, CARD_ITEMS_LIMIT),
+            );
+            return (
+              <article key={o.id} className="cafeOrders__receipt relative">
+                <SimpleStamp
+                  date={o.paid_at}
+                  className="bottom-10 left-20"
+                  type={o.status}
+                  size={"md"}
+                />
+                <div className="cafeOrders__receiptHeader">
+                  <div className="cafeOrders__receiptTable">
+                    {isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`}
+                  </div>
+                  {orderDate && (
+                    <div className="cafeOrders__receiptDate">{orderDate}</div>
+                  )}
+                </div>
+
+                <div className="cafeOrders__receiptDivider" />
+
+                <div className="cafeOrders__receiptItems">
+                  {sliceItems.map((it, i) => {
+                    const itemPrice = linePrice(it);
+                    const itemTitle = orderItemTitle(it);
+                    const itemQty = Number(it.quantity) || 0;
+                    const sum = itemPrice * itemQty;
+
+                    return (
+                      <div
+                        key={
+                          it.id ||
+                          `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`
+                        }
+                        className="cafeOrders__receiptItem"
+                      >
+                        <span className="cafeOrders__receiptItemName">
+                          {itemTitle}
+                        </span>
+                        <span className="cafeOrders__receiptItemQty">
+                          x{itemQty}
+                        </span>
+                        <span className="cafeOrders__receiptItemPrice">
+                          {fmtShort(sum)}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {!expanded && rest > 0 && (
+                    <button
+                      type="button"
+                      className="cafeOrders__moreItemsBtn"
+                      onClick={() => toggleExpandedOrder(o.id)}
+                    >
+                      Ещё {rest} поз.
+                    </button>
+                  )}
+
+                  {expanded && items.length > CARD_ITEMS_LIMIT && (
+                    <button
+                      type="button"
+                      className="cafeOrders__moreItemsBtn"
+                      onClick={() => toggleExpandedOrder(o.id)}
+                    >
+                      Свернуть позиции ({items.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="cafeOrders__receiptFooter">
+                  <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
+
+                  <div className="cafeOrders__receiptTotal">
+                    <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
+                    <span className="cafeOrders__receiptTotalAmount">
+                      {fmtShort(totals.total)}
+                    </span>
                   </div>
 
-                  <div className="cafeOrders__receiptDivider" />
-
-                  <div className="cafeOrders__receiptItems">
-                    {sliceItems.map((it, i) => {
-                      const itemPrice = linePrice(it);
-                      const itemTitle = orderItemTitle(it);
-                      const itemQty = Number(it.quantity) || 0;
-                      const sum = itemPrice * itemQty;
-
-                      return (
-                        <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`} className="cafeOrders__receiptItem">
-                          <span className="cafeOrders__receiptItemName">{itemTitle}</span>
-                          <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
-                          <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
-                        </div>
-                      );
-                    })}
-
-                    {!expanded && rest > 0 && (
-                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                        Ещё {rest} поз.
-                      </button>
-                    )}
-
-                    {expanded && items.length > CARD_ITEMS_LIMIT && (
-                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                        Свернуть позиции ({items.length})
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="cafeOrders__receiptFooter">
-                    <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
-
-                    <div className="cafeOrders__receiptTotal">
-                      <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
-                      <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
+                  {toNum(o.paid_amount) > 0 && (
+                    <div className="cafeOrders__receiptSubline">
+                      <span>Оплачено</span>
+                      <span>{fmtMoney(o.paid_amount)}</span>
                     </div>
+                  )}
+                  {debtDue > 0 && (
+                    <div className="cafeOrders__receiptSubline cafeOrders__receiptSubline--debt">
+                      <span>Долг</span>
+                      <span>{fmtMoney(debtDue)}</span>
+                    </div>
+                  )}
 
-                    {toNum(o.paid_amount) > 0 && (
-                      <div className="cafeOrders__receiptSubline">
-                        <span>Оплачено</span>
-                        <span>{fmtMoney(o.paid_amount)}</span>
-                      </div>
-                    )}
-                    {debtDue > 0 && (
-                      <div className="cafeOrders__receiptSubline cafeOrders__receiptSubline--debt">
-                        <span>Долг</span>
-                        <span>{fmtMoney(debtDue)}</span>
-                      </div>
-                    )}
-
-                    <div className="cafeOrders__receiptActions">
-                      {!o.is_paid && String(o.status || "").toLowerCase() === "open" && (
+                  <div className="cafeOrders__receiptActions">
+                    {!o.is_paid &&
+                      String(o.status || "").toLowerCase() === "open" && (
                         <button
                           className="cafeOrders__btn cafeOrders__btn--secondary"
                           onClick={() => openEdit(o)}
@@ -1710,27 +1920,28 @@ const Orders = () => {
                         </button>
                       )}
 
-                      {showPayActions && (
-                        <button
-                          className="cafeOrders__btn cafeOrders__btn--primary"
-                          onClick={() => openPay(o)}
-                          type="button"
-                          disabled={saving || paying || printingId === o.id}
-                        >
-                          <FaCheckCircle />{" "}
-                          {debtDue > 0 && o.is_paid ? "Долг" : "Оплатить"}
-                        </button>
-                      )}
-                    </div>
+                    {showPayActions && (
+                      <button
+                        className="cafeOrders__btn cafeOrders__btn--primary"
+                        onClick={() => openPay(o)}
+                        type="button"
+                        disabled={saving || paying || printingId === o.id}
+                      >
+                        <FaCheckCircle />{" "}
+                        {debtDue > 0 && o.is_paid ? "Долг" : "Оплатить"}
+                      </button>
+                    )}
                   </div>
-                </article>
-              );
-            })}
+                </div>
+              </article>
+            );
+          })}
 
           {!loading && !roleFiltered.length && (
-            <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
+            <div className="cafeOrders__alert cafeOrders__alert--muted">
+              Ничего не найдено по «{query}».
+            </div>
           )}
-
         </div>
       </DataContainer>
 
@@ -1742,10 +1953,10 @@ const Orders = () => {
         hasPrevPage={ordersPagination.currentPage > 1}
         loading={loading}
         onPageChange={(page) => {
-          setOrderPagination(prev => ({
+          setOrderPagination((prev) => ({
             ...prev,
-            currentPage: page
-          }))
+            currentPage: page,
+          }));
         }}
       />
       {/* Modal create/edit */}
@@ -1761,7 +1972,10 @@ const Orders = () => {
             }
           }}
         >
-          <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="cafeOrdersModal__shell"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div
               className="cafeOrdersModal__card"
               onClick={() => {
@@ -1769,7 +1983,9 @@ const Orders = () => {
               }}
             >
               <div className="cafeOrdersModal__header">
-                <h3 className="cafeOrdersModal__title">{isEditing ? "Редактировать заказ" : "Новый заказ"}</h3>
+                <h3 className="cafeOrdersModal__title">
+                  {isEditing ? "Редактировать заказ" : "Новый заказ"}
+                </h3>
                 <button
                   className="cafeOrdersModal__close"
                   onClick={() => {
@@ -1800,7 +2016,11 @@ const Orders = () => {
                     onChange={(val) => setForm((f) => ({ ...f, table: val }))}
                     options={tableOptions}
                     disabled={saving}
-                    hint={busyTableIds.size > 0 ? "Занятые столы скрыты до оплаты." : ""}
+                    hint={
+                      busyTableIds.size > 0
+                        ? "Занятые столы скрыты до оплаты."
+                        : ""
+                    }
                   />
 
                   <div className="cafeOrders__field">
@@ -1812,13 +2032,20 @@ const Orders = () => {
                       value={form.guests}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, "");
-                        setForm((f) => ({ ...f, guests: val === "" ? "" : Math.max(0, Number(val) || 0) }));
+                        setForm((f) => ({
+                          ...f,
+                          guests:
+                            val === "" ? "" : Math.max(0, Number(val) || 0),
+                        }));
                       }}
                       disabled={saving}
                     />
                   </div>
                   {!isStaff && !startPlan && (
-                    <div className="cafeOrders__field" style={{ gridColumn: "1 / -1" }}>
+                    <div
+                      className="cafeOrders__field"
+                      style={{ gridColumn: "1 / -1" }}
+                    >
                       <SearchSelect
                         id="waiter"
                         openId={openSelectId}
@@ -1826,7 +2053,9 @@ const Orders = () => {
                         label="Официант"
                         placeholder="— Выберите официанта —"
                         value={String(form.waiter ?? "")}
-                        onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
+                        onChange={(val) =>
+                          setForm((f) => ({ ...f, waiter: val }))
+                        }
                         options={waiterOptions}
                         disabled={saving}
                       />
@@ -1843,12 +2072,20 @@ const Orders = () => {
                         openId={openSelectId}
                         setOpenId={setOpenSelectId}
                         label={clientsLoading ? "Клиент (загрузка…)" : "Клиент"}
-                        placeholder={clientsLoading ? "Загрузка…" : "— Выберите клиента —"}
+                        placeholder={
+                          clientsLoading ? "Загрузка…" : "— Выберите клиента —"
+                        }
                         value={String(form.client ?? "")}
-                        onChange={(val) => setForm((f) => ({ ...f, client: val }))}
+                        onChange={(val) =>
+                          setForm((f) => ({ ...f, client: val }))
+                        }
                         options={clientOptions}
                         disabled={saving || clientsLoading}
-                        hint={clientsErr ? clientsErr : "Поиск работает по имени и телефону."}
+                        hint={
+                          clientsErr
+                            ? clientsErr
+                            : "Поиск работает по имени и телефону."
+                        }
                       />
                     </div>
 
@@ -1895,7 +2132,9 @@ const Orders = () => {
                 {/* Позиции */}
                 <div className="cafeOrders__itemsBlock">
                   <div className="cafeOrders__itemsHead">
-                    <h4 className="cafeOrders__itemsHeadTitle">Позиции заказа</h4>
+                    <h4 className="cafeOrders__itemsHeadTitle">
+                      Позиции заказа
+                    </h4>
 
                     <button
                       type="button"
@@ -1913,32 +2152,51 @@ const Orders = () => {
                   {form.items.length ? (
                     <div className="cafeOrders__itemsList">
                       {form.items.map((it) => {
-                        const isService = String(it.line_kind || "menu").toLowerCase() === "service";
+                        const isService =
+                          String(it.line_kind || "menu").toLowerCase() ===
+                          "service";
                         const img = isService ? "" : menuImageUrl(it.menu_item);
                         const qtyNum = lineQtyNum(it.quantity);
                         const price = toNum(it.price);
                         const sum = price * qtyNum;
-                        const lineTitle = isService ? it.service_title || "Услуга" : it.title;
+                        const lineTitle = isService
+                          ? it.service_title || "Услуга"
+                          : it.title;
 
                         return (
                           <div key={it._key} className="cafeOrders__itemRow">
                             <div className="cafeOrders__itemLeft">
-                              <span className="cafeOrders__thumb cafeOrders__thumb--sm" aria-hidden>
-                                {img ? <img src={img} alt="" /> : <FaClipboardList />}
+                              <span
+                                className="cafeOrders__thumb cafeOrders__thumb--sm"
+                                aria-hidden
+                              >
+                                {img ? (
+                                  <img src={img} alt="" />
+                                ) : (
+                                  <FaClipboardList />
+                                )}
                               </span>
 
                               <div className="cafeOrders__itemInfo">
-                                <div className="cafeOrders__itemTitle" title={lineTitle}>
+                                <div
+                                  className="cafeOrders__itemTitle"
+                                  title={lineTitle}
+                                >
                                   {lineTitle}
                                   {isService ? (
-                                    <span className="cafeOrders__itemKind"> · услуга</span>
+                                    <span className="cafeOrders__itemKind">
+                                      {" "}
+                                      · услуга
+                                    </span>
                                   ) : null}
                                 </div>
                                 <textarea
                                   className="cafeOrders__input"
                                   placeholder="Комментарий к блюду"
                                   value={it.comment || ""}
-                                  onChange={(e) => changeItemComment(it._key, e.target.value)}
+                                  onChange={(e) =>
+                                    changeItemComment(it._key, e.target.value)
+                                  }
                                   disabled={saving}
                                   rows={2}
                                 />
@@ -1968,7 +2226,9 @@ const Orders = () => {
                                   inputMode="numeric"
                                   autoComplete="off"
                                   value={lineQtyInputValue(it.quantity)}
-                                  onChange={(e) => changeItemQty(it._key, e.target.value)}
+                                  onChange={(e) =>
+                                    changeItemQty(it._key, e.target.value)
+                                  }
                                   disabled={saving}
                                 />
 
@@ -2002,7 +2262,12 @@ const Orders = () => {
                           <span>Итого</span>
                           <span>
                             {fmtMoney(
-                              form.items.reduce((s, i) => s + toNum(i.price) * (Number(i.quantity) || 0), 0)
+                              form.items.reduce(
+                                (s, i) =>
+                                  s +
+                                  toNum(i.price) * (Number(i.quantity) || 0),
+                                0,
+                              ),
                             )}{" "}
                             сом
                           </span>
@@ -2021,9 +2286,11 @@ const Orders = () => {
                         if (!editingId || saving) return;
                         setSaving(true);
                         try {
-                          await api.patch(`/cafe/orders/${editingId}/`, { status: "cancelled" });
+                          await api.patch(`/cafe/orders/${editingId}/`, {
+                            status: "cancelled",
+                          });
                           setModalOpen(false);
-                          await fetchOrders()
+                          await fetchOrders();
                         } catch (err) {
                           // Ошибка при отмене заказа
                         } finally {
@@ -2044,7 +2311,11 @@ const Orders = () => {
                       form.items.some((i) => lineQtyNum(i.quantity) < 1)
                     }
                   >
-                    {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
+                    {saving
+                      ? "Сохраняем…"
+                      : isEditing
+                        ? "Сохранить"
+                        : "Добавить"}
                   </button>
                 </div>
               </form>
@@ -2076,7 +2347,10 @@ const Orders = () => {
       {/* Pay modal */}
       {payOpen && payOrder && (
         <div className="cafeOrdersModal__overlay z-100!" onClick={closePay}>
-          <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="cafeOrdersModal__shell"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
                 <h3 className="cafeOrdersModal__title">Оплата заказа</h3>
@@ -2094,8 +2368,12 @@ const Orders = () => {
               <div className="cafeOrdersPay">
                 {(() => {
                   const tableLabel = resolveTableLabel(payOrder, tablesMap);
-                  const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
-                  const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
+                  const dt = formatReceiptDate(
+                    payOrder?.created_at || payOrder?.date || payOrder?.created,
+                  );
+                  const items = Array.isArray(payOrder?.items)
+                    ? payOrder.items
+                    : [];
                   const totals = calcTotals(payOrder);
                   const isTakeaway = tableLabel === TAKEAWAY_LABEL;
                   const due = checkoutDue(payOrder, payForm.discountAmount);
@@ -2122,17 +2400,32 @@ const Orders = () => {
                             const sum = price * qty;
 
                             return (
-                              <div key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`} className="cafeOrdersPay__row">
-                                <span className="cafeOrdersPay__name" title={title}>
+                              <div
+                                key={
+                                  it.id ||
+                                  `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`
+                                }
+                                className="cafeOrdersPay__row"
+                              >
+                                <span
+                                  className="cafeOrdersPay__name"
+                                  title={title}
+                                >
                                   {title}
                                 </span>
-                                <span className="cafeOrdersPay__qty">x{qty}</span>
-                                <span className="cafeOrdersPay__sum">{fmtShort(sum)}</span>
+                                <span className="cafeOrdersPay__qty">
+                                  x{qty}
+                                </span>
+                                <span className="cafeOrdersPay__sum">
+                                  {fmtShort(sum)}
+                                </span>
                               </div>
                             );
                           })
                         ) : (
-                          <div className="cafeOrdersPay__empty">Позиции заказа не найдены.</div>
+                          <div className="cafeOrdersPay__empty">
+                            Позиции заказа не найдены.
+                          </div>
                         )}
                       </div>
 
@@ -2162,119 +2455,144 @@ const Orders = () => {
                           </div>
                         </div>
                       )}
-  <div className="cafeOrdersPay__field">
-                            <label className="cafeOrdersPay__label">
-                              Гость (для долга){payForm.paymentMethod === "debt" ? " *" : ""}
-                            </label>
-                            <SearchableCombobox
-                              value={payForm.clientId}
-                              onChange={(v) =>
-                                setPayForm((f) => {
-                                  const nextId = String(v || "").trim();
-                                  if (f.paymentMethod === "debt" && !nextId) return f;
-                                  return { ...f, clientId: nextId };
-                                })
+                      <div className="cafeOrdersPay__field">
+                        <label className="cafeOrdersPay__label">
+                          Гость (для долга)
+                          {payForm.paymentMethod === "debt" ? " *" : ""}
+                        </label>
+                        <SearchableCombobox
+                          value={payForm.clientId}
+                          onChange={(v) =>
+                            setPayForm((f) => {
+                              const nextId = String(v || "").trim();
+                              if (f.paymentMethod === "debt" && !nextId)
+                                return f;
+                              return { ...f, clientId: nextId };
+                            })
+                          }
+                          options={payClientOptions}
+                          placeholder="Выберите гостя…"
+                          disabled={paying}
+                          hideClear={payForm.paymentMethod === "debt"}
+                          classNamePrefix="cafeOrdersPayCombo"
+                        />
+                      </div>
+                      <div className="cafeOrdersPay__field">
+                        <label className="cafeOrdersPay__label">
+                          Способ оплаты
+                        </label>
+                        <SearchableCombobox
+                          value={payForm.paymentMethod}
+                          onChange={(v) =>
+                            setPayForm((f) => {
+                              const nextMethod =
+                                normalizePaymentMethod(v) || "cash";
+                              const next = { ...f, paymentMethod: nextMethod };
+                              if (
+                                nextMethod === "debt" &&
+                                !String(next.clientId || "").trim()
+                              ) {
+                                next.clientId =
+                                  getOrderClientId(payOrder) || "";
                               }
-                              options={payClientOptions}
-                              placeholder="Выберите гостя…"
-                              disabled={paying}
-                              hideClear={payForm.paymentMethod === "debt"}
-                              classNamePrefix="cafeOrdersPayCombo"
-                            />
-                          </div>
-                           <div className="cafeOrdersPay__field">
-                            <label className="cafeOrdersPay__label">Способ оплаты</label>
-                            <SearchableCombobox
-                              value={payForm.paymentMethod}
-                              onChange={(v) =>
-                                setPayForm((f) => {
-                                  const nextMethod = normalizePaymentMethod(v) || "cash";
-                                  const next = { ...f, paymentMethod: nextMethod };
-                                  if (nextMethod === "debt" && !String(next.clientId || "").trim()) {
-                                    next.clientId = getOrderClientId(payOrder) || "";
-                                  }
-                                  return next;
-                                })
-                              }
-                              options={PAY_CHECKOUT_METHODS}
-                              placeholder="Способ…"
-                              disabled={paying}
-                              hideClear
-                              classNamePrefix="cafeOrdersPayCombo"
-                            />
-                          </div>
-                              <div className="cafeOrdersPay__field">
-                                <label className="cafeOrdersPay__label">Способ предоплаты</label>
-                                <SearchableCombobox
-                                  value={payForm.prepaidPaymentMethod}
-                                  onChange={(v) =>
-                                    setPayForm((f) => ({ ...f, prepaidPaymentMethod: v }))
-                                  }
-                                  options={[
-                                    { value: "cash", label: "Наличные" },
-                                    { value: "card", label: "Карта" },
-                                    { value: "transfer", label: "Перевод" },
-                                  ]}
-                                  placeholder="Способ…"
-                                  disabled={paying}
-                                  classNamePrefix="cafeOrdersPayCombo"
-                                />
-                              </div>
+                              return next;
+                            })
+                          }
+                          options={PAY_CHECKOUT_METHODS}
+                          placeholder="Способ…"
+                          disabled={paying}
+                          hideClear
+                          classNamePrefix="cafeOrdersPayCombo"
+                        />
+                      </div>
+                      <div className="cafeOrdersPay__field">
+                        <label className="cafeOrdersPay__label">
+                          Способ предоплаты
+                        </label>
+                        <SearchableCombobox
+                          value={payForm.prepaidPaymentMethod}
+                          onChange={(v) =>
+                            setPayForm((f) => ({
+                              ...f,
+                              prepaidPaymentMethod: v,
+                            }))
+                          }
+                          options={[
+                            { value: "cash", label: "Наличные" },
+                            { value: "card", label: "Карта" },
+                            { value: "transfer", label: "Перевод" },
+                          ]}
+                          placeholder="Способ…"
+                          disabled={paying}
+                          classNamePrefix="cafeOrdersPayCombo"
+                        />
+                      </div>
 
-                         
                       <div className="cafeOrdersPay__form">
+                        <div className="cafeOrdersPay__field">
+                          <label className="cafeOrdersPay__label">
+                            Скидка (сумма)
+                          </label>
+                          <input
+                            className="cafeOrdersPay__input"
+                            type="text"
+                            inputMode="decimal"
+                            value={payForm.discountAmount}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(",", ".");
+                              setPayForm((f) => {
+                                const next = { ...f, discountAmount: v };
+                                const d = checkoutDue(payOrder, v);
+                                next.payNow = numStr(d);
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+
+                        {payForm.paymentMethod !== "debt" && (
                           <div className="cafeOrdersPay__field">
-                            <label className="cafeOrdersPay__label">Скидка (сумма)</label>
+                            <label className="cafeOrdersPay__label">
+                              Сумма сейчас (остаток в долг, если меньше{" "}
+                              {fmtMoney(due)})
+                            </label>
                             <input
                               className="cafeOrdersPay__input"
                               type="text"
                               inputMode="decimal"
-                              value={payForm.discountAmount}
-                              onChange={(e) => {
-                                const v = e.target.value.replace(",", ".");
-                                setPayForm((f) => {
-                                  const next = { ...f, discountAmount: v };
-                                  const d = checkoutDue(payOrder, v);
-                                  next.payNow = numStr(d);
-                                  return next;
-                                });
-                              }}
+                              value={payForm.payNow}
+                              onChange={(e) =>
+                                setPayForm((f) => ({
+                                  ...f,
+                                  payNow: e.target.value.replace(",", "."),
+                                }))
+                              }
                             />
                           </div>
-
-                          {payForm.paymentMethod !== "debt" && (
-                            <div className="cafeOrdersPay__field">
-                              <label className="cafeOrdersPay__label">
-                                Сумма сейчас (остаток в долг, если меньше {fmtMoney(due)})
-                              </label>
-                              <input
-                                className="cafeOrdersPay__input"
-                                type="text"
-                                inputMode="decimal"
-                                value={payForm.payNow}
-                                onChange={(e) =>
-                                  setPayForm((f) => ({ ...f, payNow: e.target.value.replace(",", ".") }))
-                                }
-                              />
-                            </div>
-                          )}
-                          {payForm.paymentMethod === "debt" && (
-                            <label className="cafeOrdersPay__check">
-                              <input
-                                type="checkbox"
-                                checked={payForm.usePrepaid}
-                                onChange={(e) =>
-                                  setPayForm((f) => ({ ...f, usePrepaid: e.target.checked }))
-                                }
-                                disabled={paying}
-                              />
-                              <span>Предоплата + долг на остаток</span>
-                            </label>
-                          )}
-                          {payForm.paymentMethod === "debt" && payForm.usePrepaid && (
+                        )}
+                        {payForm.paymentMethod === "debt" && (
+                          <label className="cafeOrdersPay__check">
+                            <input
+                              type="checkbox"
+                              checked={payForm.usePrepaid}
+                              onChange={(e) =>
+                                setPayForm((f) => ({
+                                  ...f,
+                                  usePrepaid: e.target.checked,
+                                }))
+                              }
+                              disabled={paying}
+                            />
+                            <span>Предоплата + долг на остаток</span>
+                          </label>
+                        )}
+                        {payForm.paymentMethod === "debt" &&
+                          payForm.usePrepaid && (
                             <>
                               <div className="cafeOrdersPay__field">
-                                <label className="cafeOrdersPay__label">Предоплата</label>
+                                <label className="cafeOrdersPay__label">
+                                  Предоплата
+                                </label>
                                 <input
                                   className="cafeOrdersPay__input"
                                   type="text"
@@ -2283,15 +2601,16 @@ const Orders = () => {
                                   onChange={(e) =>
                                     setPayForm((f) => ({
                                       ...f,
-                                      prepaidAmount: e.target.value.replace(",", "."),
+                                      prepaidAmount: e.target.value.replace(
+                                        ",",
+                                        ".",
+                                      ),
                                     }))
                                   }
                                 />
                               </div>
-                          
                             </>
                           )}
-                        
                       </div>
                     </>
                   );
@@ -2314,7 +2633,8 @@ const Orders = () => {
                     disabled={paying || printingId === payOrder.id}
                     title="Распечатать чек"
                   >
-                    <FaClipboardList /> {printingId === payOrder.id ? "Печать…" : "Чек"}
+                    <FaClipboardList />{" "}
+                    {printingId === payOrder.id ? "Печать…" : "Чек"}
                   </button>
 
                   <button
