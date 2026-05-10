@@ -45,6 +45,7 @@ import {
   stripEmpty,
   toId,
 } from "./cafeOrderItemPayload";
+import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -152,19 +153,6 @@ const normalizePaymentMethod = (v) => {
 const pickClientLabel = (c) =>
   String(c?.full_name || c?.name || c?.title || c?.company_name || "Без имени").trim() ||
   "Без имени";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const TAKEAWAY_LABEL = "С собой";
-
-const normalizeTableLabel = (raw) => {
-  if (raw === null || raw === undefined) return "";
-  const v = String(raw).trim();
-  if (!v) return "";
-  if (UUID_RE.test(v)) return "";
-  return v;
-};
 
 /** Заголовок позиции в UI / печати (меню или услуга). */
 const orderItemTitle = (it) => {
@@ -603,34 +591,6 @@ const Orders = () => {
   }, [fetchOrders]);
 
   const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
-  const getOrderTableLabel = useCallback(
-    (order) => {
-      // Если стол не выбран — считаем заказ "С собой"
-      if (order?.table === null || order?.table === undefined || order?.table === "") {
-        return TAKEAWAY_LABEL;
-      }
-      const t = tablesMap.get(order?.table);
-      const direct = normalizeTableLabel(
-        t?.title ||
-        t?.name ||
-        t?.label ||
-        t?.table_name ||
-        t?.table_label ||
-        t?.table_title ||
-        ""
-      );
-      if (direct) return direct;
-      if (t?.number != null && t?.number !== "") return String(t.number);
-      const fallback = normalizeTableLabel(
-        order?.table_name || order?.table_label || order?.table_title || order?.table_number
-      );
-      if (fallback) return fallback;
-      const raw = normalizeTableLabel(order?.table);
-      return raw || TAKEAWAY_LABEL;
-    },
-    [tablesMap]
-  );
-
   const waiters = useMemo(
     () =>
       employees
@@ -747,7 +707,7 @@ const Orders = () => {
   /* ===== печать (оплата/чек) ===== */
   const buildPrintPayload = useCallback(
     (order) => {
-      const tableLabel = getOrderTableLabel(order);
+      const tableLabel = resolveTableLabel(order, tablesMap);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
@@ -772,7 +732,7 @@ const Orders = () => {
         })),
       };
     },
-    [getOrderTableLabel, userData, waiterIdLabelMap]
+    [tablesMap, userData, waiterIdLabelMap]
   );
 
   const printOrder = useCallback(
@@ -825,7 +785,7 @@ const Orders = () => {
   /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
     ({ order, kitchenId, kitchenLabel, items }, label = 'КАССАА') => {
-      const tableLabel = getOrderTableLabel(order);
+      const tableLabel = resolveTableLabel(order, tablesMap);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
@@ -852,7 +812,7 @@ const Orders = () => {
         })),
       };
     },
-    [getOrderTableLabel, userData, waiterIdLabelMap]
+    [tablesMap, userData, waiterIdLabelMap]
   );
 
   const getKitchenPrinterKey = useCallback(
@@ -1349,7 +1309,7 @@ const Orders = () => {
     if (!cashboxId) setCashboxId(firstKey);
 
     const t = tablesMap.get(order?.table);
-    const tableLabel = getOrderTableLabel(order);
+    const tableLabel = resolveTableLabel(order, tablesMap);
     const name =
       tableLabel === TAKEAWAY_LABEL ? `Оплата: ${TAKEAWAY_LABEL}` : `Оплата стол ${t?.number ?? tableLabel}`;
 
@@ -1635,7 +1595,7 @@ const Orders = () => {
           {loading && <div className="cafeOrders__alert">Загрузка…</div>}
           {
             visibleOrders.map((o) => {
-              const tableLabel = getOrderTableLabel(o);
+              const tableLabel = resolveTableLabel(o, tablesMap);
               const totals = calcTotals(o);
               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
               const isTakeaway = tableLabel === TAKEAWAY_LABEL;
@@ -2105,7 +2065,7 @@ const Orders = () => {
 
               <div className="cafeOrdersPay">
                 {(() => {
-                  const tableLabel = getOrderTableLabel(payOrder);
+                  const tableLabel = resolveTableLabel(payOrder, tablesMap);
                   const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);

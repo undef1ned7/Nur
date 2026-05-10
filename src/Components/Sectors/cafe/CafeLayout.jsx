@@ -19,6 +19,7 @@ import {
   printViaWiFiSimple,
   setActivePrinterByKey,
 } from "./Orders/OrdersPrintService";
+import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 import * as logger from "../../../utils/logger";
 
 export default function CafeLayout() {
@@ -53,9 +54,6 @@ export default function CafeLayout() {
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
   const PRINT_QUEUE_DELAY_MS = 400;
-  const TAKEAWAY_LABEL = "С собой";
-  const UUID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   // const [kitchens, setKitchens] = useState([]);
   // const fetchKitchens = useCallback(async () => {
@@ -208,54 +206,6 @@ const fullName = useCallback(
     }
   }, []);
 
-  const normalizeTableLabel = useCallback((raw) => {
-    if (raw === null || raw === undefined) return "";
-    const v = String(raw).trim();
-    if (!v) return "";
-    if (UUID_RE.test(v)) return "";
-    return v;
-  }, []);
-
-  const resolveTableLabelFromOrder = useCallback(
-    (order) => {
-      const tableId =
-        order?.table_id ?? order?.tableId ?? order?.table?.id ?? order?.table;
-
-      const hasTable = !(
-        tableId === null ||
-        tableId === undefined ||
-        tableId === ""
-      );
-      if (!hasTable) return TAKEAWAY_LABEL;
-
-      const t = tablesMap.get(String(tableId));
-      const direct = normalizeTableLabel(
-        t?.title ||
-          t?.name ||
-          t?.label ||
-          t?.table_name ||
-          t?.table_label ||
-          t?.table_title ||
-          "",
-      );
-      if (direct) return direct;
-      if (t?.number !== null && t?.number !== undefined && t?.number !== "")
-        return String(t.number);
-
-      const fallback = normalizeTableLabel(
-        order?.table_name ||
-          order?.table_label ||
-          order?.table_title ||
-          order?.table_number,
-      );
-      if (fallback) return fallback;
-
-      const raw = normalizeTableLabel(tableId);
-      return raw || "—";
-    },
-    [TAKEAWAY_LABEL, normalizeTableLabel, tablesMap],
-  );
-
   const linePrice = useCallback((it) => {
     const v =
       it?.price ??
@@ -318,7 +268,7 @@ const fullName = useCallback(
       const dt = formatReceiptDate(
         orderDetail?.created_at || orderDetail?.date || orderDetail?.created,
       );
-      const tableLabel = resolveTableLabelFromOrder(orderDetail);
+      const tableLabel = resolveTableLabel(orderDetail, tablesMap);
       const items = Array.isArray(orderDetail?.items) ? orderDetail.items : [];
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
@@ -345,7 +295,7 @@ const fullName = useCallback(
       linePrice,
       fullName,
       profile,
-      resolveTableLabelFromOrder,
+      tablesMap,
       TAKEAWAY_LABEL,
     ],
   );
@@ -630,6 +580,11 @@ const fullName = useCallback(
         scheduleRetry("no-detail");
         return;
       }
+      const _tableId =
+        detail?.table_id ?? detail?.tableId ?? detail?.table?.id ?? detail?.table;
+      if (_tableId && tablesMap.size === 0) {
+        await new Promise((res) => setTimeout(res, 1500));
+      }
 
       // Часто сразу после order_created позиции докатываются по частям.
       // Коротко ждём "стабилизацию" состава, чтобы печатать одним чеком на кухню.
@@ -679,7 +634,7 @@ const fullName = useCallback(
 
       const dtRaw = detail?.created_at || detail?.date || detail?.created;
       const dt = formatReceiptDate(dtRaw || new Date().toISOString());
-      const tableLabel = resolveTableLabelFromOrder(detail);
+      const tableLabel = resolveTableLabel(detail, tablesMap);
       const cashier =
         `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
         profile?.email ||
@@ -791,14 +746,14 @@ const fullName = useCallback(
       printingKitchenDiffRef.current.add(oid);
 
       try {
-        const detail = await api
-          .get(`/cafe/orders/${encodeURIComponent(oid)}/`)
+        const orderDetail = await api
+          .get(`/cafe/orders/${orderId}/`)
           .then((r) => r?.data || null);
-        if (!detail) return;
+        if (!orderDetail) return;
 
-        if (!shouldPrintKitchenDiffForStatus(detail)) return;
+        if (!shouldPrintKitchenDiffForStatus(orderDetail)) return;
 
-        const newMap = buildItemsQtyMap(detail?.items);
+        const newMap = buildItemsQtyMap(orderDetail?.items);
         const prevSnap = readOrderItemsSnapshot(oid);
         const prevItems =
           prevSnap?.items && typeof prevSnap.items === "object"
@@ -814,7 +769,7 @@ const fullName = useCallback(
           oldMap.set(mid, { qty, title });
         }
 
-        const isCancelled = isCancelledOrderStatus(detail);
+        const isCancelled = isCancelledOrderStatus(orderDetail);
         const allMenuIds = Array.from(
           new Set([...Array.from(oldMap.keys()), ...Array.from(newMap.keys())]),
         );
@@ -922,7 +877,7 @@ const fullName = useCallback(
           removedByKitchen.size === 0
         ) {
           const createdRaw =
-            detail?.created_at || detail?.date || detail?.created;
+            orderDetail?.created_at || orderDetail?.date || orderDetail?.created;
           const createdMs = createdRaw ? new Date(createdRaw).getTime() : 0;
           if (
             createdMs > 0 &&
@@ -940,14 +895,14 @@ const fullName = useCallback(
         }
 
         const dtRaw =
-          detail?.updated_at ||
-          detail?.updated ||
-          detail?.modified_at ||
-          detail?.created_at ||
-          detail?.date ||
+          orderDetail?.updated_at ||
+          orderDetail?.updated ||
+          orderDetail?.modified_at ||
+          orderDetail?.created_at ||
+          orderDetail?.date ||
           new Date().toISOString();
         const dt = formatReceiptDate(dtRaw);
-        const tableLabel = resolveTableLabelFromOrder(detail);
+        const tableLabel = resolveTableLabel(orderDetail, tablesMap);
         const cashier =
           `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
           profile?.email ||
@@ -956,10 +911,10 @@ const fullName = useCallback(
           tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
         const slipsSectionLabel = isCancelled ? "ОТМЕНА" : "ИЗМЕНЕНИЕ";
 
-        let diffKitchenWaiterName = pickCafeOrderWaiterName(detail);
+        let diffKitchenWaiterName = pickCafeOrderWaiterName(orderDetail);
         if (!diffKitchenWaiterName) {
           diffKitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
-            detail?.waiter,
+            orderDetail?.waiter,
           );
         }
 
@@ -1051,7 +1006,7 @@ const fullName = useCallback(
       releaseKitchenPrintLock,
       resolveKitchenPrinterBinding,
       resolveMenuKitchenId,
-      resolveTableLabelFromOrder,
+      tablesMap,
       shouldAutoPrintNow,
       shouldPrintKitchenDiffForStatus,
       isCancelledOrderStatus,
@@ -1144,7 +1099,7 @@ const fullName = useCallback(
         const oid = String(data?.order?.id || "");
         if (oid && !notifiedOrdersRef.current.has(oid)) {
           notifiedOrdersRef.current.add(oid);
-          const tableLabel = resolveTableLabelFromOrder(data?.order || {});
+          const tableLabel = resolveTableLabel(data?.order || {}, tablesMap);
           const msg = `Новый заказ \nстол: ${tableLabel}`;
           const key = `order_created-${oid}`;
           setNotificationDeps(key);
