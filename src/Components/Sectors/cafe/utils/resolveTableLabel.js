@@ -14,6 +14,15 @@ function normalizeLabel(raw) {
 }
 
 export function resolveTableLabel(order, tablesMap) {
+  // 1. table_number directly on order — most reliable, added by backend
+  const directNumber =
+    order?.table_number ??
+    order?.table_num ??
+    null;
+  if (directNumber !== null && directNumber !== undefined && String(directNumber).trim() !== "") {
+    return String(directNumber).trim();
+  }
+
   const tableId =
     order?.table_id ??
     order?.tableId ??
