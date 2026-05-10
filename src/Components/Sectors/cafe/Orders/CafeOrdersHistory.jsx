@@ -31,6 +31,7 @@ import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -345,7 +346,7 @@ const CafeOrderHistory = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
 
-  const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const tablesMap = useMemo(() => new Map(tables.map((t) => [String(t.id), t])), [tables]);
 
   const menuMap = useMemo(() => {
     const m = new Map();
@@ -544,16 +545,12 @@ const CafeOrderHistory = () => {
 
   const buildPrintPayload = useCallback(
     (order) => {
-      const t = tablesMap.get(order?.table);
-      const tableLabel =
-        order?.table === null || order?.table === undefined || order?.table === ""
-          ? "С собой"
-          : t?.number || "—";
+      const tableLabel = resolveTableLabel(order, tablesMap);
 
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
-      const isTakeaway = tableLabel === "С собой";
+      const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
       return {
         company: localStorage.getItem("company_name") || "КАССА",
@@ -666,13 +663,9 @@ const CafeOrderHistory = () => {
           {loading && <div className="cafeOrders__alert">Загрузка…</div>}
           {!loading &&
             visibleOrders.map((o) => {
-              const t = tablesMap.get(o.table);
               const totals = calcTotals(o);
               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
-              const tableLabel =
-                o.table === null || o.table === undefined || o.table === ""
-                  ? "С собой"
-                  : t?.number || "—";
+              const tableLabel = resolveTableLabel(o, tablesMap);
 
               const items = Array.isArray(o.items) ? o.items : [];
               const isFullyRefunded =
@@ -846,21 +839,17 @@ const CafeOrderHistory = () => {
 
               <div className="cafeOrdersPay">
                 {(() => {
-                  const t = tablesMap.get(viewOrder.table);
-                  const tableLabel =
-                    viewOrder.table === null || viewOrder.table === undefined || viewOrder.table === ""
-                      ? "С собой"
-                      : t?.number || "—";
+                  const tableLabel = resolveTableLabel(viewOrder, tablesMap);
                   const dt = formatReceiptDate(viewOrder?.created_at || viewOrder?.date || viewOrder?.created);
                   const items = Array.isArray(viewOrder?.items) ? viewOrder.items : [];
                   const totals = calcTotals(viewOrder);
-                  const isTakeaway = tableLabel === "С собой";
+                  const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
                   return (
                     <>
                       <div className="cafeOrdersPay__top">
                         <div className="cafeOrdersPay__table">
-                          {isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`}
+                          {isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`}
                         </div>
                         <div className="cafeOrdersPay__date">{dt || ""}</div>
                       </div>

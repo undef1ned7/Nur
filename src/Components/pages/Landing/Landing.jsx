@@ -142,7 +142,6 @@ const Landing = () => {
             </div>
           </div>
         </section>
-
         {/* ОТРАСЛИ */}
         <section
           className="landing__section landing__section--industries"
@@ -167,7 +166,6 @@ const Landing = () => {
             </div>
           </div>
         </section>
-
         {/* ТАРИФЫ */}
         <section
           className="landing__section landing__section--pricing"
@@ -196,7 +194,6 @@ const Landing = () => {
             </div>
           </div>
         </section>
-
         {/* CTA */}
         <section className="landing__cta" aria-label={t("cta.title")}>
           <div className="landing__container">
@@ -212,7 +209,6 @@ const Landing = () => {
             </div>
           </div>
         </section>
-
         {/* КОНТАКТЫ */}
         <section
           className="landing__section landing__section--contact"

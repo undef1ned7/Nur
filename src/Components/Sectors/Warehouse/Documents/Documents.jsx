@@ -85,6 +85,25 @@ const formatDocumentDateTime = (value) => {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+/** Подпись payment_kind для таблицы складских документов */
+const formatWarehousePaymentKindLabel = (kind) => {
+  if (kind == null || kind === "") return "—";
+  switch (String(kind).toLowerCase()) {
+    case "cash":
+      return "Через кассу";
+    case "credit":
+      return "В долг";
+    case "external":
+      return "Вне кассы";
+    default:
+      return String(kind);
+  }
+};
+
+/** Подтверждение/отклонение кассой — только при оплате через кассу (после post — CASH_PENDING). */
+const needsCashApproveReject = (item) =>
+  item?.rawStatus === "CASH_PENDING" && item?.payment_kind === "cash";
+
 const Documents = () => {
   const alert = useAlert();
   const confirm = useConfirm();
@@ -133,6 +152,9 @@ const Documents = () => {
   const [agentSalesError, setAgentSalesError] = useState("");
   const [agentSaleDocumentById, setAgentSaleDocumentById] = useState({});
   const [createSaleModalCart, setCreateSaleModalCart] = useState(null);
+
+  /** Фильтр списка приходов по payment_kind (только doc_type RECEIPT) */
+  const [receiptPaymentKindFilter, setReceiptPaymentKindFilter] = useState("");
 
   // Debounce для поиска
   useEffect(() => {
@@ -327,6 +349,13 @@ const Documents = () => {
     return doc.status;
   };
 
+  const documentsTableColSpan = useMemo(() => {
+    if (activeTab === "receipts") {
+      return (docType === "SALE" ? 9 : 8) + (docType === "RECEIPT" ? 1 : 0);
+    }
+    return docType === "SALE" ? 9 : 8;
+  }, [activeTab, docType]);
+
   // Фильтрация по агенту (для продаж)
   const filteredDocuments = useMemo(() => {
     const list = documents || [];
@@ -373,6 +402,7 @@ const Documents = () => {
         statusType: getStatusType(resolvedStatus),
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
+        paymentKindLabel: formatWarehousePaymentKindLabel(doc.payment_kind),
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -460,6 +490,10 @@ const Documents = () => {
     if (docType !== "SALE") setAgentFilterId("");
   }, [activeTab, docType]);
 
+  useEffect(() => {
+    if (docType !== "RECEIPT") setReceiptPaymentKindFilter("");
+  }, [docType]);
+
   // Загрузка данных через Redux при изменении таба, страницы, типа документа или поиска
   useEffect(() => {
     if (
@@ -477,12 +511,23 @@ const Documents = () => {
         page_size: 100, // По умолчанию 100 согласно документации
         ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(docType === "RECEIPT" &&
+          receiptPaymentKindFilter && {
+            payment_kind: receiptPaymentKindFilter,
+          }),
         // Дополнительные фильтры из документации:
         // status, warehouse_from, warehouse_to, counterparty - можно добавить позже через UI
       };
       dispatch(fetchWarehouseDocuments(params));
     }
-  }, [dispatch, activeTab, currentPage, debouncedSearchTerm, docType]);
+  }, [
+    dispatch,
+    activeTab,
+    currentPage,
+    debouncedSearchTerm,
+    docType,
+    receiptPaymentKindFilter,
+  ]);
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -1196,6 +1241,25 @@ const Documents = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        {docType === "RECEIPT" && (
+          <div className="documents__agent-filter">
+            <label className="documents__agent-filter-label">Оплата:</label>
+            <select
+              className="documents__agent-filter-select"
+              value={receiptPaymentKindFilter}
+              onChange={(e) => {
+                setReceiptPaymentKindFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              title="Фильтр по способу оплаты (payment_kind)"
+            >
+              <option value="">Все</option>
+              <option value="cash">Через кассу</option>
+              <option value="credit">В долг</option>
+              <option value="external">Вне кассы</option>
+            </select>
+          </div>
+        )}
         {showAgentFilter && (
           <div className="documents__agent-filter">
             <label className="documents__agent-filter-label">Агент:</label>
@@ -1332,6 +1396,7 @@ const Documents = () => {
                       <th>Дата и время</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
+                      {docType === "RECEIPT" && <th>Оплата</th>}
                       <th>Товаров</th>
                       <th>Сумма</th>
                       <th>Скидка</th>
@@ -1371,7 +1436,7 @@ const Documents = () => {
                 {documentsLoading ? (
                   <tr>
                     <td
-                      colSpan={docType === "SALE" ? 9 : 8}
+                      colSpan={documentsTableColSpan}
                       className="documents__empty"
                     >
                       Загрузка...
@@ -1380,7 +1445,7 @@ const Documents = () => {
                 ) : getCurrentData().length === 0 ? (
                   <tr>
                     <td
-                      colSpan={docType === "SALE" ? 9 : 8}
+                      colSpan={documentsTableColSpan}
                       className="documents__empty"
                     >
                       Документы не найдены
@@ -1396,6 +1461,9 @@ const Documents = () => {
                           <td>{item.client}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
+                          )}
+                          {docType === "RECEIPT" && (
+                            <td>{item.paymentKindLabel}</td>
                           )}
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
@@ -1445,22 +1513,26 @@ const Documents = () => {
                               {item.rawStatus === "CASH_PENDING" &&
                                 documentAllowsWarehousePosting(item.document) && (
                                 <>
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn documents__action-btn--approve"
-                                    onClick={() => handleCashApprove(item)}
-                                    title="Подтвердить кассой"
-                                  >
-                                    <Check size={18} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn documents__action-btn--reject"
-                                    onClick={() => handleCashReject(item)}
-                                    title="Отклонить"
-                                  >
-                                    <X size={18} />
-                                  </button>
+                                  {needsCashApproveReject(item) && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="documents__action-btn documents__action-btn--approve"
+                                        onClick={() => handleCashApprove(item)}
+                                        title="Подтвердить кассой"
+                                      >
+                                        <Check size={18} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="documents__action-btn documents__action-btn--reject"
+                                        onClick={() => handleCashReject(item)}
+                                        title="Отклонить"
+                                      >
+                                        <X size={18} />
+                                      </button>
+                                    </>
+                                  )}
                                   <button
                                     type="button"
                                     className="documents__action-btn documents__action-btn--unpost"
@@ -1557,22 +1629,26 @@ const Documents = () => {
                               {item.rawStatus === "CASH_PENDING" &&
                                 documentAllowsWarehousePosting(item.document) && (
                                 <>
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn documents__action-btn--approve"
-                                    onClick={() => handleCashApprove(item)}
-                                    title="Подтвердить кассой"
-                                  >
-                                    <Check size={18} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="documents__action-btn documents__action-btn--reject"
-                                    onClick={() => handleCashReject(item)}
-                                    title="Отклонить"
-                                  >
-                                    <X size={18} />
-                                  </button>
+                                  {needsCashApproveReject(item) && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="documents__action-btn documents__action-btn--approve"
+                                        onClick={() => handleCashApprove(item)}
+                                        title="Подтвердить кассой"
+                                      >
+                                        <Check size={18} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="documents__action-btn documents__action-btn--reject"
+                                        onClick={() => handleCashReject(item)}
+                                        title="Отклонить"
+                                      >
+                                        <X size={18} />
+                                      </button>
+                                    </>
+                                  )}
                                   <button
                                     type="button"
                                     className="documents__action-btn documents__action-btn--unpost"
@@ -1807,6 +1883,14 @@ const Documents = () => {
                         </span>
                       </div>
                     )}
+                    {docType === "RECEIPT" && activeTab === "receipts" && (
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Оплата</span>
+                        <span className="documents__card-value">
+                          {item.paymentKindLabel}
+                        </span>
+                      </div>
+                    )}
                     <div className="documents__card-row">
                       <span className="documents__card-label">
                         {activeTab === "receipts" ? "Товаров" : "Позиций"}
@@ -1916,22 +2000,26 @@ const Documents = () => {
                     {item.rawStatus === "CASH_PENDING" &&
                       documentAllowsWarehousePosting(item.document) && (
                       <>
-                        <button
-                          type="button"
-                          className="documents__action-btn documents__action-btn--approve"
-                          onClick={() => handleCashApprove(item)}
-                          title="Подтвердить кассой"
-                        >
-                          <Check size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          className="documents__action-btn documents__action-btn--reject"
-                          onClick={() => handleCashReject(item)}
-                          title="Отклонить"
-                        >
-                          <X size={18} />
-                        </button>
+                        {needsCashApproveReject(item) && (
+                          <>
+                            <button
+                              type="button"
+                              className="documents__action-btn documents__action-btn--approve"
+                              onClick={() => handleCashApprove(item)}
+                              title="Подтвердить кассой"
+                            >
+                              <Check size={18} />
+                            </button>
+                            <button
+                              type="button"
+                              className="documents__action-btn documents__action-btn--reject"
+                              onClick={() => handleCashReject(item)}
+                              title="Отклонить"
+                            >
+                              <X size={18} />
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           className="documents__action-btn documents__action-btn--unpost"

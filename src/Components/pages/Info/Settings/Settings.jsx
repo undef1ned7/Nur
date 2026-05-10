@@ -1225,7 +1225,6 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
 import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
-import sleep from "../../../../../tools/sleep";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 

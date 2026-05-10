@@ -1236,7 +1236,14 @@ const CreateSaleDocument = () => {
             ? String(doc.discount_amount)
             : "",
         );
-        setPaymentKind(doc.payment_kind || "cash");
+        const rawPk = doc.payment_kind || "cash";
+        setPaymentKind(
+          doc.doc_type === "RECEIPT"
+            ? rawPk
+            : rawPk === "external"
+              ? "cash"
+              : rawPk,
+        );
         setPrepaymentAmount(
           doc.prepayment_amount != null && doc.prepayment_amount !== ""
             ? String(doc.prepayment_amount)
@@ -1620,6 +1627,16 @@ const CreateSaleDocument = () => {
       docType,
     );
   }, [docType]);
+
+  // Приход (RECEIPT): cash | credit | external (external только для прихода на бэкенде)
+  const includePaymentKindInPayload =
+    isPaymentKindRelevant || docType === "RECEIPT";
+
+  useEffect(() => {
+    if (docType !== "RECEIPT" && paymentKind === "external") {
+      setPaymentKind("cash");
+    }
+  }, [docType, paymentKind]);
 
   // Определяем, требуется ли второй склад (для TRANSFER)
   const isWarehouseToRequired = useMemo(() => {
@@ -2103,8 +2120,10 @@ const CreateSaleDocument = () => {
         return warehouseAPI.createPurchaseReturnDocument(payload);
       case "INVENTORY":
         return warehouseAPI.createInventoryDocument(payload);
-      case "RECEIPT":
-        return warehouseAPI.createReceiptDocument(payload);
+      case "RECEIPT": {
+        const { doc_type: _docType, ...receiptBody } = payload;
+        return warehouseAPI.createReceiptDocument(receiptBody);
+      }
       case "WRITE_OFF":
         return warehouseAPI.createWriteOffDocument(payload);
       case "TRANSFER":
@@ -2141,10 +2160,17 @@ const CreateSaleDocument = () => {
       const hasPrepayment =
         isPaymentKindRelevant && paymentKind === "credit" && prepaymentNum > 0;
 
+      const resolvedComment =
+        docType === "RECEIPT" &&
+        paymentKind === "external" &&
+        !(comment || "").trim()
+          ? "Оплата иными средствами"
+          : comment || "";
+
       // Формируем данные для создания документа через новый API
       const documentData = {
         doc_type: docType,
-        ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(includePaymentKindInPayload && { payment_kind: paymentKind }),
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
@@ -2156,7 +2182,7 @@ const CreateSaleDocument = () => {
             ? { counterparty: clientId }
             : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
-        comment: comment || "",
+        comment: resolvedComment,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
         items: cartItems.map((item) => {
@@ -2331,9 +2357,16 @@ const CreateSaleDocument = () => {
       const hasPrepayment =
         isPaymentKindRelevant && paymentKind === "credit" && prepaymentNum > 0;
 
+      const resolvedCommentPrint =
+        docType === "RECEIPT" &&
+        paymentKind === "external" &&
+        !(comment || "").trim()
+          ? "Оплата иными средствами"
+          : comment || "";
+
       const documentData = {
         doc_type: docType,
-        ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(includePaymentKindInPayload && { payment_kind: paymentKind }),
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
@@ -2345,7 +2378,7 @@ const CreateSaleDocument = () => {
             ? { counterparty: clientId }
             : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
-        comment: comment || "",
+        comment: resolvedCommentPrint,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
         items: cartItems.map((item) => {
@@ -3241,6 +3274,49 @@ const CreateSaleDocument = () => {
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+                {docType === "RECEIPT" && (
+                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_kind"
+                        value="cash"
+                        checked={paymentKind === "cash"}
+                        onChange={() => {
+                          setPaymentKind("cash");
+                          setPrepaymentAmount("");
+                        }}
+                      />
+                      <span>Через кассу</span>
+                    </label>
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_kind"
+                        value="credit"
+                        checked={paymentKind === "credit"}
+                        onChange={() => {
+                          setPaymentKind("credit");
+                          setPrepaymentAmount("");
+                        }}
+                      />
+                      <span>В долг</span>
+                    </label>
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_kind"
+                        value="external"
+                        checked={paymentKind === "external"}
+                        onChange={() => {
+                          setPaymentKind("external");
+                          setPrepaymentAmount("");
+                        }}
+                      />
+                      <span>Вне кассы</span>
+                    </label>
                   </div>
                 )}
               </div>
