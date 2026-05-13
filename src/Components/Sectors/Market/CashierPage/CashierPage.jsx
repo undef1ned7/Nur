@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
-import { useDebounce } from "../../../../hooks/useDebounce";
+import { useDebounce, useDebounceByKey } from "../../../../hooks/useDebounce";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import {
@@ -314,6 +314,9 @@ const CashierPage = () => {
   const suppressQtyBlurUpdateRef = React.useRef({});
   const cartQtyInputRefs = React.useRef(new Map()); // item.id -> input
   const pendingQtyFocusRef = React.useRef(null); // { itemId?, productId?, salePackage? }
+  /** Последнее значение из инпута количества, для которого запланирован debounced API */
+  const pendingQtyLineInputRef = React.useRef(new Map());
+  const debouncedQtyApiByLine = useDebounceByKey(500);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
@@ -1126,6 +1129,9 @@ const CashierPage = () => {
     if (!currentSale?.id) return;
     if (!cartItem?.itemId) return;
 
+    debouncedQtyApiByLine.cancel(String(cartItem.id));
+    pendingQtyLineInputRef.current.delete(String(cartItem.id));
+
     try {
       const currentQty = normalizeQuantity(cartItem.quantity);
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
@@ -1239,6 +1245,10 @@ const CashierPage = () => {
   const removeCustomFromCart = async (cartItem) => {
     if (!currentSale?.id) return;
     if (!cartItem?.itemId) return;
+
+    debouncedQtyApiByLine.cancel(String(cartItem.id));
+    pendingQtyLineInputRef.current.delete(String(cartItem.id));
+
     if (!canMarketDeleteCartItem) {
       showAlert(
         "warning",
@@ -1686,6 +1696,10 @@ const CashierPage = () => {
 
   const updateQuantity = async (item, delta) => {
     if (!currentSale?.id) return;
+    if (item?.id != null) {
+      debouncedQtyApiByLine.cancel(String(item.id));
+      pendingQtyLineInputRef.current.delete(String(item.id));
+    }
 
     try {
       if (!item?.itemId || !item?.productId) return;
@@ -1864,8 +1878,46 @@ const CashierPage = () => {
     }
   };
 
+  const flushPendingQuantityLine = useCallback(
+    async (lineId) => {
+      const idKey = String(lineId);
+      const pendingRaw = pendingQtyLineInputRef.current.get(idKey);
+      if (pendingRaw === undefined) return;
+
+      const item = cart.find((c) => String(c.id) === idKey);
+      if (!item) {
+        pendingQtyLineInputRef.current.delete(idKey);
+        return;
+      }
+
+      const qtyNum = normalizeQuantity(
+        Math.max(0, parseFloat(pendingRaw) || 0),
+      );
+      pendingQtyLineInputRef.current.delete(idKey);
+
+      if (qtyNum === normalizeQuantity(item.quantity || 0)) {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+        return;
+      }
+
+      if (item.isCustom) {
+        await updateCustomQuantityDirect(item, qtyNum);
+      } else {
+        await updateQuantityDirect(item, qtyNum);
+      }
+    },
+    [cart, updateCustomQuantityDirect, updateQuantityDirect],
+  );
+
   const removeFromCart = async (item) => {
     if (!currentSale?.id) return;
+
+    debouncedQtyApiByLine.cancel(String(item.id));
+    pendingQtyLineInputRef.current.delete(String(item.id));
+
     if (!canMarketDeleteCartItem) {
       showAlert(
         "warning",
@@ -2899,9 +2951,12 @@ const CashierPage = () => {
                             formatQuantity(item.quantity || 0)
                           }
                           onChange={(e) => {
+                            const lineKey = String(item.id);
                             const rawValue = e.target.value;
                             const value = String(rawValue || "").replace(",", ".");
                             if (value === "" || value === "-") {
+                              debouncedQtyApiByLine.cancel(lineKey);
+                              pendingQtyLineInputRef.current.delete(lineKey);
                               setCartQuantities((prev) => ({
                                 ...prev,
                                 [item.id]: value,
@@ -2909,12 +2964,22 @@ const CashierPage = () => {
                               return;
                             }
                             if (item.isWeight) {
-                              if (!/^\d*\.?\d*$/.test(value)) return;
+                              if (!/^\d*\.?\d*$/.test(value)) {
+                                debouncedQtyApiByLine.cancel(lineKey);
+                                pendingQtyLineInputRef.current.delete(lineKey);
+                                return;
+                              }
                             } else if (!/^\d+$/.test(value)) {
+                              debouncedQtyApiByLine.cancel(lineKey);
+                              pendingQtyLineInputRef.current.delete(lineKey);
                               return;
                             }
                             const numValue = parseFloat(value);
-                            if (isNaN(numValue)) return;
+                            if (isNaN(numValue)) {
+                              debouncedQtyApiByLine.cancel(lineKey);
+                              pendingQtyLineInputRef.current.delete(lineKey);
+                              return;
+                            }
                             if (!item.isCustom && !item.salePackage) {
                               const product = products.find(
                                 (p) => p.id === item.productId,
@@ -2936,6 +3001,11 @@ const CashierPage = () => {
                                     "Недостаточно товара",
                                     `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
                                   );
+                                  const capStr = String(availableQuantity);
+                                  pendingQtyLineInputRef.current.set(lineKey, capStr);
+                                  debouncedQtyApiByLine.schedule(lineKey, () => {
+                                    void flushPendingQuantityLine(item.id);
+                                  });
                                   return;
                                 }
                               }
@@ -2974,6 +3044,8 @@ const CashierPage = () => {
                                     "Недостаточно товара",
                                     `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
                                   );
+                                  debouncedQtyApiByLine.cancel(lineKey);
+                                  pendingQtyLineInputRef.current.delete(lineKey);
                                   return;
                                 }
                               }
@@ -2983,12 +3055,20 @@ const CashierPage = () => {
                                 ...prev,
                                 [item.id]: "0",
                               }));
+                              pendingQtyLineInputRef.current.set(lineKey, "0");
+                              debouncedQtyApiByLine.schedule(lineKey, () => {
+                                void flushPendingQuantityLine(item.id);
+                              });
                               return;
                             }
                             setCartQuantities((prev) => ({
                               ...prev,
                               [item.id]: value,
                             }));
+                            pendingQtyLineInputRef.current.set(lineKey, value);
+                            debouncedQtyApiByLine.schedule(lineKey, () => {
+                              void flushPendingQuantityLine(item.id);
+                            });
                           }}
                           onFocus={(e) => {
                             qtyInputFocusRef.current = {
@@ -3000,8 +3080,11 @@ const CashierPage = () => {
                             e.target.select();
                           }}
                           onBlur={async (e) => {
-                            if (suppressQtyBlurUpdateRef.current[String(item.id)]) {
-                              delete suppressQtyBlurUpdateRef.current[String(item.id)];
+                            const lineKey = String(item.id);
+                            debouncedQtyApiByLine.cancel(lineKey);
+                            pendingQtyLineInputRef.current.delete(lineKey);
+                            if (suppressQtyBlurUpdateRef.current[lineKey]) {
+                              delete suppressQtyBlurUpdateRef.current[lineKey];
                               qtyInputFocusRef.current = {
                                 itemId: null,
                                 prevValue: "",
