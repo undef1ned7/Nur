@@ -390,6 +390,84 @@
     }
   }
 
+  /* Пагинация списка склада (как у меню кафе, токены страницы) */
+  &__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 18px;
+    margin-top: 12px;
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  &__pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 100px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.18s ease;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: var(--primary-dark);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      transform: translateY(-1px);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #f9fafb;
+      color: var(--muted);
+    }
+  }
+
+  &__pagination-info {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+
+  @media (max-width: 768px) {
+    &__pagination {
+      gap: 12px;
+      padding: 14px 12px;
+    }
+
+    &__pagination-btn {
+      min-width: 80px;
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+
+    &__pagination-info {
+      width: 100%;
+      text-align: center;
+      order: -1;
+      padding: 0;
+      font-size: 13px;
+    }
+  }
+
   /* ===== MODAL: по центру, не липнет к краям ===== */
   &__modalOverlay {
     position: fixed;
