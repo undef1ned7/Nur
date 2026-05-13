@@ -55,6 +55,152 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import CreateCounterpartyModal from "../../Market/Counterparties/components/CreateCounterpartyModal";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
+import * as XLSX from "xlsx";
+
+const COL_COUNT_INVOICE_EXCEL = 8;
+
+function formatDateForInvoiceExcel(value) {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ru-RU");
+}
+
+/** @param {object} createdDocument @param {object[]} items @param {{ subtotal: string, total: string }} totals @param {{ name?: string, address?: string, inn?: string }} seller @param {{ name?: string, address?: string, inn?: string }} buyer */
+function exportToExcel(createdDocument, items, totals, seller, buyer) {
+  const doc = createdDocument;
+  const docNumber = doc.number ?? "";
+  const padRow = (cells) => {
+    const row = [...cells];
+    while (row.length < COL_COUNT_INVOICE_EXCEL) row.push("");
+    return row;
+  };
+
+  const subtotalNum = Number(totals.subtotal || 0);
+  const itemsDiscountTotal = (items || []).reduce(
+    (sum, item) =>
+      sum +
+      (Number(item.unit_price) *
+        Number(item.qty) *
+        Number(item.discount_percent ?? item.discount ?? 0)) /
+        100,
+    0,
+  );
+  const docDiscountPercent = Number(doc.discount_percent || 0);
+  const docDiscountAmountFixed = Number(doc.discount_amount || 0);
+  const netAfterLineDiscounts = subtotalNum - itemsDiscountTotal;
+  const docDiscountFromPercent =
+    (netAfterLineDiscounts * docDiscountPercent) / 100;
+  const docDiscountCombined = docDiscountAmountFixed + docDiscountFromPercent;
+  const totalNum = Number(totals.total || 0);
+
+  const title = `НАКЛАДНАЯ № ${docNumber} от ${formatDateForInvoiceExcel(doc.date)}`;
+  const aoa = [];
+
+  aoa.push(padRow([title]));
+  aoa.push(padRow([]));
+  aoa.push(padRow(["Поставщик:", seller?.name ?? ""]));
+  aoa.push(padRow(["Адрес:", seller?.address ?? ""]));
+  aoa.push(padRow(["ИНН:", seller?.inn ?? ""]));
+  aoa.push(padRow(["Покупатель:", buyer?.name ?? ""]));
+  aoa.push(padRow(["Адрес:", buyer?.address ?? ""]));
+  aoa.push(padRow(["ИНН:", buyer?.inn ?? ""]));
+  aoa.push(padRow([]));
+  aoa.push(
+    padRow([
+      "№",
+      "Артикул",
+      "Наименование",
+      "Ед.изм.",
+      "Кол-во",
+      "Цена",
+      "Скидка %",
+      "Сумма",
+    ]),
+  );
+
+  (items || []).forEach((item, index) => {
+    aoa.push(
+      padRow([
+        index + 1,
+        item.article ?? "",
+        item.name ?? "",
+        item.unit ?? "",
+        Number(item.qty),
+        Number(item.unit_price),
+        Number(item.discount_percent ?? item.discount ?? 0),
+        Number(item.total),
+      ]),
+    );
+  });
+
+  aoa.push(padRow([]));
+  aoa.push(
+    padRow([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Подытог:",
+      "",
+      subtotalNum,
+    ]),
+  );
+  if (docDiscountCombined > 0) {
+    aoa.push(
+      padRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Скидка документа:",
+        "",
+        docDiscountCombined,
+      ]),
+    );
+  }
+  aoa.push(
+    padRow([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "ИТОГО:",
+      "",
+      totalNum,
+    ]),
+  );
+  aoa.push(padRow([]));
+
+  const comment = (doc.comment ?? "").trim();
+  if (comment) {
+    aoa.push(padRow(["Комментарий:", comment]));
+    aoa.push(padRow([]));
+  }
+
+  aoa.push(
+    padRow([
+      "Выдал: ___________",
+      "",
+      "",
+      "",
+      "Получил: ___________",
+    ]),
+  );
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  ws["!cols"] = [5, 12, 35, 8, 8, 14, 10, 16].map((wch) => ({ wch }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Накладная");
+
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  return new Blob([buf], { type: "application/octet-stream" });
+}
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -2521,10 +2667,9 @@ const CreateSaleDocument = () => {
                     item.product_article ??
                     "",
                 ).trim() || "",
-              images:
-                item.product_image_url
-                  ? [item.product_image_url]
-                  : getProductImages(productObject).length > 0
+              images: item.product_image_url
+                ? [item.product_image_url]
+                : getProductImages(productObject).length > 0
                   ? getProductImages(productObject)
                   : cartItem.images || [],
               product_image_url:
@@ -2670,6 +2815,29 @@ const CreateSaleDocument = () => {
           <InvoicePdfDocument data={invoiceData} />,
         ).toBlob();
         downloadBlob(blob, `invoice_${docNumber}.pdf`);
+      } else if (printType === "excel_invoice") {
+        const seller = {
+          name: company?.name || "",
+          address: company?.address || "",
+          inn: company?.inn || "",
+        };
+        const buyer = selectedCounterparty
+          ? {
+              name: selectedCounterparty.name || buyerName || "",
+              address: selectedCounterparty.address || "",
+              inn: selectedCounterparty.inn || "",
+            }
+          : buyerName
+            ? { name: buyerName, address: "", inn: "" }
+            : { name: "", address: "", inn: "" };
+        const totalsForExcel = {
+          subtotal: String(subtotal.toFixed(2)),
+          discount_total: String(totalDiscount.toFixed(2)),
+          tax_total: "0.00",
+          total: String(total.toFixed(2)),
+        };
+        const blob = exportToExcel(doc, items, totalsForExcel, seller, buyer);
+        downloadBlob(blob, `invoice_${docNumber}.xlsx`);
       } else if (printType === "receipt") {
         const receiptData = {
           document: {
@@ -3353,6 +3521,9 @@ const CreateSaleDocument = () => {
                   <div className="create-sale-document__save-print-menu">
                     <button onClick={() => handleSaveAndPrint("invoice")}>
                       Накладная
+                    </button>
+                    <button onClick={() => handleSaveAndPrint("excel_invoice")}>
+                      Накладная (Excel)
                     </button>
                     <button onClick={() => handleSaveAndPrint("receipt")}>
                       Товарный чек

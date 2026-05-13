@@ -47,7 +47,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
-    "use-scan-detection": "^0.2.3"
+    "use-scan-detection": "^0.2.3",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "dev": "vite",
