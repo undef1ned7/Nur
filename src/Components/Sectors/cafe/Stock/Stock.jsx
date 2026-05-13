@@ -1,5 +1,5 @@
 // src/Components/Sectors/cafe/Stock/Stock.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../../api";
@@ -7,8 +7,11 @@ import "./stock.scss";
 import { StockItemModal, StockMoveModal, StockDeleteModal } from "./components/StockModals";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import Suppliers from "../../../Contact/Suppliers/Suppliers";
+
+const PAGE_SIZE = 100;
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -45,10 +48,17 @@ const normalizeSupplierId = (row) => {
 
 const Stock = () => {
   const alert = useAlert();
+  const alertRef = useRef(alert);
+  alertRef.current = alert;
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(query, 400);
+  const [warehousePage, setWarehousePage] = useState(1);
+  const [warehouseCount, setWarehouseCount] = useState(0);
+  const [warehouseNext, setWarehouseNext] = useState(null);
+  const [warehousePrevious, setWarehousePrevious] = useState(null);
   const [cashboxes, setCashboxes] = useState([]);
   const [cashboxId, setCashboxId] = useState("");
 
@@ -79,20 +89,78 @@ const Stock = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState(null);
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const rStock = await api.get("/cafe/warehouse/");
-        setItems(listFrom(rStock));
-      } catch (err) {
-        const errorMessage = validateResErrors(err, "Ошибка загрузки склада");
-        alert(errorMessage, true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
+  const loadWarehouse = useCallback(async (page, search) => {
+    try {
+      setLoading(true);
+      const params = {
+        page,
+        limit: PAGE_SIZE,
+      };
+      const q = String(search ?? "").trim();
+      if (q) params.search = q;
+      const rStock = await api.get("/cafe/warehouse/", { params });
+      const data = rStock?.data ?? {};
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+          ? data
+          : [];
+      setItems(list);
+      const count =
+        typeof data?.count === "number" ? data.count : list.length;
+      setWarehouseCount(count);
+      setWarehouseNext(data?.next ?? null);
+      setWarehousePrevious(data?.previous ?? null);
+    } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка загрузки склада");
+      alertRef.current(errorMessage, true);
+      setItems([]);
+      setWarehouseCount(0);
+      setWarehouseNext(null);
+      setWarehousePrevious(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const prevDebouncedSearchRef = useRef(debouncedSearch);
+
+  useEffect(() => {
+    if (activeTab !== "stock") return;
+
+    const prevSearch = prevDebouncedSearchRef.current;
+    const searchChanged = prevSearch !== debouncedSearch;
+
+    if (searchChanged && warehousePage !== 1) {
+      setWarehousePage(1);
+      return;
+    }
+
+    prevDebouncedSearchRef.current = debouncedSearch;
+    void loadWarehouse(warehousePage, debouncedSearch);
+  }, [activeTab, warehousePage, debouncedSearch, loadWarehouse]);
+
+  const totalWarehousePages = useMemo(
+    () =>
+      warehouseCount && PAGE_SIZE
+        ? Math.max(1, Math.ceil(warehouseCount / PAGE_SIZE))
+        : 1,
+    [warehouseCount],
+  );
+
+  const hasNextWarehousePage = !!warehouseNext;
+  const hasPrevWarehousePage = !!warehousePrevious;
+
+  const handleWarehousePageChange = useCallback(
+    (nextPage) => {
+      if (nextPage < 1) return;
+      if (totalWarehousePages && nextPage > totalWarehousePages) return;
+      setWarehousePage(nextPage);
+      const listEl = document.querySelector(".cafeStock__list");
+      if (listEl) listEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [totalWarehousePages],
+  );
 
   useEffect(() => {
     const loadSuppliersFromMain = async () => {
@@ -165,19 +233,6 @@ const Stock = () => {
     };
     fetchCashboxes();
   }, []);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((s) => {
-      const supCap = rowSupplierCaption(s).toLowerCase();
-      return (
-        String(s.title || "").toLowerCase().includes(q) ||
-        String(s.unit || "").toLowerCase().includes(q) ||
-        (supCap && supCap.includes(q))
-      );
-    });
-  }, [items, query, rowSupplierCaption]);
 
   const isLow = (s) => toNum(s.remainder) <= toNum(s.minimum);
 
@@ -272,9 +327,13 @@ const Stock = () => {
     try {
       if (editingId == null) {
         // Создание товара
-        const res = await api.post("/cafe/warehouse/", payload);
-        setItems((prev) => [...prev, res.data]);
+        await api.post("/cafe/warehouse/", payload);
         setModalOpen(false);
+        if (warehousePage === 1) {
+          await loadWarehouse(1, debouncedSearch);
+        } else {
+          setWarehousePage(1);
+        }
         // Запись в кассу (расход — закупка нового товара): количество × цена
         const boxId = cashboxId || String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
         if (boxId) {
@@ -317,7 +376,6 @@ const Stock = () => {
     if (!deleteItem?.id) return;
     try {
       await api.delete(`/cafe/warehouse/${deleteItem.id}/`);
-      setItems((prev) => prev.filter((s) => s.id !== deleteItem.id));
       setDeleteOpen(false);
 
       // При удалении корректируем кассу на всю "стоимость" остатка (как разницу до нуля)
@@ -328,6 +386,14 @@ const Stock = () => {
         title: deleteItem.title,
         deltaAmount: 0 - prevTotal,
       });
+
+      const nextPage =
+        items.length <= 1 && warehousePage > 1 ? warehousePage - 1 : warehousePage;
+      if (nextPage !== warehousePage) {
+        setWarehousePage(nextPage);
+      } else {
+        await loadWarehouse(warehousePage, debouncedSearch);
+      }
 
       setDeleteItem(null);
     } catch (err) {
@@ -454,7 +520,7 @@ const Stock = () => {
               {loading && <div className="cafeStock__alert">Загрузка…</div>}
 
               {!loading &&
-                filtered.map((s) => {
+                items.map((s) => {
                   const supplierCap = rowSupplierCaption(s);
                   return (
                     <article key={s.id} className="cafeStock__card">
@@ -508,10 +574,46 @@ const Stock = () => {
                   );
                 })}
 
-              {!loading && !filtered.length && (
-                <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
+              {!loading && !items.length && (
+                <div className="cafeStock__alert">
+                  {debouncedSearch.trim()
+                    ? `Ничего не найдено по «${debouncedSearch.trim()}».`
+                    : "На складе пока нет позиций."}
+                </div>
               )}
             </div>
+
+            {!loading && totalWarehousePages > 1 && (
+              <div className="cafeStock__pagination">
+                <button
+                  type="button"
+                  className="cafeStock__pagination-btn"
+                  onClick={() => handleWarehousePageChange(warehousePage - 1)}
+                  disabled={
+                    warehousePage === 1 || loading || !hasPrevWarehousePage
+                  }
+                >
+                  Назад
+                </button>
+                <span className="cafeStock__pagination-info">
+                  Страница {warehousePage} из {totalWarehousePages}
+                  {warehouseCount ? ` (${warehouseCount} поз.)` : ""}
+                </span>
+                <button
+                  type="button"
+                  className="cafeStock__pagination-btn"
+                  onClick={() => handleWarehousePageChange(warehousePage + 1)}
+                  disabled={
+                    loading ||
+                    !hasNextWarehousePage ||
+                    (totalWarehousePages > 0 &&
+                      warehousePage >= totalWarehousePages)
+                  }
+                >
+                  Вперёд
+                </button>
+              </div>
+            )}
           </DataContainer>
 
           {/* Модалка товара */}
