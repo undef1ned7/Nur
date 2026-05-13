@@ -244,6 +244,68 @@ function lr(left, right, width = 32) {
   const spaces = Math.max(1, width - L.length - R.length);
   return L + " ".repeat(spaces) + R;
 }
+
+/** Одна ячейка фиксированной ширины для узкого чека (моноширинная логика). */
+function fitCell(str, w, align = "L") {
+  let t = String(str ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (t.length > w) {
+    if (w <= 1) return "…";
+    t = `${t.slice(0, Math.max(0, w - 1))}…`;
+  }
+  if (align === "R") return t.padStart(w, " ");
+  return t.padEnd(w, " ");
+}
+
+/** Перенос названия товара по словам для ширины чека. */
+function wrapReceiptName(text, maxWidth) {
+  const t = String(text || "").trim();
+  if (!t) return [""];
+  if (maxWidth < 1) return [t.slice(0, 1)];
+  const words = t.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = "";
+  for (const word of words) {
+    if (word.length > maxWidth) {
+      if (cur) {
+        lines.push(cur);
+        cur = "";
+      }
+      for (let i = 0; i < word.length; i += maxWidth) {
+        lines.push(word.slice(i, i + maxWidth));
+      }
+      continue;
+    }
+    const next = cur ? `${cur} ${word}` : word;
+    if (next.length <= maxWidth) cur = next;
+    else {
+      if (cur) lines.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
+}
+
+/** Строка таблицы маркета: № | Цена | Кол | (%|с) | Итого (разделитель " |", суммарная ширина = width). */
+function buildMarketItemTableRow(width, noStr, priceStr, qtyStr, discStr, totalStr) {
+  const wNo = 3;
+  const wPrice = 8;
+  const wQty = 5;
+  const sep = " |";
+  const sepTotal = sep.length * 4;
+  const wDisc = Math.max(6, width - wNo - wPrice - wQty - sepTotal - 8);
+  const wTot = width - wNo - wPrice - wQty - wDisc - sepTotal;
+  const row = [
+    fitCell(noStr, wNo, "R"),
+    fitCell(priceStr, wPrice, "R"),
+    fitCell(qtyStr, wQty, "R"),
+    fitCell(discStr, wDisc, "L"),
+    fitCell(totalStr, wTot, "R"),
+  ].join(sep);
+  return row.length > width ? row.slice(0, width) : row;
+}
 const toNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -312,8 +374,30 @@ function buildReceiptFromJSON(payload, opts = {}) {
     })
     : (Array.isArray(payload.items) ? payload.items : []).map((it) => {
       const qty = toNum(it.qty) || 1;
-      const price = toNum(it.price);
-      return { name: String(it.name || "Товар"), qty, price, total: qty * price };
+      const unitPrice = toNum(it.unit_price ?? it.price);
+      const lineDiscountAmt = toNum(it?.line_discount);
+      const lineTotalNum =
+        it?.line_total != null && it?.line_total !== ""
+          ? toNum(it.line_total)
+          : null;
+      const grossLine = Math.max(0, qty * unitPrice);
+      // line_discount — сумма скидки в сомах; % = line_discount / (цена × кол-о) × 100.
+      const lineDiscountPct =
+        lineDiscountAmt > 0 && grossLine > 0
+          ? (lineDiscountAmt / grossLine) * 100
+          : 0;
+      const total =
+        lineTotalNum != null && Number.isFinite(lineTotalNum)
+          ? lineTotalNum
+          : Math.max(0, grossLine - lineDiscountAmt);
+      return {
+        name: String(it.name || "Товар"),
+        qty,
+        price: unitPrice,
+        total,
+        line_discount_pct: lineDiscountPct,
+        line_discount_amount: lineDiscountAmt,
+      };
     });
 
   const subtotal = ekassaFields
@@ -382,26 +466,66 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(enc(divider + "\n"));
   chunks.push(enc("СНО: Общий налоговый режим\n"));
   chunks.push(enc(divider + "\n"));
-  for (const [index, it] of items.entries()) {
-    const name = String(it.name ?? "Товар");
-    const qty = Number(it.qty || 1);
-    const price = Number(it.price || 0);
-    const lineTotal = Number(it.total ?? qty * price);
-    chunks.push(enc(`${index + 1}. ${name}\n`));
-    if (emphasizeMarketReceipt) {
-      chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
-      chunks.push(
-        enc(
-          lr(
-            `${money(price)} x ${qty} ед.`,
-            money(lineTotal),
-            width,
-          ) + "\n",
-        ),
+  if (emphasizeMarketReceipt) {
+    const headRow = buildMarketItemTableRow(
+      width,
+      "№",
+      "Цена",
+      "Кол-о",
+      "(% | с)",
+      "Итого",
+    );
+    chunks.push(enc(headRow + "\n"));
+    chunks.push(enc(divider + "\n"));
+    for (const [index, it] of items.entries()) {
+      const name = String(it.name ?? "Товар");
+      const qty = Number(it.qty || 1);
+      const price = Number(it.price || 0);
+      const lineTotal = Number(it.total ?? qty * price);
+      const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
+      const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
+
+      const nameLines = wrapReceiptName(name, Math.max(10, width - 2));
+      for (const nl of nameLines) {
+        chunks.push(enc(`  ${fitCell(nl, width - 2, "L")}\n`));
+      }
+
+      let discCell = "—";
+      if (lineDiscountPct > 0 && lineDiscountAmt > 0) {
+        discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%/${money(lineDiscountAmt)}`;
+      } else if (lineDiscountPct > 0) {
+        discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%`;
+      } else if (lineDiscountAmt > 0) {
+        discCell = money(lineDiscountAmt);
+      }
+
+      const row = buildMarketItemTableRow(
+        width,
+        String(index + 1),
+        money(price),
+        String(qty),
+        discCell,
+        money(lineTotal),
       );
-      chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
-    } else {
+      chunks.push(enc(row + "\n"));
+    }
+  } else {
+    for (const [index, it] of items.entries()) {
+      const name = String(it.name ?? "Товар");
+      const qty = Number(it.qty || 1);
+      const price = Number(it.price || 0);
+      const lineTotal = Number(it.total ?? qty * price);
+      chunks.push(enc(`${index + 1}. ${name}\n`));
+      const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
+      const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
       chunks.push(enc(lr(`${money(price)} x ${qty} ед.`, money(lineTotal), width) + "\n"));
+      if (lineDiscountPct > 0 || lineDiscountAmt > 0) {
+        const pctStr =
+          lineDiscountPct > 0 ? `${money(lineDiscountPct).replace(/\.00$/, "")}%` : "";
+        const amtStr = lineDiscountAmt > 0 ? `-${money(lineDiscountAmt)}` : "";
+        const right = [pctStr, amtStr].filter(Boolean).join(" ");
+        chunks.push(enc(lr("Скидка (товар)", right || "—", width) + "\n"));
+      }
     }
   }
 

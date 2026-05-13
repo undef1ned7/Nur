@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Демо: чек №921 (JSON)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #e2e8f0;
+      padding: 24px;
+      margin: 0;
+    }
+    h1 { font-size: 1.1rem; margin: 0 0 12px; color: #0f172a; }
+    p.note { font-size: 0.85rem; color: #475569; margin: 0 0 16px; max-width: 560px; }
+    .receipt {
+      width: 42ch;
+      max-width: 100%;
+      margin: 0 auto;
+      background: #fff;
+      padding: 14px 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #0b1220;
+      white-space: pre;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Демо чека по JSON (док. №921, 2026-05-13)</h1>
+  <p class="note">
+    Демо по переданному JSON (как <code>buildReceiptFromJSON</code> в
+    <code>printService.js</code>, без ESC/POS и QR). Подытог — сумма
+    <code>line_total</code> по строкам; итог — подытог минус заказная
+    <code>discount</code>.
+  </p>
+  <div class="receipt" id="receipt"></div>
+  <script>
+    const money = (n) => Number(n || 0).toFixed(2);
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const hasText = (v) => {
+      const s = String(v ?? "").trim();
+      return s !== "" && s !== "—";
+    };
+    function lr(left, right, width = 32) {
+      const L = String(left ?? "");
+      const R = String(right ?? "");
+      const spaces = Math.max(1, width - L.length - R.length);
+      return L + " ".repeat(spaces) + R;
+    }
+    function fitCell(str, w, align = "L") {
+      let t = String(str ?? "")
+        .trim()
+        .replace(/\s+/g, " ");
+      if (t.length > w) {
+        if (w <= 1) return "…";
+        t = `${t.slice(0, Math.max(0, w - 1))}…`;
+      }
+      if (align === "R") return t.padStart(w, " ");
+      return t.padEnd(w, " ");
+    }
+    function wrapReceiptName(text, maxWidth) {
+      const t = String(text || "").trim();
+      if (!t) return [""];
+      if (maxWidth < 1) return [t.slice(0, 1)];
+      const words = t.split(/\s+/).filter(Boolean);
+      const lines = [];
+      let cur = "";
+      for (const word of words) {
+        if (word.length > maxWidth) {
+          if (cur) {
+            lines.push(cur);
+            cur = "";
+          }
+          for (let i = 0; i < word.length; i += maxWidth) {
+            lines.push(word.slice(i, i + maxWidth));
+          }
+          continue;
+        }
+        const next = cur ? `${cur} ${word}` : word;
+        if (next.length <= maxWidth) cur = next;
+        else {
+          if (cur) lines.push(cur);
+          cur = word;
+        }
+      }
+      if (cur) lines.push(cur);
+      return lines.length ? lines : [""];
+    }
+    function buildMarketItemTableRow(width, noStr, priceStr, qtyStr, discStr, totalStr) {
+      const wNo = 3;
+      const wPrice = 8;
+      const wQty = 5;
+      const sep = " |";
+      const sepTotal = sep.length * 4;
+      const wDisc = Math.max(6, width - wNo - wPrice - wQty - sepTotal - 8);
+      const wTot = width - wNo - wPrice - wQty - wDisc - sepTotal;
+      const row = [
+        fitCell(noStr, wNo, "R"),
+        fitCell(priceStr, wPrice, "R"),
+        fitCell(qtyStr, wQty, "R"),
+        fitCell(discStr, wDisc, "L"),
+        fitCell(totalStr, wTot, "R"),
+      ].join(sep);
+      return row.length > width ? row.slice(0, width) : row;
+    }
+
+    /**
+     * Маппинг payload.items как в printService: % = line_discount / (unit_price × qty) × 100;
+     * line_discount — сумма скидки в сомах.
+     */
+    function mapPayloadItems(rawList) {
+      const list = Array.isArray(rawList) ? rawList : [];
+      return list.map((it) => {
+        const qty = toNum(it.qty) || 1;
+        const unitPrice = toNum(it.unit_price ?? it.price);
+        const lineDiscountAmt = toNum(it?.line_discount);
+        const lineTotalNum =
+          it?.line_total != null && it?.line_total !== ""
+            ? toNum(it.line_total)
+            : null;
+        const grossLine = Math.max(0, qty * unitPrice);
+        const lineDiscountPct =
+          lineDiscountAmt > 0 && grossLine > 0
+            ? (lineDiscountAmt / grossLine) * 100
+            : 0;
+        const total =
+          lineTotalNum != null && Number.isFinite(lineTotalNum)
+            ? lineTotalNum
+            : Math.max(0, grossLine - lineDiscountAmt);
+        return {
+          name: String(it.name || "Товар"),
+          qty,
+          price: unitPrice,
+          total,
+          line_discount_pct: lineDiscountPct,
+          line_discount_amount: lineDiscountAmt,
+        };
+      });
+    }
+
+    function buildMarketReceiptText(payload, width) {
+      const divider = "-".repeat(width);
+      const company = String(payload.company ?? "").trim();
+      const inn = String(payload.inn ?? "").trim();
+      const address = String(payload.address ?? "").trim();
+      const cashier = String(payload.cashier_name ?? "").trim();
+      const docNo = String(payload.doc_no ?? "").trim();
+      const dt = String(payload.created_at ?? "").trim();
+      const shift = "";
+
+      const items = mapPayloadItems(payload.items);
+
+      const subtotal = items.reduce((s, it) => s + toNum(it.total), 0);
+      const discount = Math.max(0, toNum(payload.discount));
+      const vat = toNum(payload.tax);
+      const nsp = toNum(payload.nsp);
+      const total = Math.max(0, subtotal - discount + vat);
+      const paidCard = Math.max(0, toNum(payload.paid_card));
+      const paidCash = Math.max(0, toNum(payload.paid_cash));
+
+      let out = "";
+      out += "СПАСИБО ЗА ПОКУПКУ!\n";
+      out += "Контрольно-кассовый чек - Продажа\n";
+      if (hasText(company)) out += company + "\n";
+      if (hasText(inn)) out += `ИНН ${inn}\n`;
+      if (hasText(address)) out += address + "\n";
+      out += divider + "\n";
+      if (hasText(docNo) && hasText(dt)) {
+        out += lr(`Чек № ${docNo}`, dt, width) + "\n";
+      } else if (hasText(docNo)) {
+        out += `Чек № ${docNo}\n`;
+      } else if (hasText(dt)) {
+        out += `${dt}\n`;
+      }
+      if (hasText(cashier)) out += lr("Кассир", cashier, width) + "\n";
+      if (hasText(shift)) out += lr("Смена", shift, width) + "\n";
+      out += divider + "\n";
+      out += "СНО: Общий налоговый режим\n";
+      out += divider + "\n";
+
+      out +=
+        buildMarketItemTableRow(width, "№", "Цена", "Кол-о", "(% | с)", "Итого") + "\n";
+      out +=
+        fitCell("% — доля от (цена×кол-о)  |  с — сумма скидки, сом", width, "L") + "\n";
+      out += divider + "\n";
+
+      for (const [index, it] of items.entries()) {
+        const name = String(it.name ?? "Товар");
+        const qty = Number(it.qty || 1);
+        const price = Number(it.price || 0);
+        const lineTotal = Number(it.total ?? qty * price);
+        const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
+        const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
+
+        const nameLines = wrapReceiptName(name, Math.max(10, width - 2));
+        for (const nl of nameLines) {
+          out += `  ${fitCell(nl, width - 2, "L")}\n`;
+        }
+
+        let discCell = "—";
+        if (lineDiscountPct > 0 && lineDiscountAmt > 0) {
+          discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%/${money(lineDiscountAmt)}`;
+        } else if (lineDiscountPct > 0) {
+          discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%`;
+        } else if (lineDiscountAmt > 0) {
+          discCell = money(lineDiscountAmt);
+        }
+
+        out +=
+          buildMarketItemTableRow(
+            width,
+            String(index + 1),
+            money(price),
+            String(qty),
+            discCell,
+            money(lineTotal),
+          ) + "\n";
+      }
+
+      out += divider + "\n";
+      out += lr("Подытог", money(subtotal), width) + "\n";
+      if (discount > 0) out += lr("Скидка", `-${money(discount)}`, width) + "\n";
+      if (vat > 0) out += lr("НДС", money(vat), width) + "\n";
+      if (nsp > 0) out += lr("НсП", money(nsp), width) + "\n";
+      out += divider + "\n";
+      if (paidCash > 0) out += lr("Наличные", money(paidCash), width) + "\n";
+      if (paidCard > 0) out += lr("Безналичные", money(paidCard), width) + "\n";
+      out += lr("ИТОГО", money(total), width) + "\n";
+      out += divider + "\n";
+
+      return out;
+    }
+
+    const WIDTH = 42;
+    /** Пример ответа для печати (как приходит с бэка). */
+    const payload = {
+      encoding: "utf-8",
+      doc_no: "921",
+      company: "уцкенгшщ",
+      inn: "1234567890",
+      address: "укенгпшрщ",
+      created_at: "2026-05-13 14:30:54",
+      cashier_name: null,
+      items: [
+        {
+          name: 'картошка23',
+          qty: 1.0,
+          price: 85.0,
+          line_discount: 10.0,
+          line_total: 75.0,
+        },
+        {
+          name: 'Чай "Champion" черный листовой 100г*',
+          qty: 1.0,
+          price: 100.0,
+          line_discount: 25.0,
+          line_total: 75.0,
+        },
+        {
+          name: "Legenda суусу 1л*",
+          qty: 1.0,
+          price: 50.4,
+          line_discount: 0.0,
+          line_total: 50.4,
+        },
+      ],
+      discount: 35.0,
+      tax: 0.0,
+      paid_cash: 0.0,
+      paid_card: 0.0,
+      change: 0.0,
+      ekassa: {
+        newid: "23d5a9b6-795e-4036-a414-714b188f6d8c",
+        status: "pending",
+      },
+    };
+
+    document.getElementById("receipt").textContent = buildMarketReceiptText(
+      payload,
+      WIDTH,
+    );
+  </script>
+</body>
+</html>

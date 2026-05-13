@@ -48,3 +48,43 @@ export const useDebouncedAction = (
     [debounced, transform]
   );
 };
+
+/**
+ * Отдельный debounce-таймер на каждый ключ (например id строки корзины).
+ * schedule(key, fn) перезапускает таймер только для этого key; cancel(key) снимает ожидание.
+ */
+export const useDebounceByKey = (delay = 400) => {
+  const timersRef = useRef(new Map());
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => clearTimeout(t));
+      timersRef.current.clear();
+    };
+  }, []);
+
+  const schedule = useCallback(
+    (key, fn) => {
+      const k = String(key);
+      const prev = timersRef.current.get(k);
+      if (prev) clearTimeout(prev);
+      const id = setTimeout(() => {
+        timersRef.current.delete(k);
+        fn();
+      }, delay);
+      timersRef.current.set(k, id);
+    },
+    [delay],
+  );
+
+  const cancel = useCallback((key) => {
+    const k = String(key);
+    const prev = timersRef.current.get(k);
+    if (prev) {
+      clearTimeout(prev);
+      timersRef.current.delete(k);
+    }
+  }, []);
+
+  return { schedule, cancel };
+};
