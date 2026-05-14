@@ -53,7 +53,7 @@ export default function CafeLayout() {
   const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
-  const PRINT_QUEUE_DELAY_MS = 400;
+  const PRINT_QUEUE_DELAY_MS = 1000;
 
   // const [kitchens, setKitchens] = useState([]);
   // const fetchKitchens = useCallback(async () => {
@@ -300,6 +300,34 @@ const fullName = useCallback(
     ],
   );
 
+  const RECEIPT_PRINT_DEDUPE_PREFIX = "cafe_receipt_printed_";
+
+  const isReceiptMarkedPrinted = useCallback((orderId) => {
+    const oid = String(orderId || "");
+    if (!oid) return false;
+    if (printedReceiptsRef.current.has(oid)) return true;
+    try {
+      if (localStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`)) return true;
+    } catch {}
+    try {
+      if (sessionStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`))
+        return true;
+    } catch {}
+    return false;
+  }, []);
+
+  const markReceiptPrintedPersist = useCallback((orderId) => {
+    const oid = String(orderId || "");
+    if (!oid) return;
+    printedReceiptsRef.current.add(oid);
+    try {
+      localStorage.setItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`, "true");
+    } catch {}
+    try {
+      sessionStorage.setItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`, "1");
+    } catch {}
+  }, []);
+
   const enqueuePrintJob = useCallback(async (job) => {
     const run = async () => {
       await new Promise((resolve) => setTimeout(resolve, PRINT_QUEUE_DELAY_MS));
@@ -315,14 +343,8 @@ const fullName = useCallback(
     async (orderId) => {
       const oid = String(orderId || "");
       if (!oid) return;
-      if (printedReceiptsRef.current.has(oid)) return;
+      if (isReceiptMarkedPrinted(oid)) return;
       if (printingReceiptsRef.current.has(oid)) return;
-      try {
-        const alreadyPrinted = localStorage.getItem(
-          `cafe_receipt_printed_${oid}`,
-        );
-        if (alreadyPrinted) return;
-      } catch {}
       if (!acquireReceiptPrintLock(oid)) return;
 
       printingReceiptsRef.current.add(oid);
@@ -330,6 +352,9 @@ const fullName = useCallback(
         const receiptBinding =
           localStorage.getItem("cafe_receipt_printer") || "";
         if (!receiptBinding) return;
+
+        const parsed = parsePrinterBinding(receiptBinding);
+        if (parsed.kind !== "ip" && parsed.kind !== "usb") return;
 
         await checkPrinterConnection().catch(() => false);
         const detail = await api
@@ -345,22 +370,18 @@ const fullName = useCallback(
           ...buildReceiptPayload(detail),
           waiter_name: waiterName,
         };
-        const parsed = parsePrinterBinding(receiptBinding);
         if (parsed.kind === "ip") {
           await enqueuePrintJob(() =>
             printViaWiFiSimple(payload, parsed.ip, parsed.port),
           );
-        } else if (parsed.kind === "usb") {
+        } else {
           await enqueuePrintJob(async () => {
             await setActivePrinterByKey(parsed.usbKey);
             await printOrderReceiptJSONViaUSB(payload);
           });
         }
 
-        printedReceiptsRef.current.add(oid);
-        try {
-          localStorage.setItem(`cafe_receipt_printed_${oid}`, "true");
-        } catch {}
+        markReceiptPrintedPersist(oid);
       } catch (e) {
         console.error("Auto receipt print error:", e);
       } finally {
@@ -368,7 +389,12 @@ const fullName = useCallback(
         releaseReceiptPrintLock(oid);
       }
     },
-    [buildReceiptPayload, enqueuePrintJob],
+    [
+      buildReceiptPayload,
+      enqueuePrintJob,
+      isReceiptMarkedPrinted,
+      markReceiptPrintedPersist,
+    ],
   );
 
   const readKitchenPrinterMap = () => {
@@ -1057,6 +1083,8 @@ const fullName = useCallback(
         if (!oid) continue;
         const created = o?.created_at ?? o?.date;
         const createdMs = created ? new Date(created).getTime() : 0;
+        // NaN < cutoff === false — без этой проверки «битая» дата вечно попадала в ветку печати
+        if (!Number.isFinite(createdMs)) continue;
         if (createdMs < cutoff) continue;
 
         // Чек по опросу списка: только недавние по created_at из этого ответа API

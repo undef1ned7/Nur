@@ -370,6 +370,27 @@ const normalizeRevenueInflowRows = (data) => {
   }));
 };
 
+/** Строки для блока «Оплаты по способу» из ответа /cafe/analytics/finance/ (income_breakdown). */
+const normalizeIncomeBreakdownToInflowRows = (breakdown) => {
+  if (!Array.isArray(breakdown) || !breakdown.length) return [];
+  return breakdown.map((x, idx) => {
+    const method = x.method ?? x.payment_method ?? x.code ?? idx;
+    const label = String(
+      x.method_label ??
+        x.payment_method_label ??
+        x.label ??
+        labelPaymentMethod(method),
+    ).trim();
+    return {
+      _id: `${String(method)}_${idx}`,
+      method,
+      label: label || "—",
+      amount: toNum(x.total ?? x.amount ?? x.sum ?? x.revenue ?? x.total_amount),
+      orders_count: toNum(x.count ?? x.orders_count ?? x.orders ?? x.transactions ?? 0),
+    };
+  });
+};
+
 const normalizeRejectionRows = (data) => {
   const rows = apiListPayload(data);
   return rows.map((x, idx) => ({
@@ -822,11 +843,19 @@ const CafeAnalytics = () => {
       );
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
 
-      setRevenueInflowRows(normalizeRevenueInflowRows(rInflow?.data));
+      const financeNormalized = normalizeFinanceBlock(rFinance?.data);
+      setFinanceBlock(financeNormalized);
+      const inflowFromFinance = normalizeIncomeBreakdownToInflowRows(
+        financeNormalized.income_breakdown,
+      );
+      setRevenueInflowRows(
+        inflowFromFinance.length > 0
+          ? inflowFromFinance
+          : normalizeRevenueInflowRows(rInflow?.data),
+      );
       setRejectionRows(normalizeRejectionRows(rRejections?.data));
       setExpensesBlock(normalizeExpensesBlock(rExpenses?.data));
       setDebtRows(normalizeDebtRows(rDebts?.data));
-      setFinanceBlock(normalizeFinanceBlock(rFinance?.data));
       setWaiterSalaryRows(
         hideKitchenStaffKpi ? [] : normalizeWaiterSalaryRows(rSalary?.data)
       );

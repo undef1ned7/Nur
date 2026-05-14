@@ -8,7 +8,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
@@ -73,6 +73,77 @@ const normalizeCompactProductsResponse = (data) => {
     images: Array.isArray(item?.images) ? item.images : [],
     packages: Array.isArray(item?.packages) ? item.packages : [],
   }));
+};
+
+/** Убирает хвост .00 только у дробей; «50» и «100» не трогать (иначе /\\.?0+$/ даёт «5» и «1»). */
+const stripTrailingZerosAfterDecimal = (num) => {
+  const s = String(num);
+  if (!s.includes(".")) return s;
+  return s.replace(/\.?0+$/, "") || "0";
+};
+
+const fmtSomShort = (n) => {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return String(n ?? "");
+  return stripTrailingZerosAfterDecimal(Number(x.toFixed(2)));
+};
+
+const normalizeCartPromotionRules = (rules) => {
+  if (!Array.isArray(rules)) return [];
+  return rules
+    .map((r, idx) => ({
+      position: Number(r?.position ?? idx),
+      min_amount: parseFloat(String(r?.min_amount ?? "").replace(",", ".")) || 0,
+      discount_percent:
+        parseFloat(String(r?.discount_percent ?? "").replace(",", ".")) || 0,
+      promo_quantity:
+        r?.promo_quantity === null ||
+        r?.promo_quantity === undefined ||
+        String(r.promo_quantity).trim() === ""
+          ? null
+          : Math.max(0, parseFloat(String(r.promo_quantity).replace(",", ".")) || 0),
+    }))
+    .filter((r) => r.discount_percent > 0)
+    .sort((a, b) => a.position - b.position);
+};
+
+const getActiveCartPromotionTier = (price, qty, rules) => {
+  const list = normalizeCartPromotionRules(rules);
+  if (!list.length) return null;
+  const gross = (parseFloat(price) || 0) * (parseFloat(qty) || 0);
+  const q = parseFloat(qty) || 0;
+  let best = null;
+  for (const r of list) {
+    if (gross + 1e-9 < r.min_amount) continue;
+    if (r.promo_quantity != null && r.promo_quantity > 0 && q + 1e-9 < r.promo_quantity)
+      continue;
+    if (!best || r.min_amount > best.min_amount) best = r;
+  }
+  return best;
+};
+
+const formatCartPromotionRulesLabel = (rules) => {
+  const list = normalizeCartPromotionRules(rules);
+  if (!list.length) return "";
+  return list
+    .map((r) => {
+      const pq =
+        r.promo_quantity != null && r.promo_quantity > 0
+          ? `, от ${fmtSomShort(r.promo_quantity)} шт`
+          : "";
+      return `от ${fmtSomShort(r.min_amount)} сом${pq}: −${stripTrailingZerosAfterDecimal(r.discount_percent)}%`;
+    })
+    .join(" · ");
+};
+
+/** Процент скидки для поля в режиме «%» (как при переключении кнопки %). */
+const formatDiscountPercentFromLine = (discountSom, lineTotal) => {
+  const d = parseFloat(discountSom) || 0;
+  const lt = parseFloat(lineTotal) || 0;
+  if (lt <= 0) return "";
+  if (d <= 0) return "0";
+  const pctNum = Number(((d / lt) * 100).toFixed(2));
+  return stripTrailingZerosAfterDecimal(pctNum) || "0";
 };
 
 const CashierPage = () => {
@@ -297,11 +368,13 @@ const CashierPage = () => {
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const debounceTimerRef = React.useRef(null);
   const [cart, setCart] = useState([]);
+  const cartRef = useRef([]);
   const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
   const [cartPrices, setCartPrices] = useState({}); // Локальные значения цены за единицу (unit_price)
   const [cartDiscounts, setCartDiscounts] = useState({}); // Локальные значения скидки на позицию (discount_total)
   const [cartDiscountModes, setCartDiscountModes] = useState({}); // Режим скидки по позиции: "amount" (сом) или "percent"
+  const cartDiscountModesRef = useRef({});
   const lastSearchInputTime = React.useRef(0); // Время последнего ввода в поле поиска (для защиты от открытия страницы оплаты при сканировании)
   const searchInputRef = React.useRef(null); // Ref для поля поиска
   const lastScanTimeRef = React.useRef(0); // Время последнего сканирования (как в SellMainStart.jsx)
@@ -317,6 +390,16 @@ const CashierPage = () => {
   /** Последнее значение из инпута количества, для которого запланирован debounced API */
   const pendingQtyLineInputRef = React.useRef(new Map());
   const debouncedQtyApiByLine = useDebounceByKey(500);
+  const debouncedDiscountApiByLine = useDebounceByKey(500);
+  const pendingDiscountLineRef = useRef(new Map());
+
+  const cancelPendingDiscountLineInput = (lineId) => {
+    if (lineId == null) return;
+    const k = String(lineId);
+    debouncedDiscountApiByLine.cancel(k);
+    pendingDiscountLineRef.current.delete(k);
+  };
+
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
@@ -935,6 +1018,14 @@ const CashierPage = () => {
     }
   }, [debouncedSearchTerm]);
 
+  useEffect(() => {
+    cartDiscountModesRef.current = cartDiscountModes;
+  }, [cartDiscountModes]);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
   // Инициализация данных при первой загрузке
   useEffect(() => {
     dispatch(fetchClientsAsync());
@@ -1012,6 +1103,9 @@ const CashierPage = () => {
             quantity: qty,
             discountTotal,
             unit: item.unit || "шт",
+            promotionRules: Array.isArray(item.promotion_rules)
+              ? item.promotion_rules
+              : [],
             image:
               item.primary_image_url ||
               (item.images && item.images[0]?.image_url) ||
@@ -1069,11 +1163,19 @@ const CashierPage = () => {
         });
         setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
         setCartPrices((prev) => ({ ...prev, ...newPrices }));
-        // Скидки по строкам: не перезатираем то, что уже ввёл продавец.
+        // Скидки: в сомах не затираем введённое; в % после смены кол-ва/цены пересчитываем из API (discount_total / строка).
         setCartDiscounts((prev) => {
           const next = { ...prev };
+          const modes = cartDiscountModesRef.current || {};
           orderedCart.forEach((item) => {
-            if (next[item.id] === undefined) {
+            const mode = modes[item.id] || "amount";
+            const lineTotal = (item.price || 0) * (item.quantity || 0);
+            if (mode === "percent") {
+              next[item.id] = formatDiscountPercentFromLine(
+                item.discountTotal ?? 0,
+                lineTotal,
+              );
+            } else if (next[item.id] === undefined) {
               next[item.id] = formatPrice(item.discountTotal ?? 0);
             }
           });
@@ -1131,6 +1233,7 @@ const CashierPage = () => {
 
     debouncedQtyApiByLine.cancel(String(cartItem.id));
     pendingQtyLineInputRef.current.delete(String(cartItem.id));
+    cancelPendingDiscountLineInput(cartItem.id);
 
     try {
       const currentQty = normalizeQuantity(cartItem.quantity);
@@ -1196,6 +1299,7 @@ const CashierPage = () => {
   const updateCustomQuantityDirect = async (cartItem, newQuantity) => {
     if (!currentSale?.id) return;
     if (!cartItem?.itemId) return;
+    cancelPendingDiscountLineInput(cartItem.id);
 
     try {
       const qtyNum = normalizeQuantity(
@@ -1248,6 +1352,7 @@ const CashierPage = () => {
 
     debouncedQtyApiByLine.cancel(String(cartItem.id));
     pendingQtyLineInputRef.current.delete(String(cartItem.id));
+    cancelPendingDiscountLineInput(cartItem.id);
 
     if (!canMarketDeleteCartItem) {
       showAlert(
@@ -1699,6 +1804,7 @@ const CashierPage = () => {
     if (item?.id != null) {
       debouncedQtyApiByLine.cancel(String(item.id));
       pendingQtyLineInputRef.current.delete(String(item.id));
+      cancelPendingDiscountLineInput(item.id);
     }
 
     try {
@@ -1772,6 +1878,7 @@ const CashierPage = () => {
   // Функция для обновления количества напрямую (без дельты)
   const updateQuantityDirect = async (item, newQuantity) => {
     if (!currentSale?.id) return;
+    cancelPendingDiscountLineInput(item.id);
 
     try {
       if (!item?.itemId || !item?.productId) return;
@@ -1917,6 +2024,7 @@ const CashierPage = () => {
 
     debouncedQtyApiByLine.cancel(String(item.id));
     pendingQtyLineInputRef.current.delete(String(item.id));
+    cancelPendingDiscountLineInput(item.id);
 
     if (!canMarketDeleteCartItem) {
       showAlert(
@@ -1973,6 +2081,7 @@ const CashierPage = () => {
   // Без скидки по строке — цена не может быть ниже закупочной; при наличии скидки — можно.
   const patchCartItemPrice = async (item, value) => {
     if (!currentSale?.id) return;
+    cancelPendingDiscountLineInput(item.id);
     if (!canMarketEditPrice) {
       showAlert("warning", "Нет доступа", "У вас нет доступа на изменение цены");
       setCartPrices((prev) => ({
@@ -2078,6 +2187,48 @@ const CashierPage = () => {
         [item.id]: formatPrice(item.discountTotal ?? 0),
       }));
     }
+  };
+
+  /** Синхронизация скидки строки с полем ввода (сом или %). */
+  const applyDiscountFromRawInput = async (item, v) => {
+    const mode = cartDiscountModesRef.current[item.id] || "amount";
+    const num = parseFloat(v);
+    const current = parseFloat(item.discountTotal ?? 0);
+    const lineTotal = (item.price || 0) * (item.quantity || 0);
+
+    if (v === "") {
+      if (current !== 0) {
+        await patchCartItemDiscount(item, 0, { mode, displayValue: "" });
+      } else {
+        setCartDiscounts((prev) => ({ ...prev, [item.id]: "" }));
+      }
+      return;
+    }
+    if (isNaN(num) || num < 0) return;
+
+    if (mode === "percent") {
+      if (lineTotal <= 0) return;
+      let discountSom = (lineTotal * Math.max(0, num)) / 100;
+      if (discountSom > lineTotal) discountSom = lineTotal;
+      if (discountSom !== current) {
+        await patchCartItemDiscount(item, discountSom, {
+          mode: "percent",
+          displayValue: v,
+        });
+      }
+    } else if (num !== current) {
+      await patchCartItemDiscount(item, v);
+    }
+  };
+
+  const flushPendingDiscountLine = async (lineId) => {
+    const key = String(lineId);
+    const v = pendingDiscountLineRef.current.get(key);
+    pendingDiscountLineRef.current.delete(key);
+    if (v === undefined) return;
+    const line = cartRef.current.find((c) => String(c.id) === key);
+    if (!line?.itemId || !currentSale?.id) return;
+    await applyDiscountFromRawInput(line, v);
   };
 
   const total =
@@ -2652,10 +2803,58 @@ const CashierPage = () => {
                 <div key={item.id} className="cashier-page__cart-item">
                   <div className="cashier-page__cart-item-main">
                     <div className="cashier-page__cart-item-head">
-                      <span className="cashier-page__cart-item-name">
-                        {item.name}
-                        {item.salePackage ? " (поштучно)" : ""}
-                      </span>
+                      <div className="cashier-page__cart-item-name-wrap">
+                        <span className="cashier-page__cart-item-name">
+                          {item.name}
+                          {item.salePackage ? " (поштучно)" : ""}
+                        </span>
+                        {Array.isArray(item.promotionRules) &&
+                          item.promotionRules.length > 0 && (
+                            <div className="cashier-page__cart-item-promo">
+                              {(() => {
+                                const tier = getActiveCartPromotionTier(
+                                  item.price,
+                                  item.quantity,
+                                  item.promotionRules,
+                                );
+                                const lineDisc = parseFloat(
+                                  item.discountTotal ?? 0,
+                                );
+                                const gross =
+                                  (item.price || 0) * (item.quantity || 0);
+                                if (tier) {
+                                  const pctLabel = stripTrailingZerosAfterDecimal(
+                                    tier.discount_percent,
+                                  );
+                                  if (lineDisc > 0) {
+                                    return (
+                                      <span className="cashier-page__cart-item-promo-active">
+                                        По акции: −{pctLabel}% (−
+                                        {formatPrice(lineDisc)} сом)
+                                      </span>
+                                    );
+                                  }
+                                  const previewSom =
+                                    (gross * tier.discount_percent) / 100;
+                                  return (
+                                    <span className="cashier-page__cart-item-promo-warn">
+                                      По акции: −{pctLabel}% (до −
+                                      {formatPrice(previewSom)} сом к строке)
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="cashier-page__cart-item-promo-hint">
+                                    Акция:{" "}
+                                    {formatCartPromotionRulesLabel(
+                                      item.promotionRules,
+                                    )}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          )}
+                      </div>
                       <div className="cashier-page__cart-item-head-right">
                         {canMarketDiscount && (
                         <div className="cashier-page__cart-item-discount-modes">
@@ -2668,6 +2867,7 @@ const CashierPage = () => {
                                 : ""
                             }`}
                             onClick={() => {
+                              cancelPendingDiscountLineInput(item.id);
                               const lineTotal =
                                 (item.price || 0) * (item.quantity || 0);
                               const lineDiscount = parseFloat(
@@ -2700,6 +2900,7 @@ const CashierPage = () => {
                                 : ""
                             }`}
                             onClick={() => {
+                              cancelPendingDiscountLineInput(item.id);
                               const wasAmount =
                                 (cartDiscountModes[item.id] || "amount") ===
                                 "amount";
@@ -2725,7 +2926,8 @@ const CashierPage = () => {
                                 const displayPct =
                                   pct === 100
                                     ? "100"
-                                    : String(pct).replace(/\.?0+$/, "") || "0";
+                                    : stripTrailingZerosAfterDecimal(pct) ||
+                                      "0";
                                 const discountSom = (lineTotal * pct) / 100;
                                 setCartDiscounts((prev) => ({
                                   ...prev,
@@ -2741,13 +2943,9 @@ const CashierPage = () => {
                                 );
                                 const pct =
                                   lineTotal > 0 && discountSom > 0
-                                    ? String(
-                                        Number(
-                                          (
-                                            (discountSom / lineTotal) *
-                                            100
-                                          ).toFixed(2),
-                                        ).replace(/\.?0+$/, ""),
+                                    ? formatDiscountPercentFromLine(
+                                        discountSom,
+                                        lineTotal,
                                       )
                                     : "";
                                 setCartDiscounts((prev) => ({
@@ -2864,7 +3062,6 @@ const CashierPage = () => {
                           value={cartDiscounts[item.id] ?? ""}
                           onChange={(e) => {
                             const v = e.target.value;
-                            // Разрешаем только число, пустую строку и "сырой" ввод до валидации
                             if (
                               v === "" ||
                               v === "-" ||
@@ -2874,50 +3071,27 @@ const CashierPage = () => {
                                 ...prev,
                                 [item.id]: v,
                               }));
+                              const lineKey = String(item.id);
+                              pendingDiscountLineRef.current.set(lineKey, v);
+                              debouncedDiscountApiByLine.schedule(
+                                lineKey,
+                                () => {
+                                  void flushPendingDiscountLine(item.id);
+                                },
+                              );
                             }
                           }}
-                          onBlur={(e) => {
-                            const v = e.target.value;
-                            const mode = cartDiscountModes[item.id] || "amount";
-                            const num = parseFloat(v);
-                            const current = parseFloat(item.discountTotal ?? 0);
-                            const lineTotal =
-                              (item.price || 0) * (item.quantity || 0);
-
-                            // Пустое поле — скидка 0 (по доке отправляем только discount_total)
-                            if (v === "") {
-                              if (current !== 0) {
-                                patchCartItemDiscount(item, 0, {
-                                  mode,
-                                  displayValue: "",
-                                });
-                              } else {
-                                setCartDiscounts((prev) => ({
-                                  ...prev,
-                                  [item.id]: "",
-                                }));
-                              }
-                              return;
-                            }
-                            if (isNaN(num) || num < 0) return;
-
-                            if (mode === "percent") {
-                              if (lineTotal <= 0) return;
-                              let discountSom =
-                                (lineTotal * Math.max(0, num)) / 100;
-                              if (discountSom > lineTotal)
-                                discountSom = lineTotal;
-                              if (discountSom !== current) {
-                                patchCartItemDiscount(item, discountSom, {
-                                  mode: "percent",
-                                  displayValue: v,
-                                });
-                              }
-                            } else {
-                              if (num !== current) {
-                                patchCartItemDiscount(item, v);
-                              }
-                            }
+                          onBlur={async (e) => {
+                            const lineKey = String(item.id);
+                            debouncedDiscountApiByLine.cancel(lineKey);
+                            pendingDiscountLineRef.current.delete(lineKey);
+                            const line =
+                              cartRef.current.find((c) => String(c.id) === lineKey) ||
+                              item;
+                            await applyDiscountFromRawInput(
+                              line,
+                              e.target.value,
+                            );
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") e.target.blur();
@@ -2952,6 +3126,7 @@ const CashierPage = () => {
                           }
                           onChange={(e) => {
                             const lineKey = String(item.id);
+                            cancelPendingDiscountLineInput(item.id);
                             const rawValue = e.target.value;
                             const value = String(rawValue || "").replace(",", ".");
                             if (value === "" || value === "-") {
