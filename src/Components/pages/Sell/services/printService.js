@@ -114,7 +114,7 @@ const getEncoder = (n) =>
       ? encodeCP1251
       : PC936_CODES.has(n)
         ? encodePC936
-        : encodeCP1251;       
+        : encodeCP1251;
 function encodePC936(s = "") {
   const out = [];
   for (const ch of s) {
@@ -215,7 +215,7 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
   // компактная подача + рез
   const feedAndCut = new Uint8Array([0x1b, 0x64, 0x01, 0x1d, 0x56, 0x00]);
 
-  
+
   const total = new Uint8Array(
     init.length +
     alignLeft.length +
@@ -288,28 +288,63 @@ function wrapReceiptName(text, maxWidth) {
   return lines.length ? lines : [""];
 }
 
-/** Строка таблицы маркета: № | Цена | Кол | (%|с) | Итого (разделитель " |", суммарная ширина = width). */
-function buildMarketItemTableRow(width, noStr, priceStr, qtyStr, discStr, totalStr) {
+/** Между колонками маркет-таблицы на чеке — « |»; в ESC/POS вставляем байты 0x20 0x7C (пробел + ASCII |), не полагаясь на Unicode-вертикальную черту в строке. */
+const MARKET_TABLE_PIPE_SEP = new Uint8Array([0x20, 0x7c]);
+
+function concatUint8Arrays(...arrays) {
+  let n = 0;
+  for (const a of arrays) n += a.length;
+  const r = new Uint8Array(n);
+  let o = 0;
+  for (const a of arrays) {
+    r.set(a, o);
+    o += a.length;
+  }
+  return r;
+}
+
+/** Склеивает ячейки, уже переведённые enc() в байты, с ASCII pipe между ними. */
+function joinEncodedMarketTableCells(enc, cells) {
+  const parts = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (i > 0) parts.push(MARKET_TABLE_PIPE_SEP);
+    parts.push(enc(cells[i]));
+  }
+  return concatUint8Arrays(...parts);
+}
+
+function buildMarketItemTableCells(width, noStr, priceStr, qtyStr, discStr, totalStr) {
   const wNo = 3;
   const wPrice = 8;
   const wQty = 5;
-  const sep = " |";
-  const sepTotal = sep.length * 4;
+  const sepDisplayLen = 2; // " |"
+  const sepTotal = sepDisplayLen * 4;
   const wDisc = Math.max(6, width - wNo - wPrice - wQty - sepTotal - 8);
   const wTot = width - wNo - wPrice - wQty - wDisc - sepTotal;
-  const row = [
+  return [
     fitCell(noStr, wNo, "R"),
     fitCell(priceStr, wPrice, "R"),
     fitCell(qtyStr, wQty, "R"),
     fitCell(discStr, wDisc, "L"),
     fitCell(totalStr, wTot, "R"),
-  ].join(sep);
-  return row.length > width ? row.slice(0, width) : row;
+  ].map((s) => (s.length > width ? s.slice(0, width) : s));
 }
+
 const toNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+/** Колонка «скидка» в строке маркета: «0» или «( 2% | 10.50 )». */
+function formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt) {
+  const pct = Math.max(0, toNum(lineDiscountPct));
+  const amt = Math.max(0, toNum(lineDiscountAmt));
+  if (pct <= 0 && amt <= 0) return "0";
+  const pctStr = pct > 0 ? `${money(pct).replace(/\.00$/, "")}%` : "0%";
+  const amtStr = amt > 0 ? money(amt).replace(/\.00$/, "") : "0";
+  return `( ${pctStr} | ${amtStr} )`;
+}
+
 const fromTyiyn = (v) => toNum(v) / 100;
 const f = (fields, key) => (fields && Object.prototype.hasOwnProperty.call(fields, key) ? fields[key] : undefined);
 function buildEscPosQr(text) {
@@ -356,8 +391,14 @@ function buildReceiptFromJSON(payload, opts = {}) {
   ).trim();
   const shift = String(ekassaFields ? (f(ekassaFields, "1038") ?? "") : "").trim();
 
+  const payloadItemsForMerge =
+    (Array.isArray(payload.items) && payload.items) ||
+    (Array.isArray(payload.receipt?.items) && payload.receipt.items) ||
+    (Array.isArray(payload.cart?.items) && payload.cart.items) ||
+    null;
+
   const items = ekassaFields && Array.isArray(f(ekassaFields, "1059"))
-    ? f(ekassaFields, "1059").map((it) => {
+    ? f(ekassaFields, "1059").map((it, idx) => {
       const qty = toNum(it?.["1023"]) || 1;
       // В ответах eKassa для Маркета часто:
       // 1043 = сумма позиции, 1076 = цена за единицу.
@@ -365,11 +406,36 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const raw1076 = fromTyiyn(it?.["1076"]);
       const price = raw1076 > 0 ? raw1076 : (qty > 0 ? raw1043 / qty : raw1043);
       const total = raw1043 > 0 ? raw1043 : price * qty;
-      return {
+      const base = {
         name: String(it?.["1030"] || "Товар"),
         qty,
         price,
         total,
+      };
+      let src = payloadItemsForMerge?.[idx];
+      if (!src && payloadItemsForMerge?.length) {
+        const nm = base.name.trim();
+        src =
+          payloadItemsForMerge.find(
+            (x) =>
+              String(x?.name ?? "").trim() === nm &&
+              (toNum(x?.qty) || 1) === base.qty,
+          ) || null;
+      }
+      if (!src) return base;
+      const lineDiscountAmt = toNum(
+        src?.line_discount ?? src?.discount_total ?? src?.line_discount_total,
+      );
+      const unitPrice = toNum(src?.unit_price ?? src?.price) || price;
+      const grossLine = Math.max(0, qty * unitPrice);
+      const lineDiscountPct =
+        lineDiscountAmt > 0 && grossLine > 0
+          ? (lineDiscountAmt / grossLine) * 100
+          : 0;
+      return {
+        ...base,
+        line_discount_pct: lineDiscountPct,
+        line_discount_amount: lineDiscountAmt,
       };
     })
     : (Array.isArray(payload.items) ? payload.items : []).map((it) => {
@@ -439,7 +505,9 @@ function buildReceiptFromJSON(payload, opts = {}) {
 
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
-  chunks.push(ESC(0x1b, 0x52, 0x07)); // International: Russia
+  // ESC R: по Epson n=7 — это Spain I, не Россия; там часто «ломаются» | \ [ ] и т.п.
+  // Кириллица идёт через ESC t + CP866/1251 (байты 0x80+). Для стабильного ASCII — USA (0).
+  chunks.push(ESC(0x1b, 0x52, 0x00));
   chunks.push(ESC(0x1b, 0x74, codepage)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
@@ -467,15 +535,15 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(enc("СНО: Общий налоговый режим\n"));
   chunks.push(enc(divider + "\n"));
   if (emphasizeMarketReceipt) {
-    const headRow = buildMarketItemTableRow(
-      width,
-      "№",
-      "Цена",
-      "Кол-о",
-      "(% | с)",
-      "Итого",
+    chunks.push(
+      concatUint8Arrays(
+        joinEncodedMarketTableCells(
+          enc,
+          buildMarketItemTableCells(width, "№", "Цена", "Кол-о", "( % | с )", "Итого"),
+        ),
+        enc("\n"),
+      ),
     );
-    chunks.push(enc(headRow + "\n"));
     chunks.push(enc(divider + "\n"));
     for (const [index, it] of items.entries()) {
       const name = String(it.name ?? "Товар");
@@ -490,24 +558,24 @@ function buildReceiptFromJSON(payload, opts = {}) {
         chunks.push(enc(`  ${fitCell(nl, width - 2, "L")}\n`));
       }
 
-      let discCell = "—";
-      if (lineDiscountPct > 0 && lineDiscountAmt > 0) {
-        discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%/${money(lineDiscountAmt)}`;
-      } else if (lineDiscountPct > 0) {
-        discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%`;
-      } else if (lineDiscountAmt > 0) {
-        discCell = money(lineDiscountAmt);
-      }
+      const discCell = formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt);
 
-      const row = buildMarketItemTableRow(
-        width,
-        String(index + 1),
-        money(price),
-        String(qty),
-        discCell,
-        money(lineTotal),
+      chunks.push(
+        concatUint8Arrays(
+          joinEncodedMarketTableCells(
+            enc,
+            buildMarketItemTableCells(
+              width,
+              String(index + 1),
+              money(price),
+              String(qty),
+              discCell,
+              money(lineTotal),
+            ),
+          ),
+          enc("\n"),
+        ),
       );
-      chunks.push(enc(row + "\n"));
     }
   } else {
     for (const [index, it] of items.entries()) {
@@ -526,6 +594,9 @@ function buildReceiptFromJSON(payload, opts = {}) {
         const right = [pctStr, amtStr].filter(Boolean).join(" ");
         chunks.push(enc(lr("Скидка (товар)", right || "—", width) + "\n"));
       }
+      if (ekassaFields) {
+        chunks.push(enc("НДС 0%, НсП 0%\n"));
+      }
     }
   }
 
@@ -534,9 +605,11 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   }
   chunks.push(enc(lr("Подытог", money(subtotal), width) + "\n"));
-  if (discount > 0) chunks.push(enc(lr("Скидка", `-${money(discount)}`, width) + "\n"));
-  if (vat > 0) chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
-  if (nsp > 0) chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
+  if (!ekassaFields) {
+    if (discount > 0) chunks.push(enc(lr("Скидка", `-${money(discount)}`, width) + "\n"));
+    if (vat > 0) chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
+    if (nsp > 0) chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
+  }
   if (emphasizeMarketReceipt) {
     chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
   }
@@ -544,34 +617,49 @@ function buildReceiptFromJSON(payload, opts = {}) {
   if (emphasizeMarketReceipt) {
     chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   }
-  if (paidCash > 0) chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
-  if (paidCard > 0) chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+  if (ekassaFields) {
+    chunks.push(enc(lr("Всего", money(total), width) + "\n"));
+    chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
+    chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+    chunks.push(enc(lr("Вид расчета", "Полный расчет", width) + "\n"));
+    chunks.push(enc(lr("НДС 0%", "0.00", width) + "\n"));
+    chunks.push(enc(lr("НсП 0%", "0.00", width) + "\n"));
+  } else {
+    if (paidCash > 0) chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
+    if (paidCard > 0) chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+  }
   if (emphasizeMarketReceipt) {
     chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
   }
 
   chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
-  chunks.push(enc(lr("ИТОГО", money(total), width) + "\n"));
+  chunks.push(enc(lr("Итог", money(total) + " СОМ", width) + "\n"));
   chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
   chunks.push(enc(divider + "\n"));
-  let hasFiscalRows = false;
   if (hasText(kkm)) {
-    chunks.push(enc(lr("ККМ №", kkm, width) + "\n"));
-    hasFiscalRows = true;
+    if (ekassaFields) {
+      chunks.push(enc(lr("ККМ версия", "1.0", width) + "\n"));
+      chunks.push(enc(divider + "\n"));
+
+    }
+    chunks.push(enc(lr("РН ККМ", kkm, width) + "\n"));
+    chunks.push(enc(divider + "\n"));
+
   }
   if (hasText(fn)) {
-    chunks.push(enc(lr("ФН №", fn, width) + "\n"));
-    hasFiscalRows = true;
+    chunks.push(enc(lr("ФМ", fn, width) + "\n"));
+    chunks.push(enc(divider + "\n"));
+
   }
   if (hasText(fd)) {
-    chunks.push(enc(lr("ФД №", fd, width) + "\n"));
-    hasFiscalRows = true;
+    chunks.push(enc(lr("ФД", fd, width) + "\n"));
+    chunks.push(enc(divider + "\n"));
+
   }
   if (hasText(fpd)) {
     chunks.push(enc(lr("ФПД", fpd, width) + "\n"));
-    hasFiscalRows = true;
   }
-  if (hasFiscalRows) chunks.push(enc(divider + "\n"));
+  chunks.push(enc(divider + "\n"));
   if (qrLink) {
     chunks.push(ESC(0x1b, 0x61, 0x01)); // center
     chunks.push(enc("Проверка чека\n"));
@@ -904,9 +992,9 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
   saveVidPidToLS(dev);
 
   const cfg = getEscposRuntimeConfig();
-  // ESC/POS: init, Russia, codepage, text, newline, cut
+  // ESC/POS: init, international USA (см. ESC R в buildReceiptFromJSON), codepage, text, cut
   const init = ESC(0x1b, 0x40);
-  const intl = ESC(0x1b, 0x52, 0x07);
+  const intl = ESC(0x1b, 0x52, 0x00);
   const cp = ESC(0x1b, 0x74, cfg.codepage);
   const body = cfg.encoder(String(text) + "\n");
   const cut = ESC(0x1d, 0x56, 0x00);

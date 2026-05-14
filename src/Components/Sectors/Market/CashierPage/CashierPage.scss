@@ -471,6 +471,32 @@
     min-width: 0;
   }
 
+  &__cart-item-name-wrap {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__cart-item-promo {
+    font-size: 11px;
+    line-height: 1.35;
+    font-weight: 500;
+  }
+
+  &__cart-item-promo-hint {
+    color: #64748b;
+  }
+
+  &__cart-item-promo-active {
+    color: #15803d;
+  }
+
+  &__cart-item-promo-warn {
+    color: #b45309;
+  }
+
   &__cart-item-total {
     font-size: 14px;
     font-weight: 600;

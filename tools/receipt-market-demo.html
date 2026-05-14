@@ -46,6 +46,14 @@
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
     };
+    function formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt) {
+      const pct = Math.max(0, toNum(lineDiscountPct));
+      const amt = Math.max(0, toNum(lineDiscountAmt));
+      if (pct <= 0 && amt <= 0) return "0";
+      const pctStr = pct > 0 ? `${money(pct).replace(/\.00$/, "")}%` : "0%";
+      const amtStr = amt > 0 ? money(amt).replace(/\.00$/, "") : "0";
+      return `( ${pctStr} | ${amtStr} )`;
+    }
     const hasText = (v) => {
       const s = String(v ?? "").trim();
       return s !== "" && s !== "—";
@@ -188,9 +196,7 @@
       out += divider + "\n";
 
       out +=
-        buildMarketItemTableRow(width, "№", "Цена", "Кол-о", "(% | с)", "Итого") + "\n";
-      out +=
-        fitCell("% — доля от (цена×кол-о)  |  с — сумма скидки, сом", width, "L") + "\n";
+        buildMarketItemTableRow(width, "№", "Цена", "Кол-о", "( % | с )", "Итого") + "\n";
       out += divider + "\n";
 
       for (const [index, it] of items.entries()) {
@@ -206,14 +212,7 @@
           out += `  ${fitCell(nl, width - 2, "L")}\n`;
         }
 
-        let discCell = "—";
-        if (lineDiscountPct > 0 && lineDiscountAmt > 0) {
-          discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%/${money(lineDiscountAmt)}`;
-        } else if (lineDiscountPct > 0) {
-          discCell = `${money(lineDiscountPct).replace(/\.00$/, "")}%`;
-        } else if (lineDiscountAmt > 0) {
-          discCell = money(lineDiscountAmt);
-        }
+        const discCell = formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt);
 
         out +=
           buildMarketItemTableRow(
