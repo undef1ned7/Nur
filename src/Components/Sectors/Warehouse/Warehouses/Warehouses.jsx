@@ -15,10 +15,18 @@ import {
   createWarehouseAsync,
   fetchWarehousesAsync,
 } from "../../../../store/creators/warehouseCreators";
+import StockPartnershipPanel from "./components/StockPartnershipPanel";
+
+const PAGE_TABS = {
+  WAREHOUSES: "warehouses",
+  PARTNERSHIPS: "partnerships",
+};
 
 const Warehouses = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const [pageTab, setPageTab] = useState(PAGE_TABS.WAREHOUSES);
 
   // Состояния модальных окон
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -108,8 +116,38 @@ const Warehouses = () => {
 
   return (
     <div className="warehouse-page">
-      <WarehouseHeader onCreateWarehouse={handleCreateWarehouse} />
+      <WarehouseHeader
+        onCreateWarehouse={
+          pageTab === PAGE_TABS.WAREHOUSES ? handleCreateWarehouse : undefined
+        }
+        subtitle={
+          pageTab === PAGE_TABS.PARTNERSHIPS
+            ? "Партнёрство складов между компаниями"
+            : "Управление складами и их товарами"
+        }
+      />
 
+      <div className="warehouse-page-tabs">
+        <button
+          type="button"
+          className={`warehouse-page-tab ${pageTab === PAGE_TABS.WAREHOUSES ? "active" : ""}`}
+          onClick={() => setPageTab(PAGE_TABS.WAREHOUSES)}
+        >
+          Склады
+        </button>
+        <button
+          type="button"
+          className={`warehouse-page-tab ${pageTab === PAGE_TABS.PARTNERSHIPS ? "active" : ""}`}
+          onClick={() => setPageTab(PAGE_TABS.PARTNERSHIPS)}
+        >
+          Партнёры
+        </button>
+      </div>
+
+      {pageTab === PAGE_TABS.PARTNERSHIPS ? (
+        <StockPartnershipPanel />
+      ) : (
+        <>
       <SearchSection
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -152,6 +190,8 @@ const Warehouses = () => {
             setEditingWarehouse(null);
           }}
         />
+      )}
+        </>
       )}
     </div>
   );

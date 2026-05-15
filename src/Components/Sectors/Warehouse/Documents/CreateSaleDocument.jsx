@@ -55,152 +55,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import CreateCounterpartyModal from "../../Market/Counterparties/components/CreateCounterpartyModal";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
-import * as XLSX from "xlsx";
-
-const COL_COUNT_INVOICE_EXCEL = 8;
-
-function formatDateForInvoiceExcel(value) {
-  if (!value) return "";
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("ru-RU");
-}
-
-/** @param {object} createdDocument @param {object[]} items @param {{ subtotal: string, total: string }} totals @param {{ name?: string, address?: string, inn?: string }} seller @param {{ name?: string, address?: string, inn?: string }} buyer */
-function exportToExcel(createdDocument, items, totals, seller, buyer) {
-  const doc = createdDocument;
-  const docNumber = doc.number ?? "";
-  const padRow = (cells) => {
-    const row = [...cells];
-    while (row.length < COL_COUNT_INVOICE_EXCEL) row.push("");
-    return row;
-  };
-
-  const subtotalNum = Number(totals.subtotal || 0);
-  const itemsDiscountTotal = (items || []).reduce(
-    (sum, item) =>
-      sum +
-      (Number(item.unit_price) *
-        Number(item.qty) *
-        Number(item.discount_percent ?? item.discount ?? 0)) /
-        100,
-    0,
-  );
-  const docDiscountPercent = Number(doc.discount_percent || 0);
-  const docDiscountAmountFixed = Number(doc.discount_amount || 0);
-  const netAfterLineDiscounts = subtotalNum - itemsDiscountTotal;
-  const docDiscountFromPercent =
-    (netAfterLineDiscounts * docDiscountPercent) / 100;
-  const docDiscountCombined = docDiscountAmountFixed + docDiscountFromPercent;
-  const totalNum = Number(totals.total || 0);
-
-  const title = `НАКЛАДНАЯ № ${docNumber} от ${formatDateForInvoiceExcel(doc.date)}`;
-  const aoa = [];
-
-  aoa.push(padRow([title]));
-  aoa.push(padRow([]));
-  aoa.push(padRow(["Поставщик:", seller?.name ?? ""]));
-  aoa.push(padRow(["Адрес:", seller?.address ?? ""]));
-  aoa.push(padRow(["ИНН:", seller?.inn ?? ""]));
-  aoa.push(padRow(["Покупатель:", buyer?.name ?? ""]));
-  aoa.push(padRow(["Адрес:", buyer?.address ?? ""]));
-  aoa.push(padRow(["ИНН:", buyer?.inn ?? ""]));
-  aoa.push(padRow([]));
-  aoa.push(
-    padRow([
-      "№",
-      "Артикул",
-      "Наименование",
-      "Ед.изм.",
-      "Кол-во",
-      "Цена",
-      "Скидка %",
-      "Сумма",
-    ]),
-  );
-
-  (items || []).forEach((item, index) => {
-    aoa.push(
-      padRow([
-        index + 1,
-        item.article ?? "",
-        item.name ?? "",
-        item.unit ?? "",
-        Number(item.qty),
-        Number(item.unit_price),
-        Number(item.discount_percent ?? item.discount ?? 0),
-        Number(item.total),
-      ]),
-    );
-  });
-
-  aoa.push(padRow([]));
-  aoa.push(
-    padRow([
-      "",
-      "",
-      "",
-      "",
-      "",
-      "Подытог:",
-      "",
-      subtotalNum,
-    ]),
-  );
-  if (docDiscountCombined > 0) {
-    aoa.push(
-      padRow([
-        "",
-        "",
-        "",
-        "",
-        "",
-        "Скидка документа:",
-        "",
-        docDiscountCombined,
-      ]),
-    );
-  }
-  aoa.push(
-    padRow([
-      "",
-      "",
-      "",
-      "",
-      "",
-      "ИТОГО:",
-      "",
-      totalNum,
-    ]),
-  );
-  aoa.push(padRow([]));
-
-  const comment = (doc.comment ?? "").trim();
-  if (comment) {
-    aoa.push(padRow(["Комментарий:", comment]));
-    aoa.push(padRow([]));
-  }
-
-  aoa.push(
-    padRow([
-      "Выдал: ___________",
-      "",
-      "",
-      "",
-      "Получил: ___________",
-    ]),
-  );
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
-  ws["!cols"] = [5, 12, 35, 8, 8, 14, 10, 16].map((wch) => ({ wch }));
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Накладная");
-
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  return new Blob([buf], { type: "application/octet-stream" });
-}
+import { exportInvoiceToExcel } from "./components/invoiceExcelExport";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -306,6 +161,9 @@ const getProductCharacteristicText = (product) => {
 
 /** Остаток 0 с учётом строк из API (например "0.000"). */
 const isZeroStockQty = (quantity) => Number(quantity ?? 0) === 0;
+
+/** Ключ кэша для плоского списка результатов поиска (без дерева групп). */
+const PRODUCT_SEARCH_KEY = "__search__";
 
 // Маленькая модалка с полным текстом при наведении
 const FullNamePopover = ({ fullText, children, className = "" }) => {
@@ -595,6 +453,49 @@ const CreateSaleDocument = () => {
         return;
       if (isTypingElement(document.activeElement)) return;
 
+      const searchQuery = String(debouncedProductSearch || "").trim();
+      if (searchQuery) {
+        const searchKey = PRODUCT_SEARCH_KEY;
+        const searchEntry = groupProducts?.[searchKey];
+        if (key === "ArrowLeft" || key === "ArrowRight") return;
+
+        const targetItems = sortProductsByDate(
+          getVisibleProducts(searchKey, searchEntry?.items),
+        );
+        if (!targetItems.length) return;
+
+        const currentIndex =
+          typeof groupKeyboardIndexMap[searchKey] === "number"
+            ? groupKeyboardIndexMap[searchKey]
+            : 0;
+
+        if (key === "ArrowDown" || key === "ArrowUp") {
+          e.preventDefault();
+          const nextIndex =
+            key === "ArrowDown"
+              ? currentIndex >= targetItems.length - 1
+                ? 0
+                : currentIndex + 1
+              : currentIndex <= 0
+                ? targetItems.length - 1
+                : currentIndex - 1;
+          setActiveGroupKeyForKeyboard(searchKey);
+          setGroupKeyboardIndexMap((prev) => ({
+            ...(prev || {}),
+            [searchKey]: nextIndex,
+          }));
+        } else if (key === "Enter") {
+          e.preventDefault();
+          const selectedByKeyboard =
+            targetItems[currentIndex] || targetItems[0];
+          if (selectedByKeyboard) {
+            setActiveGroupKeyForKeyboard(searchKey);
+            openProductSelectModal(selectedByKeyboard);
+          }
+        }
+        return;
+      }
+
       const groupsByParentMap = new Map();
       const parentByGroupKey = new Map();
       (Array.isArray(groups) ? groups : []).forEach((g) => {
@@ -682,9 +583,9 @@ const CreateSaleDocument = () => {
         ? groupProducts?.[preferredKey]
         : null;
       const preferredItems = Array.isArray(preferredEntry?.items)
-        ? preferredKey === "all"
-          ? sortProductsByDate(getUngroupedProducts(preferredEntry.items))
-          : sortProductsByDate(preferredEntry.items)
+        ? sortProductsByDate(
+            getVisibleProducts(preferredKey, preferredEntry.items),
+          )
         : [];
 
       let targetGroupKey = preferredKey;
@@ -695,18 +596,14 @@ const CreateSaleDocument = () => {
         const fallbackKey = expandedKeys.find((k) => {
           const items = groupProducts?.[String(k)]?.items;
           if (!Array.isArray(items) || items.length === 0) return false;
-          if (String(k) === "all") {
-            return getUngroupedProducts(items).length > 0;
-          }
-          return true;
+          return getVisibleProducts(k, items).length > 0;
         });
         if (!fallbackKey) return;
         targetGroupKey = String(fallbackKey);
         const fallbackItems = groupProducts?.[targetGroupKey]?.items || [];
-        targetItems =
-          targetGroupKey === "all"
-            ? sortProductsByDate(getUngroupedProducts(fallbackItems))
-            : sortProductsByDate(fallbackItems);
+        targetItems = sortProductsByDate(
+          getVisibleProducts(targetGroupKey, fallbackItems),
+        );
       }
 
       if (!targetItems.length) return;
@@ -782,10 +679,10 @@ const CreateSaleDocument = () => {
               const prevItems = Array.isArray(prevEntry?.items)
                 ? prevEntry.items
                 : [];
-              const prevVisibleCount =
-                prevKey === "all"
-                  ? getUngroupedProducts(prevItems).length
-                  : prevItems.length;
+              const prevVisibleCount = getVisibleProducts(
+                prevKey,
+                prevItems,
+              ).length;
               const lastIndex = Math.max(0, prevVisibleCount - 1);
               setGroupKeyboardIndexMap((prev) => ({
                 ...(prev || {}),
@@ -832,6 +729,8 @@ const CreateSaleDocument = () => {
     showProductSelectModal,
     showPrepaymentModal,
     showExitModal,
+    debouncedProductSearch,
+    warehouse,
   ]);
 
   // Форматирование даты для отображения
@@ -935,6 +834,27 @@ const CreateSaleDocument = () => {
     });
   };
 
+  const getVisibleProducts = (groupKey, list) => {
+    const arr = Array.isArray(list) ? list : [];
+    if (String(groupKey) === "all") return getUngroupedProducts(arr);
+    return arr;
+  };
+
+  const isProductSearchActive = Boolean(
+    String(debouncedProductSearch || "").trim(),
+  );
+
+  const handleResetProductSearch = useCallback(() => {
+    setProductSearch("");
+    setActiveGroupKeyForKeyboard(null);
+    setGroupKeyboardIndexMap((prev) => {
+      if (!prev?.[PRODUCT_SEARCH_KEY]) return prev;
+      const next = { ...(prev || {}) };
+      delete next[PRODUCT_SEARCH_KEY];
+      return next;
+    });
+  }, []);
+
   // Сортировка товаров по дате (новые сверху)
   const sortProductsByDate = (list) => {
     const arr = Array.isArray(list) ? list : [];
@@ -943,6 +863,159 @@ const CreateSaleDocument = () => {
       const dateB = b?.updated_at || b?.created_at || 0;
       return new Date(dateB) - new Date(dateA);
     });
+  };
+
+  const renderGroupProductsList = (gKey, entry, { addOn = "click" } = {}) => {
+    if (entry?.loading) {
+      return (
+        <div className="create-sale-document__group-products-empty">
+          Загрузка…
+        </div>
+      );
+    }
+    if (entry?.error) {
+      return (
+        <div className="create-sale-document__group-products-empty">
+          Не удалось загрузить товары
+        </div>
+      );
+    }
+
+    const visibleProducts = sortProductsByDate(
+      getVisibleProducts(gKey, entry?.items),
+    );
+    if (!visibleProducts.length) {
+      return (
+        <div className="create-sale-document__group-products-empty">
+          Нет товаров
+        </div>
+      );
+    }
+
+    const currentIndex =
+      typeof groupKeyboardIndexMap[gKey] === "number"
+        ? groupKeyboardIndexMap[gKey]
+        : 0;
+
+    const handleActivate = (product) => {
+      if (addOn === "doubleclick") {
+        handleAddProduct(product);
+        return;
+      }
+      openProductSelectModal(product);
+    };
+
+    return (
+      <div
+        role="listbox"
+        className="create-sale-document__group-products-list"
+        tabIndex={0}
+        ref={(el) => {
+          if (el) productListRefs.current[gKey] = el;
+        }}
+        onFocus={() => {
+          setActiveGroupKeyForKeyboard(gKey);
+          setGroupKeyboardIndexMap((prev) => ({
+            ...(prev || {}),
+            [gKey]: typeof prev?.[gKey] === "number" ? prev[gKey] : 0,
+          }));
+        }}
+        onKeyDown={(e) => {
+          if (e.defaultPrevented) return;
+          if (!visibleProducts.length) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            const nextIndex =
+              currentIndex >= visibleProducts.length - 1 ? 0 : currentIndex + 1;
+            setActiveGroupKeyForKeyboard(gKey);
+            setGroupKeyboardIndexMap((prev) => ({
+              ...(prev || {}),
+              [gKey]: nextIndex,
+            }));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            const nextIndex =
+              currentIndex <= 0
+                ? visibleProducts.length - 1
+                : currentIndex - 1;
+            setActiveGroupKeyForKeyboard(gKey);
+            setGroupKeyboardIndexMap((prev) => ({
+              ...(prev || {}),
+              [gKey]: nextIndex,
+            }));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const selectedByKeyboard =
+              visibleProducts[currentIndex] || visibleProducts[0];
+            if (selectedByKeyboard) {
+              handleActivate(selectedByKeyboard);
+            }
+          }
+        }}
+      >
+        {visibleProducts.map((product, index) => {
+          const isSelected = selectedProductIds.has(String(product.id));
+          const isInCart = cartItems.some(
+            (item) => String(item.productId) === String(product.id),
+          );
+          const isKeyboardActive =
+            activeGroupKeyForKeyboard === gKey && currentIndex === index;
+          const isZeroQty = isZeroStockQty(product.quantity);
+          return (
+            <div
+              key={product.id}
+              className={`create-sale-document__group-product-item ${
+                isSelected || isInCart ? "active" : ""
+              } ${isKeyboardActive ? "active" : ""}${
+                isZeroQty
+                  ? " create-sale-document__group-product-item--zero-qty"
+                  : " create-sale-document__group-product-item--in-stock"
+              }`}
+              onMouseEnter={() => {
+                setActiveGroupKeyForKeyboard(gKey);
+                setGroupKeyboardIndexMap((prev) => ({
+                  ...(prev || {}),
+                  [gKey]: index,
+                }));
+              }}
+              onClick={
+                addOn === "click"
+                  ? (e) => {
+                      e.stopPropagation();
+                      handleAddProduct(product);
+                    }
+                  : undefined
+              }
+              onDoubleClick={
+                addOn === "doubleclick"
+                  ? (e) => {
+                      e.stopPropagation();
+                      handleAddProduct(product);
+                    }
+                  : undefined
+              }
+            >
+              <div className="create-sale-document__group-product-main">
+                <FullNamePopover
+                  fullText={product.name}
+                  className="create-sale-document__group-product-name"
+                >
+                  {product.name}
+                </FullNamePopover>
+                <div className="create-sale-document__group-product-meta">
+                  <span className="create-sale-document__group-product-price">
+                    {formatPrice(getProductPriceForDocument(product))} сом
+                  </span>
+                  <span className="create-sale-document__group-product-stock">
+                    {product.quantity ?? 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const toggleGroupExpand = (groupKey) => {
@@ -1026,24 +1099,44 @@ const CreateSaleDocument = () => {
     [warehouse, debouncedProductSearch, dispatch],
   );
 
+  // Поиск: грузим плоский список товаров по складу (без product_group).
+  useEffect(() => {
+    if (!warehouse || !isProductSearchActive) return;
+    const key = PRODUCT_SEARCH_KEY;
+    const entry = groupProducts?.[key];
+    const searchQuery = debouncedProductSearch || "";
+
+    if (entry?.loading) return;
+
+    const isStale = (entry?.search || "") !== searchQuery;
+    const notLoaded = !Array.isArray(entry?.items);
+    if (!isStale && !notLoaded) {
+      setActiveGroupKeyForKeyboard((prev) => prev || key);
+      return;
+    }
+
+    loadProductsForGroup(key, null);
+    setActiveGroupKeyForKeyboard((prev) => prev || key);
+    // groupProducts намеренно не в deps: обновление кэша после load иначе зацикливает запросы
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouse, isProductSearchActive, debouncedProductSearch, loadProductsForGroup]);
+
   // При изменении строки поиска обновляем уже раскрытые группы автоматически.
   useEffect(() => {
-    if (!warehouse) return;
+    if (!warehouse || isProductSearchActive) return;
+    const searchQuery = debouncedProductSearch || "";
     const expandedKeys = Array.from(expandedGroupIds || []);
     expandedKeys.forEach((k) => {
       const key = String(k);
       const entry = groupProducts?.[key];
-      const isStale = (entry?.search || "") !== (debouncedProductSearch || "");
-      if (!isStale) return;
+      if (entry?.loading) return;
+      const isStale = (entry?.search || "") !== searchQuery;
+      const notLoaded = !Array.isArray(entry?.items);
+      if (!isStale && !notLoaded) return;
       loadProductsForGroup(key, key === "all" ? null : key);
     });
-  }, [
-    warehouse,
-    expandedGroupIds,
-    groupProducts,
-    debouncedProductSearch,
-    loadProductsForGroup,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouse, expandedGroupIds, debouncedProductSearch, loadProductsForGroup, isProductSearchActive]);
 
   const renderGroupTree = (parentId, depth = 0) => {
     const key = parentId == null ? "root" : String(parentId);
@@ -2746,8 +2839,7 @@ const CreateSaleDocument = () => {
       const buyerName =
         doc.counterparty_display_name ?? selectedCounterparty?.name ?? "";
 
-      if (printType === "invoice") {
-        const invoiceData = {
+      const invoiceData = {
           doc_type: doc.doc_type || docType,
           document: {
             type: "sale_invoice",
@@ -2810,33 +2902,13 @@ const CreateSaleDocument = () => {
           warehouse_to: warehouseToName,
         };
 
-        // Генерируем PDF накладной
+      if (printType === "invoice") {
         const blob = await pdf(
           <InvoicePdfDocument data={invoiceData} />,
         ).toBlob();
         downloadBlob(blob, `invoice_${docNumber}.pdf`);
       } else if (printType === "excel_invoice") {
-        const seller = {
-          name: company?.name || "",
-          address: company?.address || "",
-          inn: company?.inn || "",
-        };
-        const buyer = selectedCounterparty
-          ? {
-              name: selectedCounterparty.name || buyerName || "",
-              address: selectedCounterparty.address || "",
-              inn: selectedCounterparty.inn || "",
-            }
-          : buyerName
-            ? { name: buyerName, address: "", inn: "" }
-            : { name: "", address: "", inn: "" };
-        const totalsForExcel = {
-          subtotal: String(subtotal.toFixed(2)),
-          discount_total: String(totalDiscount.toFixed(2)),
-          tax_total: "0.00",
-          total: String(total.toFixed(2)),
-        };
-        const blob = exportToExcel(doc, items, totalsForExcel, seller, buyer);
+        const blob = exportInvoiceToExcel(invoiceData);
         downloadBlob(blob, `invoice_${docNumber}.xlsx`);
       } else if (printType === "receipt") {
         const receiptData = {
@@ -3072,14 +3144,39 @@ const CreateSaleDocument = () => {
               <Search size={18} className="create-sale-document__search-icon" />
               <input
                 type="text"
-                placeholder="Поиск..."
+                placeholder="Поиск товара..."
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
               />
             </div>
+            {productSearch.trim() ? (
+              <button
+                type="button"
+                className="create-sale-document__search-reset-btn"
+                onClick={handleResetProductSearch}
+                aria-label="Сбросить поиск"
+              >
+                <X size={16} />
+                Сбросить
+              </button>
+            ) : null}
           </div>
 
           <div className="create-sale-document__groups">
+            {isProductSearchActive ? (
+              <div className="create-sale-document__search-results">
+                <p className="create-sale-document__search-results-hint">
+                  Поиск по всем товарам склада
+                </p>
+                <div className="create-sale-document__group-products">
+                  {renderGroupProductsList(
+                    PRODUCT_SEARCH_KEY,
+                    groupProducts?.[PRODUCT_SEARCH_KEY],
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
             <div className="create-sale-document__group-tree">
               {(() => {
                 const key = "all";
@@ -3139,151 +3236,7 @@ const CreateSaleDocument = () => {
                     {isExpanded && (
                       <div className="create-sale-document__group-body">
                         <div className="create-sale-document__group-products">
-                          {entry?.loading ? (
-                            <div className="create-sale-document__group-products-empty">
-                              Загрузка…
-                            </div>
-                          ) : entry?.error ? (
-                            <div className="create-sale-document__group-products-empty">
-                              Не удалось загрузить товары
-                            </div>
-                          ) : getUngroupedProducts(entry?.items).length ===
-                            0 ? (
-                            <div className="create-sale-document__group-products-empty">
-                              Нет товаров
-                            </div>
-                          ) : (
-                            (() => {
-                              const visibleProducts = sortProductsByDate(
-                                getUngroupedProducts(entry?.items),
-                              );
-                              const currentIndex =
-                                typeof groupKeyboardIndexMap[key] === "number"
-                                  ? groupKeyboardIndexMap[key]
-                                  : 0;
-
-                              return (
-                                <div
-                                  role="listbox"
-                                  className="create-sale-document__group-products-list"
-                                  tabIndex={0}
-                                  ref={(el) => {
-                                    if (el) productListRefs.current[key] = el;
-                                  }}
-                                  onFocus={() => {
-                                    setActiveGroupKeyForKeyboard(key);
-                                    setGroupKeyboardIndexMap((prev) => ({
-                                      ...(prev || {}),
-                                      [key]:
-                                        typeof prev?.[key] === "number"
-                                          ? prev[key]
-                                          : 0,
-                                    }));
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.defaultPrevented) return;
-                                    if (!visibleProducts.length) return;
-                                    if (e.key === "ArrowDown") {
-                                      e.preventDefault();
-                                      const nextIndex =
-                                        currentIndex >=
-                                        visibleProducts.length - 1
-                                          ? 0
-                                          : currentIndex + 1;
-                                      setActiveGroupKeyForKeyboard(key);
-                                      setGroupKeyboardIndexMap((prev) => ({
-                                        ...(prev || {}),
-                                        [key]: nextIndex,
-                                      }));
-                                    } else if (e.key === "ArrowUp") {
-                                      e.preventDefault();
-                                      const nextIndex =
-                                        currentIndex <= 0
-                                          ? visibleProducts.length - 1
-                                          : currentIndex - 1;
-                                      setActiveGroupKeyForKeyboard(key);
-                                      setGroupKeyboardIndexMap((prev) => ({
-                                        ...(prev || {}),
-                                        [key]: nextIndex,
-                                      }));
-                                    } else if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      const selectedByKeyboard =
-                                        visibleProducts[currentIndex] ||
-                                        visibleProducts[0];
-                                      if (selectedByKeyboard) {
-                                        openProductSelectModal(
-                                          selectedByKeyboard,
-                                        );
-                                      }
-                                    }
-                                  }}
-                                >
-                                  {visibleProducts.map((product, index) => {
-                                    const isSelected = selectedProductIds.has(
-                                      String(product.id),
-                                    );
-                                    const isInCart = cartItems.some(
-                                      (item) =>
-                                        String(item.productId) ===
-                                        String(product.id),
-                                    );
-                                    const isKeyboardActive =
-                                      activeGroupKeyForKeyboard === key &&
-                                      currentIndex === index;
-                                    const isZeroQty = isZeroStockQty(
-                                      product.quantity,
-                                    );
-                                    return (
-                                      <div
-                                        key={product.id}
-                                        className={`create-sale-document__group-product-item ${
-                                          isSelected || isInCart ? "active" : ""
-                                        } ${isKeyboardActive ? "active" : ""}${
-                                          isZeroQty
-                                            ? " create-sale-document__group-product-item--zero-qty"
-                                            : " create-sale-document__group-product-item--in-stock"
-                                        }`}
-                                        onMouseEnter={() => {
-                                          setActiveGroupKeyForKeyboard(key);
-                                          setGroupKeyboardIndexMap((prev) => ({
-                                            ...(prev || {}),
-                                            [key]: index,
-                                          }));
-                                        }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleAddProduct(product);
-                                        }}
-                                      >
-                                        <div className="create-sale-document__group-product-main">
-                                          <FullNamePopover
-                                            fullText={product.name}
-                                            className="create-sale-document__group-product-name"
-                                          >
-                                            {product.name}
-                                          </FullNamePopover>
-                                          <div className="create-sale-document__group-product-meta">
-                                            <span className="create-sale-document__group-product-price">
-                                              {formatPrice(
-                                                getProductPriceForDocument(
-                                                  product,
-                                                ),
-                                              )}{" "}
-                                              сом
-                                            </span>
-                                            <span className="create-sale-document__group-product-stock">
-                                              {product.quantity ?? 0}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()
-                          )}
+                          {renderGroupProductsList(key, entry)}
                         </div>
                       </div>
                     )}
@@ -3308,6 +3261,8 @@ const CreateSaleDocument = () => {
               <div className="create-sale-document__group-tree">
                 {renderGroupTree(null, 0)}
               </div>
+            )}
+              </>
             )}
           </div>
 

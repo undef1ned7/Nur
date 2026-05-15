@@ -42,18 +42,36 @@ export function fmtDateTime(dt) {
   });
 }
 
+/** Дата и время в заголовке: «27.01.2017 13:44». */
+export function fmtTitleDateTime(dt) {
+  if (!dt) return "";
+  const d = new Date(dt);
+  if (Number.isNaN(d.getTime())) return String(dt);
+  const datePart = d.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const timePart = d.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart} ${timePart}`;
+}
+
 export function getDocumentTitle(docType) {
   const titles = {
-    SALE: "Расходная накладная",
-    PURCHASE: "Приходная накладная",
-    SALE_RETURN: "Расходная накладная на возврат",
-    PURCHASE_RETURN: "Приходная накладная на возврат",
-    INVENTORY: "Бланк инвентаризации",
-    RECEIPT: "Оприходование",
-    WRITE_OFF: "Списание",
+    SALE: "Товарная накладная",
+    PURCHASE: "Товарная накладная",
+    SALE_RETURN: "Товарная накладная (возврат)",
+    PURCHASE_RETURN: "Товарная накладная (возврат)",
+    INVENTORY: "Инвентаризационная опись",
+    RECEIPT: "Накладная на оприходование",
+    WRITE_OFF: "Накладная на списание",
     TRANSFER: "Накладная на перемещение",
+    COMMERCIAL_OFFER: "Коммерческое предложение",
   };
-  return titles[docType] || "Накладная";
+  return titles[docType] || "Товарная накладная";
 }
 
 export function needsPriceColumns(docType) {
@@ -61,14 +79,46 @@ export function needsPriceColumns(docType) {
 }
 
 export function needsDiscountColumns(docType) {
-  return ["SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"].includes(docType);
+  return false;
 }
 
-/**
- * Отдельно сумма и процент скидки по документу: в сумму не подставляем discount_percent.
- * Строка «Скидка документа» в итогах показывается только если по документу задан % и
- * хотя бы одна позиция без индивидуальной скидки реально использовала общий %.
- */
+export function usesPartyBlocks(docType) {
+  return !["INVENTORY", "TRANSFER"].includes(docType);
+}
+
+export function resolvePartiesForDocType(docType, seller, buyer) {
+  const s = seller || {};
+  const b = buyer || {};
+
+  if (["PURCHASE", "PURCHASE_RETURN"].includes(docType)) {
+    return {
+      supplier: {
+        name: safe(b.name || b.full_name),
+        addressLine: b.address ? `Адрес: ${safe(b.address)}` : "",
+        phoneLine: b.phone ? `Тел: ${safe(b.phone)}` : "",
+      },
+      buyer: {
+        name: safe(s.name),
+        addressLine: s.address ? `Адрес: ${safe(s.address)}` : "",
+        phoneLine: s.phone ? `Тел: ${safe(s.phone)}` : "",
+      },
+    };
+  }
+
+  return {
+    supplier: {
+      name: safe(s.name),
+      addressLine: s.address ? `Адрес: ${safe(s.address)}` : "",
+      phoneLine: s.phone ? `Тел: ${safe(s.phone)}` : "",
+    },
+    buyer: {
+      name: b ? safe(b.name || b.full_name) : "—",
+      addressLine: b?.address ? `Адрес: ${safe(b.address)}` : "",
+      phoneLine: b?.phone ? `Тел: ${safe(b.phone)}` : "",
+    },
+  };
+}
+
 export function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
   const rawPercent = Number(doc.discount_percent);
   const percentProvided =
@@ -124,7 +174,6 @@ export function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
   };
 }
 
-/** Стабильный ключ строки PDF (список статичен; без id — составной). */
 export function goodsRowKey(it, idx, invoiceNumber) {
   if (it.id != null && it.id !== "") {
     return `id-${String(it.id)}`;
@@ -132,4 +181,49 @@ export function goodsRowKey(it, idx, invoiceNumber) {
   const name = String(it.name ?? "").slice(0, 48);
   const art = String(it.article ?? "");
   return `row-${invoiceNumber || "n"}-${idx}-${name}-${art}`;
+}
+
+/** Строки товаров для PDF/Excel — единая логика с InvoicePdfDocument. */
+export function buildInvoiceItemsFromData(data) {
+  const doc = data?.document || {};
+  const docDiscountPctForLines = Number(doc.discount_percent ?? 0);
+
+  return (Array.isArray(data?.items) ? data.items : []).map((it) => {
+    const qty = Number(it.qty || it.quantity || 0);
+    const unitBase = Number(it.price ?? it.unit_price ?? 0);
+    const lineDisc = Number(it.discount_percent ?? it.discount ?? 0);
+    const discount =
+      it.effective_discount_percent != null &&
+      it.effective_discount_percent !== ""
+        ? Number(it.effective_discount_percent)
+        : lineDisc > 0
+          ? lineDisc
+          : docDiscountPctForLines;
+
+    let priceNoDiscount = Number(
+      it.original_price ??
+        it.price_before_discount ??
+        it.price_without_discount ??
+        unitBase,
+    );
+    if (!priceNoDiscount) {
+      priceNoDiscount = unitBase;
+    }
+
+    const priceAfterDiscount =
+      priceNoDiscount * (1 - Number(discount || 0) / 100);
+    const rowTotal = qty * priceAfterDiscount;
+
+    return {
+      id: it.id,
+      name: it.name || it.product_name || "Товар",
+      qty,
+      unit_price: priceAfterDiscount,
+      price_no_discount: priceNoDiscount,
+      discount,
+      total: rowTotal,
+      unit: it.unit || "шт",
+      article: it.article || "",
+    };
+  });
 }

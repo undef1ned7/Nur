@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { createWarehouseCounterparty } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
 import { fetchEmployeesAsync } from "../../../../../store/creators/employeeCreators";
+import CounterpartyLegalFields from "./CounterpartyLegalFields";
+import { EMPTY_COUNTERPARTY_LEGAL } from "../constants";
 import "../Counterparties.scss";
 
 /** Роль агента: контрагент при создании автоматически привязывается к текущему пользователю на бэкенде */
@@ -23,6 +25,7 @@ const CreateCounterpartyModal = ({ onClose, onCreated }) => {
     type: "CLIENT",
     phone: "",
     agent: "",
+    ...EMPTY_COUNTERPARTY_LEGAL,
   });
   const [error, setError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -123,6 +126,11 @@ const CreateCounterpartyModal = ({ onClose, onCreated }) => {
         name: formData.name.trim(),
         type: formData.type,
         phone: formData.phone.trim(),
+        inn: (formData.inn || "").trim(),
+        okpo: (formData.okpo || "").trim(),
+        score: (formData.score || "").trim(),
+        bik: (formData.bik || "").trim(),
+        address: (formData.address || "").trim(),
       };
 
       if (isOwnerOrAdmin && formData.agent) {
@@ -138,7 +146,13 @@ const CreateCounterpartyModal = ({ onClose, onCreated }) => {
       // При успешном создании закрываем модальное окно
       // Список обновится автоматически через Redux slice
       onClose();
-      setFormData({ name: "", type: "CLIENT", phone: "", agent: "" });
+      setFormData({
+        name: "",
+        type: "CLIENT",
+        phone: "",
+        agent: "",
+        ...EMPTY_COUNTERPARTY_LEGAL,
+      });
       setError("");
       setLocalError("");
     } catch (err) {
@@ -230,6 +244,12 @@ const CreateCounterpartyModal = ({ onClose, onCreated }) => {
                 <option value="BOTH">Клиент и поставщик</option>
               </select>
             </div>
+
+            <CounterpartyLegalFields
+              formData={formData}
+              onChange={handleChange}
+              disabled={creating}
+            />
 
             {isOwnerOrAdmin && (
               <div className="warehouse-filter-modal__section">

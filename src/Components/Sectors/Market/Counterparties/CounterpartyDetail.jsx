@@ -18,6 +18,7 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { getAgentDisplay } from "./utils";
 import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import EditCounterpartyModal from "./components/EditCounterpartyModal";
+import CounterpartyLegalInfo from "./components/CounterpartyLegalInfo";
 import "./CounterpartyDetail.scss";
 import "../../Warehouse/Money/MoneyDocumentsPage.scss";
 
@@ -760,6 +761,8 @@ const CounterpartyDetail = () => {
           </div>
         ) : (
           <>
+            <CounterpartyLegalInfo counterparty={current} />
+
             <div className="counterparty-detail-page__summary-cards">
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
                 <span className="counterparty-detail-page__summary-label">
