@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import useScanDetection from "use-scan-detection";
+import { generateEAN13Barcode } from "../../../Deposits/Sklad/AddProductPage/utils/barcodeUtils";
 
 /* ---- Thunks / Creators ---- */
 import {
@@ -118,6 +120,8 @@ const ProductionFinishedGoodsAddPage = () => {
     () => (clients || []).filter((c) => c.type === "suppliers"),
     [clients],
   );
+
+  const barcodeInputRef = useRef(null);
 
   // Форма товара
   const [product, setProduct] = useState({
@@ -276,6 +280,64 @@ const ProductionFinishedGoodsAddPage = () => {
     dispatch(fetchCategoriesAsync());
     dispatch(fetchBrandsAsync());
   }, [dispatch]);
+
+  // EAN-13 при создании (как в сфере Магазин)
+  useEffect(() => {
+    setProduct((prev) => {
+      if (String(prev.barcode ?? "").trim()) return prev;
+      return { ...prev, barcode: generateEAN13Barcode() };
+    });
+  }, []);
+
+  const generateBarcode = useCallback(() => {
+    setProduct((prev) => ({ ...prev, barcode: generateEAN13Barcode() }));
+    requestAnimationFrame(() => barcodeInputRef.current?.focus());
+  }, []);
+
+  const applyScannedBarcode = useCallback((raw) => {
+    const code = String(raw ?? "").trim();
+    if (code.length < 3) return;
+
+    const invalidPatterns = [
+      "Backspace",
+      "Delete",
+      "Enter",
+      "Tab",
+      "Escape",
+      "Arrow",
+      "Control",
+      "Alt",
+      "Meta",
+      "Shift",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+      "Insert",
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9",
+      "F10",
+      "F11",
+      "F12",
+    ];
+    if (invalidPatterns.some((p) => code.includes(p))) return;
+    if (!/^[a-zA-Zа-яА-ЯёЁ0-9\-_.]+$/.test(code)) return;
+
+    setProduct((prev) => ({ ...prev, barcode: code }));
+    requestAnimationFrame(() => barcodeInputRef.current?.focus());
+  }, []);
+
+  useScanDetection({
+    minLength: 3,
+    onComplete: applyScannedBarcode,
+  });
 
   // Хэндлеры
   const onProductChange = useCallback((e) => {
@@ -794,15 +856,30 @@ const ProductionFinishedGoodsAddPage = () => {
               </div>
 
               <div className="finished-goods-add-modal__section">
-                <label>Штрих код *</label>
+                <label>
+                  Штрих код *{" "}
+                  <button
+                    type="button"
+                    className="finished-goods-add-modal__generate-barcode"
+                    onClick={generateBarcode}
+                  >
+                    (Сгенерировать)
+                  </button>
+                </label>
                 <input
+                  ref={barcodeInputRef}
                   name="barcode"
                   className="finished-goods-add-modal__input"
-                  placeholder="Штрих код"
+                  placeholder="Сканируйте или введите штрих-код"
                   value={product.barcode}
                   onChange={onProductChange}
+                  autoComplete="off"
                   required
                 />
+                <p className="finished-goods-add-modal__barcode-hint">
+                  Код подставляется автоматически. Чтобы указать свой — отсканируйте
+                  сканером (как на кассе) или введите вручную.
+                </p>
               </div>
 
               <div className="finished-goods-add-modal__section">
