@@ -15,6 +15,11 @@ const SearchableCombobox = ({
   classNamePrefix = "searchableCombo", // Префикс для BEM классов
   /** Рендер списка в document.body — нужно внутри модалок с overflow:hidden */
   menuPortal = false,
+  /** false — список options с сервера, без локальной фильтрации */
+  filterLocally = true,
+  /** Вызывается при вводе в поле (для debounced-запроса на бэкенд) */
+  onQueryChange,
+  loading = false,
 }) => {
   const rootRef = useRef(null);
   const controlRef = useRef(null);
@@ -53,14 +58,15 @@ const SearchableCombobox = ({
     }
   }, [isOpen]);
 
-  // Отфильтрованные опции
+  // Отфильтрованные опции (локально или целиком с сервера)
   const filteredOptions = useMemo(() => {
+    if (!filterLocally) return opts;
     const searchQuery = safeStr(query).toLowerCase();
     if (!searchQuery) return opts;
     return opts.filter((opt) =>
       safeStr(opt?.label).toLowerCase().includes(searchQuery)
     );
-  }, [opts, query]);
+  }, [opts, query, filterLocally]);
 
   const updatePortalBox = () => {
     const el = controlRef.current;
@@ -124,7 +130,9 @@ const SearchableCombobox = ({
   // Изменение поля ввода
   const handleInputChange = (e) => {
     if (!disabled) {
-      setQuery(e.target.value);
+      const next = e.target.value;
+      setQuery(next);
+      onQueryChange?.(next);
       if (!isOpen) {
         setIsOpen(true);
       }
@@ -159,11 +167,14 @@ const SearchableCombobox = ({
 
   const dropdownInner = (
     <>
-      {filteredOptions.length === 0 && (
+      {loading && (
+        <div className={`${baseClass}__empty`}>Загрузка…</div>
+      )}
+      {!loading && filteredOptions.length === 0 && (
         <div className={`${baseClass}__empty`}>Ничего не найдено</div>
       )}
 
-      {filteredOptions.length > 0 && (
+      {!loading && filteredOptions.length > 0 && (
         <div
           className={`${baseClass}__list`}
           style={
