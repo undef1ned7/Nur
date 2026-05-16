@@ -788,6 +788,44 @@ export const transferStockPartnership = async (payload) => {
   }
 };
 
+/**
+ * POST /api/warehouse/stock-partnerships/cash-incassations/
+ * @param {Object} payload - { cash_register_from, cash_register_to, amount, comment? }
+ */
+export const createCashIncassation = async (payload) => {
+  try {
+    const response = await api.post(
+      "warehouse/stock-partnerships/cash-incassations/",
+      payload,
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Cash Incassation Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * GET /api/warehouse/stock-partnerships/cash-incassations/
+ */
+export const listCashIncassations = async () => {
+  try {
+    const response = await api.get(
+      "warehouse/stock-partnerships/cash-incassations/",
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Cash Incassations Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== БРЕНДЫ (2.2) ====================
 
 /**
@@ -2864,4 +2902,6 @@ export default {
   listActiveStockPartners,
   getStockPartnerCatalog,
   transferStockPartnership,
+  createCashIncassation,
+  listCashIncassations,
 };
