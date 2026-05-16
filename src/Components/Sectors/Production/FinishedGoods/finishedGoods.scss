@@ -1229,6 +1229,29 @@
   }
 }
 
+.finished-goods-add-modal__generate-barcode {
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-weight: 500;
+  font-size: 13px;
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover {
+    color: #1d4ed8;
+  }
+}
+
+.finished-goods-add-modal__barcode-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
 .finished-goods-add-modal__input {
   width: 100%;
   padding: 12px 16px;

@@ -1,6 +1,6 @@
 // src/Components/Sectors/Production/ProductionAgents/UniversalModal/SellStart.jsx
 import { ArrowLeft, Minus, Plus, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
   useDebounce,
@@ -55,6 +55,7 @@ import AlertModal from "../../../../common/AlertModal/AlertModal";
 import axios from "axios";
 import api from "../../../../../api";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import "../../../Market/CashierPage/CashierPage.scss";
 import "./SellStartCashier.scss";
 
@@ -676,6 +677,9 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     quantity: "1",
   });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentClientsFromApi, setPaymentClientsFromApi] = useState([]);
+  const [paymentClientsLoading, setPaymentClientsLoading] = useState(false);
+  const [paymentClientSelected, setPaymentClientSelected] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [orderDiscountValue, setOrderDiscountValue] = useState("");
   const [orderDiscountMode, setOrderDiscountMode] = useState("amount");
@@ -709,6 +713,74 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const pickClient = useMemo(
     () => filterClient.find((x) => String(x.id) === String(clientId)),
     [filterClient, clientId],
+  );
+
+  const fetchPaymentClientsBySearch = useCallback(async (search) => {
+    setPaymentClientsLoading(true);
+    try {
+      const params = { type: "client", page: 1 };
+      const q = String(search ?? "").trim();
+      if (q) params.search = q;
+      const { data } = await api.get("/main/clients/", { params });
+      const results = data?.results ?? (Array.isArray(data) ? data : []);
+      setPaymentClientsFromApi(Array.isArray(results) ? results : []);
+    } catch (e) {
+      console.warn("fetchPaymentClients", e);
+      setPaymentClientsFromApi([]);
+    } finally {
+      setPaymentClientsLoading(false);
+    }
+  }, []);
+
+  const debouncedFetchPaymentClients = useDebounce((search) => {
+    fetchPaymentClientsBySearch(search);
+  }, 400);
+
+  useEffect(() => {
+    if (!showPaymentModal) return;
+    fetchPaymentClientsBySearch("");
+  }, [showPaymentModal, fetchPaymentClientsBySearch]);
+
+  const handlePaymentClientQueryChange = useCallback(
+    (q) => {
+      debouncedFetchPaymentClients(q);
+    },
+    [debouncedFetchPaymentClients],
+  );
+
+  const clientSelectOptions = useMemo(() => {
+    const mapClientToOption = (client) => {
+      const name = client.full_name || client.name || "—";
+      const phone = String(client.phone ?? "").trim();
+      return {
+        value: String(client.id),
+        label: phone ? `${name} · ${phone}` : name,
+      };
+    };
+    const map = new Map();
+    paymentClientsFromApi.forEach((c) => map.set(String(c.id), mapClientToOption(c)));
+    const selected = paymentClientSelected || pickClient;
+    if (clientId && selected) {
+      map.set(String(clientId), mapClientToOption(selected));
+    }
+    return Array.from(map.values());
+  }, [paymentClientsFromApi, paymentClientSelected, pickClient, clientId]);
+
+  const handlePaymentClientChange = useCallback(
+    (id) => {
+      const v = id ? String(id) : "";
+      setClientId(v);
+      setSelectClient(v);
+      if (v) {
+        const found =
+          paymentClientsFromApi.find((c) => String(c.id) === v) ||
+          filterClient.find((c) => String(c.id) === v);
+        if (found) setPaymentClientSelected(found);
+      } else {
+        setPaymentClientSelected(null);
+      }
+    },
+    [paymentClientsFromApi, filterClient],
   );
 
   const [qty, setQty] = useState("");
@@ -2812,21 +2884,19 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                 <div className="sellstart-cashier__payment-field sellstart-cashier__payment-field--full">
                   <label>Клиент</label>
                   <div className="sellstart-cashier__client-row">
-                    <select
-                      value={clientId}
-                      onChange={(e) => {
-                        setClientId(e.target.value);
-                        setSelectClient(e.target.value);
-                      }}
-                      className="sellstart-cashier__select"
-                    >
-                      <option value="">Выберите клиента</option>
-                      {filterClient.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.full_name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="sellstart-cashier__client-combo">
+                      <SearchableCombobox
+                        value={clientId}
+                        onChange={handlePaymentClientChange}
+                        options={clientSelectOptions}
+                        onQueryChange={handlePaymentClientQueryChange}
+                        filterLocally={false}
+                        loading={paymentClientsLoading}
+                        placeholder="Поиск клиента…"
+                        menuPortal
+                        classNamePrefix="searchableCombo"
+                      />
+                    </div>
                     <button
                       type="button"
                       className="sellstart-cashier__client-add-btn"

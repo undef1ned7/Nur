@@ -120,6 +120,11 @@
     gap: 10px;
   }
 
+  &__client-combo {
+    flex: 1;
+    min-width: 0;
+  }
+
   &__client-add-btn {
     flex: 0 0 48px;
     border: 1px solid #d1d5db;
