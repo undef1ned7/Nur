@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useUser } from "../../../../../store/slices/userSlice";
 import { fetchEmployeesAsync } from "../../../../../store/creators/employeeCreators";
 import { updateWarehouseCounterparty } from "../../../../../store/creators/warehouseThunk";
+import CounterpartyLegalFields from "./CounterpartyLegalFields";
 import "../Counterparties.scss";
 
 const isAgentRole = (profile) =>
@@ -28,6 +29,11 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
     type: counterparty?.type || "CLIENT",
     phone: counterparty?.phone || "",
     agent: initialAgent || "",
+    inn: counterparty?.inn || "",
+    okpo: counterparty?.okpo || "",
+    score: counterparty?.score || "",
+    bik: counterparty?.bik || "",
+    address: counterparty?.address || "",
   });
 
   const [error, setError] = useState("");
@@ -130,6 +136,11 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
         name: formData.name.trim(),
         type: formData.type,
         phone: formData.phone.trim(),
+        inn: (formData.inn || "").trim(),
+        okpo: (formData.okpo || "").trim(),
+        score: (formData.score || "").trim(),
+        bik: (formData.bik || "").trim(),
+        address: (formData.address || "").trim(),
       };
 
       if (isOwnerOrAdmin && formData.agent) {
@@ -234,6 +245,12 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
                 <option value="BOTH">Клиент и поставщик</option>
               </select>
             </div>
+
+            <CounterpartyLegalFields
+              formData={formData}
+              onChange={handleChange}
+              disabled={updating}
+            />
 
             {isOwnerOrAdmin && (
               <div className="warehouse-filter-modal__section">

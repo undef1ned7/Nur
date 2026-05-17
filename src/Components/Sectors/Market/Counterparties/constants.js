@@ -26,6 +26,23 @@ export const COUNTERPARTY_TYPES = {
   BOTH: "BOTH",
 };
 
+/** Реквизиты контрагента (ИНН, ОКПО, р/с, БИК, адрес) */
+export const EMPTY_COUNTERPARTY_LEGAL = {
+  inn: "",
+  okpo: "",
+  score: "",
+  bik: "",
+  address: "",
+};
+
+export const COUNTERPARTY_LEGAL_FIELDS = [
+  { name: "inn", label: "ИНН", placeholder: "Введите ИНН" },
+  { name: "okpo", label: "ОКПО", placeholder: "Введите ОКПО" },
+  { name: "score", label: "Р/с", placeholder: "Введите расчётный счёт" },
+  { name: "bik", label: "БИК", placeholder: "Введите БИК" },
+  { name: "address", label: "Адрес", placeholder: "Введите адрес" },
+];
+
 export const getInitialViewMode = () => {
   if (typeof window === "undefined") return VIEW_MODES.TABLE;
   const saved = localStorage.getItem(STORAGE_KEY);

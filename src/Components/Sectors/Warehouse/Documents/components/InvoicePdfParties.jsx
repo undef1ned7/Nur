@@ -1,6 +1,29 @@
 import React from "react";
 import { Text, View } from "@react-pdf/renderer";
-import { safe } from "./invoicePdfDocumentUtils";
+import { invoicePdfStyles as s } from "./invoicePdfDocumentStyles";
+import { resolvePartiesForDocType, safe, usesPartyBlocks } from "./invoicePdfDocumentUtils";
+
+function PartyBlock({ label, party }) {
+  if (!party?.name || party.name === "—") return null;
+  return (
+    <View style={s.partyBlock}>
+      <View style={s.partyRow}>
+        <Text style={s.partyLabel}>{label}</Text>
+        <Text style={s.partyValue}>{party.name}</Text>
+      </View>
+      {party.addressLine ? (
+        <View style={s.partySubRow}>
+          <Text style={s.partyValue}>{party.addressLine}</Text>
+        </View>
+      ) : null}
+      {party.phoneLine ? (
+        <View style={s.partySubRow}>
+          <Text style={s.partyValue}>{party.phoneLine}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export default function InvoicePdfParties({
   docType,
@@ -9,68 +32,61 @@ export default function InvoicePdfParties({
   isInventory,
   isTransfer,
 }) {
-  if (isInventory || isTransfer) return null;
+  if (isTransfer) {
+    return (
+      <View style={{ marginBottom: 8, gap: 2 }}>
+        {seller?.name && (
+          <>
+            <View style={s.partyRow}>
+              <Text style={s.partyLabel}>Организация:</Text>
+              <Text style={s.partyValue}>{safe(seller.name)}</Text>
+            </View>
+            {seller.address ? (
+              <View style={s.partySubRow}>
+                <Text style={s.partyValue}>Адрес: {safe(seller.address)}</Text>
+              </View>
+            ) : null}
+          </>
+        )}
+      </View>
+    );
+  }
+
+  if (isInventory) {
+    if (!seller?.name) return null;
+    return (
+      <View style={{ marginBottom: 8 }}>
+        <View style={s.partyRow}>
+          <Text style={s.partyLabel}>Организация:</Text>
+          <Text style={s.partyValue}>{safe(seller.name)}</Text>
+        </View>
+        {seller.address ? (
+          <View style={s.partySubRow}>
+            <Text style={s.partyValue}>Адрес: {safe(seller.address)}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  if (!usesPartyBlocks(docType)) {
+    return null;
+  }
+
+  const { supplier, buyer: buyerParty } = resolvePartiesForDocType(
+    docType,
+    seller,
+    buyer,
+  );
+
+  if (["RECEIPT", "WRITE_OFF"].includes(docType)) {
+    return <PartyBlock label="Организация:" party={supplier} />;
+  }
 
   return (
-    <View
-      style={{
-        flexDirection: "column",
-        gap: 4,
-        marginTop: 6,
-        marginBottom: 6,
-      }}
-    >
-      {["PURCHASE", "PURCHASE_RETURN"].includes(docType) && (
-        <>
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>Поставщик: </Text>
-            {buyer ? (
-              <Text style={{ fontSize: 8 }}>
-                {safe(buyer.name || buyer.full_name)}
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 8 }}>—</Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>Покупатель: </Text>
-            <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
-            {seller.address && (
-              <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
-            )}
-          </View>
-        </>
-      )}
-      {["SALE", "SALE_RETURN"].includes(docType) && (
-        <>
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>Поставщик: </Text>
-            <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
-            {seller.address && (
-              <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
-            )}
-          </View>
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>Покупатель: </Text>
-            {buyer ? (
-              <Text style={{ fontSize: 8 }}>
-                {safe(buyer.name || buyer.full_name)}
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 8 }}>—</Text>
-            )}
-          </View>
-        </>
-      )}
-      {["RECEIPT", "WRITE_OFF"].includes(docType) && seller?.name && (
-        <View style={{ flexDirection: "row", fontSize: 8 }}>
-          <Text style={{ fontSize: 8, fontWeight: "bold" }}>Организация: </Text>
-          <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
-          {seller.address && (
-            <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
-          )}
-        </View>
-      )}
-    </View>
+    <>
+      <PartyBlock label="Поставщик:" party={supplier} />
+      <PartyBlock label="Покупатель:" party={buyerParty} />
+    </>
   );
 }

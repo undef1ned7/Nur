@@ -15,6 +15,7 @@ import {
   CalendarRange,
   Tag,
   Download,
+  ArrowRightLeft,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
@@ -44,6 +45,8 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+// console.log(parseAmount("1000000"));
+
 const formatKo1Date = (value) => {
   if (!value) return new Date().toISOString().split("T")[0];
   if (typeof value === "string") return value.split("T")[0];
@@ -63,6 +66,440 @@ const triggerPdfDownload = (blob, filename) => {
   a.click();
   a.remove();
   window.URL.revokeObjectURL(url);
+};
+
+const partnershipMoneyErr = (e) => {
+  if (!e) return "Ошибка";
+  if (typeof e === "string") return e;
+  if (e.detail) return String(e.detail);
+  if (e.cash_register) return String(e.cash_register);
+  const parts = Object.entries(e).map(([k, v]) => `${k}: ${v}`);
+  return parts.length ? parts.join("; ") : JSON.stringify(e);
+};
+
+function n2display(v) {
+  const n = parseAmount(String(v ?? "0"));
+  return n.toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/* ──────────────────────────────── Инкассация партнёров ──────────────────────────────── */
+const PartnerCashIncassationPanel = () => {
+  const alert = useAlert();
+  const [partners, setPartners] = useState([]);
+  const [partnersLoading, setPartnersLoading] = useState(true);
+  const [partnerErr, setPartnerErr] = useState("");
+
+  const [ownRegisters, setOwnRegisters] = useState([]);
+  const [ownLoading, setOwnLoading] = useState(true);
+
+  const [partnerCompanyId, setPartnerCompanyId] = useState("");
+  const [catalog, setCatalog] = useState(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogErr, setCatalogErr] = useState("");
+
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const [fromRegisterId, setFromRegisterId] = useState("");
+  const [toRegisterId, setToRegisterId] = useState("");
+  const [amountStr, setAmountStr] = useState("");
+  const [commentStr, setCommentStr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadPartners = useCallback(async () => {
+    setPartnerErr("");
+    setPartnersLoading(true);
+    try {
+      const data = await warehouseAPI.listActiveStockPartners();
+      setPartners(data?.partners || []);
+    } catch (e) {
+      console.error(e);
+      setPartnerErr(partnershipMoneyErr(e));
+      setPartners([]);
+    } finally {
+      setPartnersLoading(false);
+    }
+  }, []);
+
+  const loadOwnRegisters = useCallback(async () => {
+    setOwnLoading(true);
+    try {
+      const data = await warehouseAPI.listCashRegisters({ page_size: 200 });
+      setOwnRegisters(asArray(data));
+    } catch (e) {
+      console.error(e);
+      setOwnRegisters([]);
+    } finally {
+      setOwnLoading(false);
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await warehouseAPI.listCashIncassations();
+      setHistory(asArray(data));
+    } catch (e) {
+      console.error(e);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPartners();
+    loadOwnRegisters();
+    loadHistory();
+  }, [loadPartners, loadOwnRegisters, loadHistory]);
+
+  useEffect(() => {
+    if (!partnerCompanyId) {
+      setCatalog(null);
+      setCatalogErr("");
+      setFromRegisterId("");
+      setToRegisterId("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setCatalogLoading(true);
+      setCatalogErr("");
+      try {
+        const data =
+          await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
+        if (!cancelled) {
+          setCatalog(data);
+          setFromRegisterId("");
+          setToRegisterId("");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setCatalog(null);
+          setCatalogErr(partnershipMoneyErr(e));
+        }
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partnerCompanyId]);
+
+  const partnerRegisters = catalog?.cash_registers || [];
+  const ownIds = useMemo(
+    () => new Set(ownRegisters.map((r) => String(r.id))),
+    [ownRegisters],
+  );
+  const partnerIds = useMemo(
+    () => new Set(partnerRegisters.map((r) => String(r.id))),
+    [partnerRegisters],
+  );
+
+  const isValidCrossCompanyPair = useCallback(() => {
+    const f = String(fromRegisterId || "");
+    const t = String(toRegisterId || "");
+    if (!f || !t || f === t) return false;
+    const fOwn = ownIds.has(f);
+    const tOwn = ownIds.has(t);
+    const fPart = partnerIds.has(f);
+    const tPart = partnerIds.has(t);
+    const fromOwnOnly = fOwn && !fPart;
+    const fromPartnerOnly = fPart && !fOwn;
+    const toOwnOnly = tOwn && !tPart;
+    const toPartnerOnly = tPart && !tOwn;
+    return (fromOwnOnly && toPartnerOnly) || (fromPartnerOnly && toOwnOnly);
+  }, [fromRegisterId, toRegisterId, ownIds, partnerIds]);
+
+  const handleSubmit = async () => {
+    if (!partnerCompanyId) {
+      alert("Выберите компанию-партнёра");
+      return;
+    }
+    if (!isValidCrossCompanyPair()) {
+      alert("Выберите кассу вашей компании и кассу партнёра (разные стороны).");
+      return;
+    }
+    const amount = parseAmount(amountStr);
+    if (!(amount > 0)) {
+      alert("Укажите сумму больше нуля");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await warehouseAPI.createCashIncassation({
+        cash_register_from: fromRegisterId,
+        cash_register_to: toRegisterId,
+        amount: amount.toFixed(2),
+        comment: commentStr.trim() || undefined,
+      });
+      alert("Инкассация проведена");
+      setAmountStr("");
+      setCommentStr("");
+      loadHistory();
+      if (partnerCompanyId) {
+        try {
+          const data =
+            await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
+          setCatalog(data);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      loadOwnRegisters();
+    } catch (e) {
+      alert(partnershipMoneyErr(e), true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedPartnerName =
+    partners.find((p) => String(p.id) === String(partnerCompanyId))?.name ||
+    catalog?.partner_company?.name ||
+    "";
+
+  const canSubmit =
+    !submitting &&
+    !ownLoading &&
+    isValidCrossCompanyPair() &&
+    parseAmount(amountStr) > 0;
+
+  return (
+    <div className="warehouse-kassa__partner-incass">
+      <h3 className="warehouse-kassa__inbox-title">
+        <ArrowRightLeft size={20} />
+        Инкассация между компаниями-партнёрами
+      </h3>
+      <p className="warehouse-kassa__partner-incass-hint">
+        Перевод наличных между вашей кассой и кассой партнёра (одно партнёрство
+        для склада и кассы). Создаются проведённые расход и приход по категории
+        «Инкассация».
+      </p>
+
+      {partnerErr && (
+        <div className="kassa__alert kassa__alert--error">{partnerErr}</div>
+      )}
+
+      <div className="warehouse-kassa__partner-incass-grid">
+        <div className="kassa-modal__section">
+          <label className="kassa-modal__label">Компания-партнёр</label>
+          <select
+            className="kassa-modal__input"
+            value={partnerCompanyId}
+            onChange={(e) => setPartnerCompanyId(e.target.value)}
+            disabled={partnersLoading}
+          >
+            <option value="">— выберите —</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name || p.id}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {!partnersLoading && !partners.length ? (
+        <div className="kassa-table__empty" style={{ padding: 16 }}>
+          Нет активных партнёров. Отправьте или примите заявку в разделе{" "}
+          <b>Склады → Партнёры</b>.
+        </div>
+      ) : null}
+
+      {partnerCompanyId ? (
+        <>
+          {catalogLoading && (
+            <div className="kassa-table__loading" style={{ padding: 16 }}>
+              Загрузка касс партнёра…
+            </div>
+          )}
+          {catalogErr && (
+            <div className="kassa__alert kassa__alert--error">{catalogErr}</div>
+          )}
+          {!catalogLoading && catalog && (
+            <>
+              <h4 className="warehouse-kassa__partner-incass-subtitle">
+                Кассы партнёра: {selectedPartnerName}
+              </h4>
+              <div className="kassa-table-scroll" style={{ marginBottom: 16 }}>
+                <table className="kassa-table">
+                  <thead>
+                    <tr>
+                      <th>Название</th>
+                      <th>Расположение</th>
+                      <th>Филиал</th>
+                      <th>Сальдо</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!partnerRegisters.length ? (
+                      <tr>
+                        <td colSpan={4} className="kassa-table__empty">
+                          Нет касс в каталоге партнёра
+                        </td>
+                      </tr>
+                    ) : (
+                      partnerRegisters.map((r) => (
+                        <tr key={r.id}>
+                          <td>
+                            <b>{r.name || "—"}</b>
+                          </td>
+                          <td>{r.location || "—"}</td>
+                          <td>{r.branch_name || "—"}</td>
+                          <td>
+                            {money(parseAmount(String(r.balance ?? "0")))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <h4 className="warehouse-kassa__partner-incass-subtitle">
+                Новая инкассация
+              </h4>
+              <div className="warehouse-kassa__partner-incass-form">
+                <div className="kassa-modal__section">
+                  <label className="kassa-modal__label">С кассы *</label>
+                  <select
+                    className="kassa-modal__input"
+                    value={fromRegisterId}
+                    onChange={(e) => setFromRegisterId(e.target.value)}
+                  >
+                    <option value="">— выберите —</option>
+                    <optgroup label="Ваши кассы">
+                      {ownRegisters.map((r) => (
+                        <option key={`o-f-${r.id}`} value={r.id}>
+                          {r.name || r.id}
+                          {r.location ? ` (${r.location})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Кассы партнёра">
+                      {partnerRegisters.map((r) => (
+                        <option key={`p-f-${r.id}`} value={r.id}>
+                          {r.name || r.id} · сальдо {n2display(r.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="kassa-modal__section">
+                  <label className="kassa-modal__label">На кассу *</label>
+                  <select
+                    className="kassa-modal__input"
+                    value={toRegisterId}
+                    onChange={(e) => setToRegisterId(e.target.value)}
+                  >
+                    <option value="">— выберите —</option>
+                    <optgroup label="Ваши кассы">
+                      {ownRegisters.map((r) => (
+                        <option key={`o-t-${r.id}`} value={r.id}>
+                          {r.name || r.id}
+                          {r.location ? ` (${r.location})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Кассы партнёра">
+                      {partnerRegisters.map((r) => (
+                        <option key={`p-t-${r.id}`} value={r.id}>
+                          {r.name || r.id} · сальдо {n2display(r.balance)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="kassa-modal__section">
+                  <label className="kassa-modal__label">Сумма *</label>
+                  <input
+                    className="kassa-modal__input"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={amountStr}
+                    onChange={(e) => setAmountStr(e.target.value)}
+                  />
+                </div>
+                <div className="kassa-modal__section">
+                  <label className="kassa-modal__label">Комментарий</label>
+                  <input
+                    className="kassa-modal__input"
+                    type="text"
+                    value={commentStr}
+                    onChange={(e) => setCommentStr(e.target.value)}
+                  />
+                </div>
+                <div className="kassa-modal__footer" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="kassa__btn kassa__btn--primary"
+                    disabled={!canSubmit}
+                    onClick={handleSubmit}
+                  >
+                    {submitting ? "Проведение…" : "Провести инкассацию"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      ) : null}
+
+      <h4 className="warehouse-kassa__partner-incass-subtitle">
+        История инкассаций (до 200 операций)
+      </h4>
+      {historyLoading ? (
+        <div className="kassa-table__loading" style={{ padding: 24 }}>
+          Загрузка…
+        </div>
+      ) : (
+        <div className="kassa-table-scroll">
+          <table className="kassa-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Сумма</th>
+                <th>С кассы</th>
+                <th>На кассу</th>
+                <th>Расход</th>
+                <th>Приход</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!history.length ? (
+                <tr>
+                  <td colSpan={6} className="kassa-table__empty">
+                    Нет операций
+                  </td>
+                </tr>
+              ) : (
+                history.map((row) => (
+                  <tr key={row.id}>
+                    <td>{fmtDate(row.created_at)}</td>
+                    <td>{money(parseAmount(String(row.amount ?? "0")))}</td>
+                    <td>{row.cash_register_from_name || "—"}</td>
+                    <td>{row.cash_register_to_name || "—"}</td>
+                    <td title={row.expense_document}>
+                      {row.expense_document_number || "—"}
+                    </td>
+                    <td title={row.receipt_document}>
+                      {row.receipt_document_number || "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /* ──────────────────────────────── Запросы кассы (inbox) ──────────────────────────────── */
@@ -197,7 +634,7 @@ const CashRequestsInbox = () => {
 const CashRegisterList = () => {
   const navigate = useNavigate();
   const alert = useAlert();
-  const [tab, setTab] = useState("registers"); // "registers" | "requests"
+  const [tab, setTab] = useState("registers"); // "registers" | "requests" | "partner_incass"
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -335,6 +772,16 @@ const CashRegisterList = () => {
               <Inbox size={16} />
               Запросы
             </button>
+            <button
+              type="button"
+              className={`kassa-header__nav-tab flex gap-2 items-center ${
+                tab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
+              }`}
+              onClick={() => setTab("partner_incass")}
+            >
+              <ArrowRightLeft size={16} />
+              Инкассация партнёров
+            </button>
           </nav>
           <div className="kassa-header__right">
             {tab === "registers" && rows.length === 0 && (
@@ -352,6 +799,8 @@ const CashRegisterList = () => {
 
       {tab === "requests" ? (
         <CashRequestsInbox />
+      ) : tab === "partner_incass" ? (
+        <PartnerCashIncassationPanel />
       ) : (
         <>
           <div className="kassa-search-section">

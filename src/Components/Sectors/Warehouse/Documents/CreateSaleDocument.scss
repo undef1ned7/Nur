@@ -75,7 +75,34 @@ $due-red: #dc2626;
   &__search-wrapper {
     padding: 0 16px 12px;
     display: flex;
+    align-items: stretch;
     gap: 8px;
+  }
+
+  &__search-reset-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
   }
 
   &__groups {
@@ -94,6 +121,27 @@ $due-red: #dc2626;
     padding: 8px 10px;
     color: #94a3b8;
     font-size: 13px;
+  }
+
+  &__search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+  }
+
+  &__search-results-hint {
+    margin: 0;
+    padding: 0 4px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  &__search-results .create-sale-document__group-products {
+    margin: 0;
+    border-left: none;
+    padding-left: 0;
   }
 
   &__group-tree {
@@ -1510,6 +1558,11 @@ $due-red: #dc2626;
       padding: 12px;
     }
 
+    &__search-reset-btn {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
     &__create-product-btn {
       margin: 12px;
       padding: 8px 12px;
@@ -1686,6 +1739,12 @@ $due-red: #dc2626;
 
     &__search-actions {
       gap: 6px;
+    }
+
+    &__search-reset-btn {
+      padding: 8px;
+      font-size: 11px;
+      gap: 4px;
     }
 
     &__create-product-btn {

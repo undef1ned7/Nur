@@ -3,10 +3,9 @@ import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { registerPdfFonts } from "@/pdf/registerFonts";
 import { invoicePdfStyles as s } from "./invoicePdfDocumentStyles";
 import {
-  fmtDate,
-  fmtDateTime,
+  buildInvoiceItemsFromData,
+  fmtTitleDateTime,
   getDocumentTitle,
-  needsDiscountColumns,
   needsPriceColumns,
   resolveDocumentDiscount,
   safe,
@@ -18,7 +17,6 @@ import InvoicePdfTotalsSection from "./InvoicePdfTotalsSection";
 
 registerPdfFonts();
 
-// Генерируем PDF накладной
 export default function InvoicePdfDocument({ data }) {
   const doc = data?.document || {};
   const seller = data?.seller || {};
@@ -31,97 +29,24 @@ export default function InvoicePdfDocument({ data }) {
 
   const documentTitle = getDocumentTitle(docType);
   const showPriceColumns = needsPriceColumns(docType);
-  const showDiscountColumns = needsDiscountColumns(docType);
   const isInventory = docType === "INVENTORY";
   const isTransfer = docType === "TRANSFER";
 
   const { documentDiscountPercent, documentDiscountAmount, showDocumentDiscountLine } =
     resolveDocumentDiscount(doc, data, subtotal, data?.items);
 
-  const docDiscountPctForLines = Number(doc.discount_percent ?? 0);
-
-  const items = Array.isArray(data?.items)
-    ? data.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unitBase = Number(it.price ?? it.unit_price ?? 0);
-        const lineDisc = Number(it.discount_percent ?? it.discount ?? 0);
-        const discount =
-          it.effective_discount_percent != null && it.effective_discount_percent !== ""
-            ? Number(it.effective_discount_percent)
-            : lineDisc > 0
-              ? lineDisc
-              : docDiscountPctForLines;
-
-        let priceNoDiscount = Number(
-          it.original_price ??
-            it.price_before_discount ??
-            it.price_without_discount ??
-            unitBase
-        );
-        if (!priceNoDiscount) {
-          priceNoDiscount = unitBase;
-        }
-
-        const priceAfterDiscount =
-          priceNoDiscount * (1 - Number(discount || 0) / 100);
-        const rowTotal = qty * priceAfterDiscount;
-
-        return {
-          id: it.id,
-          name: it.name || it.product_name || "Товар",
-          qty,
-          unit_price: priceAfterDiscount,
-          price_no_discount: priceNoDiscount,
-          discount,
-          total: rowTotal,
-          unit: it.unit || "ШТ",
-          article: it.article || "",
-        };
-      })
-    : [];
+  const items = buildInvoiceItemsFromData(data);
 
   const invoiceNumber = doc.number || "";
-  const invoiceDate = doc.datetime || doc.date || "";
+  const invoiceDate = doc.datetime || doc.date || doc.created_at || "";
   const docComment = String(doc.comment ?? data?.comment ?? "").trim();
+
+  const titleLine = `${documentTitle} № ${invoiceNumber || "—"} от ${fmtTitleDateTime(invoiceDate)}`;
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 4,
-          }}
-        >
-          <Text style={{ fontSize: 7 }}>
-            {fmtDateTime(invoiceDate || new Date().toISOString())}
-          </Text>
-        </View>
-
-        <View style={s.header}>
-          <Text style={s.title}>
-            {documentTitle} № {invoiceNumber || "—"} от {fmtDate(invoiceDate)}
-          </Text>
-        </View>
-
-        {seller?.name && !isTransfer && (
-          <Text style={{ fontSize: 7, textAlign: "right", marginBottom: 4 }}>
-            Автор: {safe(seller.name)}
-          </Text>
-        )}
-
-        {(isInventory || isTransfer) && seller?.name && (
-          <View style={{ marginTop: 4, marginBottom: 6 }}>
-            <Text style={{ fontSize: 8, marginBottom: 2 }}>
-              Организация: {safe(seller.name)}
-            </Text>
-            {seller.address && (
-              <Text style={{ fontSize: 8 }}>{safe(seller.address)}</Text>
-            )}
-          </View>
-        )}
+        <Text style={s.title}>{titleLine}</Text>
 
         <InvoicePdfParties
           docType={docType}
@@ -131,30 +56,34 @@ export default function InvoicePdfDocument({ data }) {
           isTransfer={isTransfer}
         />
 
-        {!isTransfer && data?.warehouse && (
-          <View style={s.warehouse}>
-            <Text>Склад: «{safe(data.warehouse)}»</Text>
+        {isTransfer && (
+          <View style={{ marginBottom: 6, gap: 2 }}>
+            {data?.warehouse ? (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>Со склада:</Text>
+                <Text>{safe(data.warehouse)}</Text>
+              </View>
+            ) : null}
+            {data?.warehouse_to ? (
+              <View style={s.metaRow}>
+                <Text style={s.metaLabel}>На склад:</Text>
+                <Text>{safe(data.warehouse_to)}</Text>
+              </View>
+            ) : null}
           </View>
         )}
 
-        {isTransfer && (
-          <View style={{ marginTop: 4, marginBottom: 8, gap: 4 }}>
-            {data?.warehouse && (
-              <Text style={{ fontSize: 8 }}>
-                Со склада: «{safe(data.warehouse)}»
-              </Text>
-            )}
-            {data?.warehouse_to && (
-              <Text style={{ fontSize: 8 }}>
-                На склад: «{safe(data.warehouse_to)}»
-              </Text>
-            )}
+        {!isTransfer && !isInventory && data?.warehouse ? (
+          <View style={[s.metaRow, { marginBottom: 6 }]}>
+            <Text style={s.metaLabel}>Склад:</Text>
+            <Text>{safe(data.warehouse)}</Text>
           </View>
-        )}
+        ) : null}
 
         {docComment ? (
-          <View style={{ marginTop: 4, marginBottom: 6 }}>
-            <Text style={{ fontSize: 8 }}>Комментарий: {safe(docComment)}</Text>
+          <View style={[s.metaRow, { marginBottom: 6 }]}>
+            <Text style={s.metaLabel}>Комментарий:</Text>
+            <Text>{safe(docComment)}</Text>
           </View>
         ) : null}
 
@@ -163,8 +92,8 @@ export default function InvoicePdfDocument({ data }) {
           isTransfer={isTransfer}
           isInventory={isInventory}
           showPriceColumns={showPriceColumns}
-          showDiscountColumns={showDiscountColumns}
           invoiceNumber={invoiceNumber}
+          total={total}
         />
 
         {showPriceColumns && (
@@ -178,20 +107,13 @@ export default function InvoicePdfDocument({ data }) {
         )}
 
         {isInventory && (
-          <View style={{ marginTop: 4, fontSize: 7, gap: 2 }}>
-            <Text style={{ fontSize: 7 }}>
-              Всего позиций: {items.length}
-            </Text>
-            <Text style={{ fontSize: 7 }}>
-              Дата печати: {fmtDateTime(new Date().toISOString())}
-            </Text>
-            <Text style={{ fontSize: 7, marginTop: 4 }}>
-              Заполнил: _________
-            </Text>
+          <View style={s.inventoryNote}>
+            <Text>Всего позиций: {items.length}</Text>
+            <Text>Заполнил: _________________</Text>
           </View>
         )}
 
-        <InvoicePdfSignatures />
+        {!isInventory && <InvoicePdfSignatures />}
       </Page>
     </Document>
   );

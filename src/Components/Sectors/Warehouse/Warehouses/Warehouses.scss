@@ -272,11 +272,278 @@
   }
 }
 
+/* Page tabs */
+.warehouse-page-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.warehouse-page-tab {
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.15s ease;
+
+  &.active {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+  }
+}
+
+/* Stock partnerships */
+.warehouse-partnership {
+  &__toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+}
+
+.warehouse-partnership-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.warehouse-partnership-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.active {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+  }
+
+  &__count {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.warehouse-partnership-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.warehouse-partnership-error {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.warehouse-partnership-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+
+  &.badge--pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &.badge--approved {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &.badge--rejected {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  &.badge--removed {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  &.badge--draft {
+    background: #f1f5f9;
+    color: #334155;
+  }
+}
+
+.warehouse-partnership-note {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warehouse-partnership-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.warehouse-partnership-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--approve {
+    background: #dcfce7;
+    border-color: #bbf7d0;
+    color: #166534;
+  }
+
+  &--reject {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #991b1b;
+  }
+}
+
+.warehouse-partnership-search-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.warehouse-partnership-catalog-modal {
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.warehouse-partnership-catalog {
+  padding: 0 4px 12px;
+}
+
+.warehouse-partnership-warehouse {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 6px 0;
+  }
+}
+
+.warehouse-partnership-products {
+  margin-top: 8px;
+}
+
+.warehouse-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &--requests .warehouse-partnership-table {
+    min-width: 720px;
+  }
+
+  &--catalog .warehouse-partnership-products {
+    min-width: 520px;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .warehouse-page {
+    padding: 16px 12px;
+  }
+
   .warehouse-header {
     flex-direction: column;
     align-items: flex-start;
+
+    > div:last-child {
+      width: 100%;
+
+      .warehouse-header__create-btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+
+  .warehouse-page-tabs {
+    width: 100%;
+
+    .warehouse-page-tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
   }
 
   .warehouse-search-section {
@@ -284,12 +551,149 @@
     align-items: stretch;
   }
 
+  .warehouse-table-container {
+    border-radius: 10px;
+  }
+
   .warehouse-table {
     font-size: 12px;
 
     th,
     td {
-      padding: 8px;
+      padding: 8px 10px;
+    }
+
+    &__action-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+  }
+
+  .warehouse-partnership {
+    &__toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__actions {
+      width: 100%;
+
+      .warehouse-header__create-btn {
+        flex: 1;
+        justify-content: center;
+        min-width: 0;
+      }
+    }
+  }
+
+  .warehouse-partnership-tabs {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .warehouse-partnership-tab {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .warehouse-partnership-note {
+    max-width: 140px;
+  }
+
+  .warehouse-partnership-row-actions {
+    flex-direction: column;
+    width: 100%;
+    min-width: 120px;
+
+    .warehouse-partnership-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .warehouse-partnership-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .warehouse-partnership-search-list li {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+
+    .warehouse-partnership-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .warehouse-partnership-catalog-modal {
+    max-height: calc(100vh - 16px);
+    margin: 0;
+    border-radius: 12px;
+  }
+
+  .warehouse-partnership-warehouse {
+    padding: 8px 10px;
+
+    summary {
+      font-size: 14px;
+      line-height: 1.35;
+    }
+  }
+
+  .warehouse-partnership-partners-table {
+    .warehouse-table__action-btn {
+      white-space: normal;
+      text-align: center;
+      line-height: 1.3;
+    }
+  }
+
+  .warehouse-filter-overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
+  .warehouse-filter-modal {
+    max-width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 16px 16px 0 0;
+
+    &__header {
+      padding: 16px;
+    }
+
+    &__title {
+      font-size: 17px;
+      padding-right: 8px;
+    }
+
+    &__subtitle {
+      padding: 10px 16px;
+      font-size: 13px;
+    }
+
+    &__content {
+      padding: 16px;
+      gap: 16px;
+    }
+
+    &__footer {
+      flex-direction: column;
+      padding: 16px;
+
+      .warehouse-filter-modal__apply-btn,
+      .warehouse-filter-modal__cancel-btn {
+        width: 100%;
+        flex: none;
+      }
     }
   }
 
@@ -309,6 +713,41 @@
       width: 100%;
       text-align: center;
       padding: 0;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .warehouse-page {
+    padding: 12px 10px;
+  }
+
+  .warehouse-page-tab,
+  .warehouse-partnership-tab {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .warehouse-partnership-error {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .warehouse-table-scroll--requests .warehouse-partnership-table {
+    min-width: 640px;
+  }
+
+  .warehouse-partnership-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .warehouse-filter-modal {
+    &__header,
+    &__content,
+    &__footer {
+      padding-left: 14px;
+      padding-right: 14px;
     }
   }
 }

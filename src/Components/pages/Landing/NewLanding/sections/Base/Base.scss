@@ -1,0 +1,78 @@
+.base {
+  &__container {
+    width: 100%;
+    margin: 100px auto;
+  }
+  &__content {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    border-radius: 30px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    padding: 35px 60px;
+    display: flex;
+    justify-content: space-between;
+    &__left{
+        &__subtitle{
+            color:  #F2B705;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+        &__dot{
+            display: block;
+            width: 16px;
+            height: 16px;
+            background: #F2B705;
+            border-radius: 50%;
+        }
+        &__title{
+            color: black;
+            font-size: 64px;
+            font-weight: 700;
+        }
+        &__description{
+            color: #000000CC;
+            font-size: 20px;
+            width: 440px;
+        }
+        &__btn{
+            margin-top: 40px;
+            width: 330px;
+            height: 56px;
+            border-radius: 333px;
+            background: #FECB05;
+            font-size: 20px;
+            font-weight: 600;
+        }
+    }
+    &__right{
+        z-index: 10;
+    }
+
+  }
+  
+  &__blur{
+    position: absolute;
+    right: 50px;
+    width: 750px;
+    top: 70px;
+    z-index: -10;
+  }
+  &__img{
+
+    z-index:  10;
+  }
+  &__line{
+    position: absolute;
+    bottom: 45px;
+    left: 420px;
+  }
+  &__line2{
+    position: absolute;
+    bottom: 68px;
+    left: 400px;
+  }
+}

@@ -1,0 +1,81 @@
+.demo {
+  background: #0e1114;
+  height: 800px;
+  position: relative;
+  &__container {
+    width: 100%;
+    padding: 100px 0;
+    display: flex;
+  }
+  &__left {
+    &__title {
+      color: #ffffff;
+      font-size: 64px;
+      line-height: 77px;
+      font-weight: 700;
+      width: 773px;
+    }
+    &__description {
+      color: #ffffffdb;
+      font-size: 20px;
+      line-height: 42px;
+      width: 540px;
+      margin-top: 26px;
+    }
+  }
+  &__form {
+    margin-top: 170px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+
+    width: 564px;
+    height: 427px;
+    border-radius: 13px;
+    background: #ececec;
+    padding: 29px 40px;
+    z-index: 1;
+    &__title {
+      color: black;
+      font-weight: 700;
+      font-size: 32px;
+    }
+    &__inp {
+      width: 100%;
+      height: 57px;
+      font-size: 16px;
+      color: gray;
+      border-radius: 8px;
+      border: 1px solid #0000002e;
+      padding: 15px;
+    }
+
+    &__btn {
+      width: 100%;
+      height: 60px;
+      border-radius: 13px;
+      background-color: #f7d617;
+      font-size: 20px;
+      color: black;
+      font-weight: 800;
+    }
+  }
+  &-span {
+    color: #f7d617;
+  }
+  &__line{
+    position: absolute ;
+    top: 258px;
+    left: 10px;
+  }
+  &__blur {
+    position: absolute;
+    top: -200px;
+    right: -300px;
+  }
+  &__blur2{
+    position: absolute;
+   top: 200px;
+    right: 200px;
+  }
+}

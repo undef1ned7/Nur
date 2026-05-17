@@ -1,64 +1,59 @@
 import { StyleSheet } from "@react-pdf/renderer";
 
+/** Макет «как в Excel»: сетка, заголовок по центру, блоки поставщик/покупатель. */
 export const invoicePdfStyles = StyleSheet.create({
   page: {
     fontFamily: "Roboto",
-    fontSize: 8,
-    padding: 15,
+    fontSize: 9,
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
     color: "#000",
   },
 
-  header: {
-    marginBottom: 6,
-    textAlign: "center",
-  },
   title: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 8,
-    textAlign: "center",
-    marginTop: 1,
+    marginBottom: 10,
   },
 
-  partiesRow: {
+  partyBlock: {
+    marginBottom: 8,
+    gap: 2,
+  },
+  partyRow: {
     flexDirection: "row",
-    marginTop: 6,
-    marginBottom: 6,
-    gap: 6,
-  },
-  partyBox: {
-    flex: 1,
-    padding: 5,
-  },
-  partyTitle: {
-    fontSize: 8,
-    fontWeight: "bold",
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  partyField: {
-    marginBottom: 2,
-    fontSize: 7,
+    alignItems: "flex-start",
+    fontSize: 9,
   },
   partyLabel: {
-    width: 70,
-    fontSize: 7,
+    width: 72,
+    fontWeight: "bold",
+    flexShrink: 0,
   },
   partyValue: {
-    fontSize: 7,
+    flex: 1,
+    fontSize: 9,
   },
-  warehouse: {
-    marginTop: 4,
-    marginBottom: 6,
-    fontSize: 7,
+  partySubRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    fontSize: 9,
+    paddingLeft: 72,
+  },
+  metaRow: {
+    flexDirection: "row",
+    fontSize: 9,
+    marginBottom: 2,
+  },
+  metaLabel: {
+    fontWeight: "bold",
+    marginRight: 4,
   },
 
   goodsTable: {
-    marginTop: 8,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: "#000",
   },
@@ -66,87 +61,98 @@ export const invoicePdfStyles = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    minHeight: 12,
+    minHeight: 14,
   },
   tableRowLast: {
     borderBottomWidth: 0,
   },
   tableHeader: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#ffffff",
     fontWeight: "bold",
-    fontSize: 7,
   },
   tableCell: {
-    padding: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
     borderRightWidth: 1,
     borderRightColor: "#000",
-    fontSize: 7,
+    fontSize: 8,
     justifyContent: "center",
   },
   tableCellLast: {
     borderRightWidth: 0,
   },
-  colNo: { width: "4%" },
-  colName: { width: "25%" },
-  colUnit: { width: "8%" },
-  colQty: { width: "8%", textAlign: "right" },
-  colPriceNoDiscount: { width: "12%", textAlign: "right" },
-  colDiscount: { width: "8%", textAlign: "right" },
-  colPrice: { width: "12%", textAlign: "right" },
-  colSum: { width: "13%", textAlign: "right" },
-  colNoTransfer: { width: "5%" },
-  colNameTransfer: { width: "52%" },
-  colArtTransfer: { width: "8%" },
-  colUnitTransfer: { width: "10%" },
-  colQtyTransfer: { width: "25%", textAlign: "right" },
-  colArt: { width: "8%" },
+  cellCenter: { textAlign: "center" },
+  cellRight: { textAlign: "right" },
+  cellLeft: { textAlign: "left" },
 
-  totalsSection: {
-    marginTop: 6,
-    marginLeft: "auto",
-    width: 280,
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 2,
-    fontSize: 7,
-  },
-  totalLabel: {
-    fontSize: 7,
-  },
-  totalValue: {
-    fontSize: 7,
-    fontWeight: "normal",
-  },
-  totalBold: {
-    fontWeight: "bold",
+  colNo: { width: "5%" },
+  colArt: { width: "11%" },
+  colName: { width: "38%" },
+  colQty: { width: "9%" },
+  colUnit: { width: "7%" },
+  colPrice: { width: "14%" },
+  colSum: { width: "16%" },
+
+  colNoWide: { width: "6%" },
+  colNameWide: { width: "54%" },
+  colArtWide: { width: "14%" },
+  colUnitWide: { width: "10%" },
+  colQtyWide: { width: "16%" },
+
+  footerLabelCell: {
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    borderRightWidth: 1,
+    borderRightColor: "#000",
     fontSize: 8,
+    fontWeight: "bold",
+    justifyContent: "center",
+  },
+  footerSumCell: {
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+    fontSize: 8,
+    fontWeight: "bold",
+    textAlign: "right",
+    justifyContent: "center",
+  },
+
+  summaryBlock: {
+    marginTop: 6,
+    gap: 3,
+  },
+  summaryLine: {
+    fontSize: 9,
+  },
+  summaryAmountWords: {
+    fontSize: 10,
+    fontWeight: "bold",
+    marginTop: 2,
   },
 
   signatures: {
-    marginTop: 12,
+    marginTop: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 40,
   },
   signatureCol: {
     flex: 1,
-    fontSize: 7,
+    fontSize: 8,
   },
   signatureLabel: {
-    marginBottom: 5,
-    fontSize: 7,
+    marginBottom: 4,
+    fontSize: 8,
   },
   signatureLine: {
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    marginBottom: 2,
-    minHeight: 15,
+    minHeight: 14,
   },
-  signatureSeal: {
-    fontSize: 6,
-    marginTop: 2,
-    fontStyle: "italic",
+
+  inventoryNote: {
+    marginTop: 8,
+    fontSize: 8,
+    gap: 2,
   },
 });
