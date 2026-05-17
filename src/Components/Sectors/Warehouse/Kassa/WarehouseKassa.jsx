@@ -45,6 +45,8 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+// console.log(parseAmount("1000000"));
+
 const formatKo1Date = (value) => {
   if (!value) return new Date().toISOString().split("T")[0];
   if (typeof value === "string") return value.split("T")[0];
@@ -167,9 +169,8 @@ const PartnerCashIncassationPanel = () => {
       setCatalogLoading(true);
       setCatalogErr("");
       try {
-        const data = await warehouseAPI.getStockPartnerCatalog(
-          partnerCompanyId,
-        );
+        const data =
+          await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
         if (!cancelled) {
           setCatalog(data);
           setFromRegisterId("");
@@ -211,9 +212,7 @@ const PartnerCashIncassationPanel = () => {
     const fromPartnerOnly = fPart && !fOwn;
     const toOwnOnly = tOwn && !tPart;
     const toPartnerOnly = tPart && !tOwn;
-    return (
-      (fromOwnOnly && toPartnerOnly) || (fromPartnerOnly && toOwnOnly)
-    );
+    return (fromOwnOnly && toPartnerOnly) || (fromPartnerOnly && toOwnOnly);
   }, [fromRegisterId, toRegisterId, ownIds, partnerIds]);
 
   const handleSubmit = async () => {
@@ -222,9 +221,7 @@ const PartnerCashIncassationPanel = () => {
       return;
     }
     if (!isValidCrossCompanyPair()) {
-      alert(
-        "Выберите кассу вашей компании и кассу партнёра (разные стороны).",
-      );
+      alert("Выберите кассу вашей компании и кассу партнёра (разные стороны).");
       return;
     }
     const amount = parseAmount(amountStr);
@@ -246,9 +243,8 @@ const PartnerCashIncassationPanel = () => {
       loadHistory();
       if (partnerCompanyId) {
         try {
-          const data = await warehouseAPI.getStockPartnerCatalog(
-            partnerCompanyId,
-          );
+          const data =
+            await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
           setCatalog(data);
         } catch (e) {
           console.error(e);
@@ -779,9 +775,7 @@ const CashRegisterList = () => {
             <button
               type="button"
               className={`kassa-header__nav-tab flex gap-2 items-center ${
-                tab === "partner_incass"
-                  ? "kassa-header__nav-tab--active"
-                  : ""
+                tab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
               }`}
               onClick={() => setTab("partner_incass")}
             >
