@@ -252,9 +252,23 @@ const saleSlice = createSlice({
       })
       .addCase(sendBarCode.fulfilled, (state, { payload }) => {
         state.loading = false;
-        state.barcodeError = payload || {
-          detail: "Что-то пошло не так. Попробуйте снова.",
-        };
+        state.barcodeError = null;
+        if (payload?.error) {
+          state.barcodeError =
+            typeof payload.error === "string"
+              ? { message: payload.error }
+              : payload.error;
+          return;
+        }
+        if (
+          payload &&
+          typeof payload === "object" &&
+          (Array.isArray(payload.items) ||
+            Array.isArray(payload.cart?.items) ||
+            payload.id)
+        ) {
+          state.start = payload;
+        }
       })
       .addCase(sendBarCode.rejected, (state, { payload }) => {
         state.barcodeError = payload;
