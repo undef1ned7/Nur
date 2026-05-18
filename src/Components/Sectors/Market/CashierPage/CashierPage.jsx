@@ -9,7 +9,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useStore } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
 import { useDebounce, useDebounceByKey } from "../../../../hooks/useDebounce";
@@ -52,6 +52,7 @@ import ShiftPage from "./ShiftPage";
 import { Button } from "@mui/material";
 import sleep from "../../../../../tools/sleep";
 import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
@@ -137,6 +138,25 @@ const formatCartPromotionRulesLabel = (rules) => {
 };
 
 /** Процент скидки для поля в режиме «%» (как при переключении кнопки %). */
+const getSaleShiftId = (sale) => {
+  if (!sale) return null;
+  const shift = sale.shift;
+  if (shift != null && typeof shift === "object") {
+    return shift.id ?? shift.pk ?? null;
+  }
+  return sale.shift_id ?? shift ?? null;
+};
+
+const isShiftNotOpenApiError = (error) => {
+  const text = validateResErrors(error, "").toLowerCase();
+  return (
+    text.includes("смен") &&
+    (text.includes("не открыт") ||
+      text.includes("закрыт") ||
+      text.includes("not open"))
+  );
+};
+
 const formatDiscountPercentFromLine = (discountSom, lineTotal) => {
   const d = parseFloat(discountSom) || 0;
   const lt = parseFloat(lineTotal) || 0;
@@ -150,6 +170,7 @@ const CashierPage = () => {
   const alert = useAlert();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const store = useStore();
   const {
     list: products,
     count,
@@ -259,9 +280,9 @@ const CashierPage = () => {
           setOpenShiftState(openShiftFromApi);
           return openShiftFromApi;
         }
-        // Если фильтр поддерживается и открытой смены нет — прекращаем поиск.
-        // Иначе будет лишнее сканирование страниц (много повторных запросов).
-        setOpenShiftState(null);
+        // Пустой ответ фильтра не сбрасывает уже найденную открытую смену
+        // (иначе UI показывает «смена открыта», а сканер — «нет смены»).
+        setOpenShiftState((prev) => (prev?.status === "open" ? prev : null));
         return null;
       } catch (e) {
         // Если фильтр не поддерживается, продолжаем поиск по страницам
@@ -292,11 +313,11 @@ const CashierPage = () => {
         if (page > 10) break;
       }
 
-      setOpenShiftState(null);
+      setOpenShiftState((prev) => (prev?.status === "open" ? prev : null));
       return null;
     } catch (error) {
       console.error("Ошибка при поиске открытой смены:", error);
-      setOpenShiftState(null);
+      setOpenShiftState((prev) => (prev?.status === "open" ? prev : null));
       return null;
     }
   }, []);
@@ -309,6 +330,12 @@ const CashierPage = () => {
   }, [shifts, openShiftState]);
   const openShiftId = openShift?.id;
   const openShiftStatus = openShift?.status;
+  const openShiftIdRef = useRef(openShiftId);
+  const preferredWholesaleModeRef = useRef(false);
+
+  useEffect(() => {
+    openShiftIdRef.current = openShiftId;
+  }, [openShiftId]);
   const [preferredWholesaleMode, setPreferredWholesaleMode] = useState(() => {
     try {
       return localStorage.getItem(MARKET_CASHIER_WHOLESALE_MODE_KEY) === "true";
@@ -320,6 +347,75 @@ const CashierPage = () => {
     currentSale?.is_wholesale !== undefined && currentSale?.is_wholesale !== null
       ? Boolean(currentSale.is_wholesale)
       : Boolean(preferredWholesaleMode);
+
+  useEffect(() => {
+    preferredWholesaleModeRef.current = preferredWholesaleMode;
+  }, [preferredWholesaleMode]);
+
+  const waitForStartSaleIdle = useCallback(
+    async (maxMs = 4000) => {
+      const started = Date.now();
+      while (Date.now() - started < maxMs) {
+        const saleState = store.getState().sale;
+        if (!saleState.startSaleLoading) {
+          return saleState.start ?? null;
+        }
+        await sleep(50);
+      }
+      return store.getState().sale?.start ?? null;
+    },
+    [store],
+  );
+
+  const ensureActiveSaleId = useCallback(
+    async (shiftId) => {
+      if (!shiftId) return null;
+
+      const readSale = () => store.getState().sale?.start ?? null;
+      let sale = readSale();
+      if (sale?.id && String(getSaleShiftId(sale)) === String(shiftId)) {
+        return sale.id;
+      }
+
+      try {
+        const result = await dispatch(
+          startSale({
+            discount_total: 0,
+            shift: shiftId,
+            is_wholesale: Boolean(preferredWholesaleModeRef.current),
+          }),
+        ).unwrap();
+        return result?.id ?? null;
+      } catch (e) {
+        const msg = String(e?.message || e || "");
+        if (!msg.includes("condition callback returning false")) {
+          throw e;
+        }
+
+        sale = await waitForStartSaleIdle();
+        if (sale?.id && String(getSaleShiftId(sale)) === String(shiftId)) {
+          return sale.id;
+        }
+
+        if (store.getState().sale.startSaleLoading) {
+          sale = await waitForStartSaleIdle();
+          if (sale?.id && String(getSaleShiftId(sale)) === String(shiftId)) {
+            return sale.id;
+          }
+        }
+
+        const retry = await dispatch(
+          startSale({
+            discount_total: 0,
+            shift: shiftId,
+            is_wholesale: Boolean(preferredWholesaleModeRef.current),
+          }),
+        ).unwrap();
+        return retry?.id ?? null;
+      }
+    },
+    [dispatch, store, waitForStartSaleIdle],
+  );
 
   const handleSwitchSaleMode = useCallback(
     async (nextWholesale) => {
@@ -845,8 +941,8 @@ const CashierPage = () => {
       lastScannedBarcodeRef.current = barcode;
       setScannedBarcode(barcode);
 
-      // Проверяем наличие открытой смены
-      if (!openShiftId) {
+      const shiftId = openShiftIdRef.current;
+      if (!shiftId) {
         showAlert(
           "warning",
           "Нет открытой смены",
@@ -856,32 +952,25 @@ const CashierPage = () => {
         return;
       }
 
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement
+      ) {
+        const isSearch =
+          activeEl === searchInputRef.current ||
+          String(activeEl.className || "").includes(
+            "cashier-page__search-input",
+          );
+        if (!isSearch) {
+          return;
+        }
+      }
+
       barcodeProcessingRef.current = true;
 
       try {
-        let saleId = currentSale?.id;
-
-        // Если нет продажи, создаем её
-        if (!saleId) {
-          try {
-            const result = await dispatch(
-              startSale({
-                discount_total: 0,
-                shift: openShiftId,
-                is_wholesale: Boolean(preferredWholesaleMode),
-              }),
-            ).unwrap();
-            saleId = result?.id;
-          } catch (e) {
-            // startSale может быть отклонен condition callback-ом, если уже идет параллельный запрос.
-            // В таком случае не показываем ошибку сканирования, а пробуем взять уже созданную продажу.
-            const msg = String(e?.message || e || "");
-            if (!msg.includes("condition callback returning false")) {
-              throw e;
-            }
-            saleId = currentSale?.id;
-          }
-        }
+        const saleId = await ensureActiveSaleId(shiftId);
 
         if (!saleId) {
           showAlert("error", "Ошибка", "Не удалось создать продажу");
@@ -919,13 +1008,7 @@ const CashierPage = () => {
         }
         // Обновляем продажу после добавления товара
         try {
-          await dispatch(
-            startSale({
-              discount_total: 0,
-              shift: openShiftId,
-              is_wholesale: Boolean(preferredWholesaleMode),
-            }),
-          ).unwrap();
+          await ensureActiveSaleId(shiftId);
         } catch (e) {
           const msg = String(e?.message || e || "");
           if (!msg.includes("condition callback returning false")) {
@@ -939,11 +1022,21 @@ const CashierPage = () => {
         isScanningRef.current = true;
       } catch (error) {
         console.error("Ошибка при сканировании:", error);
-        showAlert(
-          "error",
-          "Ошибка сканирования",
-          error?.message || "Не удалось добавить товар по штрих-коду",
+        const message = validateResErrors(
+          error,
+          "Не удалось добавить товар по штрих-коду",
         );
+        if (isShiftNotOpenApiError(error)) {
+          await findOpenShift();
+          dispatch(fetchShiftsAsync());
+          showAlert(
+            "warning",
+            "Смена недоступна",
+            `${message}. Обновите смену или откройте новую.`,
+          );
+        } else {
+          showAlert("error", "Ошибка сканирования", message);
+        }
       } finally {
         barcodeProcessingRef.current = false;
         setScannedBarcode("");
@@ -1706,27 +1799,16 @@ const CashierPage = () => {
         return;
       }
 
-      let saleId = currentSale?.id;
-
-      // Если продажа еще не создана, создаем её
-      if (!saleId) {
-        const result = await dispatch(
-          startSale({
-            discount_total: 0,
-            shift: openShiftId,
-            is_wholesale: Boolean(preferredWholesaleMode),
-          }),
+      let saleId;
+      try {
+        saleId = await ensureActiveSaleId(openShiftId);
+      } catch (error) {
+        const message = validateResErrors(
+          error,
+          "Не удалось создать продажу",
         );
-        if (result.type === "sale/start/rejected") {
-          showAlert(
-            "error",
-            "Ошибка",
-            "Ошибка при создании продажи: " +
-              (result.payload?.message || "Неизвестная ошибка"),
-          );
-          return;
-        }
-        saleId = result.payload?.id;
+        showAlert("error", "Ошибка", message);
+        return;
       }
 
       if (!saleId) {
@@ -1736,7 +1818,13 @@ const CashierPage = () => {
 
       // Проверяем, есть ли товар уже в корзине
       // startSale возвращает items напрямую, а не cart.items
-      const items = currentSale?.items || currentSale?.cart?.items || [];
+      const saleFromStore = store.getState().sale?.start;
+      const items =
+        saleFromStore?.items ||
+        saleFromStore?.cart?.items ||
+        currentSale?.items ||
+        currentSale?.cart?.items ||
+        [];
       const existingItem = items.find((item) => {
         const itemProductId = item.product || item.product_id;
         const itemSalePackage = item.sale_package || null;
