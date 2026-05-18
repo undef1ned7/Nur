@@ -46,13 +46,10 @@
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
     };
-    function formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt) {
-      const pct = Math.max(0, toNum(lineDiscountPct));
+    function formatMarketLineDiscountCell(lineDiscountAmt) {
       const amt = Math.max(0, toNum(lineDiscountAmt));
-      if (pct <= 0 && amt <= 0) return "0";
-      const pctStr = pct > 0 ? `${money(pct).replace(/\.00$/, "")}%` : "0%";
-      const amtStr = amt > 0 ? money(amt).replace(/\.00$/, "") : "0";
-      return `( ${pctStr} | ${amtStr} )`;
+      if (amt <= 0) return "0";
+      return money(amt).replace(/\.00$/, "");
     }
     const hasText = (v) => {
       const s = String(v ?? "").trim();
@@ -128,24 +125,35 @@
     function mapPayloadItems(rawList) {
       const list = Array.isArray(rawList) ? rawList : [];
       return list.map((it) => {
-        const qty = toNum(it.qty) || 1;
+        const qty = toNum(it.qty ?? it.quantity) || 1;
         const unitPrice = toNum(it.unit_price ?? it.price);
-        const lineDiscountAmt = toNum(it?.line_discount);
+        let lineDiscountAmt = toNum(
+          it?.line_discount ?? it?.discount_total ?? it?.line_discount_total,
+        );
         const lineTotalNum =
           it?.line_total != null && it?.line_total !== ""
             ? toNum(it.line_total)
             : null;
         const grossLine = Math.max(0, qty * unitPrice);
+        if (
+          lineDiscountAmt <= 0 &&
+          lineTotalNum != null &&
+          grossLine > lineTotalNum + 1e-9
+        ) {
+          lineDiscountAmt = grossLine - lineTotalNum;
+        }
         const lineDiscountPct =
-          lineDiscountAmt > 0 && grossLine > 0
-            ? (lineDiscountAmt / grossLine) * 100
-            : 0;
+          it?.line_discount_pct != null && it?.line_discount_pct !== ""
+            ? toNum(it.line_discount_pct)
+            : lineDiscountAmt > 0 && grossLine > 0
+              ? (lineDiscountAmt / grossLine) * 100
+              : 0;
         const total =
           lineTotalNum != null && Number.isFinite(lineTotalNum)
             ? lineTotalNum
             : Math.max(0, grossLine - lineDiscountAmt);
         return {
-          name: String(it.name || "Товар"),
+          name: String(it.name || it.product_name || "Товар"),
           qty,
           price: unitPrice,
           total,
@@ -168,7 +176,10 @@
       const items = mapPayloadItems(payload.items);
 
       const subtotal = items.reduce((s, it) => s + toNum(it.total), 0);
-      const discount = Math.max(0, toNum(payload.discount));
+      const discount = Math.max(
+        0,
+        toNum(payload.discount ?? payload.order_discount_total ?? payload.order_discount),
+      );
       const vat = toNum(payload.tax);
       const nsp = toNum(payload.nsp);
       const total = Math.max(0, subtotal - discount + vat);
@@ -196,7 +207,7 @@
       out += divider + "\n";
 
       out +=
-        buildMarketItemTableRow(width, "№", "Цена", "Кол-о", "( % | с )", "Итого") + "\n";
+        buildMarketItemTableRow(width, "№", "Цена", "Кол-о", "Скидка", "Итого") + "\n";
       out += divider + "\n";
 
       for (const [index, it] of items.entries()) {
@@ -204,7 +215,6 @@
         const qty = Number(it.qty || 1);
         const price = Number(it.price || 0);
         const lineTotal = Number(it.total ?? qty * price);
-        const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
         const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
 
         const nameLines = wrapReceiptName(name, Math.max(10, width - 2));
@@ -212,7 +222,7 @@
           out += `  ${fitCell(nl, width - 2, "L")}\n`;
         }
 
-        const discCell = formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt);
+        const discCell = formatMarketLineDiscountCell(lineDiscountAmt);
 
         out +=
           buildMarketItemTableRow(
