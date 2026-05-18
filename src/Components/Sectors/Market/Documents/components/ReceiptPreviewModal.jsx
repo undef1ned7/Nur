@@ -84,20 +84,30 @@ const ReceiptPreviewModal = ({
 
       if (dataToPrint && Array.isArray(dataToPrint.items)) {
         // Преобразуем данные в формат для печати
+        const orderDiscount = parseFloat(
+          dataToPrint.totals?.discount_total || 0,
+        );
         const printData = {
           items: dataToPrint.items.map((item) => ({
             name: item.name,
-            qty: parseFloat(item.qty),
-            price: parseFloat(item.unit_price),
-            total: parseFloat(item.total),
+            qty: parseFloat(item.qty ?? item.quantity),
+            unit_price: parseFloat(item.unit_price ?? item.price),
+            price: parseFloat(item.unit_price ?? item.price),
+            line_total: parseFloat(item.line_total ?? item.total),
+            total: parseFloat(item.line_total ?? item.total),
+            line_discount: item.line_discount ?? item.discount_total,
+            discount_total: item.discount_total,
           })),
           total: parseFloat(dataToPrint.totals?.total || 0),
           subtotal: parseFloat(dataToPrint.totals?.subtotal || 0),
-          discount_total: parseFloat(dataToPrint.totals?.discount_total || 0),
+          discount: orderDiscount,
+          order_discount_total: orderDiscount,
           company: dataToPrint.company?.name || "",
           payment: dataToPrint.payment || {},
         };
-        await handleCheckoutResponseForPrinting(printData);
+        await handleCheckoutResponseForPrinting(printData, {
+          receiptStyle: "market",
+        });
       } else {
         throw new Error("Нет данных для печати");
       }
@@ -200,6 +210,50 @@ const ReceiptPreviewModal = ({
     });
   };
 
+  const resolveMarketPreviewItem = (item) => {
+    const qty = parseFloat(item.qty ?? item.quantity) || 1;
+    const price = parseFloat(item.unit_price ?? item.price) || 0;
+    let lineDiscount =
+      parseFloat(
+        item.line_discount ??
+          item.discount_total ??
+          item.line_discount_total ??
+          0,
+      ) || 0;
+    const lineTotalRaw = item.line_total ?? item.total;
+    const lineTotalParsed =
+      lineTotalRaw != null && lineTotalRaw !== ""
+        ? parseFloat(lineTotalRaw)
+        : null;
+    const gross = Math.max(0, qty * price);
+    if (
+      lineDiscount <= 0 &&
+      lineTotalParsed != null &&
+      Number.isFinite(lineTotalParsed) &&
+      gross > lineTotalParsed + 1e-9
+    ) {
+      lineDiscount = gross - lineTotalParsed;
+    }
+    const total =
+      lineTotalParsed != null && Number.isFinite(lineTotalParsed)
+        ? lineTotalParsed
+        : Math.max(0, gross - lineDiscount);
+    return {
+      id: item.id,
+      name: item.name || item.product_name || "Товар",
+      qty,
+      price,
+      lineDiscount: Math.max(0, lineDiscount),
+      total,
+    };
+  };
+
+  const formatLineDiscountDisplay = (amt) => {
+    const n = parseFloat(amt) || 0;
+    if (n <= 0) return "0";
+    return formatMoney(n);
+  };
+
   if (loading) {
     return (
       <div className="receipt-preview-modal-overlay" onClick={onClose}>
@@ -236,16 +290,9 @@ const ReceiptPreviewModal = ({
     );
   }
 
-  // Нормализация данных из нового формата API
+  // Нормализация позиций (скидки — как на печати маркета)
   const items = Array.isArray(receiptData?.items)
-    ? receiptData.items.map((item) => ({
-        id: item.id,
-        name: item.name || item.product_name || "Товар",
-        qty: parseFloat(item.qty || item.quantity || 0),
-        price: parseFloat(item.unit_price || item.price || 0),
-        total: parseFloat(item.total || 0),
-        unit: item.unit || "ШТ",
-      }))
+    ? receiptData.items.map(resolveMarketPreviewItem)
     : [];
 
   const doc = receiptData?.document || receiptData?.sale || {};
@@ -253,10 +300,14 @@ const ReceiptPreviewModal = ({
   const cashier = receiptData?.cashier || {};
   const client = receiptData?.client || null;
 
-  const subtotal = parseFloat(receiptData?.totals?.subtotal || 0);
+  const itemsSubtotal = items.reduce((sum, it) => sum + (it.total || 0), 0);
+  const subtotal =
+    parseFloat(receiptData?.totals?.subtotal || 0) || itemsSubtotal;
   const discount = parseFloat(receiptData?.totals?.discount_total || 0);
   const tax = parseFloat(receiptData?.totals?.tax_total || 0);
-  const total = parseFloat(receiptData?.totals?.total || 0);
+  const total =
+    parseFloat(receiptData?.totals?.total || 0) ||
+    Math.max(0, subtotal - discount + tax);
 
   const payment = receiptData?.payment || {};
   const paidCash =
@@ -306,27 +357,37 @@ const ReceiptPreviewModal = ({
               )}
             </div>
 
-            {/* Список товаров */}
+            {/* Позиции — таблица как на чеке маркета */}
             <div className="receipt-preview-modal__items">
               {items.length > 0 ? (
-                items.map((item, index) => (
-                  <div
-                    key={item.id || index}
-                    className="receipt-preview-modal__item"
-                  >
-                    <div className="receipt-preview-modal__item-row">
+                <div className="receipt-preview-modal__items-table">
+                  <div className="receipt-preview-modal__items-table-head">
+                    <span>№</span>
+                    <span>Цена</span>
+                    <span>Кол-о</span>
+                    <span>Скидка</span>
+                    <span>Итого</span>
+                  </div>
+                  {items.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="receipt-preview-modal__items-table-item"
+                    >
                       <div className="receipt-preview-modal__item-name">
                         {item.name}
                       </div>
-                      <div className="receipt-preview-modal__item-price">
-                        {formatMoney(item.qty)} X {formatMoney(item.price)} ≡
+                      <div className="receipt-preview-modal__items-table-row">
+                        <span>{index + 1}</span>
+                        <span>{formatMoney(item.price)}</span>
+                        <span>{item.qty}</span>
+                        <span>
+                          {formatLineDiscountDisplay(item.lineDiscount)}
+                        </span>
+                        <span>{formatMoney(item.total)}</span>
                       </div>
                     </div>
-                    <div className="receipt-preview-modal__item-total">
-                      {formatMoney(item.total)}
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
                 <div className="receipt-preview-modal__item">
                   <div className="receipt-preview-modal__item-name">
@@ -336,10 +397,29 @@ const ReceiptPreviewModal = ({
               )}
             </div>
 
-            {/* Пунктирная линия перед итогом */}
-            <div className="receipt-preview-modal__divider receipt-preview-modal__divider--dashed"></div>
+            <div className="receipt-preview-modal__divider receipt-preview-modal__divider--dashed" />
 
-            {/* Итого */}
+            <div className="receipt-preview-modal__receipt-totals">
+              <div className="receipt-preview-modal__total-row">
+                <span>Подытог</span>
+                <span>{formatMoney(subtotal)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="receipt-preview-modal__total-row">
+                  <span>Скидка</span>
+                  <span>-{formatMoney(discount)}</span>
+                </div>
+              )}
+              {tax > 0 && (
+                <div className="receipt-preview-modal__total-row">
+                  <span>НДС</span>
+                  <span>{formatMoney(tax)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="receipt-preview-modal__divider receipt-preview-modal__divider--dashed" />
+
             <div className="receipt-preview-modal__total-section">
               <div className="receipt-preview-modal__total-label">ИТОГ</div>
               <div className="receipt-preview-modal__total-amount">

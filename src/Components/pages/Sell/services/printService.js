@@ -335,14 +335,62 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Колонка «скидка» в строке маркета: «0» или «( 2% | 10.50 )». */
-function formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt) {
-  const pct = Math.max(0, toNum(lineDiscountPct));
+/** Колонка «скидка» в строке маркета: «0» или сумма в сомах. */
+function formatMarketLineDiscountCell(lineDiscountAmt) {
   const amt = Math.max(0, toNum(lineDiscountAmt));
-  if (pct <= 0 && amt <= 0) return "0";
-  const pctStr = pct > 0 ? `${money(pct).replace(/\.00$/, "")}%` : "0%";
-  const amtStr = amt > 0 ? money(amt).replace(/\.00$/, "") : "0";
-  return `( ${pctStr} | ${amtStr} )`;
+  if (amt <= 0) return "0";
+  return money(amt).replace(/\.00$/, "");
+}
+
+/** Строка чека маркета: скидка как в eKassa (сумма + %), те же поля что при fiscal merge. */
+function mapMarketReceiptItem(it) {
+  const qty = toNum(it?.qty ?? it?.quantity) || 1;
+  const unitPrice = toNum(it?.unit_price ?? it?.price);
+  let lineDiscountAmt = toNum(
+    it?.line_discount ?? it?.discount_total ?? it?.line_discount_total,
+  );
+  const lineTotalNum =
+    it?.line_total != null && it?.line_total !== ""
+      ? toNum(it.line_total)
+      : null;
+  const grossLine = Math.max(0, qty * unitPrice);
+  if (
+    lineDiscountAmt <= 0 &&
+    lineTotalNum != null &&
+    grossLine > lineTotalNum + 1e-9
+  ) {
+    lineDiscountAmt = grossLine - lineTotalNum;
+  }
+  const lineDiscountPct =
+    it?.line_discount_pct != null && it?.line_discount_pct !== ""
+      ? toNum(it.line_discount_pct)
+      : lineDiscountAmt > 0 && grossLine > 0
+        ? (lineDiscountAmt / grossLine) * 100
+        : 0;
+  const total =
+    lineTotalNum != null && Number.isFinite(lineTotalNum)
+      ? lineTotalNum
+      : Math.max(0, grossLine - lineDiscountAmt);
+  return {
+    name: String(it?.name ?? it?.product_name ?? "Товар"),
+    qty,
+    price: unitPrice,
+    total,
+    line_discount_pct: lineDiscountPct,
+    line_discount_amount: lineDiscountAmt,
+  };
+}
+
+function resolveMarketOrderDiscount(payload, ekassaFields) {
+  if (ekassaFields) return 0;
+  return Math.max(
+    0,
+    toNum(
+      payload?.discount ??
+        payload?.order_discount_total ??
+        payload?.order_discount,
+    ),
+  );
 }
 
 const fromTyiyn = (v) => toNum(v) / 100;
@@ -423,53 +471,22 @@ function buildReceiptFromJSON(payload, opts = {}) {
           ) || null;
       }
       if (!src) return base;
-      const lineDiscountAmt = toNum(
-        src?.line_discount ?? src?.discount_total ?? src?.line_discount_total,
-      );
-      const unitPrice = toNum(src?.unit_price ?? src?.price) || price;
-      const grossLine = Math.max(0, qty * unitPrice);
-      const lineDiscountPct =
-        lineDiscountAmt > 0 && grossLine > 0
-          ? (lineDiscountAmt / grossLine) * 100
-          : 0;
+      const mapped = mapMarketReceiptItem({ ...src, qty, price, unit_price: price });
       return {
         ...base,
-        line_discount_pct: lineDiscountPct,
-        line_discount_amount: lineDiscountAmt,
+        line_discount_pct: mapped.line_discount_pct,
+        line_discount_amount: mapped.line_discount_amount,
+        total: mapped.total,
       };
     })
-    : (Array.isArray(payload.items) ? payload.items : []).map((it) => {
-      const qty = toNum(it.qty) || 1;
-      const unitPrice = toNum(it.unit_price ?? it.price);
-      const lineDiscountAmt = toNum(it?.line_discount);
-      const lineTotalNum =
-        it?.line_total != null && it?.line_total !== ""
-          ? toNum(it.line_total)
-          : null;
-      const grossLine = Math.max(0, qty * unitPrice);
-      // line_discount — сумма скидки в сомах; % = line_discount / (цена × кол-о) × 100.
-      const lineDiscountPct =
-        lineDiscountAmt > 0 && grossLine > 0
-          ? (lineDiscountAmt / grossLine) * 100
-          : 0;
-      const total =
-        lineTotalNum != null && Number.isFinite(lineTotalNum)
-          ? lineTotalNum
-          : Math.max(0, grossLine - lineDiscountAmt);
-      return {
-        name: String(it.name || "Товар"),
-        qty,
-        price: unitPrice,
-        total,
-        line_discount_pct: lineDiscountPct,
-        line_discount_amount: lineDiscountAmt,
-      };
-    });
+    : (payloadItemsForMerge || (Array.isArray(payload.items) ? payload.items : [])).map(
+        mapMarketReceiptItem,
+      );
 
   const subtotal = ekassaFields
     ? fromTyiyn(f(ekassaFields, "1020"))
     : items.reduce((s, it) => s + toNum(it.total), 0);
-  const discount = ekassaFields ? 0 : Math.max(0, toNum(payload.discount));
+  const discount = resolveMarketOrderDiscount(payload, ekassaFields);
   const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : toNum(payload.tax);
   const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
   const total = ekassaFields
@@ -539,7 +556,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
       concatUint8Arrays(
         joinEncodedMarketTableCells(
           enc,
-          buildMarketItemTableCells(width, "№", "Цена", "Кол-о", "( % | с )", "Итого"),
+          buildMarketItemTableCells(width, "№", "Цена", "Кол-о", "Скидка", "Итого"),
         ),
         enc("\n"),
       ),
@@ -550,7 +567,6 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const qty = Number(it.qty || 1);
       const price = Number(it.price || 0);
       const lineTotal = Number(it.total ?? qty * price);
-      const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
 
       const nameLines = wrapReceiptName(name, Math.max(10, width - 2));
@@ -558,7 +574,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
         chunks.push(enc(`  ${fitCell(nl, width - 2, "L")}\n`));
       }
 
-      const discCell = formatMarketLineDiscountCell(lineDiscountPct, lineDiscountAmt);
+      const discCell = formatMarketLineDiscountCell(lineDiscountAmt);
 
       chunks.push(
         concatUint8Arrays(
@@ -584,15 +600,14 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const price = Number(it.price || 0);
       const lineTotal = Number(it.total ?? qty * price);
       chunks.push(enc(`${index + 1}. ${name}\n`));
-      const lineDiscountPct = Math.max(0, toNum(it?.line_discount_pct));
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
       chunks.push(enc(lr(`${money(price)} x ${qty} ед.`, money(lineTotal), width) + "\n"));
-      if (lineDiscountPct > 0 || lineDiscountAmt > 0) {
-        const pctStr =
-          lineDiscountPct > 0 ? `${money(lineDiscountPct).replace(/\.00$/, "")}%` : "";
-        const amtStr = lineDiscountAmt > 0 ? `-${money(lineDiscountAmt)}` : "";
-        const right = [pctStr, amtStr].filter(Boolean).join(" ");
-        chunks.push(enc(lr("Скидка (товар)", right || "—", width) + "\n"));
+      if (lineDiscountAmt > 0) {
+        chunks.push(
+          enc(
+            lr("Скидка (товар)", `-${money(lineDiscountAmt)}`, width) + "\n",
+          ),
+        );
       }
       if (ekassaFields) {
         chunks.push(enc("НДС 0%, НсП 0%\n"));
@@ -605,8 +620,10 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   }
   chunks.push(enc(lr("Подытог", money(subtotal), width) + "\n"));
+  if (discount > 0) {
+    chunks.push(enc(lr("Скидка", `-${money(discount)}`, width) + "\n"));
+  }
   if (!ekassaFields) {
-    if (discount > 0) chunks.push(enc(lr("Скидка", `-${money(discount)}`, width) + "\n"));
     if (vat > 0) chunks.push(enc(lr("НДС", money(vat), width) + "\n"));
     if (nsp > 0) chunks.push(enc(lr("НсП", money(nsp), width) + "\n"));
   }
