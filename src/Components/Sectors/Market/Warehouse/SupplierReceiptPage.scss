@@ -94,6 +94,42 @@
     letter-spacing: 0.04em;
   }
 
+  &__payment {
+    margin-bottom: 20px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #f8fafc;
+  }
+
+  &__payment-title {
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__payment-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  &__payment-hint {
+    margin: 14px 0 0;
+    font-size: 14px;
+    color: var(--muted);
+
+    strong {
+      color: var(--text);
+    }
+  }
+
+  &__payment--detail {
+    margin-top: 16px;
+  }
+
   &__actions {
     display: flex;
     justify-content: flex-end;
@@ -323,6 +359,71 @@
   &__modal-card--detail {
     width: min(720px, 100%);
     max-height: calc(100vh - 24px);
+  }
+
+  &__modal-card--payment {
+    width: min(640px, 100%);
+  }
+
+  &__modal-card--success {
+    width: min(480px, 100%);
+    text-align: center;
+  }
+
+  &__payment-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+
+    .market-receipt-page__modal-title {
+      margin: 0;
+    }
+  }
+
+  &__payment-modal-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+
+      span {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      strong {
+        font-size: 14px;
+        color: var(--text);
+        word-break: break-word;
+      }
+    }
+  }
+
+  &__success-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+    color: #16a34a;
+  }
+
+  &__success-text {
+    text-align: center;
+    margin-bottom: 8px;
+
+    strong {
+      color: var(--text);
+    }
   }
 
   &__table-row--clickable {
@@ -721,6 +822,10 @@
     }
 
     &__modal-products-grid {
+      grid-template-columns: 1fr;
+    }
+
+    &__payment-modal-summary {
       grid-template-columns: 1fr;
     }
   }

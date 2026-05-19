@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import BarcodePrintTab from "./components/BarcodePrintTab";
 import { fetchProductsAsync } from "../../../store/creators/productCreators";
 import { clearProducts } from "../../../store/slices/productSlice";
+import { useDebouncedValue } from "../../../hooks/useDebounce";
 
 const PAGE_SIZE = 100;
 
@@ -15,21 +16,13 @@ const BarcodePrintPage = () => {
   const dispatch = useDispatch();
   const { list: products, loading, count } = useSelector((state) => state.product);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+  const normalizedSearch = debouncedSearch.trim();
   const [page, setPage] = useState(1);
-  const debounceRef = useRef(null);
 
-  // Дебаунс поиска и сброс на первую страницу при смене поиска
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim() || "");
-      setPage(1);
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchTerm]);
+    setPage(1);
+  }, [normalizedSearch]);
 
   // Загрузка товаров с пагинацией
   useEffect(() => {
@@ -37,10 +30,10 @@ const BarcodePrintPage = () => {
       fetchProductsAsync({
         page,
         page_size: PAGE_SIZE,
-        search: debouncedSearch || undefined,
+        search: normalizedSearch || undefined,
       })
     );
-  }, [dispatch, page, debouncedSearch]);
+  }, [dispatch, page, normalizedSearch]);
 
   // Очистка списка при выходе со страницы
   useEffect(() => {

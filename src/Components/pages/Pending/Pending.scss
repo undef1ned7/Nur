@@ -598,3 +598,23 @@
     }
   }
 }
+
+.pending-action-spinner {
+  animation: pending-spin 0.8s linear infinite;
+}
+
+@keyframes pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pending-table__row--busy,
+.pending-card--busy {
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.pending-table__loading .loading {
+  padding: 12px 0;
+}

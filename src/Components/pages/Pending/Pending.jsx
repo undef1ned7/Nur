@@ -1,4 +1,4 @@
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Search,
@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import {
   deleteItemsMake,
@@ -25,6 +26,8 @@ import { useLocation, useParams } from "react-router-dom";
 import { HeaderTabs } from "../../Sectors/Hostel/kassa/kassa";
 import { deleteSale } from "../../../store/creators/saleThunk";
 import { onPayDebtDeal } from "../../../store/creators/clientCreators";
+import { useAlert, useConfirm } from "../../../hooks/useDialog";
+import Loading from "../../common/Loading/Loading";
 
 const STORAGE_KEY = "pending_view_mode";
 
@@ -40,12 +43,14 @@ const Pending = () => {
   const location = useLocation();
   const { id: cashboxId } = useParams(); // UUID кассы из URL
   const dispatch = useDispatch();
-  const { cashFlows } = useCash();
-  const { loading } = useSelector((s) => s.product);
+  const alert = useAlert();
+  const confirm = useConfirm();
+  const { cashFlows, loading: cashFlowsLoading } = useCash();
 
   // --- selection state ---
   const [selected, setSelected] = useState(() => new Set());
   const [processing, setProcessing] = useState(false);
+  const [actingId, setActingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState(getInitialViewMode);
@@ -108,54 +113,62 @@ const Pending = () => {
     dispatch(getCashFlows(apiParams));
   };
 
-  const handleAccept = async (item) => {
+  const applyRejectSideEffects = (item) => {
+    if (item.source_business_operation_id === "Склад") {
+      dispatch(deleteProductAsync(item?.source_cashbox_flow_id));
+    }
+
+    if (item.source_business_operation_id === "Продажа") {
+      dispatch(deleteSale(item?.source_cashbox_flow_id));
+    }
+
+    if (item.source_business_operation_id === "Оплата долга") {
+      dispatch(onPayDebtDeal(item?.source_cashbox_flow_id));
+    }
+
+    if (item.source_business_operation_id === "Сырье") {
+      dispatch(deleteItemsMake(item.source_cashbox_flow_id));
+    }
+
+    if (item.source_business_operation_id === "Продажа производство") {
+      dispatch(deleteSale(item?.source_cashbox_flow_id));
+    }
+  };
+
+  const performAccept = async (item) => {
+    setActingId(item.id);
     try {
       await dispatch(
         updateCashFlows({
           productId: item.id,
           updatedData: { status: "approved" },
-        })
+        }),
       ).unwrap();
       await refresh();
-      // убирать из selected, если был выбран
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(item.id);
         return next;
       });
+      alert("Запрос одобрен");
     } catch (e) {
-      alert("Не удалось отправить товар");
+      alert("Не удалось одобрить запрос", true);
+    } finally {
+      setActingId(null);
     }
   };
 
-  const handleReject = async (item) => {
+  const performReject = async (item) => {
+    setActingId(item.id);
     try {
       await dispatch(
         updateCashFlows({
           productId: item.id,
           updatedData: { status: "rejected" },
-        })
+        }),
       ).unwrap();
 
-      if (item.source_business_operation_id === "Склад") {
-        dispatch(deleteProductAsync(item?.source_cashbox_flow_id));
-      }
-
-      if (item.source_business_operation_id === "Продажа") {
-        dispatch(deleteSale(item?.source_cashbox_flow_id));
-      }
-
-      if (item.source_business_operation_id === "Оплата долга") {
-        dispatch(onPayDebtDeal(item?.source_cashbox_flow_id));
-      }
-
-      if (item.source_business_operation_id === "Сырье") {
-        dispatch(deleteItemsMake(item.source_cashbox_flow_id));
-      }
-
-      if (item.source_business_operation_id === "Продажа производство") {
-        dispatch(deleteSale(item?.source_cashbox_flow_id));
-      }
+      applyRejectSideEffects(item);
 
       await refresh();
       setSelected((prev) => {
@@ -163,10 +176,29 @@ const Pending = () => {
         next.delete(item.id);
         return next;
       });
+      alert("Запрос отклонён");
     } catch (e) {
-      alert("Не удалось отклонить товар");
+      alert("Не удалось отклонить запрос", true);
+    } finally {
+      setActingId(null);
     }
   };
+
+  const handleAccept = (item) => {
+    confirm(`Одобрить запрос «${item.name || "без названия"}»?`, (ok) => {
+      if (!ok) return;
+      void performAccept(item);
+    });
+  };
+
+  const handleReject = (item) => {
+    confirm(`Отклонить запрос «${item.name || "без названия"}»?`, (ok) => {
+      if (!ok) return;
+      void performReject(item);
+    });
+  };
+
+  const isActionLocked = Boolean(actingId) || processing;
 
   // --- массовые действия ---
   const bulkUpdate = async (ids, statusValue) => {
@@ -179,64 +211,72 @@ const Pending = () => {
       }));
       await dispatch(bulkUpdateCashFlowsStatus(items)).unwrap();
       await refresh();
-      // очищаем выбранные
       setSelected(new Set());
+      alert("Выбранные запросы одобрены");
     } catch (e) {
-      alert("Не все операции прошли успешно. Проверьте список и повторите.");
+      alert(
+        "Не все операции прошли успешно. Проверьте список и повторите.",
+        true,
+      );
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleBulkAccept = () => bulkUpdate(Array.from(selected), "approved");
+  const handleBulkAccept = () => {
+    if (!selected.size) return;
+    const count = selected.size;
+    confirm(
+      `Одобрить ${count} ${count === 1 ? "запрос" : count < 5 ? "запроса" : "запросов"}?`,
+      (ok) => {
+        if (!ok) return;
+        void bulkUpdate(Array.from(selected), "approved");
+      },
+    );
+  };
 
-  const handleBulkReject = async () => {
+  const performBulkReject = async () => {
     if (!selected.size) return;
     setProcessing(true);
     try {
       const selectedIds = Array.from(selected);
       const selectedItems = pending.filter((item) =>
-        selectedIds.includes(item.id)
+        selectedIds.includes(item.id),
       );
 
-      // Обновляем статус всех выбранных элементов через bulk API
       const items = selectedIds.map((id) => ({
         id,
         status: "rejected",
       }));
       await dispatch(bulkUpdateCashFlowsStatus(items)).unwrap();
 
-      // Применяем логику удаления связанных записей для каждого элемента
       for (const item of selectedItems) {
-        if (item.source_business_operation_id === "Склад") {
-          dispatch(deleteProductAsync(item?.source_cashbox_flow_id));
-        }
-
-        if (item.source_business_operation_id === "Продажа") {
-          dispatch(deleteSale(item?.source_cashbox_flow_id));
-        }
-
-        if (item.source_business_operation_id === "Оплата долга") {
-          dispatch(onPayDebtDeal(item?.source_cashbox_flow_id));
-        }
-
-        if (item.source_business_operation_id === "Сырье") {
-          dispatch(deleteItemsMake(item.source_cashbox_flow_id));
-        }
-
-        if (item.source_business_operation_id === "Продажа производство") {
-          dispatch(deleteSale(item?.source_cashbox_flow_id));
-        }
+        applyRejectSideEffects(item);
       }
 
       await refresh();
-      // очищаем выбранные
       setSelected(new Set());
+      alert("Выбранные запросы отклонены");
     } catch (e) {
-      alert("Не все операции прошли успешно. Проверьте список и повторите.");
+      alert(
+        "Не все операции прошли успешно. Проверьте список и повторите.",
+        true,
+      );
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleBulkReject = () => {
+    if (!selected.size) return;
+    const count = selected.size;
+    confirm(
+      `Отклонить ${count} ${count === 1 ? "запрос" : count < 5 ? "запроса" : "запросов"}?`,
+      (ok) => {
+        if (!ok) return;
+        void performBulkReject();
+      },
+    );
   };
 
   // --- чекбоксы ---
@@ -385,7 +425,7 @@ const Pending = () => {
               <button
                 className="pending-bulk-actions__clear-btn"
                 onClick={() => setSelected(new Set())}
-                disabled={processing}
+                disabled={isActionLocked}
                 title="Снять выбор"
               >
                 <X size={16} />
@@ -394,19 +434,27 @@ const Pending = () => {
               <button
                 className="pending-bulk-actions__reject-btn"
                 onClick={handleBulkReject}
-                disabled={processing}
+                disabled={isActionLocked}
                 title="Отказать выбранным"
               >
-                <XCircle size={16} />
+                {processing ? (
+                  <Loader2 size={16} className="pending-action-spinner" />
+                ) : (
+                  <XCircle size={16} />
+                )}
                 {processing ? "Обработка..." : "Отказать выбранным"}
               </button>
               <button
                 className="pending-bulk-actions__accept-btn"
                 onClick={handleBulkAccept}
-                disabled={processing}
+                disabled={isActionLocked}
                 title="Одобрить выбранные"
               >
-                <CheckCircle2 size={16} />
+                {processing ? (
+                  <Loader2 size={16} className="pending-action-spinner" />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
                 {processing ? "Обработка..." : "Одобрить выбранные"}
               </button>
             </div>
@@ -418,9 +466,12 @@ const Pending = () => {
           <button
             className="pending-footer__refresh-btn"
             onClick={() => dispatch(getCashFlows(apiParams))}
-            disabled={processing}
+            disabled={isActionLocked}
           >
-            <RefreshCw size={16} />
+            <RefreshCw
+              size={16}
+              className={cashFlowsLoading ? "pending-action-spinner" : ""}
+            />
             Обновить список
           </button>
         </div>
@@ -453,10 +504,10 @@ const Pending = () => {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {cashFlowsLoading ? (
                   <tr>
                     <td colSpan={8} className="pending-table__loading">
-                      Загрузка...
+                      <Loading message="Загрузка запросов..." />
                     </td>
                   </tr>
                 ) : filteredPending.length === 0 ? (
@@ -468,47 +519,70 @@ const Pending = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredPending.map((item, idx) => (
-                    <tr key={item.id} className="pending-table__row">
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(item.id)}
-                          onChange={() => toggleRow(item.id)}
-                        />
-                      </td>
-                      <td>{idx + 1}</td>
-                      <td className="pending-table__name">{item.name}</td>
-                      <td>{mapType(item.type)}</td>
-                      <td>{item.cashbox_name || "—"}</td>
-                      <td>
-                        {new Date(item.created_at).toLocaleDateString("ru-RU")}
-                      </td>
-                      <td>{item.amount ? `${item.amount} сом` : "—"}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div className="pending-table__actions">
-                          <button
-                            className="pending-table__action-btn pending-table__action-btn--accept"
-                            title="Одобрить"
-                            onClick={() => handleAccept(item)}
-                            disabled={processing}
-                          >
-                            <CheckCircle2 size={16} />
-                            Одобрить
-                          </button>
-                          <button
-                            className="pending-table__action-btn pending-table__action-btn--reject"
-                            title="Отказать"
-                            onClick={() => handleReject(item)}
-                            disabled={processing}
-                          >
-                            <XCircle size={16} />
-                            Отказать
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  filteredPending.map((item, idx) => {
+                    const rowBusy = actingId === item.id;
+                    const rowDisabled =
+                      isActionLocked && actingId !== item.id;
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`pending-table__row${rowBusy ? " pending-table__row--busy" : ""}`}
+                      >
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggleRow(item.id)}
+                            disabled={isActionLocked}
+                          />
+                        </td>
+                        <td>{idx + 1}</td>
+                        <td className="pending-table__name">{item.name}</td>
+                        <td>{mapType(item.type)}</td>
+                        <td>{item.cashbox_name || "—"}</td>
+                        <td>
+                          {new Date(item.created_at).toLocaleDateString("ru-RU")}
+                        </td>
+                        <td>{item.amount ? `${item.amount} сом` : "—"}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div className="pending-table__actions">
+                            <button
+                              className="pending-table__action-btn pending-table__action-btn--accept"
+                              title="Одобрить"
+                              onClick={() => handleAccept(item)}
+                              disabled={rowDisabled || rowBusy}
+                            >
+                              {rowBusy ? (
+                                <Loader2
+                                  size={16}
+                                  className="pending-action-spinner"
+                                />
+                              ) : (
+                                <CheckCircle2 size={16} />
+                              )}
+                              {rowBusy ? "Обработка..." : "Одобрить"}
+                            </button>
+                            <button
+                              className="pending-table__action-btn pending-table__action-btn--reject"
+                              title="Отказать"
+                              onClick={() => handleReject(item)}
+                              disabled={rowDisabled || rowBusy}
+                            >
+                              {rowBusy ? (
+                                <Loader2
+                                  size={16}
+                                  className="pending-action-spinner"
+                                />
+                              ) : (
+                                <XCircle size={16} />
+                              )}
+                              {rowBusy ? "Обработка..." : "Отказать"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -540,9 +614,9 @@ const Pending = () => {
               </div>
             </div>
 
-            {loading ? (
-              <div className="pending-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Загрузка...
+            {cashFlowsLoading ? (
+              <div className="pending-table__loading rounded-2xl border border-slate-200 bg-white p-6">
+                <Loading message="Загрузка запросов..." />
               </div>
             ) : filteredPending.length === 0 ? (
               <div className="pending-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
@@ -550,10 +624,14 @@ const Pending = () => {
               </div>
             ) : (
               <div className="pending-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filteredPending.map((item, idx) => (
+                {filteredPending.map((item, idx) => {
+                  const rowBusy = actingId === item.id;
+                  const rowDisabled =
+                    isActionLocked && actingId !== item.id;
+                  return (
                   <div
                     key={item.id}
-                    className="pending-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                    className={`pending-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md${rowBusy ? " pending-card--busy" : ""}`}
                   >
                     <div className="flex items-start gap-3">
                       <div
@@ -569,6 +647,7 @@ const Pending = () => {
                           onChange={() => toggleRow(item.id)}
                           onClick={(e) => e.stopPropagation()}
                           className="h-4 w-4 rounded border-slate-300"
+                          disabled={isActionLocked}
                         />
                       </div>
 
@@ -620,10 +699,17 @@ const Pending = () => {
                           e.stopPropagation();
                           handleAccept(item);
                         }}
-                        disabled={processing}
+                        disabled={rowDisabled || rowBusy}
                       >
-                        <CheckCircle2 size={14} />
-                        Одобрить
+                        {rowBusy ? (
+                          <Loader2
+                            size={14}
+                            className="pending-action-spinner"
+                          />
+                        ) : (
+                          <CheckCircle2 size={14} />
+                        )}
+                        {rowBusy ? "Обработка..." : "Одобрить"}
                       </button>
                       <button
                         className="pending-card__action-btn pending-card__action-btn--reject flex-1"
@@ -631,14 +717,22 @@ const Pending = () => {
                           e.stopPropagation();
                           handleReject(item);
                         }}
-                        disabled={processing}
+                        disabled={rowDisabled || rowBusy}
                       >
-                        <XCircle size={14} />
-                        Отказать
+                        {rowBusy ? (
+                          <Loader2
+                            size={14}
+                            className="pending-action-spinner"
+                          />
+                        ) : (
+                          <XCircle size={14} />
+                        )}
+                        {rowBusy ? "Обработка..." : "Отказать"}
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
