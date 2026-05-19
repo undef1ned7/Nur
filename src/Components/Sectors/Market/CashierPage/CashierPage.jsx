@@ -417,6 +417,32 @@ const CashierPage = () => {
     [dispatch, store, waitForStartSaleIdle],
   );
 
+  /** После скана/добавления — всегда подтянуть актуальную корзину через /start/ */
+  const refreshSaleFromStore = useCallback(
+    async (shiftId) => {
+      if (!shiftId) return;
+      const sale = store.getState().sale?.start;
+      if (!sale?.id) return;
+      const currentDiscount = normalizePrice(sale?.order_discount_total || 0);
+      try {
+        await dispatch(
+          startSale({
+            discount_total: currentDiscount,
+            shift: shiftId,
+            is_wholesale: Boolean(preferredWholesaleModeRef.current),
+          }),
+        ).unwrap();
+      } catch (e) {
+        const msg = String(e?.message || e || "");
+        if (!msg.includes("condition callback returning false")) {
+          throw e;
+        }
+        await waitForStartSaleIdle();
+      }
+    },
+    [dispatch, store, waitForStartSaleIdle],
+  );
+
   const handleSwitchSaleMode = useCallback(
     async (nextWholesale) => {
       try {
@@ -1006,9 +1032,9 @@ const CashierPage = () => {
             }
           }
         }
-        // Обновляем продажу после добавления товара
+        // Обновляем корзину из API (как раньше — startSale после scan)
         try {
-          await ensureActiveSaleId(shiftId);
+          await refreshSaleFromStore(shiftId);
         } catch (e) {
           const msg = String(e?.message || e || "");
           if (!msg.includes("condition callback returning false")) {

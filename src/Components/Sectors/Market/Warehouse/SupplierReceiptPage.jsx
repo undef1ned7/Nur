@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
 import { pdf } from "@react-pdf/renderer";
 import {
   ArrowLeft,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
   PackageCheck,
   Plus,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../api";
@@ -17,6 +20,13 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import InvoicePdfDocument from "../Documents/components/InvoicePdfDocument";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  addCashFlows,
+  getCashBoxes,
+  useCash,
+} from "../../../../store/slices/cashSlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import { createDeal } from "../../../../store/creators/saleThunk";
 import "./Warehouse.scss";
 import "./SupplierReceiptPage.scss";
 
@@ -82,10 +92,20 @@ const formatMoney = (value) =>
     maximumFractionDigits: 2,
   });
 
+const toNum = (value) => {
+  const num = Number(String(value ?? "").replace(",", "."));
+  return Number.isFinite(num) ? num : 0;
+};
+
+const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
+
 export default function SupplierReceiptPage() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const alert = useAlert();
   const confirm = useConfirm();
+  const { list: cashBoxes } = useCash();
+  const { company } = useUser();
 
   const [suppliers, setSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
@@ -110,6 +130,14 @@ export default function SupplierReceiptPage() {
   const [priceByProductId, setPriceByProductId] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [selectCashBox, setSelectCashBox] = useState("");
+  const [paymentType, setPaymentType] = useState("full");
+  const [prepayment, setPrepayment] = useState("");
+  const [debtMonths, setDebtMonths] = useState("1");
+  const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [completedReceiptSnapshot, setCompletedReceiptSnapshot] = useState(null);
 
   const supplierOptions = useMemo(
     () =>
@@ -249,13 +277,24 @@ export default function SupplierReceiptPage() {
 
   useEffect(() => {
     void loadSuppliers();
+    dispatch(getCashBoxes());
     // intentionally once on mount to avoid refetch loops from unstable hook refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (!cashBoxes?.length || selectCashBox) return;
+    const firstId = cashBoxes[0]?.id || cashBoxes[0]?.uuid || "";
+    if (firstId) setSelectCashBox(String(firstId));
+  }, [cashBoxes, selectCashBox]);
+
+  useEffect(() => {
     setQtyByProductId({});
     setPriceByProductId({});
+    setPaymentType("full");
+    setPrepayment("");
+    setDebtMonths("1");
+    setFirstPaymentDate(getTodayIsoDate());
     if (!selectedSupplierId) {
       setProducts([]);
       return;
@@ -326,6 +365,12 @@ export default function SupplierReceiptPage() {
       ),
     [receiptItemsForPdf],
   );
+
+  const cashExpenseAmount = useMemo(() => {
+    if (paymentType === "debt") return 0;
+    if (paymentType === "prepayment") return toNum(prepayment);
+    return totalReceiptAmount;
+  }, [paymentType, prepayment, totalReceiptAmount]);
 
   const handleQtyChange = useCallback((productId, value) => {
     const nextValue = String(value ?? "");
@@ -474,19 +519,8 @@ export default function SupplierReceiptPage() {
     setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   }, []);
 
-  const handleDownloadInvoice = useCallback(async () => {
-    if (!selectedSupplier) {
-      alert("Сначала выберите поставщика", true);
-      return;
-    }
-
-    if (!receiptItemsForPdf.length) {
-      alert("Добавьте хотя бы один товар в накладную", true);
-      return;
-    }
-
-    setDownloadingInvoice(true);
-    try {
+  const buildInvoicePdfBlob = useCallback(
+    async ({ supplier, items, total }) => {
       const timestamp = new Date();
       const invoiceNumber = `PR-${timestamp.getFullYear()}${String(
         timestamp.getMonth() + 1,
@@ -498,18 +532,13 @@ export default function SupplierReceiptPage() {
       ).padStart(2, "0")}`;
 
       let companyName = "";
-      let employeeName = "";
       try {
         companyName = localStorage.getItem("company_name") || "";
-        const rawUser = localStorage.getItem("userData");
-        const user = rawUser ? JSON.parse(rawUser) : null;
-        employeeName =
-          [user?.last_name || "", user?.first_name || ""].filter(Boolean).join(" ").trim() ||
-          user?.email ||
-          "";
-      } catch {}
+      } catch {
+        companyName = "";
+      }
 
-      const blob = await pdf(
+      return pdf(
         <InvoicePdfDocument
           data={{
             doc_type: "purchase",
@@ -525,10 +554,10 @@ export default function SupplierReceiptPage() {
               discount_percent: 0,
             },
             seller: {
-              name: buildSupplierLabel(selectedSupplier),
-              address: selectedSupplier?.address || "",
-              phone: selectedSupplier?.phone || null,
-              email: selectedSupplier?.email || null,
+              name: buildSupplierLabel(supplier),
+              address: supplier?.address || "",
+              phone: supplier?.phone || null,
+              email: supplier?.email || null,
             },
             buyer: {
               name: companyName || "Компания",
@@ -537,7 +566,7 @@ export default function SupplierReceiptPage() {
               phone: null,
               email: null,
             },
-            items: receiptItemsForPdf.map((item) => ({
+            items: items.map((item) => ({
               id: item.productId,
               name: item.name,
               article: item.article,
@@ -549,34 +578,65 @@ export default function SupplierReceiptPage() {
               price_before_discount: String(item.purchase_price.toFixed(2)),
             })),
             totals: {
-              subtotal: String(totalReceiptAmount.toFixed(2)),
+              subtotal: String(total.toFixed(2)),
               discount_total: "0.00",
               tax_total: "0.00",
-              total: String(totalReceiptAmount.toFixed(2)),
+              total: String(total.toFixed(2)),
             },
             warehouse: companyName || "Склад",
           }}
         />,
       ).toBlob();
+    },
+    [],
+  );
 
-      const supplierFilePart = buildSupplierLabel(selectedSupplier)
-        .toLowerCase()
-        .replace(/\s+/g, "_")
-        .replace(/[^a-z0-9а-яё_()-]/gi, "")
-        .slice(0, 40);
+  const handleDownloadInvoice = useCallback(
+    async (snapshot = null) => {
+      const supplier = snapshot?.supplier || selectedSupplier;
+      const items = snapshot?.items || receiptItemsForPdf;
+      const total = snapshot?.total ?? totalReceiptAmount;
 
-      downloadBlob(blob, `receipt_invoice_${supplierFilePart || "supplier"}.pdf`);
-    } catch (error) {
-      alert(
-        error?.message || "Не удалось скачать накладную. Попробуйте позже.",
-        true,
-      );
-    } finally {
-      setDownloadingInvoice(false);
-    }
-  }, [alert, downloadBlob, receiptItemsForPdf, selectedSupplier]);
+      if (!supplier) {
+        alert("Нет данных для накладной", true);
+        return;
+      }
 
-  const handleSubmit = useCallback(async () => {
+      if (!items.length) {
+        alert("Нет позиций для накладной", true);
+        return;
+      }
+
+      setDownloadingInvoice(true);
+      try {
+        const blob = await buildInvoicePdfBlob({ supplier, items, total });
+        const supplierFilePart = buildSupplierLabel(supplier)
+          .toLowerCase()
+          .replace(/\s+/g, "_")
+          .replace(/[^a-z0-9а-яё_()-]/gi, "")
+          .slice(0, 40);
+
+        downloadBlob(blob, `receipt_invoice_${supplierFilePart || "supplier"}.pdf`);
+      } catch (error) {
+        alert(
+          error?.message || "Не удалось скачать накладную. Попробуйте позже.",
+          true,
+        );
+      } finally {
+        setDownloadingInvoice(false);
+      }
+    },
+    [
+      alert,
+      buildInvoicePdfBlob,
+      downloadBlob,
+      receiptItemsForPdf,
+      selectedSupplier,
+      totalReceiptAmount,
+    ],
+  );
+
+  const handleOpenPaymentModal = useCallback(() => {
     if (!selectedSupplierId) {
       alert("Сначала выберите поставщика", true);
       return;
@@ -587,16 +647,134 @@ export default function SupplierReceiptPage() {
       return;
     }
 
+    setPaymentModalOpen(true);
+  }, [alert, receiptItems.length, selectedSupplierId]);
+
+  const handleCloseSuccessModal = useCallback(() => {
+    setSuccessModalOpen(false);
+    setCompletedReceiptSnapshot(null);
+  }, []);
+
+  const handleConfirmReceipt = useCallback(async () => {
+    if (!selectedSupplierId) {
+      alert("Сначала выберите поставщика", true);
+      return;
+    }
+
+    if (receiptItems.length === 0) {
+      alert("Укажите количество хотя бы для одного товара", true);
+      return;
+    }
+
+    if (totalReceiptAmount > 0 && paymentType === "prepayment") {
+      const prepaymentValue = toNum(prepayment);
+      if (prepaymentValue <= 0) {
+        alert("Укажите сумму предоплаты", true);
+        return;
+      }
+      if (prepaymentValue > totalReceiptAmount) {
+        alert("Предоплата не может быть больше суммы накладной", true);
+        return;
+      }
+    }
+
+    if (
+      totalReceiptAmount > 0 &&
+      (paymentType === "full" || paymentType === "prepayment") &&
+      cashExpenseAmount > 0
+    ) {
+      if (!Array.isArray(cashBoxes) || cashBoxes.length === 0) {
+        alert("Нет доступных касс. Создайте кассу в разделе «Кассы».", true);
+        return;
+      }
+      if (!selectCashBox) {
+        alert("Выберите кассу для списания расхода.", true);
+        return;
+      }
+    }
+
+    if (
+      totalReceiptAmount > 0 &&
+      (paymentType === "debt" || paymentType === "prepayment") &&
+      (!debtMonths || Number(debtMonths) <= 0)
+    ) {
+      alert("Укажите срок долга", true);
+      return;
+    }
+
+    const supplierLabel = buildSupplierLabel(selectedSupplier);
+
     try {
       setSubmitting(true);
-      await api.post(
+      const { data: receiptData } = await api.post(
         `/main/suppliers/${encodeURIComponent(selectedSupplierId)}/receipt/`,
         {
           items: receiptItems,
         },
       );
-      alert("Товары успешно оприходованы");
+
+      const receiptId = receiptData?.id ?? receiptData?.uuid ?? null;
+
+      if (
+        totalReceiptAmount > 0 &&
+        (paymentType === "debt" || paymentType === "prepayment")
+      ) {
+        const prepaymentValue = toNum(prepayment);
+        const remainingDebt =
+          paymentType === "prepayment"
+            ? Math.max(0, totalReceiptAmount - prepaymentValue)
+            : totalReceiptAmount;
+
+        if (company?.subscription_plan?.name === "Старт" && remainingDebt > 0) {
+          await api.post("/main/debts/", {
+            name: supplierLabel,
+            phone: selectedSupplier?.phone || "",
+            due_date: firstPaymentDate,
+            amount: remainingDebt,
+          });
+        }
+
+        await dispatch(
+          createDeal({
+            clientId: selectedSupplierId,
+            title: `${paymentType === "prepayment" ? "Предоплата" : "Долги"} ${supplierLabel}`,
+            statusRu: paymentType === "prepayment" ? "Предоплата" : "Долги",
+            amount: totalReceiptAmount,
+            prepayment:
+              paymentType === "prepayment" ? prepaymentValue : undefined,
+            debtMonths: Number(debtMonths || 1),
+            first_due_date: firstPaymentDate,
+          }),
+        ).unwrap();
+      }
+
+      if (cashExpenseAmount > 0 && selectCashBox) {
+        await dispatch(
+          addCashFlows({
+            cashbox: selectCashBox,
+            type: "expense",
+            name: `Закупка: ${supplierLabel}`,
+            amount: Number(cashExpenseAmount).toFixed(2),
+            ...(receiptId != null && { source_cashbox_flow_id: receiptId }),
+            source_business_operation_id: "Закупки",
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+          }),
+        ).unwrap();
+      }
+
+      setCompletedReceiptSnapshot({
+        supplier: selectedSupplier,
+        items: [...receiptItemsForPdf],
+        total: totalReceiptAmount,
+        paymentType,
+        cashExpenseAmount,
+      });
+      setPaymentModalOpen(false);
       setQtyByProductId({});
+      setSuccessModalOpen(true);
       await loadSupplierProducts(selectedSupplierId);
     } catch (error) {
       const errorMessage = validateResErrors(
@@ -607,7 +785,32 @@ export default function SupplierReceiptPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [alert, loadSupplierProducts, receiptItems, selectedSupplierId]);
+  }, [
+    alert,
+    cashBoxes,
+    cashExpenseAmount,
+    company?.subscription_plan?.name,
+    debtMonths,
+    dispatch,
+    firstPaymentDate,
+    loadSupplierProducts,
+    paymentType,
+    prepayment,
+    receiptItems,
+    receiptItemsForPdf,
+    selectCashBox,
+    selectedSupplier,
+    selectedSupplierId,
+    totalReceiptAmount,
+  ]);
+
+  const paymentSummaryDebt = useMemo(() => {
+    if (paymentType === "debt") return totalReceiptAmount;
+    if (paymentType === "prepayment") {
+      return Math.max(0, totalReceiptAmount - toNum(prepayment));
+    }
+    return 0;
+  }, [paymentType, prepayment, totalReceiptAmount]);
 
   return (
     <div className="warehouse-page market-receipt-page">
@@ -711,19 +914,6 @@ export default function SupplierReceiptPage() {
               disabled={receiptItems.length === 0 || submitting}
             >
               Очистить количества
-            </button>
-            <button
-              type="button"
-              className="market-receipt-page__secondary-button"
-              onClick={handleDownloadInvoice}
-              disabled={
-                !selectedSupplierId ||
-                receiptItems.length === 0 ||
-                downloadingInvoice
-              }
-            >
-              <Download size={16} />
-              {downloadingInvoice ? "Скачиваем..." : "Скачать накладную"}
             </button>
           </div>
 
@@ -860,11 +1050,11 @@ export default function SupplierReceiptPage() {
             <button
               type="button"
               className="market-receipt-page__primary-button"
-              onClick={handleSubmit}
+              onClick={handleOpenPaymentModal}
               disabled={!selectedSupplierId || receiptItems.length === 0 || submitting}
             >
               <PackageCheck size={16} />
-              {submitting ? "Сохраняем..." : "Оприходовать товары"}
+              Оприходовать товары
             </button>
           </div>
         </div>
@@ -1026,6 +1216,216 @@ export default function SupplierReceiptPage() {
                 onClick={() => setProductsModalOpen(false)}
               >
                 Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {paymentModalOpen && (
+        <div
+          className="market-receipt-page__modal-overlay"
+          onClick={() => !submitting && setPaymentModalOpen(false)}
+        >
+          <div
+            className="market-receipt-page__modal-card market-receipt-page__modal-card--payment"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="market-receipt-page__payment-modal-head">
+              <h3 className="market-receipt-page__modal-title">
+                Подтверждение оплаты
+              </h3>
+              <button
+                type="button"
+                className="market-receipt-page__detail-close"
+                onClick={() => !submitting && setPaymentModalOpen(false)}
+                disabled={submitting}
+                aria-label="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="market-receipt-page__payment-modal-summary">
+              <div>
+                <span>Поставщик</span>
+                <strong>{buildSupplierLabel(selectedSupplier)}</strong>
+              </div>
+              <div>
+                <span>Позиций</span>
+                <strong>{receiptItems.length}</strong>
+              </div>
+              <div>
+                <span>Сумма накладной</span>
+                <strong>{formatMoney(totalReceiptAmount)}</strong>
+              </div>
+            </div>
+
+            {totalReceiptAmount > 0 ? (
+              <>
+                <div className="market-receipt-page__payment-grid">
+                  <div className="market-receipt-page__field">
+                    <label className="market-receipt-page__label">Тип оплаты</label>
+                    <select
+                      className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                      value={paymentType}
+                      onChange={(e) => setPaymentType(e.target.value)}
+                      disabled={submitting}
+                    >
+                      <option value="full">Наличные (полная оплата)</option>
+                      <option value="prepayment">Предоплата</option>
+                      <option value="debt">В долг поставщику</option>
+                    </select>
+                  </div>
+                  {(paymentType === "full" || paymentType === "prepayment") && (
+                    <div className="market-receipt-page__field">
+                      <label className="market-receipt-page__label">Касса</label>
+                      <select
+                        className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                        value={selectCashBox}
+                        onChange={(e) => setSelectCashBox(e.target.value)}
+                        disabled={submitting || !cashBoxes?.length}
+                      >
+                        {!cashBoxes?.length ? (
+                          <option value="">Нет касс</option>
+                        ) : (
+                          cashBoxes.map((box) => {
+                            const boxId = String(box.id || box.uuid || "");
+                            return (
+                              <option key={boxId} value={boxId}>
+                                {box.name || box.title || `Касса #${boxId}`}
+                              </option>
+                            );
+                          })
+                        )}
+                      </select>
+                    </div>
+                  )}
+                  {paymentType === "prepayment" && (
+                    <div className="market-receipt-page__field">
+                      <label className="market-receipt-page__label">Сумма предоплаты</label>
+                      <input
+                        className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={prepayment}
+                        onChange={(e) => setPrepayment(e.target.value)}
+                        disabled={submitting}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                  {(paymentType === "debt" || paymentType === "prepayment") && (
+                    <>
+                      <div className="market-receipt-page__field">
+                        <label className="market-receipt-page__label">Срок долга (мес.)</label>
+                        <input
+                          className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={debtMonths}
+                          onChange={(e) => setDebtMonths(e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="market-receipt-page__field">
+                        <label className="market-receipt-page__label">Дата первой оплаты</label>
+                        <input
+                          className="market-receipt-page__qty-input market-receipt-page__qty-input--mobile"
+                          type="date"
+                          value={firstPaymentDate}
+                          onChange={(e) => setFirstPaymentDate(e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <p className="market-receipt-page__payment-hint">
+                  {paymentType === "debt" ? (
+                    <>
+                      Долг поставщику:{" "}
+                      <strong>{formatMoney(paymentSummaryDebt)}</strong>
+                    </>
+                  ) : (
+                    <>
+                      К списанию из кассы:{" "}
+                      <strong>{formatMoney(cashExpenseAmount)}</strong>
+                      {paymentSummaryDebt > 0 && (
+                        <>
+                          {" "}
+                          · остаток в долг:{" "}
+                          <strong>{formatMoney(paymentSummaryDebt)}</strong>
+                        </>
+                      )}
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="market-receipt-page__modal-hint">
+                Сумма накладной равна нулю — оплата не требуется. Подтвердите
+                оприходование товаров.
+              </p>
+            )}
+
+            <div className="market-receipt-page__actions market-receipt-page__modal-actions">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={() => setPaymentModalOpen(false)}
+                disabled={submitting}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="market-receipt-page__primary-button"
+                onClick={() => void handleConfirmReceipt()}
+                disabled={submitting}
+              >
+                <PackageCheck size={16} />
+                {submitting ? "Оприходуем..." : "Подтвердить и оприходовать"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {successModalOpen && completedReceiptSnapshot && (
+        <div className="market-receipt-page__modal-overlay">
+          <div
+            className="market-receipt-page__modal-card market-receipt-page__modal-card--success"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="market-receipt-page__success-icon">
+              <CheckCircle2 size={48} />
+            </div>
+            <h3 className="market-receipt-page__modal-title">Оприходование завершено</h3>
+            <p className="market-receipt-page__modal-hint market-receipt-page__success-text">
+              Товары успешно оприходованы у поставщика{" "}
+              <strong>{buildSupplierLabel(completedReceiptSnapshot.supplier)}</strong>
+              . Сумма накладной:{" "}
+              <strong>{formatMoney(completedReceiptSnapshot.total)}</strong>
+            </p>
+            <div className="market-receipt-page__actions market-receipt-page__modal-actions">
+              <button
+                type="button"
+                className="market-receipt-page__secondary-button"
+                onClick={handleCloseSuccessModal}
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                className="market-receipt-page__primary-button"
+                onClick={() =>
+                  void handleDownloadInvoice(completedReceiptSnapshot)
+                }
+                disabled={downloadingInvoice}
+              >
+                <Download size={16} />
+                {downloadingInvoice ? "Скачиваем..." : "Скачать накладную"}
               </button>
             </div>
           </div>

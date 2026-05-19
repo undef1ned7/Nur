@@ -7,6 +7,7 @@ import {
   connectXp365bManually,
 } from "../services/xp365bPrintService";
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
+import Loading from "../../../common/Loading/Loading";
 import JsBarcode from "jsbarcode";
 
 /**
@@ -358,18 +359,11 @@ const BarcodePrintTab = ({
     };
   }, []);
 
-  // фильтрация товаров
-  const filteredProducts = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    const search = searchTerm?.trim().toLowerCase() || "";
-    if (!search) return products;
-
-    return products.filter((p) => {
-      const name = (p.name || "").toLowerCase();
-      const barcode = String(p.barcode || "").toLowerCase();
-      return name.includes(search) || barcode.includes(search);
-    });
-  }, [products, searchTerm]);
+  // Список приходит уже отфильтрованным с API (debounce в BarcodePrintPage)
+  const filteredProducts = useMemo(
+    () => (Array.isArray(products) ? products : []),
+    [products],
+  );
 
   // выбранные товары с штрих-кодом (для массовой печати)
   const selectedWithBarcode = useMemo(() => {
@@ -671,13 +665,9 @@ const BarcodePrintTab = ({
     isRasterFont,
   ]);
 
-  if (loading) {
-    return (
-      <div className="barcode-print-tab">
-        <div className="barcode-print-tab__loading">Загрузка...</div>
-      </div>
-    );
-  }
+  const hasProducts = Array.isArray(products) && products.length > 0;
+  const isInitialLoading = Boolean(loading) && !hasProducts;
+  const isContentRefreshing = Boolean(loading) && hasProducts;
 
   return (
     <div className="barcode-print-tab">
@@ -689,7 +679,14 @@ const BarcodePrintTab = ({
             value={searchTerm || ""}
             onChange={onSearchChange}
             className="barcode-print-tab__search"
+            disabled={isInitialLoading}
           />
+          {isContentRefreshing && (
+            <span
+              className="barcode-print-tab__search-spinner"
+              aria-hidden="true"
+            />
+          )}
         </div>
 
         <div className="barcode-print-tab__printer-controls">
@@ -757,7 +754,11 @@ const BarcodePrintTab = ({
       </div>
 
       <div className="barcode-print-tab__content">
-        {filteredProducts.length === 0 ? (
+        {isInitialLoading ? (
+          <div className="barcode-print-tab__loading">
+            <Loading message="Загрузка товаров..." />
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="barcode-print-tab__empty">
             <div className="barcode-print-tab__empty-icon">📦</div>
             <div className="barcode-print-tab__empty-text">Товары не найдены</div>
@@ -898,7 +899,7 @@ const BarcodePrintTab = ({
                     type="button"
                     className="barcode-print-tab__pagination-btn"
                     onClick={() => onPageChange(page - 1)}
-                    disabled={page <= 1}
+                    disabled={page <= 1 || loading}
                     aria-label="Предыдущая страница"
                   >
                     Назад
@@ -907,7 +908,7 @@ const BarcodePrintTab = ({
                     type="button"
                     className="barcode-print-tab__pagination-btn"
                     onClick={() => onPageChange(page + 1)}
-                    disabled={page >= totalPages}
+                    disabled={page >= totalPages || loading}
                     aria-label="Следующая страница"
                   >
                     Вперёд

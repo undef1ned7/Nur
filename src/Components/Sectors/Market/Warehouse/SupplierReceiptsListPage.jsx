@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, X } from "lucide-react";
+import { Plus, RefreshCw, Wallet, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  addCashFlows,
+  getCashBoxes,
+  useCash,
+} from "../../../../store/slices/cashSlice";
+import { useUser } from "../../../../store/slices/userSlice";
 import "./SupplierReceiptPage.scss";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -48,9 +55,18 @@ const receiptItemLabel = (it) => {
   );
 };
 
+const calcReceiptTotal = (items) =>
+  (Array.isArray(items) ? items : []).reduce(
+    (sum, it) => sum + Number(it.qty || 0) * Number(it.purchase_price || 0),
+    0,
+  );
+
 export default function SupplierReceiptsListPage() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const alert = useAlert();
+  const { list: cashBoxes } = useCash();
+  const { company } = useUser();
 
   const [loading, setLoading] = useState(false);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
@@ -62,6 +78,9 @@ export default function SupplierReceiptsListPage() {
   const [suppliers, setSuppliers] = useState([]);
   const [detailReceipt, setDetailReceipt] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [payCashBox, setPayCashBox] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payingReceipt, setPayingReceipt] = useState(false);
 
   const openReceiptDetail = async (row) => {
     if (!row) return;
@@ -95,6 +114,8 @@ export default function SupplierReceiptsListPage() {
   const closeReceiptDetail = () => {
     setDetailReceipt(null);
     setDetailLoading(false);
+    setPayAmount("");
+    setPayingReceipt(false);
   };
   const emptyFilters = useMemo(
     () => ({
@@ -206,8 +227,22 @@ export default function SupplierReceiptsListPage() {
 
   useEffect(() => {
     void loadSuppliers();
+    dispatch(getCashBoxes());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!cashBoxes?.length || payCashBox) return;
+    const firstId = cashBoxes[0]?.id || cashBoxes[0]?.uuid || "";
+    if (firstId) setPayCashBox(String(firstId));
+  }, [cashBoxes, payCashBox]);
+
+  useEffect(() => {
+    if (!detailReceipt) return;
+    const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
+    const total = calcReceiptTotal(items);
+    setPayAmount(total > 0 ? String(total.toFixed(2)) : "");
+  }, [detailReceipt]);
 
   useEffect(() => {
     void loadReceipts();
@@ -225,6 +260,55 @@ export default function SupplierReceiptsListPage() {
   const handleResetFilters = () => {
     setFiltersDraft(emptyFilters);
     setAppliedFilters(emptyFilters);
+  };
+
+  const handlePayReceipt = async () => {
+    if (!detailReceipt) return;
+
+    const amount = Number(String(payAmount || "").replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Укажите корректную сумму оплаты", true);
+      return;
+    }
+
+    if (!Array.isArray(cashBoxes) || cashBoxes.length === 0) {
+      alert("Нет доступных касс. Создайте кассу в разделе «Кассы».", true);
+      return;
+    }
+
+    if (!payCashBox) {
+      alert("Выберите кассу для списания расхода.", true);
+      return;
+    }
+
+    const receiptId = detailReceipt.id ?? detailReceipt.uuid ?? null;
+    const supplierName = detailReceipt.supplier_name || "Поставщик";
+
+    try {
+      setPayingReceipt(true);
+      await dispatch(
+        addCashFlows({
+          cashbox: payCashBox,
+          type: "expense",
+          name: `Оплата накладной: ${supplierName}`,
+          amount: amount.toFixed(2),
+          ...(receiptId != null && { source_cashbox_flow_id: receiptId }),
+          source_business_operation_id: "Закупки",
+          status:
+            company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
+        }),
+      ).unwrap();
+      alert("Расход по накладной создан");
+      closeReceiptDetail();
+    } catch (error) {
+      const errorMessage = validateResErrors(
+        error,
+        "Не удалось создать расход по накладной",
+      );
+      alert(errorMessage, true);
+    } finally {
+      setPayingReceipt(false);
+    }
   };
 
   return (
@@ -458,11 +542,77 @@ export default function SupplierReceiptsListPage() {
                 </div>
               );
             })()}
+            {(() => {
+              const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
+              const total = calcReceiptTotal(items);
+              if (total <= 0) return null;
+              return (
+                <div className="market-receipt-page__payment market-receipt-page__payment--detail">
+                  <h4 className="market-receipt-page__payment-title">Оплата накладной</h4>
+                  <div className="market-receipt-page__payment-grid">
+                    <div className="market-receipt-page__field">
+                      <label className="market-receipt-page__label">Касса</label>
+                      <select
+                        className="market-receipt-page__qty-input"
+                        value={payCashBox}
+                        onChange={(e) => setPayCashBox(e.target.value)}
+                        disabled={payingReceipt || !cashBoxes?.length}
+                      >
+                        {!cashBoxes?.length ? (
+                          <option value="">Нет касс</option>
+                        ) : (
+                          cashBoxes.map((box) => {
+                            const boxId = String(box.id || box.uuid || "");
+                            return (
+                              <option key={boxId} value={boxId}>
+                                {box.name || box.title || `Касса #${boxId}`}
+                              </option>
+                            );
+                          })
+                        )}
+                      </select>
+                    </div>
+                    <div className="market-receipt-page__field">
+                      <label className="market-receipt-page__label">Сумма расхода</label>
+                      <input
+                        className="market-receipt-page__qty-input"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        disabled={payingReceipt}
+                      />
+                    </div>
+                  </div>
+                  <p className="market-receipt-page__payment-hint">
+                    Сумма накладной: <strong>{fmtNum(total)}</strong>
+                  </p>
+                </div>
+              );
+            })()}
             <div className="market-receipt-page__actions">
+              {(() => {
+                const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
+                const total = calcReceiptTotal(items);
+                if (total <= 0) return null;
+                return (
+                  <button
+                    type="button"
+                    className="market-receipt-page__primary-button"
+                    onClick={() => void handlePayReceipt()}
+                    disabled={payingReceipt || detailLoading}
+                  >
+                    <Wallet size={16} />
+                    {payingReceipt ? "Списываем..." : "Оплатить (расход)"}
+                  </button>
+                );
+              })()}
               <button
                 type="button"
                 className="market-receipt-page__secondary-button"
                 onClick={closeReceiptDetail}
+                disabled={payingReceipt}
               >
                 Закрыть
               </button>

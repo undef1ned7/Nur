@@ -17,9 +17,24 @@
   }
 
   &__search-wrapper {
+    position: relative;
     flex: 1;
     max-width: 500px;
     min-width: 200px;
+  }
+
+  &__search-spinner {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin-top: -9px;
+    border: 2px solid #e5e7eb;
+    border-top-color: $color-primary;
+    border-radius: 50%;
+    animation: barcode-print-tab-spin 0.7s linear infinite;
+    pointer-events: none;
   }
 
   &__search {
@@ -152,7 +167,10 @@
   }
 
   &__content {
+    position: relative;
+    min-height: 200px;
     background: transparent;
+
   }
 
   &__selection-bar {
@@ -414,14 +432,25 @@
   }
 
   &__loading {
-    text-align: center;
-    padding: 80px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    padding: 40px 20px;
     background: #fff;
     border-radius: 12px;
-    color: #666;
-    font-size: 16px;
-    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+    .loading {
+      padding: 0;
+    }
   }
+
+@keyframes barcode-print-tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
   // Модалка предпросмотра
   &__preview {
