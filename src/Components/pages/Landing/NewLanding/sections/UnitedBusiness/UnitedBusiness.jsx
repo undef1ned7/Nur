@@ -3,7 +3,7 @@ import blur from '../../assets/banner/blur.svg';
 
 const UnitedBusiness = () => {
   return (
-    <section className="unibusiness">
+    <section id="features" className="unibusiness">
       <div className="unibusiness__container new-container">
         <img className="unibusiness__blur" src={blur} alt="" />
         <h1 className="unibusiness__title">

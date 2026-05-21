@@ -1,40 +1,91 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import phoneIcon from "../../assets/icons/phone.svg";
 import headerLogo from "../../assets/icons/headerLogo.svg";
+import { DEMO_SECTION_ID, scrollToDemoSection } from "../../utils/scrollToDemo";
 import "./header.scss";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Возможности" },
-  { to: "/", label: "Для кого" },
-  { to: "/", label: "Интерфейс" },
-  { to: "/", label: "Тариф" },
-  { to: "/", label: "Команда" },
-  { to: "/video-lessons", label: "База знаний" },
-  { to: "/", label: "FAQ" },
+const SECTION_LINKS = [
+  { id: "features", label: "Возможности" },
+  { id: "for-whom", label: "Для кого" },
+  { id: "interface", label: "Интерфейс" },
+  { id: "tariff", label: "Тариф" },
+  { id: "team", label: "Команда" },
 ];
+
+const scrollToSection = (id) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", `/#${id}`);
+  }
+};
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isLanding = location.pathname === "/";
+  const currentHash = location.hash.replace("#", "");
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleSectionClick = (e, sectionId) => {
+    e.preventDefault();
+    closeMenu();
+
+    if (isLanding) {
+      scrollToSection(sectionId);
+      return;
+    }
+
+    navigate({ pathname: "/", hash: sectionId });
+  };
 
   return (
     <header className={`newHeader${menuOpen ? " newHeader--menu-open" : ""}`}>
       <div className="newHeader__container new-container">
         <div className="newHeader__left">
-          <div className="newHeader__logo">
-            <img src={headerLogo} alt="Logo" />
-          </div>
+          <Link to="/" className="newHeader__logo" onClick={closeMenu}>
+            <img src={headerLogo} alt="NurCRM" />
+          </Link>
           <nav className="newHeader__nav" aria-label="Основная навигация">
             <ul className="newHeader__menu">
-              {NAV_ITEMS.map(({ to, label }) => (
-                <li key={label} className="newHeader__menu-item">
-                  <NavLink to={to} onClick={closeMenu}>
+              {SECTION_LINKS.map(({ id, label }) => (
+                <li key={id} className="newHeader__menu-item">
+                  <a
+                    href={`/#${id}`}
+                    className={isLanding && currentHash === id ? "active" : undefined}
+                    onClick={(e) => handleSectionClick(e, id)}
+                  >
                     {label}
-                  </NavLink>
+                  </a>
                 </li>
               ))}
+              <li className="newHeader__menu-item">
+                <NavLink
+                  to="/video-lessons"
+                  className={({ isActive }) => (isActive ? "active" : undefined)}
+                  onClick={closeMenu}
+                >
+                  База знаний
+                </NavLink>
+              </li>
+              <li className="newHeader__menu-item">
+                <a
+                  href={`/#${DEMO_SECTION_ID}`}
+                  className={
+                    isLanding && currentHash === DEMO_SECTION_ID ? "active" : undefined
+                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    closeMenu();
+                    scrollToDemoSection(navigate, location.pathname);
+                  }}
+                >
+                  FAQ
+                </a>
+              </li>
             </ul>
           </nav>
         </div>

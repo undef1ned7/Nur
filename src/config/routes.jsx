@@ -220,6 +220,7 @@ import BuildingLayout, {
 import NewLanding from "../Components/pages/Landing/NewLanding/NewLanding";
 import VideoLessons from "../Components/pages/Landing/NewLanding/VideoLessons/VideoLessons";
 import VideoLessonView from "../Components/pages/Landing/NewLanding/VideoLessons/VideoLessonView";
+import VideoLessonsAdmin from "../Components/pages/Landing/NewLanding/VideoLessons/VideoLessonsAdmin";
 
 /**
  * Создает защищенный роут
@@ -425,6 +426,11 @@ export const publicRoutes = [
     key="/video-lessons"
     path="/video-lessons"
     element={<VideoLessons />}
+  />,
+  <Route
+    key="/video-lessons-admin"
+    path="/video-lessons/admin"
+    element={<VideoLessonsAdmin />}
   />,
   <Route
     key="/video-lessons-lesson"
