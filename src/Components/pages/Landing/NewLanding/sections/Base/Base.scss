@@ -1,6 +1,7 @@
 @use "../../breakpoints" as *;
 
 .base {
+  padding: 90px 0;
   &__container {
     width: 100%;
     margin: 100px auto;

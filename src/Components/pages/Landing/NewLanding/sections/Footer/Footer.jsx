@@ -64,7 +64,7 @@ const Footer = () => {
                   src={call}
                   alt=""
                 />
-                +996 (500) 00 00 00
+                +996 (556) 900 556
               </a>
               <a
                 className="footer__content__link footer__content__link1"
@@ -76,7 +76,7 @@ const Footer = () => {
                   src={gmail}
                   alt=""
                 />
-                info@gmail.com
+                nurcrmkg@gmail.com
               </a>
               <a
                 className="footer__content__link footer__content__link1"
@@ -88,7 +88,7 @@ const Footer = () => {
                   src={loc}
                   alt=""
                 />
-                Бишкек, Кыргызстан
+                Улица Салиевой, 1/3, Ош, Кыргызстан
               </a>
             </ul>
           </div>
@@ -98,7 +98,7 @@ const Footer = () => {
             <ul className="footer__content__ul">
               <a
                 className="footer__content__link footer__content__link1"
-                href="#"
+                href="https://www.instagram.com/nurcrm.osh/"
               >
                 <img
                   className="footer__icon
@@ -108,7 +108,7 @@ const Footer = () => {
                 />
                 Instagram
               </a>
-              <a
+              {/* <a
                 className="footer__content__link footer__content__link1"
                 href="#"
               >
@@ -119,7 +119,7 @@ const Footer = () => {
                   alt=""
                 />
                 Telegram
-              </a>
+              </a> */}
               <a
                 className="footer__content__link footer__content__link1"
                 href="#"
@@ -134,7 +134,7 @@ const Footer = () => {
               </a>
               <a
                 className="footer__content__link footer__content__link1"
-                href="#"
+                href="https://www.youtube.com/@NURCRM25"
               >
                 <img
                   className="footer__icon

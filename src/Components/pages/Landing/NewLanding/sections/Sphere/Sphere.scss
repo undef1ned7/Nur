@@ -33,30 +33,18 @@
   }
 
   &__grid {
-    display: flex;
-    justify-content: flex-start;
-    gap: 24px;
     margin-bottom: 40px;
     padding: 20px 0;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    overflow: visible;
+  }
 
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    @media (min-width: $nl-bp-lg + 1px) {
-      justify-content: center;
-      overflow-x: visible;
-      flex-wrap: wrap;
-    }
+  &__slide {
+    height: auto;
+    box-sizing: border-box;
   }
 
   &__card {
-    flex: 0 0 300px;
-    scroll-snap-align: center;
+    height: 100%;
     background: #fff;
     padding: 50px 30px;
     border-radius: 24px;
@@ -102,9 +90,12 @@
   &__dot {
     width: 10px;
     height: 10px;
+    padding: 0;
+    border: none;
     background: #e0e0e0;
     border-radius: 50%;
     cursor: pointer;
+    transition: background 0.2s ease;
 
     &--active {
       background: #f2b705;
@@ -187,7 +178,6 @@
     }
 
     &__card {
-      flex: 0 0 min(300px, 85vw);
       padding: 36px 24px;
     }
 
@@ -218,8 +208,6 @@
     }
 
     &__card {
-      flex: 0 0 88vw;
-
       &-title {
         font-size: 18px;
       }

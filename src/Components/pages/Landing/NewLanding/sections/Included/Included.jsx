@@ -5,7 +5,6 @@ const Included = () => {
     <section className="included">
       <div className="included__container new-container">
         <div className="included__main">
-   
           <div className="included__info">
             <h1 className="included__title">
               Что входит <span className="included-yellow">в каждый</span> тариф
@@ -15,7 +14,6 @@ const Included = () => {
               каждом этапе
             </p>
           </div>
-
 
           <div className="included__grid">
             <div className="included__grid-item">
@@ -56,7 +54,6 @@ const Included = () => {
             </div>
           </div>
         </div>
-
 
         <div className="included__stats">
           <div className="included__stat-box">

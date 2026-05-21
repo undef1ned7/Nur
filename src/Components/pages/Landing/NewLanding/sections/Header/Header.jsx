@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Интерфейс" },
   { to: "/", label: "Тариф" },
   { to: "/", label: "Команда" },
-  { to: "/", label: "База знаний" },
+  { to: "/video-lessons", label: "База знаний" },
   { to: "/", label: "FAQ" },
 ];
 
@@ -39,6 +39,13 @@ const Header = () => {
           </nav>
         </div>
         <div className="newHeader__right">
+          <NavLink
+            to="/login"
+            className="newHeader__login"
+            onClick={closeMenu}
+          >
+            Логин
+          </NavLink>
           <div className="newHeader__lang">
             <button type="button">RU</button>
             <span>/</span>

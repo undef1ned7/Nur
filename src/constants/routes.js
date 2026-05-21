@@ -6,11 +6,11 @@ export const ALLOWED_PATHS_WITHOUT_TOKEN = [
   "/old-landing",
   "/submit-application",
   "/get-application-list",
-
   // Public pages
   "/cafe/:company_slug/menu",
   "/catalog/:slug",
   "/barber/:company_slug/booking",
+  "/video-lessons",
 ];
 
 // Публичные пути, на которые нужно редиректить если токен валиден
