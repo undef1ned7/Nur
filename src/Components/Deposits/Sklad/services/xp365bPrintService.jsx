@@ -1,4 +1,5 @@
 import JsBarcode from "jsbarcode";
+import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
 
 /**
  * XPrinter XP-350B / XP-365B — TSPL • 203 DPI
@@ -486,60 +487,9 @@ function drawFullWidthText(
   }
 }
 
-function normalizeEan13(raw) {
-  const digits = String(raw || "").replace(/\D/g, "");
-  if (digits.length === 13) return digits;
-  if (digits.length !== 12) return "";
-  let sum = 0;
-  for (let i = 0; i < 12; i += 1) {
-    const d = Number(digits[i] || 0);
-    sum += i % 2 === 0 ? d : d * 3;
-  }
-  const check = (10 - (sum % 10)) % 10;
-  return digits + String(check);
-}
-
-function normalizeEan8(raw) {
-  const digits = String(raw || "").replace(/\D/g, "");
-  if (digits.length === 8) return digits;
-  if (digits.length !== 7) return "";
-  let sum = 0;
-  for (let i = 0; i < 7; i += 1) {
-    const d = Number(digits[i] || 0);
-    sum += (i % 2 === 0 ? 3 : 1) * d;
-  }
-  const check = (10 - (sum % 10)) % 10;
-  return digits + String(check);
-}
-
 /** Возвращает { code, format: "EAN13" | "EAN8" | "CODE128" } */
 function normalizeBarcode(raw) {
-  const digits = String(raw || "").replace(/\D/g, "");
-  if (!digits) throw new Error("Пустой штрих-код");
-  // EAN-13: 12 или 13 цифр
-  if (digits.length === 12 || digits.length === 13) {
-    const code = normalizeEan13(raw);
-    if (code) return { code, format: "EAN13" };
-  }
-  // EAN-8: 7 или 8 цифр
-  if (digits.length === 7 || digits.length === 8) {
-    const code = normalizeEan8(raw);
-    if (code) return { code, format: "EAN8" };
-  }
-  // 10 или 11 цифр — дополняем нулями слева до 12 и печатаем как EAN-13
-  if (digits.length === 10 || digits.length === 11) {
-    const padded = digits.padStart(12, "0");
-    const code = normalizeEan13(padded);
-    if (code) return { code, format: "EAN13" };
-  }
-  // Любая другая длина (1–6, 9, 14+ цифр) — CODE128
-  if (digits.length >= 1 && digits.length <= 32)
-    return { code: digits, format: "CODE128" };
-  throw new Error(
-    "Штрих-код слишком длинный (макс. 32 символа для CODE128). Сейчас: " +
-      digits.length +
-      " цифр."
-  );
+  return getBarcodePrintEncoding(raw);
 }
 
 function buildLabel({
