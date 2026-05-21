@@ -1,69 +1,157 @@
-.team{
-    background: #0E1114;
-    &__container{
-        padding: 60px 0;
-        width: 100%;
-    }
-    &__first{
-        width: 580px;
-    }
-    &__start{
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+@use "../../breakpoints" as *;
 
-        &__title{
-            width: 580px;
-            font-size: 64px;
-            color: #FFFFFF;
-            font-weight: 700;
-        }
-        &__line{
-            width: 2px;
-            height: 200px;
-            background: #FFFFFF33;
-        }
-        &__description{
-            width: 539px;
-            color: #FFFFFFDB;
-            font-size: 20px;
-            line-height: 45px;
-        }
+.team {
+  background: #0e1114;
+  padding: 90px 0;
+
+  &__container {
+    padding-block: 60px;
+    padding-inline: 0;
+    width: 100%;
+
+    @media (max-width: $nl-bp-md) {
+      padding-block: 48px;
     }
-    &-span{
-        color: #F7D617;
+  }
+
+  &__first {
+    max-width: 580px;
+    width: 100%;
+  }
+
+  &__start {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+
+    &__title {
+      max-width: 580px;
+      font-size: 64px;
+      color: #ffffff;
+      font-weight: 700;
+      line-height: 1.15;
     }
-    &__cards{
-        margin-top: 80px;
+
+    &__line {
+      width: 2px;
+      height: 200px;
+      background: #ffffff33;
+      flex-shrink: 0;
+    }
+
+    &__description {
+      flex: 1;
+      min-width: 280px;
+      max-width: 539px;
+      color: #ffffffdb;
+      font-size: 20px;
+      line-height: 1.6;
+    }
+  }
+
+  &-span {
+    color: #f7d617;
+  }
+
+  &__cards {
+    margin-top: 80px;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+
+    &__card {
+      flex: 1 1 calc(25% - 15px);
+      min-width: 220px;
+      height: auto;
+      border-radius: 22px;
+      background: #ffffff;
+      overflow: hidden;
+
+      &__img {
         width: 100%;
-        display: flex;
-        gap: 20px;
-        &__card{
-            width: 25%;
-            height: 540px;
-            border-radius: 22px;
-            background: #FFFFFF;
-            &__img{
-                border-radius: 22px 22px 0 0 ;
-            }
-            &__title{
-                color: #000;
-                font-weight: bold;
-                font-size: 28px;
-                margin: 14px 21px 0 21px;
-            }
-            &__description{
-                color: #000000B2;
-                font-size: 20px;
-                line-height: 34px;
-                margin: 5px 21px 0 21px;
-            }
-            &__line{
-                width: 70px;
-                height: 2px;
-                background: #F2B705;
-                margin: 17px 21px 0 21px;
-            }
-        }
+        height: auto;
+        display: block;
+        border-radius: 22px 22px 0 0;
+      }
+
+      &__title {
+        color: #000;
+        font-weight: bold;
+        font-size: 28px;
+        margin: 14px 21px 0;
+      }
+
+      &__description {
+        color: #000000b2;
+        font-size: 20px;
+        line-height: 34px;
+        margin: 5px 21px 0;
+      }
+
+      &__line {
+        width: 70px;
+        height: 2px;
+        background: #f2b705;
+        margin: 17px 21px 24px;
+      }
     }
+  }
+
+  @media (max-width: $nl-bp-lg) {
+    &__start {
+      &__title {
+        font-size: 48px;
+      }
+
+      &__line {
+        display: none;
+      }
+    }
+
+    &__cards__card {
+      flex: 1 1 calc(50% - 10px);
+    }
+  }
+
+  @media (max-width: $nl-bp-md) {
+    &__start {
+      flex-direction: column;
+      align-items: flex-start;
+
+      &__title {
+        font-size: 36px;
+      }
+
+      &__description {
+        font-size: 18px;
+        max-width: 100%;
+      }
+    }
+
+    &__cards {
+      margin-top: 48px;
+    }
+  }
+
+  @media (max-width: $nl-bp-sm) {
+    &__start__title {
+      font-size: 28px;
+    }
+
+    &__cards__card {
+      flex: 1 1 100%;
+
+      &__title {
+        font-size: 22px;
+      }
+
+      &__description {
+        font-size: 16px;
+        line-height: 26px;
+      }
+    }
+  }
 }

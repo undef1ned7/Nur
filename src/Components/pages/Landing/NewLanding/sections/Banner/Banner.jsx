@@ -3,8 +3,8 @@ import banner from "../../assets/banner/banner.svg";
 import smartphone from "../../assets/icons/smartphone.svg";
 import shop from "../../assets/icons/shop.svg";
 import mess from "../../assets/icons/mess.svg";
-import blur1 from './img/blur1.svg';
-import blur2 from './img/blur2.svg';
+import blur1 from "./img/blur1.svg";
+import blur2 from "./img/blur2.svg";
 import "./Banner.scss";
 
 const Banner = () => {
@@ -32,7 +32,11 @@ const Banner = () => {
         <div className="banner__content">
           <img className="banner__image" src={banner} alt="Banner" />
           <div className="banner__content__cart banner__content__cart-1">
-            <img className="banner__content__logo" src={smartphone} alt="Smartphone" />
+            <img
+              className="banner__content__logo"
+              src={smartphone}
+              alt="Smartphone"
+            />
             <p className="banner__content__description">Поддержка 24/7</p>
           </div>
           <div className="banner__content__cart banner__content__cart-2">

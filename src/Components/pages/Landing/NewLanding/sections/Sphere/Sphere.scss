@@ -1,3 +1,5 @@
+@use "../../breakpoints" as *;
+
 .spheres {
   padding: 100px 0;
   background-color: #f9f9f9;
@@ -6,6 +8,7 @@
 
   &__header {
     margin-bottom: 60px;
+    padding-inline: 0;
   }
 
   &__title {
@@ -14,6 +17,7 @@
     color: #000;
     margin-bottom: 20px;
     letter-spacing: -1px;
+    line-height: 1.15;
 
     &-yellow {
       color: #f2b705;
@@ -29,15 +33,18 @@
   }
 
   &__grid {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
     margin-bottom: 40px;
-    padding: 20px;
+    padding: 20px 0;
+    overflow: visible;
+  }
+
+  &__slide {
+    height: auto;
+    box-sizing: border-box;
   }
 
   &__card {
-    flex: 0 0 300px;
+    height: 100%;
     background: #fff;
     padding: 50px 30px;
     border-radius: 24px;
@@ -83,9 +90,12 @@
   &__dot {
     width: 10px;
     height: 10px;
+    padding: 0;
+    border: none;
     background: #e0e0e0;
     border-radius: 50%;
     cursor: pointer;
+    transition: background 0.2s ease;
 
     &--active {
       background: #f2b705;
@@ -99,6 +109,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 24px;
     max-width: 1100px;
     margin: 0 auto;
 
@@ -130,6 +141,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: background 0.2s ease;
 
     &:hover {
@@ -138,6 +151,66 @@
 
     &-arrow {
       font-size: 20px;
+    }
+  }
+
+  @media (max-width: $nl-bp-lg) {
+    padding: 72px 0;
+
+    &__title {
+      font-size: 40px;
+    }
+
+    &__header {
+      margin-bottom: 40px;
+    }
+  }
+
+  @media (max-width: $nl-bp-md) {
+    padding: 56px 0;
+
+    &__title {
+      font-size: 32px;
+    }
+
+    &__subtitle {
+      font-size: 16px;
+    }
+
+    &__card {
+      padding: 36px 24px;
+    }
+
+    &__footer {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+      padding: 24px 20px;
+
+      &-info {
+        text-align: center;
+      }
+    }
+
+    &__btn {
+      justify-content: center;
+      width: 100%;
+    }
+
+    &__dots {
+      margin-bottom: 40px;
+    }
+  }
+
+  @media (max-width: $nl-bp-sm) {
+    &__title {
+      font-size: 26px;
+    }
+
+    &__card {
+      &-title {
+        font-size: 18px;
+      }
     }
   }
 }

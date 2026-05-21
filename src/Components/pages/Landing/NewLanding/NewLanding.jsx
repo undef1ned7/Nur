@@ -7,10 +7,10 @@ import UnitedBusiness from "./sections/UnitedBusiness/UnitedBusiness";
 import Rate from "./sections/Rate/Rate";
 import Included from "./sections/Included/Included";
 import Team from "./sections/Team/Team";
-import Base from './sections/Base/Base'
-import Demo from './sections/Demo/Demo'
-import Footer from './sections/Footer/Footer'
-import Sphere from './sections/Sphere/Sphere'
+import Base from "./sections/Base/Base";
+import Demo from "./sections/Demo/Demo";
+import Footer from "./sections/Footer/Footer";
+import Sphere from "./sections/Sphere/Sphere";
 
 const NewLanding = () => {
   return (
@@ -20,14 +20,14 @@ const NewLanding = () => {
         <Banner />
         <BusinessProblems />
         <UnitedBusiness />
-        <Sphere/>
+        <Sphere />
         <Rate />
         <Included />
         <Team />
-        <Base/>
-        <Demo/>
+        <Base />
+        <Demo />
       </main>
-      <Footer/>
+      <Footer />
     </div>
   );
 };

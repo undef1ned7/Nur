@@ -218,6 +218,8 @@ import BuildingLayout, {
   BuildingEmployees,
 } from "../Components/pages/Building";
 import NewLanding from "../Components/pages/Landing/NewLanding/NewLanding";
+import VideoLessons from "../Components/pages/Landing/NewLanding/VideoLessons/VideoLessons";
+import VideoLessonView from "../Components/pages/Landing/NewLanding/VideoLessons/VideoLessonView";
 
 /**
  * Создает защищенный роут
@@ -416,9 +418,19 @@ const WarehouseAnalyticsRoute = () => {
  */
 export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
-  <Route key="/" path="/" element={<Landing />} />,
-  <Route key="/new-landing" path="/new-landing" element={<NewLanding />} />,
+  <Route key="/old-landing" path="/old-landing" element={<Landing />} />,
+  <Route key="/" path="/" element={<NewLanding />} />,
   <Route key="/register" path="/register" element={<Register />} />,
+  <Route
+    key="/video-lessons"
+    path="/video-lessons"
+    element={<VideoLessons />}
+  />,
+  <Route
+    key="/video-lessons-lesson"
+    path="/video-lessons/:lessonId"
+    element={<VideoLessonView />}
+  />,
 
   // Public routes
   <Route
