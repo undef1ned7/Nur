@@ -9,6 +9,7 @@ import {
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
 import Loading from "../../../common/Loading/Loading";
 import JsBarcode from "jsbarcode";
+import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
 
 /**
  * Компонент таба для печати штрих-кодов
@@ -607,6 +608,17 @@ const BarcodePrintTab = ({
     const barcode = String(previewProduct.barcode || "").trim();
     if (!barcode) return;
 
+    let printCode = barcode;
+    let printFormat = "CODE128";
+    try {
+      const encoded = getBarcodePrintEncoding(barcode);
+      printCode = encoded.code;
+      printFormat = encoded.format;
+    } catch {
+      printCode = barcode.replace(/\D/g, "") || barcode;
+      printFormat = "CODE128";
+    }
+
     const { scale, barcode: barcodeLayout } = previewLayout;
     const lineGapDots = Math.max(1, Math.round(lineGap));
     const textScaleInt = Math.max(1, Math.round(textScaleValue));
@@ -626,13 +638,18 @@ const BarcodePrintTab = ({
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const format = "EAN13";
+      const jsFormat =
+        printFormat === "EAN8"
+          ? "EAN8"
+          : printFormat === "EAN13"
+            ? "EAN13"
+            : "CODE128";
 
       const barWidth = Math.max(1, Math.round(barcodeBarWidth * scale));
       const barHeight = Math.round(barcodeLayout.height * scale);
 
-      JsBarcode(canvas, barcode, {
-        format,
+      JsBarcode(canvas, printCode, {
+        format: jsFormat,
         width: barWidth,
         height: barHeight,
         displayValue: true,
@@ -651,7 +668,7 @@ const BarcodePrintTab = ({
       ctx.font = "bold 14px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(barcode, canvas.width / 2, canvas.height / 2);
+      ctx.fillText(printCode, canvas.width / 2, canvas.height / 2);
     }
   }, [
     previewProduct,
