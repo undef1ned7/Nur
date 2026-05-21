@@ -1,159 +1,301 @@
+@use "../../breakpoints" as *;
+
 .business {
   display: flex;
   width: 100%;
-  height: 900px;
-  // padding: 95px 67px;
-  // margin-top: 20px;
-//   margin-bottom: 20px;
-&__container{
-  padding: 95px 67px;
-}
+  height: auto;
+  min-height: 0;
+
+  &__container {
+    padding-block: 95px;
+    padding-inline: 0;
+
+    @media (max-width: $nl-bp-lg) {
+      padding-block: 64px;
+    }
+
+    @media (max-width: $nl-bp-md) {
+      padding-block: 48px;
+    }
+  }
 
   &__wrapper {
     display: flex;
     flex-wrap: wrap;
+    row-gap: 40px;
   }
+
   &__tems {
     display: flex;
     align-items: center;
     gap: 17px;
+
     &-text {
       color: #f81717;
       font-weight: bold;
       font-size: 20px;
     }
+
     &-dot {
       width: 16px;
       height: 16px;
       background-color: #f81717;
       border-radius: 50%;
+      flex-shrink: 0;
     }
   }
+
   &__title {
     margin-top: 25px;
-    width: 475px;
-    line-height: 77px;
+    max-width: 475px;
+    line-height: 1.2;
     font-size: 64px;
     font-weight: bold;
+
     &-span {
       color: #f81717;
     }
   }
+
   &__description {
     margin-top: 24px;
     color: #000000bf;
-    width: 400px;
+    max-width: 400px;
     font-size: 20px;
     font-weight: 400;
     line-height: 34px;
   }
+
   &__line {
     width: 72px;
     height: 3px;
     margin-top: 24px;
     background: #fcc70a;
   }
+
   &__btn {
     margin-top: 42px;
     font-weight: 600;
-    width: 342px;
+    width: 100%;
+    max-width: 342px;
     height: 67px;
     border-radius: 333px;
     background: #fecb05;
     font-size: 20px;
-    font-weight: bold;
     color: #000000;
+    cursor: pointer;
+    border: none;
   }
-  &__banner{
-    width: 100%;
-    height: auto;
-    position: relative;
 
-    &__img1{
-        position: absolute;
-        width: 144px;
-        height: 95px;
-        left: 70px;
-        top: 50px;
+  &__banner {
+    width: 100%;
+    min-height: 280px;
+    position: relative;
+    margin-top: 24px;
+
+    &__img1 {
+      position: absolute;
+      width: 144px;
+      height: auto;
+      left: 70px;
+      top: 50px;
     }
-    &__img2{
-        position: absolute;
-        width: 112px;
-        height: 112px;
-        left: 250px;
-        top: 137px;
-        z-index: 2;
+
+    &__img2 {
+      position: absolute;
+      width: 112px;
+      height: auto;
+      left: 250px;
+      top: 137px;
+      z-index: 2;
     }
-    &__img3{
-        position: absolute;
-        width: 76px;
-        height: 68px;
-        right: 69px;
-        top: 84px;
-        z-index: 2;
+
+    &__img3 {
+      position: absolute;
+      width: 76px;
+      height: auto;
+      right: 69px;
+      top: 84px;
+      z-index: 2;
     }
-    &__img4{
-        position: absolute;
-        width: 380px;
-        height: 276px;
-        right: 30px;
-        top: -50px;
+
+    &__img4 {
+      position: absolute;
+      width: min(380px, 90%);
+      height: auto;
+      right: 30px;
+      top: -50px;
     }
-    &__img5{
-        position: absolute;
-        width: 100%;
-        height: max-content;
-        right: 20px;
-        top: -40px;
-        z-index: 1;
+
+    &__img5 {
+      position: absolute;
+      width: 100%;
+      height: auto;
+      right: 20px;
+      top: -40px;
+      z-index: 1;
     }
   }
+
   &__carts {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 20px;
+
     &-col {
       width: 100% !important;
       display: flex;
       gap: 20px;
+      flex-wrap: wrap;
     }
   }
+
   &__cart {
-    width: 110%;
-    height: 400px;
-    // margin: 20px;
+    flex: 1 1 calc(50% - 10px);
+    min-width: 240px;
+    min-height: 320px;
+    height: auto;
     border-radius: 22px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     padding: 45px 35px;
-    &__img{
-        width: 108px;
-        height: 108px;
+
+    &__img {
+      width: 108px;
+      height: 108px;
+      object-fit: contain;
     }
-    &__num{
-        color: #DFE1E2;
-        font-size: 48px;
+
+    &__num {
+      color: #dfe1e2;
+      font-size: 48px;
     }
-    &__up{
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
+
+    &__up {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-start;
     }
-    &__title{
-        margin-top: 37px;
-        color: #000000;
-        font-size: 28px;
-        font-style: semi-bold;
+
+    &__title {
+      margin-top: 37px;
+      color: #000000;
+      font-size: 28px;
     }
-    &__description{
-        margin-top: 11px;
-        color: #000000B2;
-        font-size: 20px;
-        font-weight: 400;
+
+    &__description {
+      margin-top: 11px;
+      color: #000000b2;
+      font-size: 20px;
+      font-weight: 400;
     }
   }
-}
-.col-6 {
-  width: 50%;
-  padding: 0 15px;
+
+  @media (max-width: $nl-bp-lg) {
+    &__title {
+      font-size: 48px;
+      max-width: 100%;
+    }
+
+    &__banner {
+      min-height: 240px;
+
+      &__img1 {
+        left: 0;
+        width: 110px;
+      }
+
+      &__img2 {
+        left: 140px;
+        width: 90px;
+      }
+
+      &__img3 {
+        right: 0;
+      }
+
+      &__img4 {
+        right: 0;
+        top: 0;
+      }
+    }
+
+    &__cart {
+      flex: 1 1 100%;
+      min-height: 280px;
+      padding: 32px 24px;
+
+      &__title {
+        font-size: 24px;
+      }
+
+      &__description {
+        font-size: 18px;
+      }
+    }
+  }
+
+  @media (max-width: $nl-bp-md) {
+    &__container {
+      padding-block: 40px;
+      padding-inline: 0;
+    }
+
+    &__tems-text {
+      font-size: 16px;
+    }
+
+    &__title {
+      font-size: 36px;
+    }
+
+    &__description {
+      font-size: 18px;
+      line-height: 28px;
+      max-width: 100%;
+    }
+
+    &__btn {
+      max-width: 100%;
+      height: 56px;
+      font-size: 18px;
+    }
+
+    &__banner {
+      display: none;
+    }
+
+    &__carts-col {
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: $nl-bp-sm) {
+    &__title {
+      font-size: 28px;
+    }
+
+    &__cart {
+      padding: 24px 20px;
+
+      &__img {
+        width: 72px;
+        height: 72px;
+      }
+
+      &__num {
+        font-size: 36px;
+      }
+
+      &__title {
+        font-size: 20px;
+        margin-top: 20px;
+      }
+
+      &__description {
+        font-size: 16px;
+      }
+    }
+  }
 }

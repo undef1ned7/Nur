@@ -1,64 +1,181 @@
-.footer{
-    background: #0E1114;
-    width: 100%;
-    height: 850px;
-    position: relative;
-    &__content{
-        width: 100%;
-        padding: 0 24px;
-        display: flex;
-        gap: 10px;
-        margin: 79px auto;
+@use "../../breakpoints" as *;
 
-        &__ul{
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-        }
-        &__link{
-            color: #FFFFFFE5;
-            font-size: 16px;
-            font-weight: 400;
-        }
-        &__link1{
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 18px;
-        }
+.footer {
+  background: #0e1114;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 40px;
+
+  &__container {
+    position: relative;
+    z-index: 2;
+  }
+
+  &__blur {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    max-width: min(480px, 55vw);
+    width: auto;
+    height: auto;
+    pointer-events: none;
+    object-fit: contain;
+    object-position: bottom right;
+  }
+
+  &__content {
+    width: 100%;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    // gap: 32px 24px;
+    margin: 79px auto 0;
+
+    @media (max-width: $nl-bp-md) {
+      margin-top: 48px;
+      gap: 40px 16px;
     }
-    &__description{
-        color: #FFFFFFE5;
-        font-size: 16px;
-        margin-top: 31px;
+
+    &__ul {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
     }
-    &__subtitle{
-        color: #FFFFFF;
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 47px;
+
+    &__link {
+      color: #ffffffe5;
+      font-size: 16px;
+      font-weight: 400;
+      text-decoration: none;
+
+      &:hover {
+        color: #f7d617;
+      }
     }
-    &__icon{
-        width: 18px;
-        height: 18px;
+
+    &__link1 {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 18px;
     }
-    &__end{
-        display: flex;
-        justify-content: space-between;
-        margin-top: 36px;
-        &__des{
-            display: flex;
-            flex-direction: row;
-            gap: 80px;
-        }
-        &-des{
-            color: #FFFFFF;
-            font-size: 16px;
-        }
+
+    &__first {
+      @media (max-width: $nl-bp-lg) {
+        flex: 1 1 100%;
+      }
     }
-    &__blur{
-        position: absolute;
-        bottom: 0;
-        right: 0;
+  }
+
+  &__description {
+    color: #ffffffe5;
+    font-size: 16px;
+    margin-top: 31px;
+    line-height: 1.5;
+    max-width: 320px;
+  }
+
+  &__subtitle {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 24px;
+  }
+
+  &__icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  &__end {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-top: 36px;
+    position: relative;
+    z-index: 2;
+
+    &__des {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 24px 80px;
     }
+
+    &-des {
+      color: #ffffff;
+      font-size: 16px;
+      text-decoration: none;
+
+      &:hover {
+        color: #f7d617;
+      }
+    }
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    margin: 0;
+  }
+
+  @media (max-width: $nl-bp-lg) {
+    &__content > .col-3 {
+      flex: 1 1 calc(50% - 12px);
+      width: calc(50% - 12px) !important;
+    }
+  }
+
+  @media (max-width: $nl-bp-md) {
+    padding-bottom: 32px;
+
+    &__content > .col-3 {
+      flex: 1 1 100%;
+      width: 100% !important;
+    }
+
+    &__description {
+      max-width: 100%;
+    }
+
+    &__end {
+      flex-direction: column;
+      align-items: flex-start;
+
+      &__des {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
+
+    &__blur {
+      max-width: min(360px, 75vw);
+      opacity: 0.5;
+    }
+  }
+
+  @media (max-width: $nl-bp-sm) {
+    &__subtitle {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    &__content__link {
+      font-size: 15px;
+    }
+
+    &__end-des {
+      font-size: 14px;
+    }
+  }
 }

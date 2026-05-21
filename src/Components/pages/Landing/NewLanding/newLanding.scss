@@ -1,11 +1,97 @@
+@use "./breakpoints" as *;
+
 // App.scss задаёт * { font-family: Montserrat !important } — поднимаем Manrope для лендинга
-.new-landing-page,
-.new-landing-page * {
-  font-family: "Manrope", system-ui, sans-serif !important;
+.new-landing-page {
+  overflow-x: hidden;
+
+  &,
+  & * {
+    font-family: "Manrope", system-ui, sans-serif !important;
+  }
+
+  @media screen and (max-width: $nl-container-mobile) {
+    --nl-gutter-x: 10px;
+  }
 }
 
 .new-container {
-  max-width: 1320px;
   width: 100%;
+  max-width: 1320px;
   margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+
+  @media screen and (max-width: 1200px) {
+    max-width: 960px;
+  }
+
+  @media screen and (max-width: 992px) {
+    max-width: 720px;
+  }
+
+  @media screen and (max-width: 768px) {
+    max-width: 540px;
+  }
+
+  @media screen and (max-width: $nl-container-mobile) {
+    max-width: 100%;
+    padding-inline: var(--nl-gutter-x);
+  }
+}
+
+// Секции вешают __container на тот же узел, что и .new-container — shorthand padding: X 0
+// сбрасывает padding-inline. Вертикаль только через padding-block в секциях.
+@media screen and (max-width: $nl-container-mobile) {
+  .new-landing-page .new-container {
+    padding-inline: var(--nl-gutter-x) !important;
+  }
+
+  .new-landing-page .new-container .col-4,
+  .new-landing-page .new-container .col-6 {
+    padding-inline: 0;
+  }
+}
+
+// Общие колонки (используются в нескольких секциях)
+.col-3 {
+  width: calc((100% - 42px) / 4);
+  box-sizing: border-box;
+
+  @media (max-width: $nl-bp-lg) {
+    width: calc((100% - 14px) / 2);
+  }
+
+  @media (max-width: $nl-bp-sm) {
+    width: 100%;
+  }
+}
+
+.col-4 {
+  width: calc(100% / 3);
+  padding-block: 0;
+  padding-inline: 10px;
+  box-sizing: border-box;
+
+  @media (max-width: $nl-bp-lg) {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    padding-inline: 0;
+  }
+
+  @media (max-width: $nl-container-mobile) {
+    padding-inline: 0;
+  }
+}
+
+.col-6 {
+  width: 50%;
+  padding-block: 0;
+  padding-inline: 15px;
+  box-sizing: border-box;
+
+  @media (max-width: $nl-bp-lg) {
+    width: 100%;
+    padding-inline: 0;
+  }
 }

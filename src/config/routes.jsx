@@ -416,8 +416,8 @@ const WarehouseAnalyticsRoute = () => {
  */
 export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
-  <Route key="/" path="/" element={<Landing />} />,
-  <Route key="/new-landing" path="/new-landing" element={<NewLanding />} />,
+  <Route key="/old-landing" path="/old-landing" element={<Landing />} />,
+  <Route key="/" path="/" element={<NewLanding />} />,
   <Route key="/register" path="/register" element={<Register />} />,
 
   // Public routes
