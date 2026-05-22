@@ -26,6 +26,7 @@ import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const toIdArray = (value) => {
   if (!Array.isArray(value)) return [];
@@ -294,14 +295,7 @@ const ProductionWarehouseProductDetail = () => {
       await fetchProduct();
       setEditMode(false);
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e);
-      setSaveError(
-        e?.detail ||
-        e?.message ||
-        e?.response?.data?.detail ||
-        "Не удалось сохранить изменения"
-      );
+      setSaveError(validateResErrors(e, "Ошибка при сохранении товара"));
     } finally {
       setSaving(false);
     }

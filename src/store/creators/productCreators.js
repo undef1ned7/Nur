@@ -22,6 +22,7 @@ import {
   getProductByBarcodeApi, // GET /main/products/barcode/{barcode}/
   addProductToWarehouseApi, // POST /main/products/add-to-warehouse/
 } from "../../api/products";
+import { getApiErrorPayload } from "../../../tools/validateResErrors";
 
 /* =================================================================== */
 /*                               PRODUCTS                              */
@@ -58,7 +59,10 @@ export const updateProductAsync = createAsyncThunk(
       // если нет helpers — (await api.patch(`/main/products/${productId}/`, updatedData)).data
       return await updateProductApi(productId, updatedData);
     } catch (error) {
-      return rejectWithValue(error);
+      const payload = getApiErrorPayload(error);
+      return rejectWithValue(
+        payload != null && payload !== "" ? payload : "Ошибка при сохранении товара",
+      );
     }
   }
 );
