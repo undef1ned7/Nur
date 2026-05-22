@@ -218,6 +218,17 @@ const CashierPage = () => {
     return rounded;
   };
 
+  /** Не синхронизируем с API при «0» / «0.» — пользователь может дописать 05, 0.5 и т.д. */
+  const shouldSyncQuantityToApiWhileTyping = (rawValue) => {
+    const value = String(rawValue ?? "")
+      .replace(",", ".")
+      .trim();
+    if (!value || value === "-") return false;
+    if (value === "0" || value === "0.") return false;
+    const num = parseFloat(value);
+    return Number.isFinite(num) && num > 0;
+  };
+
   // Функция для нормализации цены перед отправкой на сервер
   const normalizePrice = (price) => {
     if (price === null || price === undefined || price === "") return 0;
@@ -2104,6 +2115,10 @@ const CashierPage = () => {
       const idKey = String(lineId);
       const pendingRaw = pendingQtyLineInputRef.current.get(idKey);
       if (pendingRaw === undefined) return;
+      if (!shouldSyncQuantityToApiWhileTyping(pendingRaw)) {
+        pendingQtyLineInputRef.current.delete(idKey);
+        return;
+      }
 
       const item = cart.find((c) => String(c.id) === idKey);
       if (!item) {
@@ -3345,9 +3360,7 @@ const CashierPage = () => {
                                 [item.id]: "0",
                               }));
                               pendingQtyLineInputRef.current.set(lineKey, "0");
-                              debouncedQtyApiByLine.schedule(lineKey, () => {
-                                void flushPendingQuantityLine(item.id);
-                              });
+                              debouncedQtyApiByLine.cancel(lineKey);
                               return;
                             }
                             setCartQuantities((prev) => ({
@@ -3355,9 +3368,13 @@ const CashierPage = () => {
                               [item.id]: value,
                             }));
                             pendingQtyLineInputRef.current.set(lineKey, value);
-                            debouncedQtyApiByLine.schedule(lineKey, () => {
-                              void flushPendingQuantityLine(item.id);
-                            });
+                            if (shouldSyncQuantityToApiWhileTyping(value)) {
+                              debouncedQtyApiByLine.schedule(lineKey, () => {
+                                void flushPendingQuantityLine(item.id);
+                              });
+                            } else {
+                              debouncedQtyApiByLine.cancel(lineKey);
+                            }
                           }}
                           onFocus={(e) => {
                             qtyInputFocusRef.current = {
@@ -3380,7 +3397,18 @@ const CashierPage = () => {
                               };
                               return;
                             }
-                            const value = e.target.value;
+                            const value = e.target.value.trim();
+                            if (value === "" || value === "-") {
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: formatQuantity(item.quantity || 0),
+                              }));
+                              qtyInputFocusRef.current = {
+                                itemId: null,
+                                prevValue: "",
+                              };
+                              return;
+                            }
                             const qtyNum = normalizeQuantity(
                               Math.max(0, parseFloat(value) || 0),
                             );
