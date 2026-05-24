@@ -218,15 +218,33 @@ const CashierPage = () => {
     return rounded;
   };
 
-  /** Не синхронизируем с API при «0» / «0.» — пользователь может дописать 05, 0.5 и т.д. */
+  const DECIMAL_INPUT_PATTERN = /^\d*[,.]?\d*$/;
+
+  /** Ввод дроби не завершён: ждём цифру после «.»/«,» или blur */
+  const isIncompleteDecimalInput = (rawValue) => {
+    const raw = String(rawValue ?? "").trim();
+    if (!raw || raw === "-") return true;
+    if (raw === "." || raw === ",") return true;
+    if (/[.,]$/.test(raw)) return true;
+    const normalized = raw.replace(",", ".");
+    if (normalized === "0" || normalized === "0.") return true;
+    return false;
+  };
+
+  const parseDecimalInput = (rawValue) =>
+    parseFloat(String(rawValue ?? "").trim().replace(",", "."));
+
+  /** Не синхронизируем с API, пока дробь не дописана */
   const shouldSyncQuantityToApiWhileTyping = (rawValue) => {
-    const value = String(rawValue ?? "")
-      .replace(",", ".")
-      .trim();
-    if (!value || value === "-") return false;
-    if (value === "0" || value === "0.") return false;
-    const num = parseFloat(value);
+    if (isIncompleteDecimalInput(rawValue)) return false;
+    const num = parseDecimalInput(rawValue);
     return Number.isFinite(num) && num > 0;
+  };
+
+  const shouldSyncDecimalFieldWhileTyping = (rawValue) => {
+    if (isIncompleteDecimalInput(rawValue)) return false;
+    const num = parseDecimalInput(rawValue);
+    return Number.isFinite(num) && num >= 0;
   };
 
   // Функция для нормализации цены перед отправкой на сервер
@@ -1288,7 +1306,13 @@ const CashierPage = () => {
         const newQuantities = {};
         const newPrices = {};
         orderedCart.forEach((item) => {
-          newQuantities[item.id] = formatQuantity(item.quantity || 0);
+          const lineKey = String(item.id);
+          const isQtyFocused =
+            String(qtyInputFocusRef.current.itemId) === lineKey;
+          const hasPendingQty = pendingQtyLineInputRef.current.has(lineKey);
+          if (!isQtyFocused && !hasPendingQty) {
+            newQuantities[item.id] = formatQuantity(item.quantity || 0);
+          }
           newPrices[item.id] = formatPrice(item.price ?? 0);
         });
         setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
@@ -2116,7 +2140,6 @@ const CashierPage = () => {
       const pendingRaw = pendingQtyLineInputRef.current.get(idKey);
       if (pendingRaw === undefined) return;
       if (!shouldSyncQuantityToApiWhileTyping(pendingRaw)) {
-        pendingQtyLineInputRef.current.delete(idKey);
         return;
       }
 
@@ -2353,8 +2376,9 @@ const CashierPage = () => {
   const flushPendingDiscountLine = async (lineId) => {
     const key = String(lineId);
     const v = pendingDiscountLineRef.current.get(key);
-    pendingDiscountLineRef.current.delete(key);
     if (v === undefined) return;
+    if (!shouldSyncDecimalFieldWhileTyping(v)) return;
+    pendingDiscountLineRef.current.delete(key);
     const line = cartRef.current.find((c) => String(c.id) === key);
     if (!line?.itemId || !currentSale?.id) return;
     await applyDiscountFromRawInput(line, v);
@@ -3146,7 +3170,7 @@ const CashierPage = () => {
                               if (
                                 v === "" ||
                                 v === "-" ||
-                                /^\d*\.?\d*$/.test(v)
+                                DECIMAL_INPUT_PATTERN.test(v)
                               ) {
                                 setCartPrices((prev) => ({
                                   ...prev,
@@ -3155,8 +3179,8 @@ const CashierPage = () => {
                               }
                             }}
                             onBlur={(e) => {
-                              const v = e.target.value;
-                              const num = parseFloat(v);
+                              const v = e.target.value.trim();
+                              const num = parseDecimalInput(v);
                               if (v !== "" && !isNaN(num) && num !== item.price) {
                                 patchCartItemPrice(item, v);
                               } else {
@@ -3194,7 +3218,7 @@ const CashierPage = () => {
                             if (
                               v === "" ||
                               v === "-" ||
-                              /^\d*\.?\d*$/.test(v)
+                              DECIMAL_INPUT_PATTERN.test(v)
                             ) {
                               setCartDiscounts((prev) => ({
                                 ...prev,
@@ -3202,12 +3226,16 @@ const CashierPage = () => {
                               }));
                               const lineKey = String(item.id);
                               pendingDiscountLineRef.current.set(lineKey, v);
-                              debouncedDiscountApiByLine.schedule(
-                                lineKey,
-                                () => {
-                                  void flushPendingDiscountLine(item.id);
-                                },
-                              );
+                              if (shouldSyncDecimalFieldWhileTyping(v)) {
+                                debouncedDiscountApiByLine.schedule(
+                                  lineKey,
+                                  () => {
+                                    void flushPendingDiscountLine(item.id);
+                                  },
+                                );
+                              } else {
+                                debouncedDiscountApiByLine.cancel(lineKey);
+                              }
                             }
                           }}
                           onBlur={async (e) => {
@@ -3257,27 +3285,37 @@ const CashierPage = () => {
                             const lineKey = String(item.id);
                             cancelPendingDiscountLineInput(item.id);
                             const rawValue = e.target.value;
-                            const value = String(rawValue || "").replace(",", ".");
-                            if (value === "" || value === "-") {
+                            if (rawValue === "" || rawValue === "-") {
                               debouncedQtyApiByLine.cancel(lineKey);
                               pendingQtyLineInputRef.current.delete(lineKey);
                               setCartQuantities((prev) => ({
                                 ...prev,
-                                [item.id]: value,
+                                [item.id]: rawValue,
                               }));
                               return;
                             }
                             if (item.isWeight) {
-                              if (!/^\d*\.?\d*$/.test(value)) {
-                                debouncedQtyApiByLine.cancel(lineKey);
-                                pendingQtyLineInputRef.current.delete(lineKey);
+                              if (!DECIMAL_INPUT_PATTERN.test(rawValue)) {
                                 return;
                               }
-                            } else if (!/^\d+$/.test(value)) {
-                              debouncedQtyApiByLine.cancel(lineKey);
-                              pendingQtyLineInputRef.current.delete(lineKey);
+                            } else if (!/^\d+$/.test(rawValue)) {
                               return;
                             }
+
+                            if (isIncompleteDecimalInput(rawValue)) {
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: rawValue,
+                              }));
+                              pendingQtyLineInputRef.current.set(
+                                lineKey,
+                                rawValue,
+                              );
+                              debouncedQtyApiByLine.cancel(lineKey);
+                              return;
+                            }
+
+                            const value = String(rawValue).replace(",", ".");
                             const numValue = parseFloat(value);
                             if (isNaN(numValue)) {
                               debouncedQtyApiByLine.cancel(lineKey);
@@ -3365,10 +3403,10 @@ const CashierPage = () => {
                             }
                             setCartQuantities((prev) => ({
                               ...prev,
-                              [item.id]: value,
+                              [item.id]: rawValue,
                             }));
-                            pendingQtyLineInputRef.current.set(lineKey, value);
-                            if (shouldSyncQuantityToApiWhileTyping(value)) {
+                            pendingQtyLineInputRef.current.set(lineKey, rawValue);
+                            if (shouldSyncQuantityToApiWhileTyping(rawValue)) {
                               debouncedQtyApiByLine.schedule(lineKey, () => {
                                 void flushPendingQuantityLine(item.id);
                               });
@@ -3397,7 +3435,7 @@ const CashierPage = () => {
                               };
                               return;
                             }
-                            const value = e.target.value.trim();
+                            let value = e.target.value.trim();
                             if (value === "" || value === "-") {
                               setCartQuantities((prev) => ({
                                 ...prev,
@@ -3409,8 +3447,22 @@ const CashierPage = () => {
                               };
                               return;
                             }
+                            if (value === "." || value === ",") {
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: formatQuantity(item.quantity || 0),
+                              }));
+                              qtyInputFocusRef.current = {
+                                itemId: null,
+                                prevValue: "",
+                              };
+                              return;
+                            }
+                            if (/[.,]$/.test(value)) {
+                              value = value.slice(0, -1);
+                            }
                             const qtyNum = normalizeQuantity(
-                              Math.max(0, parseFloat(value) || 0),
+                              Math.max(0, parseDecimalInput(value) || 0),
                             );
                             if (!item.isCustom && !item.salePackage) {
                               const product = products.find(
