@@ -53,6 +53,11 @@ import { Button } from "@mui/material";
 import sleep from "../../../../../tools/sleep";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  MARKET_CASHIER_SALE_ID_PARAM,
+  useMarketCashierMultiCart,
+} from "../../../../hooks/useMarketCashierMultiCart";
+import CashierCartsBar from "./components/CashierCartsBar";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
@@ -363,6 +368,16 @@ const CashierPage = () => {
     preferredWholesaleModeRef.current = preferredWholesaleMode;
   }, [preferredWholesaleMode]);
 
+  const multiCart = useMarketCashierMultiCart({
+    shiftId: openShiftId,
+    dispatch,
+    preferredWholesaleMode,
+  });
+  const multiCartRef = useRef(multiCart);
+  useEffect(() => {
+    multiCartRef.current = multiCart;
+  }, [multiCart]);
+
   const waitForStartSaleIdle = useCallback(
     async (maxMs = 4000) => {
       const started = Date.now();
@@ -378,9 +393,33 @@ const CashierPage = () => {
     [store],
   );
 
+  const getSaleIdFromUrl = useCallback(() => {
+    try {
+      return new URLSearchParams(window.location.search).get(
+        MARKET_CASHIER_SALE_ID_PARAM,
+      );
+    } catch {
+      return null;
+    }
+  }, []);
+
   const ensureActiveSaleId = useCallback(
     async (shiftId) => {
       if (!shiftId) return null;
+
+      const urlSaleId = getSaleIdFromUrl();
+      const targetId = multiCartRef.current?.resolveTargetSaleId(urlSaleId);
+
+      if (targetId) {
+        try {
+          const loaded = await dispatch(getSale({ id: targetId })).unwrap();
+          if (String(getSaleShiftId(loaded)) === String(shiftId)) {
+            return loaded.id;
+          }
+        } catch {
+          // создадим новую продажу ниже
+        }
+      }
 
       const readSale = () => store.getState().sale?.start ?? null;
       let sale = readSale();
@@ -425,24 +464,15 @@ const CashierPage = () => {
         return retry?.id ?? null;
       }
     },
-    [dispatch, store, waitForStartSaleIdle],
+    [dispatch, store, waitForStartSaleIdle, getSaleIdFromUrl],
   );
 
-  /** После скана/добавления — всегда подтянуть актуальную корзину через /start/ */
+  /** Подтянуть активную корзину (GET sale) или fallback startSale */
   const refreshSaleFromStore = useCallback(
     async (shiftId) => {
       if (!shiftId) return;
-      const sale = store.getState().sale?.start;
-      if (!sale?.id) return;
-      const currentDiscount = normalizePrice(sale?.order_discount_total || 0);
       try {
-        await dispatch(
-          startSale({
-            discount_total: currentDiscount,
-            shift: shiftId,
-            is_wholesale: Boolean(preferredWholesaleModeRef.current),
-          }),
-        ).unwrap();
+        await multiCartRef.current?.refreshCartsFromStart?.({});
       } catch (e) {
         const msg = String(e?.message || e || "");
         if (!msg.includes("condition callback returning false")) {
@@ -451,7 +481,7 @@ const CashierPage = () => {
         await waitForStartSaleIdle();
       }
     },
-    [dispatch, store, waitForStartSaleIdle],
+    [waitForStartSaleIdle],
   );
 
   const handleSwitchSaleMode = useCallback(
@@ -495,7 +525,59 @@ const CashierPage = () => {
   }, [currentSale?.is_wholesale]);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const urlSaleId = searchParams.get(MARKET_CASHIER_SALE_ID_PARAM);
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
+
+  useEffect(() => {
+    if (!urlSaleId || !openShiftId) return;
+    if (String(currentSale?.id) === String(urlSaleId)) return;
+    multiCart.switchToCart(urlSaleId).catch(() => {});
+  }, [urlSaleId, openShiftId, currentSale?.id, multiCart]);
+
+  useEffect(() => {
+    if (!currentSale?.id || !openShiftId) return;
+    if (searchParams.get(MARKET_CASHIER_SALE_ID_PARAM)) return;
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set(MARKET_CASHIER_SALE_ID_PARAM, String(currentSale.id));
+        return p;
+      },
+      { replace: true },
+    );
+  }, [currentSale?.id, openShiftId, searchParams, setSearchParams]);
+
+  const handleSelectCashierCart = useCallback(
+    async (saleId) => {
+      await multiCart.switchToCart(saleId);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set(MARKET_CASHIER_SALE_ID_PARAM, String(saleId));
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [multiCart, setSearchParams],
+  );
+
+  const handleNewCashierCart = useCallback(async () => {
+    try {
+      const newId = await multiCart.parkAndNewCart();
+      if (!newId) return;
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set(MARKET_CASHIER_SALE_ID_PARAM, String(newId));
+          return p;
+        },
+        { replace: true },
+      );
+    } catch (e) {
+      alert(validateResErrors(e, "Не удалось создать новую корзину"), true);
+    }
+  }, [multiCart, setSearchParams, alert]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -725,24 +807,14 @@ const CashierPage = () => {
 
   // Функция для обновления продажи после запросов
   const refreshSale = useCallback(async () => {
-    // Не обновляем продажу, если нет открытой смены
     if (currentSale?.id && openShiftId) {
       try {
-        const currentDiscount = normalizePrice(
-          currentSale?.order_discount_total || 0,
-        );
-        await dispatch(
-          startSale({
-            discount_total: currentDiscount,
-            shift: openShiftId,
-            is_wholesale: Boolean(preferredWholesaleMode),
-          }),
-        ).unwrap();
+        await multiCartRef.current?.refreshActiveSale?.();
       } catch (error) {
         console.error("Ошибка при обновлении продажи:", error);
       }
     }
-  }, [openShiftId, currentSale]);
+  }, [openShiftId, currentSale?.id]);
 
   const debouncedDiscount = useDebounce((payload) => {
     if (!currentSale?.id || !openShiftId) return;
@@ -1007,7 +1079,10 @@ const CashierPage = () => {
       barcodeProcessingRef.current = true;
 
       try {
-        const saleId = await ensureActiveSaleId(shiftId);
+        const urlSaleId = getSaleIdFromUrl();
+        const scanSaleId =
+          urlSaleId || multiCartRef.current?.getActiveSaleId?.() || null;
+        const saleId = scanSaleId || (await ensureActiveSaleId(shiftId));
 
         if (!saleId) {
           showAlert("error", "Ошибка", "Не удалось создать продажу");
@@ -1016,7 +1091,11 @@ const CashierPage = () => {
         }
 
         const res = await dispatch(
-          sendBarCode({ barcode, id: saleId }),
+          sendBarCode({
+            barcode,
+            id: saleId,
+            sale_id: scanSaleId,
+          }),
         ).unwrap();
         if (res?.error) {
           const msg =
@@ -2530,21 +2609,28 @@ const CashierPage = () => {
         onComplete={async () => {
           setShowPaymentPage(false);
           setCart([]);
-          cartOrderRef.current = []; // Очищаем порядок при завершении продажи
+          cartOrderRef.current = [];
           setSelectedCustomer(null);
-          setDiscountValue(""); // Сбрасываем скидку
-          // Начинаем новую продажу после завершения (только если есть открытая смена)
-          // Важно: создаем новую корзину БЕЗ скидки (discount_total: 0)
+          setDiscountValue("");
           if (openShiftId) {
-            await dispatch(
-              startSale({
-                discount_total: 0,
-                shift: openShiftId,
-                is_wholesale: Boolean(preferredWholesaleMode),
-              }),
-            );
-            // Не вызываем refreshSale() здесь, так как он использует старую скидку из currentSale
-            // startSale уже обновляет состояние продажи
+            try {
+              await multiCart.refreshCartsFromStart();
+            } catch (e) {
+              console.error("Не удалось обновить список корзин:", e);
+            }
+            const activeId =
+              store.getState().sale?.activeSaleId ??
+              store.getState().sale?.start?.id;
+            if (activeId) {
+              setSearchParams(
+                (prev) => {
+                  const p = new URLSearchParams(prev);
+                  p.set(MARKET_CASHIER_SALE_ID_PARAM, String(activeId));
+                  return p;
+                },
+                { replace: true },
+              );
+            }
           }
           // После завершения продажи обновляем список товаров (остатки)
           try {
@@ -2654,6 +2740,21 @@ const CashierPage = () => {
               Скрыть
             </Button>
           </div>
+
+          {openShiftId && (
+            <div className="cashier-page__carts-bar-wrap">
+              <CashierCartsBar
+                layout="toolbar"
+                alwaysShow
+                carts={multiCart.carts}
+                activeSaleId={multiCart.activeSaleId}
+                switching={multiCart.switching}
+                onSelect={handleSelectCashierCart}
+                onNewCart={handleNewCashierCart}
+              />
+            </div>
+          )}
+
           <div className="cashier-page__search">
             <Search size={20} />
             <input

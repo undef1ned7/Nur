@@ -144,6 +144,12 @@
     }
   }
 
+  &__carts-bar-wrap {
+    flex-shrink: 0;
+    width: 100%;
+    margin-bottom: 0;
+  }
+
   &__search {
     display: flex;
     align-items: center;
