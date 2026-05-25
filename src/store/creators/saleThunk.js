@@ -1,5 +1,9 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api";
+import {
+  buildPosStartPayload,
+  getMainCartSaleId,
+} from "../../../tools/posSaleCarts";
 
 // Делает ошибки сериализуемыми
 const plainAxiosError = (error) => ({
@@ -35,24 +39,7 @@ export const startSale = createAsyncThunk(
   "sale/start",
   async (args = {}, { rejectWithValue }) => {
     try {
-      // Нормализуем аргументы:
-      // - startSale() -> {}
-      // - startSale(10) / startSale("10") -> { discount_total: 10 }
-      // - startSale({ discount_total, shift }) -> как есть
-      const normalized =
-        typeof args === "number" || typeof args === "string"
-          ? { discount_total: Number(args) || 0 }
-          : args || {};
-
-      const { discount_total, shift = null, ...rest } = normalized;
-      const payload = { ...rest };
-      if (discount_total !== undefined && payload.order_discount_total === undefined) {
-        payload.order_discount_total = discount_total;
-      }
-      // Если передан shift, добавляем его в payload
-      if (shift) {
-        payload.shift = shift;
-      }
+      const payload = buildPosStartPayload(args);
       const { data } = await api.post("/main/pos/sales/start/", payload);
       return data;
     } catch (error) {
@@ -173,11 +160,32 @@ export const updateProductInCart = createAsyncThunk(
 
 export const sendBarCode = createAsyncThunk(
   "products/sendBarcode",
-  async ({ barcode, id }, { rejectWithValue }) => {
+  async ({ barcode, id, sale_id, saleId }, { rejectWithValue, getState }) => {
     try {
-      const { data } = await api.post(`/main/pos/sales/${id}/scan/`, {
-        barcode,
-      });
+      const state = getState?.()?.sale;
+      const carts = state?.posCarts || [];
+      const mainId = getMainCartSaleId(carts);
+      const explicitSaleId = sale_id ?? saleId ?? null;
+      const targetId =
+        explicitSaleId ??
+        state?.activeSaleId ??
+        mainId ??
+        id ??
+        state?.start?.id;
+
+      if (!targetId) {
+        return rejectWithValue({ message: "Не выбрана корзина для сканирования" });
+      }
+
+      const body = { barcode };
+      if (explicitSaleId) {
+        body.sale_id = explicitSaleId;
+      }
+
+      const { data } = await api.post(
+        `/main/pos/sales/${targetId}/scan/`,
+        body,
+      );
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -315,15 +323,16 @@ export const historySellObjectDetail = createAsyncThunk(
 export const productCheckout = createAsyncThunk(
   "products/productCheckout",
   async (
-    { id, bool, clientId, payment_method, cash_received },
+    { id, bool, clientId, payment_method, cash_received, payments },
     { rejectWithValue },
   ) => {
     try {
+      const hasPayments = Array.isArray(payments) && payments.length > 0;
       const payload = {
         print_receipt: bool,
         ...(clientId && { client_id: clientId }),
-        ...(payment_method && { payment_method }),
-        ...(cash_received && { cash_received }),
+        ...(hasPayments ? { payments } : payment_method ? { payment_method } : {}),
+        ...(cash_received != null && cash_received !== "" ? { cash_received } : {}),
       };
       const { data } = await api.post(
         `main/pos/sales/${id}/checkout/`,

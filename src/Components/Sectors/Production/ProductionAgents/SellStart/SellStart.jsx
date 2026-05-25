@@ -2,10 +2,16 @@
 import { ArrowLeft, Minus, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import {
   useDebounce,
   useDebouncedAction,
 } from "../../../../../hooks/useDebounce";
+import {
+  MARKET_CASHIER_SALE_ID_PARAM,
+  useMarketCashierMultiCart,
+} from "../../../../../hooks/useMarketCashierMultiCart";
+import { useConfirm } from "../../../../../hooks/useDialog";
 import {
   doSearchInAgent,
   manualFillingInAgent,
@@ -52,6 +58,7 @@ import { useUser } from "../../../../../store/slices/userSlice";
 import UniversalModal from "../UniversalModal/UniversalModal";
 import { DEAL_STATUS_RU } from "../../../../pages/Sell/Sell";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import CashierCartsBar from "../../../Market/CashierPage/components/CashierCartsBar";
 import axios from "axios";
 import api from "../../../../../api";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
@@ -98,6 +105,17 @@ const paymentBanks = [
   { id: "demir", name: "Демир Банк" },
   { id: "other", name: "Другой банк" },
 ];
+
+const formatSplitAmount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : "";
+};
+
+const normalizeSplitAmountInput = (value) => {
+  const raw = String(value ?? "").replace(",", ".");
+  if (raw === "" || /^\d*\.?\d{0,2}$/.test(raw)) return raw;
+  return null;
+};
 
 /* ============================================================
    A) WebUSB + ESC/POS helpers (автоподключение, JSON и PDF)
@@ -661,6 +679,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
   const run = (thunk) => dispatch(thunk).unwrap();
   const [selectClient, setSelectClient] = useState("");
   const [selectCashBox, setSelectCashBox] = useState("");
@@ -685,6 +705,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const [orderDiscountMode, setOrderDiscountMode] = useState("amount");
   const [receiptWithCheck, setReceiptWithCheck] = useState(true);
   const [selectedBank, setSelectedBank] = useState("");
+  const [splitOnlineAmount, setSplitOnlineAmount] = useState("");
+  const [splitCashAmount, setSplitCashAmount] = useState("");
   const [debtInitialPayment, setDebtInitialPayment] = useState("");
   const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
 
@@ -693,6 +715,23 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const [cartPrices, setCartPrices] = useState({});
   const [cartDiscounts, setCartDiscounts] = useState({});
   const [cartDiscountModes, setCartDiscountModes] = useState({});
+
+  const marketShiftId =
+    marketStart?.shift?.id ?? marketStart?.shift ?? marketStart?.shift_id ?? null;
+  const marketMultiCart = useMarketCashierMultiCart({
+    shiftId: isMarketPosMode ? marketShiftId : null,
+    dispatch,
+    preferredWholesaleMode: false,
+  });
+  const urlSaleId = searchParams.get(MARKET_CASHIER_SALE_ID_PARAM);
+  const getMarketSaleId = useCallback(() => {
+    const id =
+      marketMultiCart.getActiveSaleId?.() ||
+      marketStart?.id ||
+      urlSaleId ||
+      null;
+    return id ? String(id) : null;
+  }, [marketMultiCart.getActiveSaleId, marketStart?.id, urlSaleId]);
 
   const [selectedId, setSelectedId] = useState(null);
   const selectedItem = useMemo(() => {
@@ -783,6 +822,114 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     [paymentClientsFromApi, filterClient],
   );
 
+  useEffect(() => {
+    if (!isMarketPosMode || !urlSaleId || !marketShiftId) return;
+    if (String(marketStart?.id) === String(urlSaleId)) return;
+    marketMultiCart.switchToCart(urlSaleId).catch(() => {});
+  }, [
+    isMarketPosMode,
+    marketShiftId,
+    marketMultiCart.switchToCart,
+    marketStart?.id,
+    urlSaleId,
+  ]);
+
+  useEffect(() => {
+    if (!isMarketPosMode || !marketStart?.id || !marketShiftId) return;
+    if (searchParams.get(MARKET_CASHIER_SALE_ID_PARAM)) return;
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set(MARKET_CASHIER_SALE_ID_PARAM, String(marketStart.id));
+        return p;
+      },
+      { replace: true },
+    );
+  }, [isMarketPosMode, marketShiftId, marketStart?.id, searchParams, setSearchParams]);
+
+  const handleSelectMarketCart = useCallback(
+    async (saleId) => {
+      if (!saleId) return;
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set(MARKET_CASHIER_SALE_ID_PARAM, String(saleId));
+          return p;
+        },
+        { replace: true },
+      );
+      await marketMultiCart.switchToCart(saleId);
+    },
+    [marketMultiCart.switchToCart, setSearchParams],
+  );
+
+  const handleNewMarketCart = useCallback(async () => {
+    try {
+      const newId = await marketMultiCart.parkAndNewCart();
+      if (!newId) return;
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set(MARKET_CASHIER_SALE_ID_PARAM, String(newId));
+          return p;
+        },
+        { replace: true },
+      );
+    } catch (error) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: validateResErrors(error, "Не удалось создать новую корзину"),
+      });
+    }
+  }, [marketMultiCart.parkAndNewCart, setSearchParams]);
+
+  const handleDeleteMarketCart = useCallback(
+    (saleId) => {
+      if (!saleId) return;
+      confirm("Удалить эту корзину?", async (ok) => {
+        if (!ok) return;
+        try {
+          const deletingActiveCart =
+            String(saleId) === String(marketStart?.id) ||
+            String(saleId) === String(urlSaleId);
+          if (deletingActiveCart) {
+            setSearchParams(
+              (prev) => {
+                const p = new URLSearchParams(prev);
+                p.delete(MARKET_CASHIER_SALE_ID_PARAM);
+                return p;
+              },
+              { replace: true },
+            );
+          }
+          const nextId = await marketMultiCart.deleteCart(saleId);
+          setSearchParams(
+            (prev) => {
+              const p = new URLSearchParams(prev);
+              if (nextId) p.set(MARKET_CASHIER_SALE_ID_PARAM, String(nextId));
+              else p.delete(MARKET_CASHIER_SALE_ID_PARAM);
+              return p;
+            },
+            { replace: true },
+          );
+          setAlert({
+            open: true,
+            type: "success",
+            message: "Корзина удалена",
+          });
+        } catch (error) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: validateResErrors(error, "Не удалось удалить корзину"),
+          });
+        }
+      });
+    },
+    [confirm, marketMultiCart.deleteCart, marketStart?.id, setSearchParams, urlSaleId],
+  );
+
   const [qty, setQty] = useState("");
 
   useEffect(() => {
@@ -799,15 +946,19 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           discount_total: v,
         }),
       );
-    } else if (isMarketPosMode && selectedItem && start?.id) {
+    } else if (isMarketPosMode && selectedItem) {
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       dispatch(
         updateProductInCart({
-          id: start.id,
+          id: saleId,
           productId: selectedItem.product ?? selectedItem.product_id ?? selectedItem.id,
           data: { discount_total: v },
         }),
       ).then(() => {
-        dispatch(getSale({ id: start.id }));
+        marketMultiCart.refreshActiveSale().catch(() => {
+          dispatch(getSale({ id: saleId }));
+        });
       });
     } else {
       dispatch(
@@ -856,10 +1007,21 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       mode,
     }).toFixed(2);
     if (isMarketPosMode) {
+      const saleId = getMarketSaleId();
       if (mode === "percent") {
-        dispatch(startSale({ order_discount_percent: Math.max(0, toNum(value)) }));
+        dispatch(
+          startSale({
+            ...(saleId ? { sale_id: saleId } : {}),
+            order_discount_percent: Math.max(0, toNum(value)),
+          }),
+        );
       } else {
-        dispatch(startSale({ order_discount_total: discountTotal }));
+        dispatch(
+          startSale({
+            ...(saleId ? { sale_id: saleId } : {}),
+            order_discount_total: discountTotal,
+          }),
+        );
       }
       return;
     }
@@ -894,8 +1056,12 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         );
       }
     } else if (isMarketPosMode) {
-      if (start?.id) {
-        dispatch(getSale({ id: start.id }));
+      const saleId = getMarketSaleId();
+      if (saleId) {
+        marketMultiCart.refreshActiveSale().catch((error) => {
+          console.error("Ошибка при обновлении корзины:", error);
+          dispatch(getSale({ id: saleId }));
+        });
       } else {
         dispatch(startSale());
       }
@@ -985,11 +1151,13 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       });
       return;
     }
-    if (isMarketPosMode && start?.id) {
+    if (isMarketPosMode) {
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       try {
         await dispatch(
           addCustomItem({
-            id: start.id,
+            id: saleId,
             name: customItem.name.trim(),
             price: customItem.price.trim(),
             quantity: Number(customItem.quantity) || 1,
@@ -1149,11 +1317,12 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         });
       }
     } else if (isMarketPosMode) {
-      if (!start?.id) return;
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       try {
         await dispatch(
           updateManualFilling({
-            id: start.id,
+            id: saleId,
             productId: item.product ?? item.product_id ?? item.id,
             quantity: (Number(item.quantity) || 0) + 1,
           }),
@@ -1224,21 +1393,22 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         });
       }
     } else if (isMarketPosMode) {
-      if (!start?.id) return;
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       const currentQty = Number(item.quantity) || 0;
       const next = Math.max(0, currentQty - 1);
       try {
         if (next === 0) {
           await dispatch(
             deleteProductInCart({
-              id: start.id,
+              id: saleId,
               productId: item.product ?? item.product_id ?? item.id,
             }),
           ).unwrap();
         } else {
           await dispatch(
             updateManualFilling({
-              id: start.id,
+              id: saleId,
               productId: item.product ?? item.product_id ?? item.id,
               quantity: next,
             }),
@@ -1309,11 +1479,12 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         });
       }
     } else if (isMarketPosMode) {
-      if (!start?.id) return;
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       try {
         await dispatch(
           deleteProductInCart({
-            id: start.id,
+            id: saleId,
             productId: item.product ?? item.product_id ?? item.id,
           }),
         ).unwrap();
@@ -1409,7 +1580,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         });
       }
     } else if (isMarketPosMode) {
-      if (!start?.id) return;
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       const inputValue = itemQuantities[item.id] || "";
       let qtyNum;
       if (inputValue === "" || inputValue === "0") {
@@ -1428,7 +1600,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       try {
         await dispatch(
           updateManualFilling({
-            id: start.id,
+            id: saleId,
             productId: item.product ?? item.product_id ?? item.id,
             quantity: qtyNum,
           }),
@@ -1486,13 +1658,14 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   };
 
   const patchCartItemPrice = async (item, value) => {
-    if (!isMarketPosMode || !start?.id) return;
+    const saleId = getMarketSaleId();
+    if (!isMarketPosMode || !saleId) return;
     const productId = item.product ?? item.product_id ?? item.id;
     const num = Math.max(0, toNum(value));
     try {
       await dispatch(
         updateProductInCart({
-          id: start.id,
+          id: saleId,
           productId,
           data: { unit_price: num.toFixed(2) },
         }),
@@ -1521,7 +1694,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
   const patchCartItemDiscount = async (item, value, options = {}) => {
     const { mode = "amount", displayValue } = options;
-    if (!isMarketPosMode || !start?.id) return;
+    const saleId = getMarketSaleId();
+    if (!isMarketPosMode || !saleId) return;
     const productId = item.product ?? item.product_id ?? item.id;
     const lineTotal = previewCartMetrics.byId[item.id]?.lineTotal ??
       toNum(item.unit_price ?? item.price) * toNum(item.quantity);
@@ -1532,7 +1706,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     try {
       await dispatch(
         updateProductInCart({
-          id: start.id,
+          id: saleId,
           productId,
           data: { discount_total: discountAmount.toFixed(2) },
         }),
@@ -1988,9 +2162,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           }),
         );
       } else if (isMarketPosMode) {
+        const saleId = getMarketSaleId();
+        if (!saleId) return;
         result = await run(
           productCheckout({
-            id: start?.id,
+            id: saleId,
             bool: withReceipt,
             clientId: clientId,
           }),
@@ -2026,9 +2202,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       setShow(false);
 
       // Если надо печатать — получаем чек и шлём в принтер через WebUSB
-      if (withReceipt && (result?.sale_id || start?.id)) {
+      const saleIdForReceipt =
+        result?.sale_id || (isMarketPosMode ? getMarketSaleId() : start?.id);
+      if (withReceipt && saleIdForReceipt) {
         try {
-          const resp = await run(getProductCheckout(result?.sale_id || start?.id));
+          const resp = await run(getProductCheckout(saleIdForReceipt));
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
           console.error("Печать чека не удалась:", e);
@@ -2059,9 +2237,10 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   };
 
   const handleMarketPosPayment = async () => {
+    const saleId = getMarketSaleId();
     if (isPilorama) {
       if (!agentCart.currentCart?.id) return;
-    } else if (!start?.id) {
+    } else if (!saleId) {
       return;
     }
     if (!cashData.cashbox) {
@@ -2125,7 +2304,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
     }
 
-    if (paymentMethod === "cashless" && !selectedBank) {
+    if ((paymentMethod === "cashless" || paymentMethod === "split") && !selectedBank) {
       setAlert({
         open: true,
         type: "error",
@@ -2136,18 +2315,51 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
     try {
       const supportedBanks = ["mbank", "optima", "obank", "bakai"];
+      const selectedBankMethod = supportedBanks.includes(selectedBank)
+        ? selectedBank
+        : "transfer";
+      const splitOnlineNumber = Math.min(
+        totalNumber,
+        Math.max(0, toNum(splitOnlineAmount)),
+      );
+      const splitCashNumber = Math.min(
+        totalNumber,
+        Math.max(0, toNum(splitCashAmount)),
+      );
+
+      if (
+        paymentMethod === "split" &&
+        Math.abs(splitOnlineNumber + splitCashNumber - totalNumber) > 0.01
+      ) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Сумма онлайн и наличных должна совпадать с итогом оплаты",
+        });
+        return;
+      }
+
+      const splitPayments =
+        paymentMethod === "split"
+          ? [
+              { method: selectedBankMethod, amount: splitOnlineNumber.toFixed(2) },
+              { method: "cash", amount: splitCashNumber.toFixed(2) },
+            ].filter((payment) => toNum(payment.amount) > 0)
+          : null;
       const paymentMethodApi =
         paymentMethod === "cash"
           ? "cash"
           : paymentMethod === "cashless"
-            ? supportedBanks.includes(selectedBank)
-              ? selectedBank
-              : "transfer"
-            : "debt";
+            ? selectedBankMethod
+            : paymentMethod === "debt"
+              ? "debt"
+              : undefined;
 
       const cashReceivedValue =
         paymentMethod === "cash"
           ? totalNumber
+          : paymentMethod === "split"
+            ? splitCashNumber
           : paymentMethod === "debt"
             ? totalNumber
             : null;
@@ -2169,10 +2381,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       } else {
         result = await run(
           productCheckout({
-            id: start.id,
+            id: saleId,
             bool: receiptWithCheck,
             clientId: clientId || null,
             payment_method: paymentMethodApi,
+            ...(splitPayments ? { payments: splitPayments } : {}),
             cash_received: cashReceivedValue,
           }),
         );
@@ -2248,7 +2461,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       setShow(false);
 
       const saleIdForReceipt =
-        result?.sale_id || result?.id || (!isPilorama ? start?.id : null);
+        result?.sale_id || result?.id || (!isPilorama ? saleId : null);
       if (receiptWithCheck && saleIdForReceipt) {
         try {
           const resp = await run(getProductCheckout(saleIdForReceipt));
@@ -2277,6 +2490,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     setPaymentMethod("cash");
     setReceiptWithCheck(true);
     setSelectedBank("");
+    setSplitOnlineAmount("");
+    setSplitCashAmount("");
     setDebtInitialPayment("");
     setFirstPaymentDate(getTodayIsoDate());
     setShowMobileCart(false);
@@ -2298,6 +2513,31 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     };
   }, [showMobileCart]);
 
+  useEffect(() => {
+    if (!showPaymentModal || paymentMethod !== "split") return;
+    const total = Math.max(0, Number(currentTotal || 0));
+    setSplitOnlineAmount(formatSplitAmount(total));
+    setSplitCashAmount(formatSplitAmount(0));
+  }, [currentTotal, paymentMethod, showPaymentModal]);
+
+  const handleSplitOnlineAmountChange = (value) => {
+    const normalized = normalizeSplitAmountInput(value);
+    if (normalized == null) return;
+    const total = Math.max(0, Number(currentTotal || 0));
+    setSplitOnlineAmount(normalized);
+    const online = normalized === "" ? 0 : Math.min(total, Math.max(0, toNum(normalized)));
+    setSplitCashAmount(formatSplitAmount(Math.max(0, total - online)));
+  };
+
+  const handleSplitCashAmountChange = (value) => {
+    const normalized = normalizeSplitAmountInput(value);
+    if (normalized == null) return;
+    const total = Math.max(0, Number(currentTotal || 0));
+    setSplitCashAmount(normalized);
+    const cash = normalized === "" ? 0 : Math.min(total, Math.max(0, toNum(normalized)));
+    setSplitOnlineAmount(formatSplitAmount(Math.max(0, total - cash)));
+  };
+
   const handleCatalogProductAdd = async (product) => {
     if (isPilorama) {
       await dispatch(
@@ -2313,7 +2553,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     }
 
     if (isMarketPosMode) {
-      if (!start?.id) return;
+      const saleId = getMarketSaleId();
+      if (!saleId) return;
       const productId = product.product ?? product.id;
       const existingItem = currentItems.find(
         (item) =>
@@ -2324,7 +2565,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       if (existingItem) {
         await dispatch(
           updateManualFilling({
-            id: start.id,
+            id: saleId,
             productId,
             quantity: (Number(existingItem.quantity) || 0) + 1,
           }),
@@ -2332,7 +2573,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       } else {
         await dispatch(
           manualFilling({
-            id: start.id,
+            id: saleId,
             productId,
             quantity: 1,
           }),
@@ -2358,6 +2599,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     return Number(cartItem?.quantity || 0);
   };
 
+  const activeMarketSaleId = isMarketPosMode ? getMarketSaleId() : null;
   const selectedClientName =
     filterClient.find((client) => String(client.id) === String(clientId))
       ?.full_name || "Клиент не выбран";
@@ -2390,6 +2632,21 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
         <div className="cashier-page__content">
           <div className="cashier-page__products">
+            {isMarketPosMode && (
+              <div className="cashier-page__carts-bar-wrap">
+                <CashierCartsBar
+                  layout="toolbar"
+                  alwaysShow
+                  carts={marketMultiCart.carts}
+                  activeSaleId={activeMarketSaleId}
+                  switching={marketMultiCart.switching}
+                  onSelect={handleSelectMarketCart}
+                  onNewCart={handleNewMarketCart}
+                  onDelete={handleDeleteMarketCart}
+                />
+              </div>
+            )}
+
             <div className="cashier-page__search">
               <Search size={20} />
               <input
@@ -2816,7 +3073,9 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                   type="button"
                   className="cashier-page__checkout-btn"
                   onClick={openPaymentModal}
-                  disabled={isPilorama ? !agentCart.currentCart?.id : !start?.id}
+                  disabled={
+                    isPilorama ? !agentCart.currentCart?.id : !activeMarketSaleId
+                  }
                 >
                   Оплатить
                 </button>
@@ -2871,6 +3130,15 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                 >
                   Безналичный расчет
                 </button>
+                {isMarketPosMode && (
+                  <button
+                    type="button"
+                    className={`sellstart-cashier__payment-method ${paymentMethod === "split" ? "active" : ""}`}
+                    onClick={() => setPaymentMethod("split")}
+                  >
+                    Смешанная
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`sellstart-cashier__payment-method ${paymentMethod === "debt" ? "active" : ""}`}
@@ -2920,7 +3188,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                   </select>
                 </div>
 
-                {paymentMethod === "cashless" && (
+                {(paymentMethod === "cashless" || paymentMethod === "split") && (
                   <div className="sellstart-cashier__payment-field">
                     <label>Банк / способ перевода</label>
                     <select
@@ -2936,6 +3204,35 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                       ))}
                     </select>
                   </div>
+                )}
+
+                {paymentMethod === "split" && (
+                  <>
+                    <div className="sellstart-cashier__payment-field">
+                      <label>Сумма онлайн</label>
+                      <input
+                        type="text"
+                        value={splitOnlineAmount}
+                        onChange={(e) =>
+                          handleSplitOnlineAmountChange(e.target.value)
+                        }
+                        className="sellstart-cashier__discount-input"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="sellstart-cashier__payment-field">
+                      <label>Сумма наличными</label>
+                      <input
+                        type="text"
+                        value={splitCashAmount}
+                        onChange={(e) =>
+                          handleSplitCashAmountChange(e.target.value)
+                        }
+                        className="sellstart-cashier__discount-input"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </>
                 )}
 
                 {paymentMethod === "debt" && (
@@ -2992,6 +3289,18 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                         "Перевод"}
                     </strong>
                   </div>
+                )}
+                {paymentMethod === "split" && (
+                  <>
+                    <div>
+                      <span>Онлайн</span>
+                      <strong>{formatSom(splitOnlineAmount)} сом</strong>
+                    </div>
+                    <div>
+                      <span>Наличными</span>
+                      <strong>{formatSom(splitCashAmount)} сом</strong>
+                    </div>
+                  </>
                 )}
                 {paymentMethod === "debt" && (
                   <div>

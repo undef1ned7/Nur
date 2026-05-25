@@ -17,6 +17,9 @@ import SuccessPaymentModal from "./components/SuccessPaymentModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
+  validateSplitAmounts,
+} from "../../../../../tools/marketCashierSplitPayment";
+import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
   ensurePrinterConnectedInteractively,
@@ -55,6 +58,9 @@ const PaymentPage = ({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
   const [selectedBank, setSelectedBank] = useState("");
+  const [splitOnlineBank, setSplitOnlineBank] = useState("");
+  const [splitOnlineAmount, setSplitOnlineAmount] = useState("");
+  const [splitTransferAmount, setSplitTransferAmount] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [printing, setPrinting] = useState(false);
   const amountReceivedInputRef = useRef(null);
@@ -94,6 +100,11 @@ const PaymentPage = ({
       id: "deferred",
       label: "Отсрочка",
       description: "Оплата в долг",
+    },
+    {
+      id: "split",
+      label: "Смешанная",
+      description: "Часть онлайн, часть наличными",
     },
   ];
 
@@ -202,6 +213,38 @@ const PaymentPage = ({
     .filter((bill) => bill >= total)
     .slice(0, 3);
 
+  const formatSplitAmount = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "0.00";
+    return Math.max(0, amount).toFixed(2);
+  };
+
+  const normalizeSplitAmountInput = (value) => {
+    if (value === "") return { raw: "", amount: 0 };
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return { raw: "", amount: 0 };
+    const maxTotal = Math.max(0, Number(total) || 0);
+    const clampedAmount = Math.min(Math.max(0, amount), maxTotal);
+    return {
+      raw: clampedAmount === amount ? value : formatSplitAmount(clampedAmount),
+      amount: clampedAmount,
+    };
+  };
+
+  const handleSplitOnlineAmountChange = (value) => {
+    const { raw, amount } = normalizeSplitAmountInput(value);
+    const maxTotal = Math.max(0, Number(total) || 0);
+    setSplitOnlineAmount(raw);
+    setSplitTransferAmount(formatSplitAmount(maxTotal - amount));
+  };
+
+  const handleSplitTransferAmountChange = (value) => {
+    const { raw, amount } = normalizeSplitAmountInput(value);
+    const maxTotal = Math.max(0, Number(total) || 0);
+    setSplitTransferAmount(raw);
+    setSplitOnlineAmount(formatSplitAmount(maxTotal - amount));
+  };
+
   const printReceiptSmart = async (payload) => {
     try {
       await handleCheckoutResponseForPrinting(payload, {
@@ -260,6 +303,28 @@ const PaymentPage = ({
       }
     }
 
+    let splitParts = null;
+    if (paymentMethod === "split") {
+      if (!splitOnlineBank) {
+        showAlert(
+          "warning",
+          "Требуется банк",
+          "Выберите банк для онлайн-оплаты",
+        );
+        return;
+      }
+      const check = validateSplitAmounts(
+        total,
+        splitOnlineAmount,
+        splitTransferAmount,
+      );
+      if (!check.ok) {
+        showAlert("warning", "Смешанная оплата", check.message);
+        return;
+      }
+      splitParts = check;
+    }
+
     // Валидация для наличных
     if (paymentMethod === "cash") {
       const received = parseFloat(amountReceived) || 0;
@@ -277,16 +342,32 @@ const PaymentPage = ({
       // Маппинг способов оплаты
       // payment_method может быть: cash, transfer, debt, mbank, optima, obank, bakai
       let paymentMethodApi = "cash";
+      let checkoutPayments = null;
+      let checkoutCashReceived = null;
       if (paymentMethod === "cashless") {
-        // Если выбран один из поддерживаемых банков, используем его id как payment_method
         const supportedBanks = ["mbank", "optima", "obank", "bakai"];
         if (selectedBank && supportedBanks.includes(selectedBank)) {
           paymentMethodApi = selectedBank;
         } else {
-          paymentMethodApi = "transfer"; // По умолчанию для безналичных
+          paymentMethodApi = "transfer";
         }
       } else if (paymentMethod === "deferred") {
-        paymentMethodApi = "debt"; // Отправляем как долг
+        paymentMethodApi = "debt";
+      } else if (paymentMethod === "split" && splitParts) {
+        const supportedBanks = ["mbank", "optima", "obank", "bakai"];
+        const onlineMethod =
+          splitOnlineBank && supportedBanks.includes(splitOnlineBank)
+            ? splitOnlineBank
+            : "transfer";
+        checkoutPayments = [
+          ...(splitParts.online > 0
+            ? [{ method: onlineMethod, amount: splitParts.online.toFixed(2) }]
+            : []),
+          ...(splitParts.transfer > 0
+            ? [{ method: "cash", amount: splitParts.transfer.toFixed(2) }]
+            : []),
+        ];
+        checkoutCashReceived = splitParts.transfer.toFixed(2);
       }
 
       // ВАЖНО: перед оплатой НЕ показываем окно выбора USB-принтера.
@@ -309,9 +390,12 @@ const PaymentPage = ({
           id: saleId,
           bool: isPrinterConnected, // print_receipt - только если принтер подключен (или false при "Без чека")
           clientId: selectedCustomer?.id || null,
-          payment_method: paymentMethodApi,
+          payment_method: checkoutPayments ? null : paymentMethodApi,
+          payments: checkoutPayments,
           cash_received:
-            paymentMethod === "cash" || paymentMethod === "deferred"
+            paymentMethod === "split"
+              ? checkoutCashReceived
+              : paymentMethod === "cash" || paymentMethod === "deferred"
               ? parseFloat(amountReceived) || total
               : null,
         })
@@ -387,27 +471,50 @@ const PaymentPage = ({
           }
         }
 
-        // Отправляем запрос на кассу для наличных и переводов (не для отсрочки)
+        // Денежные потоки (не для отсрочки)
         if (paymentMethod !== "deferred" && selectCashBox && total > 0) {
+          const flowBase = {
+            cashbox: selectCashBox,
+            type: "income",
+            source_cashbox_flow_id:
+              result.payload?.sale_id || result.payload?.id,
+            source_business_operation_id: "Продажа",
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+          };
           try {
-            await dispatch(
-              addCashFlows({
-                cashbox: selectCashBox,
-                type: "income",
-                name: "Продажа",
-                amount: total,
-                source_cashbox_flow_id:
-                  result.payload?.sale_id || result.payload?.id,
-                source_business_operation_id: "Продажа",
-                status:
-                  company?.subscription_plan?.name === "Старт"
-                    ? "approved"
-                    : "pending",
-              })
-            ).unwrap();
+            if (paymentMethod === "split" && splitParts) {
+              if (splitParts.online > 0) {
+                await dispatch(
+                  addCashFlows({
+                    ...flowBase,
+                    name: `Продажа (онлайн)`,
+                    amount: splitParts.online,
+                  }),
+                ).unwrap();
+              }
+              if (splitParts.transfer > 0) {
+                await dispatch(
+                  addCashFlows({
+                    ...flowBase,
+                    name: `Продажа (наличные)`,
+                    amount: splitParts.transfer,
+                  }),
+                ).unwrap();
+              }
+            } else {
+              await dispatch(
+                addCashFlows({
+                  ...flowBase,
+                  name: "Продажа",
+                  amount: total,
+                }),
+              ).unwrap();
+            }
           } catch (cashError) {
             console.warn("Ошибка при создании денежного потока:", cashError);
-            // Не блокируем успешную оплату, если ошибка с кассой
           }
         }
 
@@ -556,19 +663,28 @@ const PaymentPage = ({
         cashless: 0,
         deferred: 0,
       };
-    } else if (paymentMethod === "cashless") {
+    }
+    if (paymentMethod === "cashless") {
       return {
         cash: 0,
         cashless: total,
         deferred: 0,
       };
-    } else {
+    }
+    if (paymentMethod === "split") {
+      const online = parseFloat(splitOnlineAmount) || 0;
+      const cash = parseFloat(splitTransferAmount) || 0;
       return {
-        cash: 0,
-        cashless: 0,
-        deferred: total,
+        cash,
+        cashless: online,
+        deferred: 0,
       };
     }
+    return {
+      cash: 0,
+      cashless: 0,
+      deferred: total,
+    };
   };
 
   const paymentAmounts = getPaymentAmounts();
@@ -592,10 +708,13 @@ const PaymentPage = ({
   // Автозаполнение суммы при выборе способа оплаты и при изменении итоговой суммы
   useEffect(() => {
     if (paymentMethod === "cashless" || paymentMethod === "cash") {
-      // При переключении на наличные или безналичные устанавливаем итоговую сумму
       setAmountReceived(total ? total.toFixed(2) : "0.00");
     }
-    // Сбрасываем выбор банка при смене способа оплаты
+    if (paymentMethod === "split" && total > 0) {
+      const half = (total / 2).toFixed(2);
+      setSplitOnlineAmount(half);
+      setSplitTransferAmount((total - parseFloat(half)).toFixed(2));
+    }
     if (paymentMethod !== "cashless") {
       setSelectedBank("");
     }
@@ -727,48 +846,6 @@ const PaymentPage = ({
             </div>
           </div>
 
-          {paymentMethod === "cashless" && (
-            <div className="payment-page__section">
-              <h3 className="payment-page__section-title">ВЫБОР БАНКА</h3>
-              <div className="payment-page__banks">
-                {banks.map((bank) => (
-                  <button
-                    key={bank.id}
-                    className={`payment-page__bank ${selectedBank === bank.id
-                      ? "payment-page__bank--active"
-                      : ""
-                      }`}
-                    onClick={() => setSelectedBank(bank.id)}
-                    title={bank.name}
-                  >
-                    <div className="payment-page__bank-content">
-                      {bank.logo ? (
-                        typeof bank.logo === "string" ? (
-                          <img
-                            src={bank.logo}
-                            alt={bank.name}
-                            className="payment-page__bank-logo"
-                          />
-                        ) : (
-                          <div className="payment-page__bank-svg">
-                            {bank.logo}
-                          </div>
-                        )
-                      ) : (
-                        <div className="payment-page__bank-name">
-                          {bank.name}
-                        </div>
-                      )}
-                    </div>
-                    {selectedBank === bank.id && (
-                      <div className="payment-page__bank-check">✓</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="payment-page__section">
             <h3 className="payment-page__section-title">ПОКУПАТЕЛЬ</h3>
             {selectedCustomer ? (
@@ -857,6 +934,115 @@ const PaymentPage = ({
             </div>
           </div>
 
+          {paymentMethod === "cashless" && (
+            <div className="payment-page__section">
+              <h3 className="payment-page__section-title">ВЫБОР БАНКА</h3>
+              <div className="payment-page__banks">
+                {banks.map((bank) => (
+                  <button
+                    key={bank.id}
+                    className={`payment-page__bank ${selectedBank === bank.id
+                      ? "payment-page__bank--active"
+                      : ""
+                      }`}
+                    onClick={() => setSelectedBank(bank.id)}
+                    title={bank.name}
+                  >
+                    <div className="payment-page__bank-content">
+                      {bank.logo ? (
+                        typeof bank.logo === "string" ? (
+                          <img
+                            src={bank.logo}
+                            alt={bank.name}
+                            className="payment-page__bank-logo"
+                          />
+                        ) : (
+                          <div className="payment-page__bank-svg">
+                            {bank.logo}
+                          </div>
+                        )
+                      ) : (
+                        <div className="payment-page__bank-name">
+                          {bank.name}
+                        </div>
+                      )}
+                    </div>
+                    {selectedBank === bank.id && (
+                      <div className="payment-page__bank-check">✓</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === "split" && (
+            <div className="payment-page__section payment-page__split">
+              <h3 className="payment-page__section-title">ОНЛАЙН-ОПЛАТА</h3>
+              <div className="payment-page__banks">
+                {banks.map((bank) => (
+                  <button
+                    key={`online-${bank.id}`}
+                    type="button"
+                    className={`payment-page__bank ${
+                      splitOnlineBank === bank.id
+                        ? "payment-page__bank--active"
+                        : ""
+                    }`}
+                    onClick={() => setSplitOnlineBank(bank.id)}
+                    title={bank.name}
+                  >
+                    <div className="payment-page__bank-content">
+                      {typeof bank.logo === "string" ? (
+                        <img
+                          src={bank.logo}
+                          alt={bank.name}
+                          className="payment-page__bank-logo"
+                        />
+                      ) : (
+                        <div className="payment-page__bank-name">{bank.name}</div>
+                      )}
+                    </div>
+                    {splitOnlineBank === bank.id && (
+                      <div className="payment-page__bank-check">✓</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <label className="payment-page__split-field">
+                <span>Сумма онлайн (сом)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="payment-page__amount-input"
+                  value={splitOnlineAmount}
+                  onChange={(e) => handleSplitOnlineAmountChange(e.target.value)}
+                />
+              </label>
+              <h3 className="payment-page__section-title">НАЛИЧНЫЕ</h3>
+              <label className="payment-page__split-field">
+                <span>Сумма наличными (сом)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="payment-page__amount-input"
+                  value={splitTransferAmount}
+                  onChange={(e) => handleSplitTransferAmountChange(e.target.value)}
+                />
+              </label>
+              <p className="payment-page__split-total">
+                Итого частей:{" "}
+                {(
+                  (parseFloat(splitOnlineAmount) || 0) +
+                  (parseFloat(splitTransferAmount) || 0)
+                ).toFixed(2)}{" "}
+                / {total.toFixed(2)} сом
+              </p>
+            </div>
+          )}
+
           {paymentMethod === "deferred" ? (
             <div className="payment-page__debt-section">
               <div className="payment-page__debt-amount">
@@ -907,7 +1093,7 @@ const PaymentPage = ({
                 </span>
               </div>
             </div>
-          ) : (
+          ) : paymentMethod === "split" ? null : (
             <div className="payment-page__amount-section">
               <h3 className="payment-page__section-title">
                 ПОЛУЧЕНО ОТ ПОКУПАТЕЛЯ

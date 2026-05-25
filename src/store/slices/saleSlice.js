@@ -27,6 +27,11 @@ import {
   getSale,
 } from "../creators/saleThunk";
 import {
+  applyPosStartToState,
+  normalizePosStartResponse,
+  patchCartTabFromSale,
+} from "../../../tools/posSaleCarts";
+import {
   fetchWarehouseDocuments,
   createWarehouseDocument,
   updateWarehouseDocument,
@@ -41,7 +46,9 @@ import {
 } from "../creators/warehouseThunk";
 
 const initialState = {
-  start: null, // POS-продажа (товары)
+  start: null, // POS-продажа (товары) — активная корзина
+  posCarts: [], // вкладки корзин смены (из POST /start/)
+  activeSaleId: null,
   startObject: null, // Object-продажа (строительные)
   loading: false,
   // отдельный флаг именно для startSale (чтобы не плодить параллельные /start/ запросы)
@@ -85,6 +92,8 @@ const saleSlice = createSlice({
       // Сбрасываем активную POS-продажу и связанные ошибки/данные,
       // например при закрытии смены
       state.start = null;
+      state.posCarts = [];
+      state.activeSaleId = null;
       state.cart = null;
       state.checkout = null;
       state.error = null;
@@ -100,7 +109,7 @@ const saleSlice = createSlice({
         state.startSaleLoading = true;
       })
       .addCase(startSale.fulfilled, (state, { payload }) => {
-        state.start = payload;
+        applyPosStartToState(state, payload);
         state.loading = false;
         state.startSaleLoading = false;
       })
@@ -114,6 +123,10 @@ const saleSlice = createSlice({
       })
       .addCase(getSale.fulfilled, (state, { payload }) => {
         state.start = payload;
+        if (payload?.id) {
+          state.activeSaleId = String(payload.id);
+          state.posCarts = patchCartTabFromSale(state.posCarts, payload);
+        }
         state.loading = false;
       })
       .addCase(getSale.rejected, (state, action) => {
@@ -260,6 +273,12 @@ const saleSlice = createSlice({
               : payload.error;
           return;
         }
+
+        if (Array.isArray(payload?.carts) || payload?.sale) {
+          applyPosStartToState(state, payload);
+          return;
+        }
+
         if (
           payload &&
           typeof payload === "object" &&
@@ -268,6 +287,8 @@ const saleSlice = createSlice({
             payload.id)
         ) {
           state.start = payload;
+          state.activeSaleId = String(payload.id);
+          state.posCarts = patchCartTabFromSale(state.posCarts, payload);
         }
       })
       .addCase(sendBarCode.rejected, (state, { payload }) => {

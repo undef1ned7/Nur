@@ -55,6 +55,37 @@
     margin: 2px 0 0 0;
   }
 
+  &__split-hint {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    font-size: 12px;
+    color: #92400e;
+    line-height: 1.4;
+
+    code {
+      font-size: 11px;
+    }
+  }
+
+  &__split-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #374151;
+  }
+
+  &__split-total {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+  }
+
   &__content {
     display: flex;
     gap: 20px;
