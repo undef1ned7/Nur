@@ -31,7 +31,7 @@ export const clearPendingSplitPayment = (saleId) => {
   }
 };
 
-/** Суммы онлайн + перевод должны совпадать с итогом (допуск 0.01 сом). */
+/** Суммы онлайн + наличные должны совпадать с итогом (допуск 0.01 сом). */
 export const validateSplitAmounts = (total, onlineAmount, transferAmount) => {
   const t = Number(total) || 0;
   const online = Math.round((Number(onlineAmount) || 0) * 100) / 100;
@@ -40,7 +40,7 @@ export const validateSplitAmounts = (total, onlineAmount, transferAmount) => {
   const target = Math.round(t * 100) / 100;
 
   if (online <= 0 && transfer <= 0) {
-    return { ok: false, message: "Укажите суммы онлайн-оплаты и перевода" };
+    return { ok: false, message: "Укажите суммы онлайн-оплаты и наличных" };
   }
   if (online < 0 || transfer < 0) {
     return { ok: false, message: "Суммы не могут быть отрицательными" };
