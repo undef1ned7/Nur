@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { UserCircle, Package, Users, Filter } from "lucide-react";
 import "./Counterparties.scss";
 import CounterpartyHeader from "./components/CounterpartyHeader";
@@ -17,7 +17,9 @@ import {
   VIEW_MODES,
   TYPE_TABS,
   TYPE_TAB_LABELS,
-  COUNTERPARTY_TYPES,
+  PAGE_SIZE,
+  getCounterpartyTypesForTab,
+  filterCounterpartiesByTypeTab,
 } from "./constants";
 import { getAgentDisplay } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
@@ -25,16 +27,6 @@ import ReactPortal from "../../../common/Portal/ReactPortal";
 /** Показывать колонку «Агент» для владельца и админа */
 const showAgentColumn = (profile) =>
   profile?.role === "owner" || profile?.role === "admin";
-
-const toDateInputValue = (date) => {
-  if (!date) return "";
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return "";
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const Counterparties = () => {
   const navigate = useNavigate();
@@ -48,14 +40,8 @@ const Counterparties = () => {
 
   // Состояние фильтров и модальных окон
   const [filters, setFilters] = useState({});
-  const [period, setPeriod] = useState(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    return {
-      from: toDateInputValue(monthStart),
-      to: toDateInputValue(now),
-    };
-  });
+  const [period, setPeriod] = useState({ from: "", to: "" });
+  const [periodFilterActive, setPeriodFilterActive] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -67,52 +53,35 @@ const Counterparties = () => {
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
-  const [searchParams] = useSearchParams();
-
-  // Получаем текущую страницу из URL
-  const currentPageFromUrl = useMemo(
-    () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
-  );
-
-  // Параметры запроса (type не передаём — фильтруем на фронте, чтобы BOTH был в обеих вкладках)
   const requestParams = useMemo(() => {
     const params = {
-      page: currentPageFromUrl,
       ...filters,
+      _counterpartyTypes: getCounterpartyTypesForTab(typeTab),
     };
     if (debouncedSearchTerm?.trim()) {
       params.search = debouncedSearchTerm.trim();
     }
-    if (period.from) {
-      params.period_start = period.from;
-      params.date_from = period.from;
-    }
-    if (period.to) {
-      params.period_end = period.to;
-      params.date_to = period.to;
+    if (periodFilterActive && period.from && period.to) {
+      params._periodRange = { from: period.from, to: period.to };
     }
     return params;
-  }, [currentPageFromUrl, filters, debouncedSearchTerm, period.from, period.to]);
+  }, [
+    typeTab,
+    filters,
+    debouncedSearchTerm,
+    periodFilterActive,
+    period.from,
+    period.to,
+  ]);
 
   // Загрузка контрагентов
-  const {
-    counterparties: rawCounterparties,
-    loading,
-    count,
-    next,
-    previous,
-  } = useCounterpartyData(requestParams);
+  const { counterparties: rawCounterparties, loading } =
+    useCounterpartyData(requestParams);
 
-  // Фильтр по вкладке: Клиент — CLIENT и BOTH, Поставщик — SUPPLIER и BOTH
-  const counterparties = useMemo(() => {
-    if (!Array.isArray(rawCounterparties)) return [];
-    const allowedTypes =
-      typeTab === TYPE_TABS.CLIENT
-        ? [COUNTERPARTY_TYPES.CLIENT, COUNTERPARTY_TYPES.BOTH]
-        : [COUNTERPARTY_TYPES.SUPPLIER, COUNTERPARTY_TYPES.BOTH];
-    return rawCounterparties.filter((c) => allowedTypes.includes(c?.type));
-  }, [rawCounterparties, typeTab]);
+  const counterparties = useMemo(
+    () => filterCounterpartiesByTypeTab(rawCounterparties, typeTab),
+    [rawCounterparties, typeTab]
+  );
 
   // Список уникальных агентов с текущей страницы (для выбора в фильтре)
   const agentOptions = useMemo(() => {
@@ -141,16 +110,21 @@ const Counterparties = () => {
     return counterparties.filter((c) => c?.agent === agentFilter);
   }, [counterparties, agentFilter]);
 
-  // Хук для пагинации с реальными данными
   const {
     currentPage,
     totalPages,
-    hasNextPage,
-    hasPrevPage,
     getRowNumber,
     handlePageChange: handlePageChangeBase,
     resetToFirstPage,
-  } = usePagination(count, next, previous);
+  } = usePagination(filteredCounterparties.length, null, null);
+
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+
+  const pageCounterparties = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredCounterparties.slice(start, start + PAGE_SIZE);
+  }, [filteredCounterparties, currentPage]);
 
   // Сброс на первую страницу при изменении поиска или вкладки типа
   useEffect(() => {
@@ -166,8 +140,17 @@ const Counterparties = () => {
   }, [typeTab]);
 
   useEffect(() => {
-    resetToFirstPage();
-  }, [period.from, period.to, resetToFirstPage]);
+    if (periodFilterActive) resetToFirstPage();
+  }, [periodFilterActive, period.from, period.to, resetToFirstPage]);
+
+  const applyPeriodFilter = useCallback(() => {
+    if (period.from && period.to) setPeriodFilterActive(true);
+  }, [period.from, period.to]);
+
+  const clearPeriodFilter = useCallback(() => {
+    setPeriodFilterActive(false);
+    setPeriod({ from: "", to: "" });
+  }, []);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -266,7 +249,11 @@ const Counterparties = () => {
             </select>
           </div>
         )}
-        <div className="counterparties-period-filter">
+        <div
+          className={`counterparties-period-filter ${
+            periodFilterActive ? "counterparties-period-filter--active" : ""
+          }`}
+        >
           <label
             htmlFor="counterparties-period-from"
             className="counterparties-period-filter__label"
@@ -289,9 +276,28 @@ const Counterparties = () => {
             type="date"
             className="counterparties-period-filter__input"
             value={period.to}
-            onChange={(e) => setPeriod((prev) => ({ ...prev, to: e.target.value }))}
+            onChange={(e) =>
+              setPeriod((prev) => ({ ...prev, to: e.target.value }))
+            }
             min={period.from || undefined}
           />
+          <button
+            type="button"
+            className="counterparties-period-filter__btn"
+            onClick={applyPeriodFilter}
+            disabled={!period.from || !period.to}
+          >
+            Применить
+          </button>
+          {periodFilterActive && (
+            <button
+              type="button"
+              className="counterparties-period-filter__btn counterparties-period-filter__btn--reset"
+              onClick={clearPeriodFilter}
+            >
+              Сбросить
+            </button>
+          )}
         </div>
       </section>
 
@@ -300,7 +306,7 @@ const Counterparties = () => {
         onSearchChange={setSearchTerm}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
-        count={count}
+        count={filteredCounterparties.length}
         foundCount={filteredCounterparties.length}
       />
 
@@ -333,7 +339,7 @@ const Counterparties = () => {
         ) : viewMode === VIEW_MODES.TABLE ? (
           <div className="counterparties-table-wrap">
             <CounterpartyTable
-              counterparties={filteredCounterparties}
+              counterparties={pageCounterparties}
               loading={loading}
               onCounterpartyClick={handleCounterpartyClick}
               getRowNumber={getRowNumber}
@@ -343,7 +349,7 @@ const Counterparties = () => {
         ) : (
           <div className="counterparties-cards-wrap">
             <CounterpartyCards
-              counterparties={filteredCounterparties}
+              counterparties={pageCounterparties}
               loading={loading}
               onCounterpartyClick={handleCounterpartyClick}
               getRowNumber={getRowNumber}
@@ -356,7 +362,7 @@ const Counterparties = () => {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            count={count}
+            count={filteredCounterparties.length}
             loading={loading}
             hasNextPage={hasNextPage}
             hasPrevPage={hasPrevPage}

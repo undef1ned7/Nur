@@ -1,5 +1,9 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import warehouseAPI from "../../api/warehouse";
+import {
+  mergeCounterpartyLists,
+  mergeCounterpartyPeriodAnalytics,
+} from "../../Components/Sectors/Market/Counterparties/utils";
 
 /**
  * Thunks для работы с документами склада
@@ -165,8 +169,39 @@ export const fetchWarehouseCounterparties = createAsyncThunk(
   "warehouse/fetchCounterparties",
   async (params = {}, { rejectWithValue }) => {
     try {
-      const data = await warehouseAPI.listCounterparties(params);
-      return data;
+      const { _periodRange, _counterpartyTypes, ...listParams } = params;
+      const types = Array.isArray(_counterpartyTypes)
+        ? _counterpartyTypes.filter(Boolean)
+        : [];
+
+      const fetchByTypes = async (queryParams, apiTypes) => {
+        if (!apiTypes.length) {
+          return warehouseAPI.listCounterparties(queryParams);
+        }
+        const { page: _page, ...rest } = queryParams;
+        const payloads = await Promise.all(
+          apiTypes.map((type) =>
+            warehouseAPI.listCounterparties({
+              ...rest,
+              type,
+              page_size: 500,
+            })
+          )
+        );
+        return mergeCounterpartyLists(...payloads);
+      };
+
+      const data = await fetchByTypes(listParams, types);
+
+      const from = _periodRange?.from;
+      const to = _periodRange?.to;
+      if (!from || !to) return data;
+
+      const periodData = await fetchByTypes(
+        { period_start: from, period_end: to },
+        types
+      );
+      return mergeCounterpartyPeriodAnalytics(data, periodData);
     } catch (error) {
       return rejectWithValue(error);
     }

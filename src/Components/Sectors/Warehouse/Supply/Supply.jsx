@@ -24,6 +24,22 @@ const fmtDate = (v) => {
 const statusLabel = (s) =>
   s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
 
+const formatApiError = (error) => {
+  if (!error) return "Неизвестная ошибка";
+  if (typeof error === "object" && !error.detail && !error.message) {
+    const labels = { phone: "Телефон", name: "Название", type: "Тип" };
+    const fieldErrors = Object.entries(error)
+      .map(([field, messages]) => {
+        const msgArray = Array.isArray(messages) ? messages : [messages];
+        const label = labels[field] || field;
+        return `${label}: ${msgArray.join(", ")}`;
+      })
+      .join("; ");
+    return fieldErrors || "Ошибка валидации";
+  }
+  return error.detail || error.message || "Ошибка при сохранении";
+};
+
 const WarehouseSupply = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -41,6 +57,7 @@ const WarehouseSupply = () => {
 
   const [openSup, setOpenSup] = useState(false);
   const [supName, setSupName] = useState("");
+  const [supPhone, setSupPhone] = useState("");
   const [supError, setSupError] = useState("");
   const [savingSup, setSavingSup] = useState(false);
 
@@ -153,14 +170,24 @@ const WarehouseSupply = () => {
 
   const openSupModal = () => {
     setSupName("");
+    setSupPhone("");
     setSupError("");
     setOpenSup(true);
   };
 
   const saveSupplier = async () => {
     const name = supName?.trim();
+    const phone = supPhone?.trim();
     if (!name) {
       setSupError("Укажите название.");
+      return;
+    }
+    if (!phone) {
+      setSupError("Укажите номер телефона.");
+      return;
+    }
+    if (!/^\+?\d[\d\s\-()]{5,}$/.test(phone)) {
+      setSupError("Неверный формат телефона.");
       return;
     }
     setSavingSup(true);
@@ -168,16 +195,13 @@ const WarehouseSupply = () => {
     try {
       await warehouseAPI.createCounterparty({
         name,
+        phone,
         type: "SUPPLIER",
       });
       setOpenSup(false);
       loadCounterparties();
     } catch (err) {
-      const msg =
-        err?.detail ||
-        err?.message ||
-        (typeof err === "string" ? err : "Ошибка при создании поставщика");
-      setSupError(msg);
+      setSupError(formatApiError(err));
     } finally {
       setSavingSup(false);
     }
@@ -491,6 +515,20 @@ const WarehouseSupply = () => {
                     value={supName}
                     onChange={(e) => setSupName(e.target.value)}
                     placeholder="Например: ООО «Альфа»"
+                  />
+                </div>
+                <div className="sklad-supply__field sklad-supply__field--full">
+                  <label className="sklad-supply__label" htmlFor="sup-phone">
+                    Телефон <span className="sklad-supply__req">*</span>
+                  </label>
+                  <input
+                    id="sup-phone"
+                    className="sklad-supply__input"
+                    type="tel"
+                    value={supPhone}
+                    onChange={(e) => setSupPhone(e.target.value)}
+                    placeholder="+996 555 123-456"
+                    autoComplete="tel"
                   />
                 </div>
               </div>

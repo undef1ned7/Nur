@@ -26,6 +26,30 @@ export const COUNTERPARTY_TYPES = {
   BOTH: "BOTH",
 };
 
+export const COUNTERPARTY_TYPE_LABELS = {
+  [COUNTERPARTY_TYPES.CLIENT]: "Клиент",
+  [COUNTERPARTY_TYPES.SUPPLIER]: "Поставщик",
+  [COUNTERPARTY_TYPES.BOTH]: "Клиент и поставщик",
+};
+
+/** Типы API для каждой вкладки (BOTH показывается и у клиентов, и у поставщиков) */
+export const TYPE_TAB_API_TYPES = {
+  [TYPE_TABS.CLIENT]: [COUNTERPARTY_TYPES.CLIENT, COUNTERPARTY_TYPES.BOTH],
+  [TYPE_TABS.SUPPLIER]: [COUNTERPARTY_TYPES.SUPPLIER, COUNTERPARTY_TYPES.BOTH],
+};
+
+export const getCounterpartyTypesForTab = (typeTab) =>
+  TYPE_TAB_API_TYPES[typeTab] ?? TYPE_TAB_API_TYPES[TYPE_TABS.CLIENT];
+
+export const filterCounterpartiesByTypeTab = (list, typeTab) => {
+  if (!Array.isArray(list)) return [];
+  const allowed = new Set(getCounterpartyTypesForTab(typeTab));
+  return list.filter((c) => allowed.has(c?.type));
+};
+
+export const getCounterpartyTypeLabel = (type) =>
+  COUNTERPARTY_TYPE_LABELS[type] || type || "—";
+
 /** Реквизиты контрагента (ИНН, ОКПО, р/с, БИК, адрес) */
 export const EMPTY_COUNTERPARTY_LEGAL = {
   inn: "",

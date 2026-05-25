@@ -123,6 +123,35 @@
     color: var(--counterparties-tab-text);
     font-weight: 500;
   }
+
+  &__btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--counterparties-tab-text-active);
+    background: var(--counterparties-surface);
+    border: 1px solid var(--counterparties-border);
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      border-color: var(--counterparties-tab-active);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--reset {
+      color: var(--counterparties-tab-text);
+    }
+  }
+
+  &--active &__input {
+    border-color: var(--counterparties-tab-active);
+  }
 }
 
 /* Контейнер контента */
