@@ -2149,8 +2149,15 @@ export const listOwnerAgentsProducts = async (params = {}) => {
  */
 export const listCounterparties = async (params = {}) => {
   try {
+    const {
+      _cacheKey,
+      _skipLoadingIfCached,
+      _periodRange,
+      _counterpartyTypes,
+      ...restParams
+    } = params;
     const response = await api.get("warehouse/crud/counterparties/", {
-      params,
+      params: restParams,
     });
     return response.data;
   } catch (error) {

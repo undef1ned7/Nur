@@ -1,5 +1,10 @@
 import React, { useMemo } from "react";
-import { formatPhone, getCounterpartyName, getAgentDisplay } from "../utils";
+import {
+  formatPhone,
+  getCounterpartyName,
+  getAgentDisplay,
+} from "../utils";
+import { getCounterpartyTypeLabel } from "../constants";
 import "./CounterpartyCards.scss";
 
 /**
@@ -15,17 +20,8 @@ const CounterpartyCard = React.memo(
     const name = getCounterpartyName(counterparty);
     const phone = formatPhone(counterparty?.phone);
     const email = counterparty?.email || "—";
-    const type = counterparty?.type || "—";
+    const typeLabel = getCounterpartyTypeLabel(counterparty?.type);
     const inn = counterparty?.inn || "—";
-
-    // Маппинг типов для отображения
-    const typeLabels = {
-      CLIENT: "Клиент",
-      SUPPLIER: "Поставщик",
-      BOTH: "Клиент и поставщик",
-    };
-
-    const typeLabel = typeLabels[type] || type;
 
     return (
       <div className="warehouse-table__row warehouse-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
