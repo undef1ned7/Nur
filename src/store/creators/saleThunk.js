@@ -323,15 +323,16 @@ export const historySellObjectDetail = createAsyncThunk(
 export const productCheckout = createAsyncThunk(
   "products/productCheckout",
   async (
-    { id, bool, clientId, payment_method, cash_received },
+    { id, bool, clientId, payment_method, cash_received, payments },
     { rejectWithValue },
   ) => {
     try {
+      const hasPayments = Array.isArray(payments) && payments.length > 0;
       const payload = {
         print_receipt: bool,
         ...(clientId && { client_id: clientId }),
-        ...(payment_method && { payment_method }),
-        ...(cash_received && { cash_received }),
+        ...(hasPayments ? { payments } : payment_method ? { payment_method } : {}),
+        ...(cash_received != null && cash_received !== "" ? { cash_received } : {}),
       };
       const { data } = await api.post(
         `main/pos/sales/${id}/checkout/`,

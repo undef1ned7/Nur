@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { getSale, startSale } from "../store/creators/saleThunk";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { deleteSale, getSale, startSale } from "../store/creators/saleThunk";
 import { useSale } from "../store/slices/saleSlice";
 import {
   buildPosStartPayload,
@@ -22,6 +22,7 @@ export function useMarketCashierMultiCart({
     activeSaleId: storeActiveSaleId,
   } = useSale();
   const [switching, setSwitching] = useState(false);
+  const switchingTargetRef = useRef(null);
 
   const carts = useMemo(() => posCarts, [posCarts]);
 
@@ -52,12 +53,13 @@ export function useMarketCashierMultiCart({
   );
 
   const getActiveSaleId = useCallback(
-    () => activeSaleId,
+    () => switchingTargetRef.current || activeSaleId,
     [activeSaleId],
   );
 
   const resolveTargetSaleId = useCallback(
     (urlSaleId) => {
+      if (switchingTargetRef.current) return switchingTargetRef.current;
       const fromUrl = urlSaleId ? String(urlSaleId).trim() : "";
       if (fromUrl) return fromUrl;
       if (activeSaleId) return String(activeSaleId);
@@ -71,14 +73,19 @@ export function useMarketCashierMultiCart({
     async (saleId) => {
       if (!saleId || !shiftId) return;
       const id = String(saleId);
+      if (switchingTargetRef.current === id) {
+        return;
+      }
       if (String(activeSaleId) === id && String(currentSale?.id) === id) {
         return;
       }
+      switchingTargetRef.current = id;
       setSwitching(true);
       try {
         await dispatch(getSale({ id })).unwrap();
         await refreshCartsFromStart({ sale_id: id });
       } finally {
+        switchingTargetRef.current = null;
         setSwitching(false);
       }
     },
@@ -96,6 +103,22 @@ export function useMarketCashierMultiCart({
       setSwitching(false);
     }
   }, [shiftId, refreshCartsFromStart]);
+
+  const deleteCart = useCallback(
+    async (saleId) => {
+      if (!saleId || !shiftId) return null;
+      setSwitching(true);
+      try {
+        await dispatch(deleteSale(String(saleId))).unwrap();
+        const data = await refreshCartsFromStart({});
+        const { activeSaleId: nextId } = normalizePosStartResponse(data);
+        return nextId;
+      } finally {
+        setSwitching(false);
+      }
+    },
+    [shiftId, dispatch, refreshCartsFromStart],
+  );
 
   const refreshActiveSale = useCallback(async () => {
     if (!shiftId) return null;
@@ -124,6 +147,7 @@ export function useMarketCashierMultiCart({
     registerMainSale,
     switchToCart,
     parkAndNewCart,
+    deleteCart,
     removeCartFromSession,
     getActiveSaleId,
     resolveTargetSaleId,

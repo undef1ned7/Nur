@@ -30,6 +30,12 @@
     min-width: 0;
   }
 
+  &__tab-wrap {
+    display: inline-flex;
+    align-items: stretch;
+    flex-shrink: 0;
+  }
+
   &__tab {
     display: inline-flex;
     align-items: center;
@@ -66,6 +72,40 @@
 
     &--main .cashier-carts-bar__tab-label {
       font-weight: 700;
+    }
+  }
+
+  &__tab-wrap--deletable &__tab {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  &__delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-left: 0;
+    border-radius: 0 8px 8px 0;
+    background: #fff;
+    color: #9ca3af;
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      color 0.15s;
+
+    &:hover:not(:disabled) {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
     }
   }
 
@@ -156,6 +196,10 @@
       max-width: none;
       padding: 8px 14px;
       font-size: 13px;
+    }
+
+    .cashier-carts-bar__delete-btn {
+      width: 30px;
     }
 
     .cashier-carts-bar__tab-label {

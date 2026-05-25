@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, ShoppingCart } from "lucide-react";
+import { Plus, ShoppingCart, X } from "lucide-react";
 import "./CashierCartsBar.scss";
 
 const CashierCartsBar = ({
@@ -8,6 +8,7 @@ const CashierCartsBar = ({
   switching = false,
   onSelect,
   onNewCart,
+  onDelete,
   layout = "compact",
   alwaysShow = false,
 }) => {
@@ -26,24 +27,42 @@ const CashierCartsBar = ({
           const isActive = String(cart.saleId) === String(activeSaleId);
           const count = Number(cart.itemCount) || 0;
           return (
-            <button
+            <div
               key={cart.saleId}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              disabled={switching}
-              className={`cashier-carts-bar__tab ${
-                isActive ? "cashier-carts-bar__tab--active" : ""
-              } ${cart.isMain ? "cashier-carts-bar__tab--main" : ""}`}
-              onClick={() => onSelect(cart.saleId)}
-              title={cart.isMain ? "Основная корзина" : cart.label}
+              className={`cashier-carts-bar__tab-wrap ${
+                isActive ? "cashier-carts-bar__tab-wrap--active" : ""
+              } ${onDelete ? "cashier-carts-bar__tab-wrap--deletable" : ""}`}
             >
-              <ShoppingCart size={14} aria-hidden />
-              <span className="cashier-carts-bar__tab-label">{cart.label}</span>
-              {count > 0 && (
-                <span className="cashier-carts-bar__tab-badge">{count}</span>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                disabled={switching}
+                className={`cashier-carts-bar__tab ${
+                  isActive ? "cashier-carts-bar__tab--active" : ""
+                } ${cart.isMain ? "cashier-carts-bar__tab--main" : ""}`}
+                onClick={() => onSelect(cart.saleId)}
+                title={cart.isMain ? "Основная корзина" : cart.label}
+              >
+                <ShoppingCart size={14} aria-hidden />
+                <span className="cashier-carts-bar__tab-label">{cart.label}</span>
+                {count > 0 && (
+                  <span className="cashier-carts-bar__tab-badge">{count}</span>
+                )}
+              </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  className="cashier-carts-bar__delete-btn"
+                  disabled={switching}
+                  onClick={() => onDelete(cart.saleId)}
+                  title={`Удалить ${cart.label}`}
+                  aria-label={`Удалить ${cart.label}`}
+                >
+                  <X size={13} />
+                </button>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

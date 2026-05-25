@@ -40,6 +40,7 @@ const paymentMethodTranslate = {
   cash: "Наличные",
   card: "Карта",
   transfer: "Перевод",
+  mixed: "Смешанная",
   debt: "Долг",
 };
 
