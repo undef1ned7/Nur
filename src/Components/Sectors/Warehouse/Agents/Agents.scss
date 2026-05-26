@@ -7,6 +7,9 @@
   }
 
   .agents-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     padding: 10px 14px;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -14,6 +17,20 @@
     color: #0f172a;
     font-weight: 600;
     transition: 0.15s ease;
+  }
+
+  .agents-tab__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
   }
 
   .agents-tab.active {
@@ -685,6 +702,173 @@
 
   .agent-cart-add-panel__dropdown--catalog {
     max-height: 320px;
+  }
+
+  .agent-cart-add-panel__hint--top {
+    margin-top: 0;
+    margin-bottom: 10px;
+  }
+
+  .agent-cart-add-panel__catalog {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+
+  .agent-cart-add-panel__catalog-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #fff;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+  }
+
+  .agent-cart-add-panel__catalog-row:hover:not(.agent-cart-add-panel__catalog-row--out) {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+  }
+
+  .agent-cart-add-panel__catalog-row--picked {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .agent-cart-add-panel__catalog-row--out {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background: #fef2f2;
+  }
+
+  .agent-cart-add-panel__checkbox {
+    margin-top: 2px;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .agent-cart-add-panel__catalog-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .agent-cart-add-panel__pick-list {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed #cbd5e1;
+  }
+
+  .agent-cart-add-panel__pick-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .agent-cart-add-panel__pick-list-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .agent-cart-add-panel__pick-clear {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+  }
+
+  .agent-cart-add-panel__pick-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .agent-cart-add-panel__pick-row {
+    display: grid;
+    grid-template-columns: 1fr 88px 36px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+
+  .agent-cart-add-panel__pick-row--error {
+    border-color: #fecaca;
+    background: #fef2f2;
+  }
+
+  .agent-cart-add-panel__pick-row-info {
+    min-width: 0;
+  }
+
+  .agent-cart-add-panel__pick-row-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .agent-cart-add-panel__pick-row-meta {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .agent-cart-add-panel__pick-qty {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .agent-cart-add-panel__pick-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+  }
+
+  .agent-cart-add-panel__pick-remove:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
   }
 
   .agent-cart-add-panel__selected {
