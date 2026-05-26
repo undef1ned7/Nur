@@ -62,6 +62,33 @@ import CashierCartsBar from "./components/CashierCartsBar";
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
 
+const mergeChangedMap = (prev, patch) => {
+  let changed = false;
+  const next = { ...prev };
+  Object.entries(patch).forEach(([key, value]) => {
+    if (next[key] !== value) {
+      next[key] = value;
+      changed = true;
+    }
+  });
+  return changed ? next : prev;
+};
+
+const isSameCartLine = (a, b) =>
+  Boolean(a && b) &&
+  a.saleId === b.saleId &&
+  a.itemId === b.itemId &&
+  a.productId === b.productId &&
+  a.isCustom === b.isCustom &&
+  a.isWeight === b.isWeight &&
+  a.salePackage === b.salePackage &&
+  a.name === b.name &&
+  a.price === b.price &&
+  a.quantity === b.quantity &&
+  a.discountTotal === b.discountTotal &&
+  a.unit === b.unit &&
+  a.image === b.image;
+
 const normalizeHotkeyGroup = (value) => {
   const normalized = String(value || "").trim().toUpperCase();
   return HOTKEY_GROUP_PATTERN.test(normalized) ? normalized : "";
@@ -519,9 +546,6 @@ const CashierPage = () => {
       if (!shiftId) return;
       const targetSaleId = saleId ? String(saleId) : getSelectedSaleId();
       try {
-        if (targetSaleId) {
-          await dispatch(getSale({ id: targetSaleId })).unwrap();
-        }
         await multiCartRef.current?.refreshCartsFromStart?.(
           targetSaleId ? { sale_id: targetSaleId } : {},
         );
@@ -533,7 +557,7 @@ const CashierPage = () => {
         await waitForStartSaleIdle();
       }
     },
-    [dispatch, getSelectedSaleId, waitForStartSaleIdle],
+    [getSelectedSaleId, waitForStartSaleIdle],
   );
 
   const handleSwitchSaleMode = useCallback(
@@ -696,6 +720,7 @@ const CashierPage = () => {
   const isScanningRef = React.useRef(false); // Флаг, указывающий что идет или недавно было сканирование
   const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
+  const productsGridRef = React.useRef(null);
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
   const qtyInputScanGuardRef = React.useRef({ count: 0, lastTime: 0 });
   const qtyInputFocusRef = React.useRef({ itemId: null, prevValue: "" });
@@ -1182,6 +1207,7 @@ const CashierPage = () => {
       barcodeProcessingRef.current = true;
 
       try {
+        const productsScrollTop = productsGridRef.current?.scrollTop ?? 0;
         const scanSaleId =
           multiCartRef.current?.getActiveSaleId?.() || getSaleIdFromUrl() || null;
         const saleId = scanSaleId || (await ensureActiveSaleId(shiftId));
@@ -1209,6 +1235,11 @@ const CashierPage = () => {
         }
 
         const scanItems = res?.items ?? res?.cart?.items;
+        const scanReturnedSale =
+          Array.isArray(scanItems) || Array.isArray(res?.carts) || Boolean(res?.sale);
+        if (!scanReturnedSale) {
+          await dispatch(getSale({ id: saleId })).unwrap();
+        }
         if (Array.isArray(scanItems) && scanItems.length > 0) {
           for (let i = scanItems.length - 1; i >= 0; i--) {
             const it = scanItems[i];
@@ -1224,15 +1255,24 @@ const CashierPage = () => {
             }
           }
         }
-        // Обновляем корзину из API (как раньше — startSale после scan)
-        try {
-          await refreshSaleFromStore(shiftId, saleId);
-        } catch (e) {
-          const msg = String(e?.message || e || "");
-          if (!msg.includes("condition callback returning false")) {
-            throw e;
+        // Если scan уже вернул sale/cart, reducer обновит UI одним проходом.
+        // Дополнительный /start/ делаем только как fallback, чтобы не дергать
+        // весь список выбранных товаров при каждом скане.
+        if (!scanReturnedSale) {
+          try {
+            await refreshSaleFromStore(shiftId, saleId);
+          } catch (e) {
+            const msg = String(e?.message || e || "");
+            if (!msg.includes("condition callback returning false")) {
+              throw e;
+            }
           }
         }
+        requestAnimationFrame(() => {
+          if (productsGridRef.current) {
+            productsGridRef.current.scrollTop = productsScrollTop;
+          }
+        });
         // Обновляем время последнего сканирования после успешного добавления
         // Это защитит от открытия страницы оплаты при Enter от сканера
         lastScanTimeRef.current = Date.now();
@@ -1479,39 +1519,59 @@ const CashierPage = () => {
           }
           newPrices[item.id] = formatPrice(item.price ?? 0);
         });
-        setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
-        setCartPrices((prev) => ({ ...prev, ...newPrices }));
+        setCartQuantities((prev) => mergeChangedMap(prev, newQuantities));
+        setCartPrices((prev) => mergeChangedMap(prev, newPrices));
         // Скидки: в сомах не затираем введённое; в % после смены кол-ва/цены пересчитываем из API (discount_total / строка).
         setCartDiscounts((prev) => {
           const next = { ...prev };
           const modes = cartDiscountModesRef.current || {};
+          let changed = false;
           orderedCart.forEach((item) => {
             const mode = modes[item.id] || "amount";
             const lineTotal = (item.price || 0) * (item.quantity || 0);
             if (mode === "percent") {
-              next[item.id] = formatDiscountPercentFromLine(
+              const value = formatDiscountPercentFromLine(
                 item.discountTotal ?? 0,
                 lineTotal,
               );
+              if (next[item.id] !== value) {
+                next[item.id] = value;
+                changed = true;
+              }
             } else if (next[item.id] === undefined) {
               next[item.id] = formatPrice(item.discountTotal ?? 0);
+              changed = true;
             }
           });
-          return next;
+          return changed ? next : prev;
         });
 
         // Режим скидки по умолчанию — в сомах
         setCartDiscountModes((prev) => {
           const next = { ...prev };
+          let changed = false;
           orderedCart.forEach((item) => {
             if (!next[item.id]) {
               next[item.id] = "amount";
+              changed = true;
             }
           });
-          return next;
+          return changed ? next : prev;
         });
 
-        setCart(orderedCart);
+        setCart((prev) => {
+          const prevById = new Map(prev.map((item) => [item.id, item]));
+          let changed = prev.length !== orderedCart.length;
+          const next = orderedCart.map((item) => {
+            const prevItem = prevById.get(item.id);
+            if (isSameCartLine(prevItem, item)) {
+              return prevItem;
+            }
+            changed = true;
+            return item;
+          });
+          return changed ? next : prev;
+        });
       } else {
         // Если корзина пуста
         setCart([]);
@@ -2963,7 +3023,7 @@ const CashierPage = () => {
             />
           </div>
 
-          <div className="cashier-page__products-grid">
+          <div className="cashier-page__products-grid" ref={productsGridRef}>
             {productsLoading ? (
               <div className="cashier-page__products-loading">
                 Загрузка товаров...
