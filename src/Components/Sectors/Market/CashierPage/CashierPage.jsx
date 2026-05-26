@@ -515,10 +515,16 @@ const CashierPage = () => {
 
   /** Подтянуть активную корзину (GET sale) или fallback startSale */
   const refreshSaleFromStore = useCallback(
-    async (shiftId) => {
+    async (shiftId, saleId = null) => {
       if (!shiftId) return;
+      const targetSaleId = saleId ? String(saleId) : getSelectedSaleId();
       try {
-        await multiCartRef.current?.refreshCartsFromStart?.({});
+        if (targetSaleId) {
+          await dispatch(getSale({ id: targetSaleId })).unwrap();
+        }
+        await multiCartRef.current?.refreshCartsFromStart?.(
+          targetSaleId ? { sale_id: targetSaleId } : {},
+        );
       } catch (e) {
         const msg = String(e?.message || e || "");
         if (!msg.includes("condition callback returning false")) {
@@ -527,7 +533,7 @@ const CashierPage = () => {
         await waitForStartSaleIdle();
       }
     },
-    [waitForStartSaleIdle],
+    [dispatch, getSelectedSaleId, waitForStartSaleIdle],
   );
 
   const handleSwitchSaleMode = useCallback(
@@ -1220,7 +1226,7 @@ const CashierPage = () => {
         }
         // Обновляем корзину из API (как раньше — startSale после scan)
         try {
-          await refreshSaleFromStore(shiftId);
+          await refreshSaleFromStore(shiftId, saleId);
         } catch (e) {
           const msg = String(e?.message || e || "");
           if (!msg.includes("condition callback returning false")) {
@@ -2582,7 +2588,7 @@ const CashierPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    const items = currentSale?.items || [];
+    const items = currentSale?.items || currentSale?.cart?.items || [];
     return products
       .map((el) => {
         const qty = parseFloat(el.quantity);
@@ -2610,7 +2616,7 @@ const CashierPage = () => {
   }, [products, currentSale, getProductFavorite]);
 
   const hotkeyFilteredProducts = useMemo(() => {
-    const items = currentSale?.items || [];
+    const items = currentSale?.items || currentSale?.cart?.items || [];
     const enrichedProducts = hotkeyProducts.map((product) => {
       const fallbackProduct = products.find((item) => item.id === product.id);
       return fallbackProduct
