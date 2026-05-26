@@ -286,9 +286,14 @@ const saleSlice = createSlice({
             Array.isArray(payload.cart?.items) ||
             payload.id)
         ) {
-          state.start = payload;
-          state.activeSaleId = String(payload.id);
-          state.posCarts = patchCartTabFromSale(state.posCarts, payload);
+          const saleId =
+            payload.id ?? payload.sale_id ?? payload.cart?.id ?? state.activeSaleId;
+          const nextSale = saleId ? { ...payload, id: saleId } : payload;
+          state.start = nextSale;
+          if (saleId) {
+            state.activeSaleId = String(saleId);
+            state.posCarts = patchCartTabFromSale(state.posCarts, nextSale);
+          }
         }
       })
       .addCase(sendBarCode.rejected, (state, { payload }) => {
