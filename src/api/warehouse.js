@@ -1719,6 +1719,23 @@ export const approveAgentCart = async (id) => {
 };
 
 /**
+ * POST /api/warehouse/agent-carts/{id}/dispatch/
+ * Выдача товара агенту владельцем (только draft).
+ */
+export const dispatchAgentCart = async (id) => {
+  try {
+    const response = await api.post(`warehouse/agent-carts/${id}/dispatch/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Dispatch Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
  * POST /api/warehouse/agent-carts/{id}/reject/
  */
 export const rejectAgentCart = async (id) => {
@@ -2836,6 +2853,7 @@ export default {
   deleteAgentCart,
   submitAgentCart,
   approveAgentCart,
+  dispatchAgentCart,
   rejectAgentCart,
   createSaleFromCart,
   listAgentCartItems,
