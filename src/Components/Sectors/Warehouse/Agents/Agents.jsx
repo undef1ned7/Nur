@@ -1,8 +1,18 @@
-import { Check, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Minus,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
   approveAgentCart,
+  dispatchAgentCart,
   createAgentCart,
   createAgentCartItem,
   deleteAgentCart,
@@ -13,7 +23,6 @@ import {
   listAgentCarts,
   listMyAgentProducts,
   listOwnerAgentsProducts,
-  listProducts,
   listWarehouses,
   listWarehouseProducts,
   patchAgentCart,
@@ -31,6 +40,11 @@ import {
 } from "../../../../api/warehouse";
 import { VIEW_MODES } from "../../Market/Warehouse/constants";
 
+import AlertModal from "../../../common/AlertModal/AlertModal";
+import {
+  getApiErrorPayload,
+  validateResErrors,
+} from "../../../../../tools/validateResErrors";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./Agents.scss";
 
@@ -38,6 +52,124 @@ const normalizeList = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.results)) return data.results;
   return [];
+};
+
+const OWNER_DISPATCH_CARTS_KEY = "nur_owner_dispatch_cart_ids";
+
+const readOwnerDispatchCartIds = () => {
+  if (typeof sessionStorage === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(OWNER_DISPATCH_CARTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const rememberOwnerDispatchCart = (cartId) => {
+  if (!cartId || typeof sessionStorage === "undefined") return;
+  const ids = readOwnerDispatchCartIds();
+  ids.add(String(cartId));
+  sessionStorage.setItem(
+    OWNER_DISPATCH_CARTS_KEY,
+    JSON.stringify([...ids]),
+  );
+};
+
+const forgetOwnerDispatchCart = (cartId) => {
+  if (!cartId || typeof sessionStorage === "undefined") return;
+  const ids = readOwnerDispatchCartIds();
+  ids.delete(String(cartId));
+  sessionStorage.setItem(
+    OWNER_DISPATCH_CARTS_KEY,
+    JSON.stringify([...ids]),
+  );
+};
+
+const isOwnerDispatchCartId = (cartId) =>
+  cartId ? readOwnerDispatchCartIds().has(String(cartId)) : false;
+
+const INITIAL_ALERT_MODAL = {
+  open: false,
+  type: "info",
+  title: "",
+  message: "",
+  okText: "Понятно",
+  onConfirm: null,
+};
+
+const getErrorMessage = (err, fallback) =>
+  validateResErrors(err, err?.detail || err?.message || fallback);
+
+const getCartActionErrorAlert = (
+  err,
+  { stockTitle = "Недостаточно товара на складе", errorTitle = "Ошибка" } = {},
+) => {
+  const payload = getApiErrorPayload(err) ?? err;
+  const stockMessages =
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray(payload.items) &&
+    payload.items.length > 0
+      ? payload.items.map((item) => String(item)).filter(Boolean)
+      : [];
+
+  if (stockMessages.length > 0) {
+    return {
+      ...INITIAL_ALERT_MODAL,
+      open: true,
+      type: "warning",
+      title: stockTitle,
+      message: stockMessages.join("\n"),
+      okText: "Понятно",
+    };
+  }
+
+  return {
+    ...INITIAL_ALERT_MODAL,
+    open: true,
+    type: "error",
+    title: errorTitle,
+    message: getErrorMessage(err, errorTitle),
+    okText: "Понятно",
+  };
+};
+
+const getApproveErrorAlert = (err) =>
+  getCartActionErrorAlert(err, {
+    errorTitle: "Не удалось одобрить заявку",
+  });
+
+const getDispatchErrorAlert = (err) =>
+  getCartActionErrorAlert(err, {
+    errorTitle: "Не удалось выдать товар",
+  });
+
+const openErrorAlert = (setAlert, message, title = "Ошибка") => {
+  setAlert({
+    ...INITIAL_ALERT_MODAL,
+    open: true,
+    type: "error",
+    title,
+    message: getErrorMessage(message, message),
+    okText: "Понятно",
+  });
+};
+
+const openConfirmAlert = (
+  setAlert,
+  { title, message, onConfirm, okText = "Да" },
+) => {
+  setAlert({
+    ...INITIAL_ALERT_MODAL,
+    open: true,
+    type: "warning",
+    title,
+    message,
+    okText,
+    onConfirm,
+  });
 };
 
 const shortId = (id) => {
@@ -115,104 +247,479 @@ const companyStatusClass = (status) => {
   }
 };
 
-const ProductAutocomplete = ({ onPick, disabled, warehouseId }) => {
+const parseQty = (value) => {
+  const qtyNum = Number.parseFloat(String(value).replace(",", "."));
+  if (!Number.isFinite(qtyNum) || qtyNum <= 0) return null;
+  return qtyNum;
+};
+
+const getStockQty = (product) => {
+  if (product?.quantity == null || product?.quantity === "") return null;
+  const n = Number(product.quantity);
+  return Number.isFinite(n) ? n : null;
+};
+
+const clampQtyToStock = (value, maxStock) => {
+  const qtyNum = parseQty(value);
+  if (qtyNum == null) return value;
+  if (maxStock == null) return String(qtyNum);
+  if (maxStock <= 0) return "0";
+  if (qtyNum > maxStock) return String(maxStock);
+  return String(qtyNum);
+};
+
+const buildQtyPresets = (maxStock) => {
+  if (maxStock == null) return [1, 5, 10, 24];
+  if (maxStock <= 0) return [];
+  const presets = [1, 5, 10, 24].filter((p) => p <= maxStock);
+  if (!presets.includes(maxStock)) presets.push(maxStock);
+  return [...new Set(presets)].sort((a, b) => a - b);
+};
+
+const mapWarehouseProductRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  article: row.article,
+  unit: row.unit,
+  quantity: row.quantity,
+});
+
+const CATALOG_PAGE_SIZE = 1000;
+
+const CartItemAddPanel = ({
+  disabled,
+  busy,
+  warehouseId,
+  existingItems = [],
+  onAdd,
+}) => {
+  const searchRef = useRef(null);
+  const qtyRef = useRef(null);
+  const catalogWarehouseRef = useRef(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [options, setOptions] = useState([]);
-  const timerRef = useRef(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [qty, setQty] = useState("1");
+  const [localError, setLocalError] = useState("");
+
+  const existingQtyByProductId = useMemo(() => {
+    const map = {};
+    existingItems.forEach((it) => {
+      const pid =
+        typeof it.product === "string" ? it.product : it.product?.id;
+      if (pid) map[pid] = it.quantity_requested;
+    });
+    return map;
+  }, [existingItems]);
+
+  const resetForm = useCallback(() => {
+    setSelected(null);
+    setQty("1");
+    setQuery("");
+    setCatalogOpen(false);
+    setLocalError("");
+  }, []);
 
   useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!query.trim() || disabled) {
-      setOptions([]);
-      return;
-    }
-    timerRef.current = setTimeout(async () => {
+    setAllProducts([]);
+    catalogWarehouseRef.current = null;
+  }, [warehouseId]);
+
+  const loadCatalog = useCallback(
+    async (force = false) => {
+      if (!warehouseId || disabled) return;
+      if (
+        !force &&
+        catalogWarehouseRef.current === warehouseId &&
+        allProducts.length > 0
+      ) {
+        return;
+      }
       setLoading(true);
       try {
-        let data;
-        if (warehouseId) {
-          data = await listWarehouseProducts(warehouseId, {
-            search: query.trim(),
-            page_size: 10,
-          });
-        } else {
-          data = await listProducts({
-            search: query.trim(),
-            page_size: 10,
-          });
-        }
-        const list = normalizeList(data);
-        // API: { results: [ { id, name, article, barcode, unit, quantity: "20.000" }, ... ] }
-        setOptions(
-          list.map((row) => ({
-            id: row.id,
-            name: row.name,
-            article: row.article,
-            unit: row.unit,
-            quantity: row.quantity,
-          })),
-        );
+        const data = await listWarehouseProducts(warehouseId, {
+          page_size: CATALOG_PAGE_SIZE,
+        });
+        const list = normalizeList(data).map(mapWarehouseProductRow);
+        setAllProducts(list);
+        catalogWarehouseRef.current = warehouseId;
       } catch (e) {
         console.error(e);
-        setOptions([]);
+        setAllProducts([]);
+        setLocalError("Не удалось загрузить список товаров");
       } finally {
         setLoading(false);
       }
-    }, 300);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [query, disabled, warehouseId]);
+    },
+    [warehouseId, disabled],
+  );
+
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allProducts;
+    return allProducts.filter((p) => {
+      const name = String(p.name || "").toLowerCase();
+      const article = String(p.article || "").toLowerCase();
+      return name.includes(q) || article.includes(q);
+    });
+  }, [allProducts, query]);
+
+  const handleSearchFocus = async () => {
+    if (disabled || busy || selected) return;
+    setCatalogOpen(true);
+    setLocalError("");
+    await loadCatalog();
+  };
+
+  const handleSearchBlur = () => {
+    window.setTimeout(() => setCatalogOpen(false), 160);
+  };
+
+  const pickProduct = (product) => {
+    const stockQty = getStockQty(product);
+    if (stockQty !== null && stockQty <= 0) {
+      setLocalError("Товара нет на складе — добавить нельзя");
+      return;
+    }
+    setSelected(product);
+    setQuery("");
+    setCatalogOpen(false);
+    setLocalError("");
+    const inCart = existingQtyByProductId[product.id];
+    const initial = inCart != null ? parseQty(inCart) : 1;
+    const safeQty =
+      stockQty != null && initial != null
+        ? Math.min(initial, stockQty)
+        : (initial ?? 1);
+    setQty(clampQtyToStock(String(safeQty), stockQty));
+    setTimeout(() => qtyRef.current?.focus(), 0);
+  };
+
+  const selectedStock = selected ? getStockQty(selected) : null;
+  const isSelectedOutOfStock =
+    selectedStock !== null && selectedStock <= 0;
+  const qtyPresets = useMemo(
+    () => buildQtyPresets(selectedStock),
+    [selectedStock],
+  );
+  const currentQtyNum = parseQty(qty);
+  const atStockMax =
+    selectedStock != null &&
+    currentQtyNum != null &&
+    currentQtyNum >= selectedStock;
+
+  const adjustQty = (delta) => {
+    const current = parseQty(qty) ?? 0;
+    let next = Math.max(0.001, current + delta);
+    if (selectedStock != null && selectedStock > 0) {
+      next = Math.min(next, selectedStock);
+    }
+    setQty(String(next));
+  };
+
+  const handleQtyChange = (value) => {
+    setQty(value);
+    if (localError) setLocalError("");
+  };
+
+  const handleQtyBlur = () => {
+    if (selectedStock == null) return;
+    setQty(clampQtyToStock(qty, selectedStock));
+  };
+
+  const handleAdd = async () => {
+    if (!selected || busy || disabled) return;
+    if (isSelectedOutOfStock) {
+      setLocalError("Товара нет на складе — добавить нельзя");
+      return;
+    }
+    const qtyNum = parseQty(qty);
+    if (!qtyNum) {
+      setLocalError("Укажите количество больше 0");
+      qtyRef.current?.focus();
+      return;
+    }
+    if (selectedStock != null && qtyNum > selectedStock) {
+      setLocalError(
+        `На складе только ${selectedStock}${selected?.unit ? ` ${selected.unit}` : ""} — нельзя добавить больше`,
+      );
+      setQty(clampQtyToStock(qty, selectedStock));
+      qtyRef.current?.focus();
+      return;
+    }
+    setLocalError("");
+    try {
+      await onAdd(selected, qtyNum);
+      resetForm();
+      searchRef.current?.focus();
+    } catch {
+      // ошибка обрабатывается в родителе
+    }
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Escape") {
+      if (selected) {
+        resetForm();
+      } else {
+        setQuery("");
+        setCatalogOpen(false);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" && filteredOptions.length > 0) {
+      e.preventDefault();
+      pickProduct(filteredOptions[0]);
+    }
+  };
+
+  const trimmedQuery = query.trim();
+  const showDropdown =
+    catalogOpen &&
+    !selected &&
+    (loading || filteredOptions.length > 0 || allProducts.length > 0);
+  const catalogTruncated = allProducts.length >= CATALOG_PAGE_SIZE;
+  const alreadyInCart =
+    selected?.id && existingQtyByProductId[selected.id] != null;
+
+  if (!warehouseId) {
+    return (
+      <div className="agent-cart-add-panel agent-cart-add-panel--blocked">
+        <p className="agent-cart-add-panel__notice">
+          Сначала выберите склад в блоке «Параметры заявки», затем добавляйте
+          товары.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="agents-product-autocomplete">
-      <div className="warehouse-search" style={{ marginBottom: 8 }}>
-        <Search className="warehouse-search__icon" size={18} />
-        <input
-          type="text"
-          className="warehouse-search__input"
-          placeholder="Поиск товара по названию/артикулу/штрихкоду…"
-          value={query}
-          disabled={disabled}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-      {loading ? (
-        <div className="agents-hint">Поиск…</div>
-      ) : options.length === 0 ? (
-        <div className="agents-hint">Ничего не найдено</div>
-      ) : (
-        <div className="agents-options">
-          {options.map((p) => {
-            const qty = p.quantity != null ? Number(p.quantity) : null;
-            const isOutOfStock = qty !== null && qty <= 0;
-            return (
+    <div
+      className={`agent-cart-add-panel ${disabled ? "agent-cart-add-panel--disabled" : ""}`}
+    >
+      {!selected ? (
+        <>
+          <label className="agent-cart-add-panel__label">Добавить товар</label>
+          <div className="agent-cart-add-panel__search">
+            <Search className="agent-cart-add-panel__search-icon" size={18} />
+            <input
+              ref={searchRef}
+              type="text"
+              className="agent-cart-add-panel__search-input"
+              placeholder="Название, артикул или штрихкод…"
+              value={query}
+              disabled={disabled || busy}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
+              onKeyDown={handleSearchKeyDown}
+            />
+            {query && (
               <button
                 type="button"
-                key={p.id}
-                className={`agents-option ${isOutOfStock ? "agents-option--out-of-stock" : ""}`}
+                className="agent-cart-add-panel__search-clear"
+                disabled={disabled || busy}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  onPick?.(p);
                   setQuery("");
-                  setOptions([]);
+                  setCatalogOpen(true);
+                  searchRef.current?.focus();
                 }}
+                aria-label="Очистить поиск"
               >
-                <div className="agents-option__name">{p.name || "—"}</div>
-                <div className="agents-option__meta">
-                  {p.article ? `арт. ${p.article}` : ""}{" "}
-                  {p.unit ? `• ${p.unit}` : ""}
-                  {qty !== null ? ` • На складе: ${qty}` : ""}
-                </div>
-                {isOutOfStock && (
-                  <div className="agents-option__stock agents-option__stock--zero">
-                    Нет в наличии
-                  </div>
-                )}
+                <X size={16} />
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          {loading && (
+            <p className="agent-cart-add-panel__hint">Загрузка товаров…</p>
+          )}
+          {!loading && catalogOpen && !trimmedQuery && allProducts.length > 0 && (
+            <p className="agent-cart-add-panel__hint">
+              {allProducts.length} товар(ов) на складе
+              {catalogTruncated
+                ? ` — показаны первые ${CATALOG_PAGE_SIZE}, используйте поиск для уточнения`
+                : " — выберите из списка или введите название для фильтра"}
+            </p>
+          )}
+          {!loading && catalogOpen && trimmedQuery && filteredOptions.length === 0 && (
+            <p className="agent-cart-add-panel__hint">Ничего не найдено</p>
+          )}
+          {!loading && !catalogOpen && !trimmedQuery && (
+            <p className="agent-cart-add-panel__hint">
+              Нажмите на поле — откроется полный список товаров склада
+            </p>
+          )}
+
+          {showDropdown && (
+            <div
+              className="agents-options agent-cart-add-panel__dropdown agent-cart-add-panel__dropdown--catalog"
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {(loading ? [] : filteredOptions).map((p) => {
+                const stockQty =
+                  p.quantity != null ? Number(p.quantity) : null;
+                const isOutOfStock = stockQty !== null && stockQty <= 0;
+                const inCartQty = existingQtyByProductId[p.id];
+                return (
+                  <button
+                    type="button"
+                    key={p.id}
+                    className={`agents-option ${isOutOfStock ? "agents-option--out-of-stock" : ""}`}
+                    disabled={isOutOfStock}
+                    onClick={() => pickProduct(p)}
+                  >
+                    <div className="agents-option__name">{p.name || "—"}</div>
+                    <div className="agents-option__meta">
+                      {p.article ? `арт. ${p.article}` : ""}
+                      {p.unit ? ` • ${p.unit}` : ""}
+                      {stockQty !== null ? ` • На складе: ${stockQty}` : ""}
+                      {inCartQty != null ? ` • В заявке: ${inCartQty}` : ""}
+                    </div>
+                    {isOutOfStock && (
+                      <div className="agents-option__stock agents-option__stock--zero">
+                        Нет в наличии
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="agent-cart-add-panel__selected">
+          <div className="agent-cart-add-panel__selected-head">
+            <div className="agent-cart-add-panel__selected-info">
+              <span className="agent-cart-add-panel__selected-name">
+                {selected.name || "—"}
+              </span>
+              <span className="agent-cart-add-panel__selected-meta">
+                {selected.article ? `арт. ${selected.article}` : ""}
+                {selected.unit ? ` • ${selected.unit}` : ""}
+                {selected.quantity != null
+                  ? ` • На складе: ${Number(selected.quantity)}`
+                  : ""}
+              </span>
+              {alreadyInCart && (
+                <span className="agent-cart-add-panel__selected-note">
+                  Уже в заявке — новое количество заменит текущее
+                </span>
+              )}
+              {selectedStock != null && selectedStock > 0 && (
+                <span className="agent-cart-add-panel__selected-note agent-cart-add-panel__selected-note--stock">
+                  Максимум к добавлению: {selectedStock}
+                  {selected.unit ? ` ${selected.unit}` : ""}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="agent-cart-add-panel__selected-change"
+              disabled={disabled || busy}
+              onClick={() => {
+                setSelected(null);
+                setQty("1");
+                setLocalError("");
+                searchRef.current?.focus();
+              }}
+            >
+              Сменить товар
+            </button>
+          </div>
+
+          <div className="agent-cart-add-panel__qty-row">
+            <span className="agent-cart-add-panel__qty-label">Количество</span>
+            <div className="agent-cart-add-panel__qty-controls">
+              <button
+                type="button"
+                className="agent-cart-add-panel__qty-btn"
+                disabled={
+                  disabled ||
+                  busy ||
+                  (currentQtyNum != null && currentQtyNum <= 0.001)
+                }
+                onClick={() => adjustQty(-1)}
+                aria-label="Уменьшить"
+              >
+                <Minus size={16} />
+              </button>
+              <input
+                ref={qtyRef}
+                type="number"
+                step="0.001"
+                min="0.001"
+                max={selectedStock != null ? selectedStock : undefined}
+                className="agent-cart-add-panel__qty-input"
+                value={qty}
+                disabled={disabled || busy || isSelectedOutOfStock}
+                onChange={(e) => handleQtyChange(e.target.value)}
+                onBlur={handleQtyBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAdd();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    resetForm();
+                    searchRef.current?.focus();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="agent-cart-add-panel__qty-btn"
+                disabled={disabled || busy || atStockMax || isSelectedOutOfStock}
+                onClick={() => adjustQty(1)}
+                aria-label="Увеличить"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            {qtyPresets.length > 0 && (
+              <div className="agent-cart-add-panel__qty-presets">
+                {qtyPresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="agent-cart-add-panel__qty-preset"
+                    disabled={disabled || busy || isSelectedOutOfStock}
+                    onClick={() =>
+                      setQty(clampQtyToStock(String(preset), selectedStock))
+                    }
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="agent-cart-modal__btn agent-cart-modal__btn--primary agent-cart-add-panel__submit"
+              disabled={
+                disabled ||
+                busy ||
+                isSelectedOutOfStock ||
+                !parseQty(qty) ||
+                (selectedStock != null &&
+                  currentQtyNum != null &&
+                  currentQtyNum > selectedStock)
+              }
+              onClick={handleAdd}
+            >
+              <Plus size={18} />
+              {alreadyInCart ? "Обновить" : "Добавить"}
+            </button>
+          </div>
         </div>
+      )}
+
+      {localError && (
+        <p className="agent-cart-add-panel__error">{localError}</p>
       )}
     </div>
   );
@@ -226,20 +733,62 @@ const AgentCartModal = ({
   onChanged,
   warehousesById,
   isOwnerOrAdmin,
+  isAgent = false,
   currentUserId,
+  activeAgents = [],
+  dispatchMode = false,
 }) => {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState(null);
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ warehouse: "", note: "" });
+  const [form, setForm] = useState({ warehouse: "", note: "", agent: "" });
   const [itemQtyDraft, setItemQtyDraft] = useState({});
   const productLabelCacheRef = useRef(new Map());
   const productMetaCacheRef = useRef(new Map());
   const [error, setError] = useState("");
+  const [alertModal, setAlertModal] = useState(INITIAL_ALERT_MODAL);
+
+  const closeAlertModal = () => setAlertModal(INITIAL_ALERT_MODAL);
+
+  const handleAlertConfirm = () => {
+    const onConfirm = alertModal.onConfirm;
+    closeAlertModal();
+    onConfirm?.();
+  };
 
   const isDraft = cart?.status === "draft" || !cart?.status;
-  const canEditItems = Boolean(cartId) && isDraft;
+  const isOwnerDispatchFlow = Boolean(isOwnerOrAdmin && dispatchMode);
+  const canEditOwnerDispatch = isOwnerDispatchFlow && isDraft;
+  const canEditItems =
+    Boolean(cartId) && isDraft && (isAgent || isOwnerDispatchFlow);
+  const canEditHeader =
+    (!cartId || isDraft) && (isAgent || isOwnerDispatchFlow);
+
+  const selectedAgentMembership = useMemo(() => {
+    if (!form.agent) return null;
+    return activeAgents.find((a) => a.user === form.agent) || null;
+  }, [activeAgents, form.agent]);
+
+  const warehouseOptions = useMemo(() => {
+    const all = Object.values(warehousesById || {});
+    const assigned = selectedAgentMembership?.assigned_warehouse;
+    if (isOwnerDispatchFlow && assigned) {
+      return all.filter((w) => w.id === assigned);
+    }
+    return all;
+  }, [warehousesById, selectedAgentMembership, isOwnerDispatchFlow]);
+
+  useEffect(() => {
+    if (!isOwnerDispatchFlow || !selectedAgentMembership?.assigned_warehouse) {
+      return;
+    }
+    const whId = selectedAgentMembership.assigned_warehouse;
+    setForm((prev) => {
+      if (prev.warehouse === whId) return prev;
+      return { ...prev, warehouse: whId };
+    });
+  }, [isOwnerDispatchFlow, selectedAgentMembership?.assigned_warehouse]);
 
   const load = useCallback(async () => {
     if (!cartId) return;
@@ -251,6 +800,7 @@ const AgentCartModal = ({
       setForm({
         warehouse: c?.warehouse || "",
         note: c?.note || "",
+        agent: c?.agent || "",
       });
 
       const itData = await listAgentCartItems({ cart: cartId });
@@ -278,7 +828,7 @@ const AgentCartModal = ({
       setCart(null);
       setItems([]);
       setError("");
-      setForm({ warehouse: "", note: "" });
+      setForm({ warehouse: "", note: "", agent: "" });
       setItemQtyDraft({});
     }
   }, [open, cartId, load]);
@@ -360,17 +910,6 @@ const AgentCartModal = ({
     };
   }, [items, open, getProductMeta]);
 
-  const [newItem, setNewItem] = useState({
-    product: null,
-    quantity_requested: "1.000",
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    // сбрасываем форму добавления при открытии/смене заявки
-    setNewItem({ product: null, quantity_requested: "1.000" });
-  }, [open, cartId]);
-
   const saveCartHeader = async () => {
     if (!cartId) return;
     setBusy(true);
@@ -395,45 +934,75 @@ const AgentCartModal = ({
       setError("Выберите склад");
       return;
     }
-    if (!currentUserId) {
-      setError("Не определен текущий пользователь (agent)");
+    if (isOwnerDispatchFlow && !form.agent) {
+      setError("Выберите агента");
       return;
+    }
+    if (!isOwnerDispatchFlow) {
+      if (!isAgent) {
+        setError("Создание заявки доступно только сотрудникам с ролью «агент»");
+        return;
+      }
+      if (!currentUserId) {
+        setError("Не определён текущий пользователь");
+        return;
+      }
     }
     setBusy(true);
     setError("");
     try {
-      const created = await createAgentCart({
-        agent: currentUserId,
+      const payload = {
         warehouse: form.warehouse,
         note: form.note || "",
-      });
+      };
+      if (isOwnerDispatchFlow) {
+        payload.agent = form.agent;
+      }
+      const created = await createAgentCart(payload);
+      if (isOwnerDispatchFlow && created?.id) {
+        rememberOwnerDispatchCart(created.id);
+      }
       setCart(created);
       setCartId?.(created?.id);
+      setForm((prev) => ({
+        ...prev,
+        agent: created?.agent || prev.agent,
+        warehouse: created?.warehouse || prev.warehouse,
+      }));
       onChanged?.();
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось создать заявку");
+      setError(getErrorMessage(e, "Не удалось создать заявку"));
     } finally {
       setBusy(false);
     }
   };
 
-  const removeCart = async () => {
+  const removeCartConfirmed = async () => {
     if (!cartId) return;
-    if (!window.confirm("Удалить заявку?")) return;
     setBusy(true);
     setError("");
     try {
       await deleteAgentCart(cartId);
+      forgetOwnerDispatchCart(cartId);
       onChanged?.();
       setCartId?.(null);
       onClose?.();
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось удалить");
+      setError(getErrorMessage(e, "Не удалось удалить"));
     } finally {
       setBusy(false);
     }
+  };
+
+  const removeCart = () => {
+    if (!cartId) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Удалить заявку?",
+      message: "Заявка и все позиции будут удалены.",
+      onConfirm: removeCartConfirmed,
+    });
   };
 
   const doSubmit = async () => {
@@ -483,10 +1052,8 @@ const AgentCartModal = ({
     }
   };
 
-  const doApprove = async () => {
+  const doApproveConfirmed = async () => {
     if (!cartId) return;
-    if (!window.confirm("Одобрить заявку? Товар будет списан со склада."))
-      return;
     setBusy(true);
     setError("");
     try {
@@ -496,15 +1063,23 @@ const AgentCartModal = ({
       await load();
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось одобрить");
+      setAlertModal(getApproveErrorAlert(e));
     } finally {
       setBusy(false);
     }
   };
 
-  const doReject = async () => {
+  const doApprove = () => {
     if (!cartId) return;
-    if (!window.confirm("Отклонить заявку?")) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Одобрить заявку?",
+      message: "Товар будет списан со склада.",
+      onConfirm: doApproveConfirmed,
+    });
+  };
+
+  const doRejectConfirmed = async () => {
+    if (!cartId) return;
     setBusy(true);
     setError("");
     try {
@@ -514,33 +1089,106 @@ const AgentCartModal = ({
       await load();
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось отклонить");
+      setError(getErrorMessage(e, "Не удалось отклонить"));
     } finally {
       setBusy(false);
     }
   };
 
-  const addItem = async (product, qty) => {
+  const doReject = () => {
     if (!cartId) return;
-    const qtyNum = Number.parseFloat(String(qty).replace(",", "."));
-    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-      setError("Введите корректное количество (> 0)");
+    openConfirmAlert(setAlertModal, {
+      title: "Отклонить заявку?",
+      message: "Заявка будет отклонена.",
+      onConfirm: doRejectConfirmed,
+    });
+  };
+
+  const doDispatchConfirmed = async () => {
+    if (!cartId) return;
+    if (items.length === 0) {
+      setError("Добавьте хотя бы одну позицию с количеством больше 0");
       return;
     }
     setBusy(true);
     setError("");
     try {
-      await createAgentCartItem({
-        cart: cartId,
-        product: product?.id || product,
-        quantity_requested: qtyNum.toFixed(3),
+      const res = await dispatchAgentCart(cartId);
+      forgetOwnerDispatchCart(cartId);
+      setCart(res);
+      onChanged?.();
+      await load();
+      setAlertModal({
+        ...INITIAL_ALERT_MODAL,
+        open: true,
+        type: "success",
+        title: "Товар выдан",
+        message: "Товар списан со склада и зачислен агенту.",
+        okText: "Понятно",
       });
+    } catch (e) {
+      console.error(e);
+      setAlertModal(getDispatchErrorAlert(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDispatch = () => {
+    if (!cartId) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Выдать товар агенту?",
+      message:
+        "Товар будет списан со склада и зачислен на остаток выбранного агента.",
+      onConfirm: doDispatchConfirmed,
+    });
+  };
+
+  const addItem = async (product, qtyNum) => {
+    if (!cartId) return;
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      setError("Введите корректное количество (> 0)");
+      throw new Error("invalid qty");
+    }
+    const stockQty = getStockQty(product);
+    if (stockQty !== null && stockQty <= 0) {
+      setError("Товара нет на складе — добавить нельзя");
+      throw new Error("out of stock");
+    }
+    if (stockQty !== null && qtyNum > stockQty) {
+      setError(
+        `На складе только ${stockQty}${product?.unit ? ` ${product.unit}` : ""} — нельзя добавить больше`,
+      );
+      throw new Error("exceeds stock");
+    }
+    const productId = product?.id || product;
+    const existing = items.find((it) => {
+      const pid =
+        typeof it.product === "string" ? it.product : it.product?.id;
+      return pid === productId;
+    });
+
+    setBusy(true);
+    setError("");
+    try {
+      const qtyStr = qtyNum.toFixed(3);
+      if (existing?.id) {
+        await patchAgentCartItem(existing.id, {
+          quantity_requested: qtyStr,
+        });
+      } else {
+        await createAgentCartItem({
+          cart: cartId,
+          product: productId,
+          quantity_requested: qtyStr,
+        });
+      }
       await load();
       onChanged?.();
-      setNewItem({ product: null, quantity_requested: "1.000" });
     } catch (e) {
       console.error(e);
       setError(e?.detail || "Не удалось добавить позицию");
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -564,8 +1212,7 @@ const AgentCartModal = ({
     }
   };
 
-  const removeItem = async (itemId) => {
-    if (!window.confirm("Удалить позицию?")) return;
+  const removeItemConfirmed = async (itemId) => {
     setBusy(true);
     setError("");
     try {
@@ -574,10 +1221,18 @@ const AgentCartModal = ({
       onChanged?.();
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось удалить позицию");
+      setError(getErrorMessage(e, "Не удалось удалить позицию"));
     } finally {
       setBusy(false);
     }
+  };
+
+  const removeItem = (itemId) => {
+    openConfirmAlert(setAlertModal, {
+      title: "Удалить позицию?",
+      message: "Позиция будет удалена из заявки.",
+      onConfirm: () => removeItemConfirmed(itemId),
+    });
   };
 
   if (!open) return null;
@@ -590,7 +1245,17 @@ const AgentCartModal = ({
   const agentLabel =
     cart?.agent_name ||
     cart?.agent_display ||
-    (cart?.agent ? shortId(cart.agent) : "—");
+    selectedAgentMembership?.user_display ||
+    (cart?.agent || form.agent ? shortId(cart?.agent || form.agent) : "—");
+
+  const modalTitle = cartId
+    ? isOwnerDispatchFlow
+      ? "Выдача товара агенту"
+      : "Заявка на товар"
+    : isOwnerDispatchFlow
+      ? "Выдача товара агенту"
+      : "Новая заявка";
+
   return (
     <div className="agent-cart-modal">
       <div className="agent-cart-modal__overlay" onClick={onClose} />
@@ -604,7 +1269,7 @@ const AgentCartModal = ({
         <header className="agent-cart-modal__header">
           <div className="agent-cart-modal__header-left">
             <h2 id="agent-cart-modal-title" className="agent-cart-modal__title">
-              {cartId ? "Заявка на товар" : "Новая заявка"}
+              {modalTitle}
             </h2>
             {cartId && (
               <div className="agent-cart-modal__meta-inline">
@@ -633,8 +1298,8 @@ const AgentCartModal = ({
         ) : (
           <>
             <div className="agent-cart-modal__body">
-              {/* Блок данных заявки (6.1): все поля из API */}
-              {cartId && cart && (
+              {/* Блок данных заявки — просмотр (не режим выдачи владельцем) */}
+              {cartId && cart && !isOwnerDispatchFlow && (
                 <section className="agent-cart-modal__section agent-cart-modal__info">
                   <h3 className="agent-cart-modal__section-title">
                     Данные заявки
@@ -694,45 +1359,152 @@ const AgentCartModal = ({
                 </section>
               )}
 
-              {/* Редактируемые поля: склад, примечание */}
-              <section className="agent-cart-modal__section">
-                <h3 className="agent-cart-modal__section-title">
-                  {cartId ? "Редактирование" : "Параметры заявки"}
-                </h3>
-                <div className="agent-cart-modal__form">
-                  <label className="agent-cart-modal__label">
-                    Склад *
-                    <select
-                      className="agent-cart-modal__input"
-                      value={form.warehouse}
-                      disabled={busy || (cartId && !isDraft)}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, warehouse: e.target.value }))
-                      }
-                    >
-                      <option value="">Выберите склад…</option>
-                      {Object.values(warehousesById || {}).map((w) => (
-                        <option value={w.id} key={w.id}>
-                          {w.name || w.title || shortId(w.id)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="agent-cart-modal__label">
-                    Примечание (note)
-                    <textarea
-                      className="agent-cart-modal__input agent-cart-modal__textarea"
-                      rows={3}
-                      value={form.note}
-                      disabled={busy || (cartId && !isDraft)}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, note: e.target.value }))
-                      }
-                      placeholder="Комментарий к заявке…"
-                    />
-                  </label>
-                </div>
-              </section>
+              {/* Параметры заявки — сотрудник с ролью agent */}
+              {isAgent && canEditHeader && (
+                <section className="agent-cart-modal__section">
+                  <h3 className="agent-cart-modal__section-title">
+                    {cartId ? "Редактирование" : "Параметры заявки"}
+                  </h3>
+                  <div className="agent-cart-modal__form">
+                    <label className="agent-cart-modal__label">
+                      Склад *
+                      <select
+                        className="agent-cart-modal__input"
+                        value={form.warehouse}
+                        disabled={busy || !canEditHeader}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, warehouse: e.target.value }))
+                        }
+                      >
+                        <option value="">Выберите склад…</option>
+                        {warehouseOptions.map((w) => (
+                          <option value={w.id} key={w.id}>
+                            {w.name || w.title || shortId(w.id)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="agent-cart-modal__label">
+                      Примечание
+                      <textarea
+                        className="agent-cart-modal__input agent-cart-modal__textarea"
+                        rows={3}
+                        value={form.note}
+                        disabled={busy || !canEditHeader}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, note: e.target.value }))
+                        }
+                        placeholder="Комментарий к заявке…"
+                      />
+                    </label>
+                  </div>
+                </section>
+              )}
+
+              {/* Параметры выдачи — владелец */}
+              {isOwnerDispatchFlow && canEditHeader && (
+                <section className="agent-cart-modal__section">
+                  <h3 className="agent-cart-modal__section-title">
+                    {cartId ? "Параметры выдачи" : "Кому и откуда выдать"}
+                  </h3>
+                  <div className="agent-cart-modal__form">
+                    <label className="agent-cart-modal__label">
+                      Агент *
+                      <select
+                        className="agent-cart-modal__input"
+                        value={form.agent}
+                        disabled={busy || Boolean(cartId)}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            agent: e.target.value,
+                            warehouse: "",
+                          }))
+                        }
+                      >
+                        <option value="">Выберите агента…</option>
+                        {activeAgents.map((m) => (
+                          <option value={m.user} key={m.id || m.user}>
+                            {m.user_display || shortId(m.user)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {activeAgents.length === 0 && (
+                      <p className="agent-cart-modal__hint">
+                        Нет активных агентов. Назначьте агента на вкладке
+                        «Компании».
+                      </p>
+                    )}
+                    <label className="agent-cart-modal__label">
+                      Склад *
+                      <select
+                        className="agent-cart-modal__input"
+                        value={form.warehouse}
+                        disabled={
+                          busy ||
+                          !canEditHeader ||
+                          !form.agent ||
+                          Boolean(selectedAgentMembership?.assigned_warehouse)
+                        }
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, warehouse: e.target.value }))
+                        }
+                      >
+                        <option value="">Выберите склад…</option>
+                        {warehouseOptions.map((w) => (
+                          <option value={w.id} key={w.id}>
+                            {w.name || w.title || shortId(w.id)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedAgentMembership?.assigned_warehouse && (
+                      <p className="agent-cart-modal__hint">
+                        Агенту назначен склад:{" "}
+                        {warehousesById?.[
+                          selectedAgentMembership.assigned_warehouse
+                        ]?.name || shortId(selectedAgentMembership.assigned_warehouse)}
+                      </p>
+                    )}
+                    <label className="agent-cart-modal__label">
+                      Примечание
+                      <textarea
+                        className="agent-cart-modal__input agent-cart-modal__textarea"
+                        rows={3}
+                        value={form.note}
+                        disabled={busy || !canEditHeader}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, note: e.target.value }))
+                        }
+                        placeholder="Комментарий к выдаче…"
+                      />
+                    </label>
+                  </div>
+                </section>
+              )}
+
+              {cartId &&
+                cart &&
+                isOwnerDispatchFlow &&
+                !canEditOwnerDispatch && (
+                  <section className="agent-cart-modal__section agent-cart-modal__info">
+                    <p className="agent-cart-modal__hint">
+                      Заявка уже обработана — только просмотр.
+                    </p>
+                  </section>
+                )}
+
+              {cartId &&
+                cart &&
+                isOwnerOrAdmin &&
+                !isOwnerDispatchFlow &&
+                isDraft && (
+                  <p className="agent-cart-modal__hint agent-cart-modal__hint--info">
+                    Черновик агента — ожидает отправки агентом. Одобрение будет
+                    доступно после статуса «Отправлено».
+                  </p>
+                )}
 
               {/* Позиции заявки показываем только после создания заявки (есть cartId) */}
               {cartId && (
@@ -740,77 +1512,23 @@ const AgentCartModal = ({
                   <h3 className="agent-cart-modal__section-title">
                     Позиции заявки
                   </h3>
-                  <p className="agent-cart-modal__hint">
-                    Редактировать можно только в статусе «Черновик».
-                  </p>
+                  {canEditItems && (
+                    <>
+                      <p className="agent-cart-modal__hint">
+                        {isOwnerDispatchFlow
+                          ? "Добавьте товары и нажмите «Выдать» — товар сразу спишется со склада."
+                          : "Редактировать можно только в статусе «Черновик»."}
+                      </p>
 
-                  <div
-                    className={`agent-cart-modal__add-row ${
-                      canEditItems ? "" : "agent-cart-modal__add-row--disabled"
-                    }`}
-                  >
-                    <div className="agent-cart-modal__add-search">
-                      <ProductAutocomplete
-                        disabled={!canEditItems || busy}
+                      <CartItemAddPanel
+                        disabled={!canEditItems}
+                        busy={busy}
                         warehouseId={form.warehouse || cart?.warehouse}
-                        onPick={(p) =>
-                          setNewItem((s) => ({ ...s, product: p }))
-                        }
+                        existingItems={items}
+                        onAdd={addItem}
                       />
-                      {newItem.product && (
-                        <div className="agent-cart-modal__picked">
-                          <span className="agent-cart-modal__picked-name">
-                            {newItem.product?.name || "—"}
-                          </span>
-                          <button
-                            type="button"
-                            className="agent-cart-modal__picked-clear"
-                            onClick={() =>
-                              setNewItem((s) => ({ ...s, product: null }))
-                            }
-                            disabled={busy || !canEditItems}
-                          >
-                            Сбросить
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="agent-cart-modal__add-qty">
-                      <label className="agent-cart-modal__label-inline">
-                        Кол-во (quantity_requested)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        className="agent-cart-modal__input agent-cart-modal__input--num"
-                        value={newItem.quantity_requested}
-                        disabled={busy || !canEditItems}
-                        onChange={(e) =>
-                          setNewItem((s) => ({
-                            ...s,
-                            quantity_requested: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="agent-cart-modal__btn agent-cart-modal__btn--primary"
-                      disabled={busy || !canEditItems || !newItem.product?.id}
-                      onClick={() =>
-                        addItem(newItem.product, newItem.quantity_requested)
-                      }
-                      title={
-                        !canEditItems
-                          ? "Доступно только в черновике"
-                          : "Добавить позицию"
-                      }
-                    >
-                      <Plus size={18} />
-                      Добавить
-                    </button>
-                  </div>
+                    </>
+                  )}
 
                   <div className="agent-cart-modal__table-wrap">
                     <table className="agent-cart-modal__table">
@@ -823,13 +1541,16 @@ const AgentCartModal = ({
                           <th>Кол-во</th>
                           <th>Дата создания</th>
                           <th>Обновлено</th>
-                          <th>Действия</th>
+                          {canEditItems && <th>Действия</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {items.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="agent-cart-modal__empty">
+                            <td
+                              colSpan={canEditItems ? 8 : 7}
+                              className="agent-cart-modal__empty"
+                            >
                               Нет позиций
                             </td>
                           </tr>
@@ -848,19 +1569,25 @@ const AgentCartModal = ({
                                 {productMetaByItemId?.[it.id]?.unit || "—"}
                               </td>
                               <td>
-                                <input
-                                  type="number"
-                                  step="0.001"
-                                  className="agent-cart-modal__input-inline"
-                                  disabled={busy || !canEditItems}
-                                  value={itemQtyDraft?.[it.id] ?? ""}
-                                  onChange={(e) =>
-                                    setItemQtyDraft((p) => ({
-                                      ...p,
-                                      [it.id]: e.target.value,
-                                    }))
-                                  }
-                                />
+                                {canEditItems ? (
+                                  <input
+                                    type="number"
+                                    step="0.001"
+                                    className="agent-cart-modal__input-inline"
+                                    disabled={busy || !canEditItems}
+                                    value={itemQtyDraft?.[it.id] ?? ""}
+                                    onChange={(e) =>
+                                      setItemQtyDraft((p) => ({
+                                        ...p,
+                                        [it.id]: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                ) : (
+                                  (itemQtyDraft?.[it.id] ??
+                                    it.quantity_requested ??
+                                    "—")
+                                )}
                               </td>
                               <td className="agent-cart-modal__cell-date">
                                 {fmtDateTime(it.created_date)}
@@ -868,28 +1595,30 @@ const AgentCartModal = ({
                               <td className="agent-cart-modal__cell-date">
                                 {fmtDateTime(it.updated_date)}
                               </td>
-                              <td>
-                                <div className="agent-cart-modal__row-actions">
-                                  <button
-                                    type="button"
-                                    className="agent-cart-modal__btn-icon"
-                                    disabled={busy || !canEditItems}
-                                    onClick={() => saveItemQty(it.id)}
-                                    title="Сохранить количество"
-                                  >
-                                    <Check size={16} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="agent-cart-modal__btn-icon agent-cart-modal__btn-icon--danger"
-                                    disabled={busy || !canEditItems}
-                                    onClick={() => removeItem(it.id)}
-                                    title="Удалить позицию"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
+                              {canEditItems && (
+                                <td>
+                                  <div className="agent-cart-modal__row-actions">
+                                    <button
+                                      type="button"
+                                      className="agent-cart-modal__btn-icon"
+                                      disabled={busy || !canEditItems}
+                                      onClick={() => saveItemQty(it.id)}
+                                      title="Сохранить количество"
+                                    >
+                                      <Check size={16} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="agent-cart-modal__btn-icon agent-cart-modal__btn-icon--danger"
+                                      disabled={busy || !canEditItems}
+                                      onClick={() => removeItem(it.id)}
+                                      title="Удалить позицию"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
                             </tr>
                           ))
                         )}
@@ -904,7 +1633,7 @@ const AgentCartModal = ({
             <footer className="agent-cart-modal__footer">
               {cartId ? (
                 <div className="agent-cart-modal__actions">
-                  {!isOwnerOrAdmin && (
+                  {isAgent && (
                     <>
                       <button
                         type="button"
@@ -944,7 +1673,40 @@ const AgentCartModal = ({
                       )}
                     </>
                   )}
-                  {cart?.status === "submitted" && isOwnerOrAdmin && (
+                  {canEditOwnerDispatch && (
+                    <>
+                      <button
+                        type="button"
+                        className="agent-cart-modal__btn agent-cart-modal__btn--secondary"
+                        disabled={busy}
+                        onClick={saveCartHeader}
+                      >
+                        <Check size={18} />
+                        Сохранить
+                      </button>
+                      <button
+                        type="button"
+                        className="agent-cart-modal__btn agent-cart-modal__btn--danger"
+                        disabled={busy}
+                        onClick={removeCart}
+                      >
+                        <Trash2 size={18} />
+                        Удалить
+                      </button>
+                      <button
+                        type="button"
+                        className="agent-cart-modal__btn agent-cart-modal__btn--primary"
+                        disabled={busy || items.length === 0}
+                        onClick={doDispatch}
+                      >
+                        <Send size={18} />
+                        Выдать
+                      </button>
+                    </>
+                  )}
+                  {cart?.status === "submitted" &&
+                    isOwnerOrAdmin &&
+                    !isOwnerDispatchFlow && (
                     <>
                       <button
                         type="button"
@@ -976,7 +1738,9 @@ const AgentCartModal = ({
                     onClick={createCart}
                   >
                     <Plus size={18} />
-                    Создать заявку
+                    {isOwnerDispatchFlow
+                      ? "Создать черновик"
+                      : "Создать заявку"}
                   </button>
                 </div>
               )}
@@ -984,15 +1748,27 @@ const AgentCartModal = ({
           </>
         )}
       </div>
+
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        okText={alertModal.okText}
+        onClose={closeAlertModal}
+        onConfirm={alertModal.onConfirm ? handleAlertConfirm : undefined}
+      />
     </div>
   );
 };
 
 const Agents = () => {
   const { profile } = useUser();
-  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+  const userRole = profile?.role;
+  const isOwnerOrAdmin = userRole === "owner" || userRole === "admin";
+  const isAgent = userRole === "agent";
 
-  // Владелец: carts | history | requests | companies | stocks. Агент: carts | companies | stocks
+  // Владелец/админ: все заявки, история, запросы, выдача. Агент (role=agent): свои заявки и остатки.
   const [activeTab, setActiveTab] = useState("carts");
   const [historySubTab, setHistorySubTab] = useState("approved");
   const [ownerCompanySubTab, setOwnerCompanySubTab] = useState("incoming"); // incoming | active
@@ -1016,6 +1792,15 @@ const Agents = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [actionBusyId, setActionBusyId] = useState(null);
+  const [alertModal, setAlertModal] = useState(INITIAL_ALERT_MODAL);
+
+  const closeAlertModal = () => setAlertModal(INITIAL_ALERT_MODAL);
+
+  const handleAlertConfirm = () => {
+    const onConfirm = alertModal.onConfirm;
+    closeAlertModal();
+    onConfirm?.();
+  };
 
   const loadWarehouses = useCallback(async () => {
     try {
@@ -1061,7 +1846,9 @@ const Agents = () => {
     try {
       const data = isOwnerOrAdmin
         ? await listOwnerAgentsProducts()
-        : await listMyAgentProducts();
+        : isAgent
+          ? await listMyAgentProducts()
+          : [];
       setStocks(normalizeList(data));
     } catch (e) {
       console.error(e);
@@ -1070,7 +1857,7 @@ const Agents = () => {
     } finally {
       setStocksLoading(false);
     }
-  }, [isOwnerOrAdmin]);
+  }, [isOwnerOrAdmin, isAgent]);
 
   // company agent requests (агент ↔ компании)
   const [companyRequestsLoading, setCompanyRequestsLoading] = useState(false);
@@ -1169,13 +1956,39 @@ const Agents = () => {
   // modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalCartId, setModalCartId] = useState(null);
+  const [modalDispatchMode, setModalDispatchMode] = useState(false);
+  const [activeAgentsList, setActiveAgentsList] = useState([]);
+
+  useEffect(() => {
+    if (!isOwnerOrAdmin) return;
+    listCompanyAgentRequests({ status: "active" })
+      .then((data) => setActiveAgentsList(normalizeList(data)))
+      .catch((e) => {
+        console.error(e);
+        setActiveAgentsList([]);
+      });
+  }, [isOwnerOrAdmin]);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalDispatchMode(false);
+  };
 
   const openNew = () => {
     setModalCartId(null);
+    setModalDispatchMode(false);
     setModalOpen(true);
   };
+
+  const openNewDispatch = () => {
+    setModalCartId(null);
+    setModalDispatchMode(true);
+    setModalOpen(true);
+  };
+
   const openExisting = (id) => {
     setModalCartId(id);
+    setModalDispatchMode(isOwnerDispatchCartId(id));
     setModalOpen(true);
   };
 
@@ -1262,7 +2075,7 @@ const Agents = () => {
     [companyRequests],
   );
 
-  const handleApprove = async (cartId) => {
+  const handleApproveConfirmed = async (cartId) => {
     if (!cartId || actionBusyId) return;
     setActionBusyId(cartId);
     try {
@@ -1270,13 +2083,22 @@ const Agents = () => {
       loadCarts();
     } catch (e) {
       console.error(e);
-      alert(e?.detail || e?.message || "Не удалось одобрить заявку");
+      setAlertModal(getApproveErrorAlert(e));
     } finally {
       setActionBusyId(null);
     }
   };
 
-  const handleReject = async (cartId) => {
+  const handleApprove = (cartId) => {
+    if (!cartId || actionBusyId) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Одобрить заявку?",
+      message: "Товар будет списан со склада.",
+      onConfirm: () => handleApproveConfirmed(cartId),
+    });
+  };
+
+  const handleRejectConfirmed = async (cartId) => {
     if (!cartId || actionBusyId) return;
     setActionBusyId(cartId);
     try {
@@ -1284,10 +2106,23 @@ const Agents = () => {
       loadCarts();
     } catch (e) {
       console.error(e);
-      alert(e?.detail || e?.message || "Не удалось отклонить заявку");
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось отклонить заявку",
+      );
     } finally {
       setActionBusyId(null);
     }
+  };
+
+  const handleReject = (cartId) => {
+    if (!cartId || actionBusyId) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Отклонить заявку?",
+      message: "Заявка будет отклонена.",
+      onConfirm: () => handleRejectConfirmed(cartId),
+    });
   };
 
   const handleSendCompanyRequest = async (company) => {
@@ -1298,10 +2133,10 @@ const Agents = () => {
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
-      alert(
-        e?.detail ||
-          e?.message ||
-          "Не удалось отправить заявку в выбранную компанию",
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось отправить заявку в выбранную компанию",
       );
     } finally {
       setCompanyActionBusyId(null);
@@ -1316,10 +2151,10 @@ const Agents = () => {
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
-      alert(
-        e?.detail ||
-          e?.message ||
-          "Не удалось принять заявку агента в компанию",
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось принять заявку агента в компанию",
       );
     } finally {
       setCompanyActionBusyId(null);
@@ -1334,37 +2169,42 @@ const Agents = () => {
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
-      alert(
-        e?.detail ||
-          e?.message ||
-          "Не удалось отклонить заявку агента в компанию",
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось отклонить заявку агента в компанию",
       );
     } finally {
       setCompanyActionBusyId(null);
     }
   };
 
-  const handleCompanyRemove = async (requestId) => {
+  const handleCompanyRemoveConfirmed = async (requestId) => {
     if (!requestId || companyActionBusyId) return;
-    if (
-      !window.confirm(
-        "Отстранить агента от компании? Доступ к складам компании будет снят.",
-      )
-    ) {
-      return;
-    }
     setCompanyActionBusyId(requestId);
     try {
       await removeCompanyAgent(requestId);
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
-      alert(
-        e?.detail || e?.message || "Не удалось отстранить агента от компании",
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось отстранить агента от компании",
       );
     } finally {
       setCompanyActionBusyId(null);
     }
+  };
+
+  const handleCompanyRemove = (requestId) => {
+    if (!requestId || companyActionBusyId) return;
+    openConfirmAlert(setAlertModal, {
+      title: "Отстранить агента?",
+      message:
+        "Доступ агента к складам компании будет снят.",
+      onConfirm: () => handleCompanyRemoveConfirmed(requestId),
+    });
   };
 
   const handleCompanyCommonAccessChange = async (request, warehouseId) => {
@@ -1388,10 +2228,10 @@ const Agents = () => {
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
-      alert(
-        e?.detail ||
-          e?.message ||
-          "Не удалось обновить общий доступ к складу для агента",
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось обновить общий доступ к складу для агента",
       );
     } finally {
       setCompanyActionBusyId(null);
@@ -1460,7 +2300,17 @@ const Agents = () => {
           </div>
         </div>
         <div className="warehouse-header__actions">
-          {!isOwnerOrAdmin && activeTab === "carts" && (
+          {isOwnerOrAdmin && activeTab === "carts" && (
+            <button
+              className="warehouse-header__create-btn"
+              onClick={openNewDispatch}
+              title="Выдать товар агенту со склада"
+            >
+              <Send size={16} />
+              Выдать товар
+            </button>
+          )}
+          {isAgent && activeTab === "carts" && (
             <button
               className="warehouse-header__create-btn"
               onClick={openNew}
@@ -1527,7 +2377,7 @@ const Agents = () => {
           className={`agents-tab ${activeTab === "companies" ? "active" : ""}`}
           onClick={() => setActiveTab("companies")}
         >
-          {isOwnerOrAdmin ? "Агенты склада" : "Мои компании"}
+          {isOwnerOrAdmin ? "Агенты склада" : isAgent ? "Мои компании" : "Компании"}
         </button>
         <button
           type="button"
@@ -2353,7 +3203,9 @@ const Agents = () => {
                             ? newMembershipAssignedWarehouse
                             : newMembershipWarehouse
                         }
-                        onChange={(e) => setNewMembershipWarehouse(e.target.value)}
+                        onChange={(e) =>
+                          setNewMembershipWarehouse(e.target.value)
+                        }
                         disabled={
                           newMembershipBusy ||
                           !newMembershipCommonEnabled ||
@@ -2371,7 +3223,9 @@ const Agents = () => {
                         type="button"
                         className="agents-action-btn agents-action-btn--approve"
                         onClick={handleCreateMembership}
-                        disabled={newMembershipBusy || !newMembershipUserId.trim()}
+                        disabled={
+                          newMembershipBusy || !newMembershipUserId.trim()
+                        }
                       >
                         <Check size={16} />
                         Назначить агентом
@@ -2428,8 +3282,7 @@ const Agents = () => {
                                 <td>
                                   {r.assigned_warehouse
                                     ? warehousesById?.[r.assigned_warehouse]
-                                        ?.name ||
-                                      shortId(r.assigned_warehouse)
+                                        ?.name || shortId(r.assigned_warehouse)
                                     : "Все склады"}
                                 </td>
                                 <td>
@@ -2918,16 +3771,34 @@ const Agents = () => {
 
       <AgentCartModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         cartId={modalCartId}
         setCartId={setModalCartId}
         onChanged={() => {
           loadCarts();
           if (activeTab === "stocks") loadStocks();
+          if (isOwnerOrAdmin) {
+            listCompanyAgentRequests({ status: "active" })
+              .then((data) => setActiveAgentsList(normalizeList(data)))
+              .catch(console.error);
+          }
         }}
         warehousesById={warehousesById}
         isOwnerOrAdmin={isOwnerOrAdmin}
+        isAgent={isAgent}
         currentUserId={profile?.id}
+        activeAgents={activeAgentsList}
+        dispatchMode={modalDispatchMode}
+      />
+
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        okText={alertModal.okText}
+        onClose={closeAlertModal}
+        onConfirm={alertModal.onConfirm ? handleAlertConfirm : undefined}
       />
     </div>
   );
