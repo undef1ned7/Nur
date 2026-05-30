@@ -92,6 +92,16 @@
   &__stat-box {
     text-align: center;
     flex: 1 1 120px;
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+      opacity 0.5s ease var(--stat-delay, 0ms),
+      transform 0.5s ease var(--stat-delay, 0ms);
+  }
+
+  &__stats--visible &__stat-box {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   &__stat-value {
@@ -99,6 +109,17 @@
     font-size: 48px;
     font-weight: 800;
     margin-bottom: 8px;
+    opacity: 0;
+    transform: scale(0.85);
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s ease;
+    font-variant-numeric: tabular-nums;
+
+    &--visible {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   &__stat-label {

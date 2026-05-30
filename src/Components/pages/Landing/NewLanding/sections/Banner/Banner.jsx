@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
-import banner from "../../assets/banner/banner.svg";
+import LandingImg from "../../components/LandingImg";
+import banner from "../../assets/banner/banner.jpg";
 import smartphone from "../../assets/icons/smartphone.svg";
 import shop from "../../assets/icons/shop.svg";
 import mess from "../../assets/icons/mess.svg";
@@ -11,11 +12,21 @@ import "./Banner.scss";
 const Banner = () => {
   const scrollToDemo = useScrollToDemo();
 
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = banner;
+    link.fetchPriority = "high";
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
+
   return (
     <section className="banner">
       <div className="banner__container new-container">
-        <img className="banner__blur1" src={blur1} alt="Blur 1" />
-        <img className="banner__blur2" src={blur2} alt="Blur 2" />
+        <LandingImg className="banner__blur1" src={blur1} alt="" aria-hidden="true" />
+        <LandingImg className="banner__blur2" src={blur2} alt="" aria-hidden="true" />
         <h2 className="banner__title">
           Управляйте бизнесом <br />
           <span>в одной</span> системе
@@ -41,21 +52,39 @@ const Banner = () => {
           </button>
         </div>
         <div className="banner__content">
-          <img className="banner__image" src={banner} alt="Banner" />
+          <LandingImg
+            className="banner__image"
+            src={banner}
+            alt="Интерфейс NurCRM"
+            width={766}
+            height={428}
+            priority
+          />
           <div className="banner__content__cart banner__content__cart-1">
-            <img
+            <LandingImg
               className="banner__content__logo"
               src={smartphone}
-              alt="Smartphone"
+              alt=""
+              aria-hidden="true"
             />
             <p className="banner__content__description">Поддержка 24/7</p>
           </div>
           <div className="banner__content__cart banner__content__cart-2">
-            <img className="banner__content__logo" src={shop} alt="Shop" />
+            <LandingImg
+              className="banner__content__logo"
+              src={shop}
+              alt=""
+              aria-hidden="true"
+            />
             <p className="banner__content__description">Для магазинов</p>
           </div>
           <div className="banner__content__cart banner__content__cart-3">
-            <img className="banner__content__logo" src={mess} alt="Mess" />
+            <LandingImg
+              className="banner__content__logo"
+              src={mess}
+              alt=""
+              aria-hidden="true"
+            />
             <p className="banner__content__description">Мобильное приложение</p>
           </div>
         </div>

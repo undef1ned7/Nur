@@ -3,6 +3,7 @@
 .team {
   background: #0e1114;
   padding: 90px 0;
+  overflow: hidden;
 
   &__container {
     padding-block: 60px;
@@ -55,17 +56,113 @@
     color: #f7d617;
   }
 
-  &__cards {
+  &__slider {
+    position: relative;
     margin-top: 80px;
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
 
+    @media (min-width: 1025px) {
+      padding-inline: 52px;
+    }
+  }
+
+  &__cards {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  &__slide {
+    height: auto;
+    box-sizing: border-box;
+  }
+
+  &__nav {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    border: none;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #0e1114;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      opacity 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: #f7d617;
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    @media (min-width: 1025px) {
+      display: flex;
+    }
+
+    &--prev {
+      left: 0;
+    }
+
+    &--next {
+      right: 0;
+    }
+  }
+
+  &__controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 32px;
+  }
+
+  &__dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      transform 0.2s ease;
+
+    &--active {
+      background: #f7d617;
+      transform: scale(1.2);
+    }
+  }
+
+  &__counter {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+
+    @media (min-width: 1025px) {
+      display: none;
+    }
+  }
+
+  &__cards {
     &__card {
-      flex: 1 1 calc(25% - 15px);
-      min-width: 220px;
-      height: auto;
+      height: 100%;
       border-radius: 22px;
       background: #ffffff;
       overflow: hidden;
@@ -111,9 +208,6 @@
       }
     }
 
-    &__cards__card {
-      flex: 1 1 calc(50% - 10px);
-    }
   }
 
   @media (max-width: $nl-bp-md) {
@@ -131,7 +225,7 @@
       }
     }
 
-    &__cards {
+    &__slider {
       margin-top: 48px;
     }
   }
@@ -142,8 +236,6 @@
     }
 
     &__cards__card {
-      flex: 1 1 100%;
-
       &__title {
         font-size: 22px;
       }

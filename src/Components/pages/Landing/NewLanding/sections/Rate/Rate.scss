@@ -159,6 +159,13 @@
         gap: 10px;
       }
 
+      &-check {
+        width: 19px;
+        height: 14px;
+        flex-shrink: 0;
+        background: url("./img/check.svg") no-repeat center / contain;
+      }
+
       &-img {
         width: 19px;
         height: 14px;

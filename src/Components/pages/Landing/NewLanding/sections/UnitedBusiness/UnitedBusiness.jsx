@@ -1,11 +1,12 @@
+import LandingImg from "../../components/LandingImg";
 import "./UnitedBusiness.scss";
-import blur from '../../assets/banner/blur.svg';
+import blur from "../../assets/banner/blur.svg";
 
 const UnitedBusiness = () => {
   return (
     <section id="features" className="unibusiness">
       <div className="unibusiness__container new-container">
-        <img className="unibusiness__blur" src={blur} alt="" />
+        <LandingImg className="unibusiness__blur" src={blur} alt="" aria-hidden="true" />
         <h1 className="unibusiness__title">
           NurCRM объединяет{" "}
           <span className="unibusiness__title-span">все процессы</span> бизнеса

@@ -1,49 +1,21 @@
-import { useEffect, useState } from "react";
-import { getIndustries } from "../../../../../../api/auth";
+import { useState } from "react";
+import { useLandingIndustries } from "../../hooks/useLandingIndustries";
+import LandingImg from "../../components/LandingImg";
 import "./Demo.scss";
 import blur1 from "./img/blur1.svg";
 import line from "./img/line.svg";
 
 const Demo = () => {
-  const [industries, setIndustries] = useState([]);
-  const [loadingIndustries, setLoadingIndustries] = useState(true);
+  const { industries, loading: loadingIndustries } = useLandingIndustries();
   const [industryId, setIndustryId] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadIndustries = async () => {
-      setLoadingIndustries(true);
-      try {
-        const data = await getIndustries();
-        if (!cancelled) {
-          setIndustries(Array.isArray(data) ? data : []);
-        }
-      } catch {
-        if (!cancelled) {
-          setIndustries([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingIndustries(false);
-        }
-      }
-    };
-
-    loadIndustries();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <section id="demo" className="demo">
       <div className="demo__container new-container">
-        <img className="demo__blur" src={blur1} alt="" />
-        <img className="demo__blur2" src={blur1} alt="" />
+        <LandingImg className="demo__blur" src={blur1} alt="" aria-hidden="true" />
+        <LandingImg className="demo__blur2" src={blur1} alt="" aria-hidden="true" />
         <div className="demo__left">
-          <img className="demo__line" src={line} alt="" />
+          <LandingImg className="demo__line" src={line} alt="" aria-hidden="true" />
           <h1 className="demo__left__title">
             Получите демо <span className="demo-span">NurCRM</span> под ваш
             бизнес

@@ -1,3 +1,4 @@
+import LandingImg from "../../components/LandingImg";
 import "./Base.scss";
 import img from "./img/img.svg";
 import btn from "./img/btn.svg";
@@ -10,8 +11,8 @@ const Base = () => {
     <section className="base">
       <div className="base__container new-container">
         <div className="base__content">
-          <img className="base__line" src={line} alt="" />
-          <img className="base__line2" src={line2} alt="" />
+          <LandingImg className="base__line" src={line} alt="" aria-hidden="true" />
+          <LandingImg className="base__line2" src={line2} alt="" aria-hidden="true" />
           <div className="base__content__left">
             <h2 className="base__content__left__subtitle">
               <span className="base__content__left__dot"></span> ПОДДЕРЖКА И
@@ -22,17 +23,17 @@ const Base = () => {
               Подробные видеоуроки и инструкции помогут быстро осваоить и
               использовать ее на максимум
             </p>
-            <button className="base__content__left__btn">
+            <button type="button" className="base__content__left__btn">
               Перейти к базе знаний ⭢
             </button>
           </div>
 
           <div className="base__content__right">
-            <img className="base__img" src={img} alt="" />
-            <img className="base__blur" src={blur} alt="" />
+            <LandingImg className="base__img" src={img} alt="" />
+            <LandingImg className="base__blur" src={blur} alt="" aria-hidden="true" />
           </div>
-          <button className="base__content__btn">
-            <img src={btn} alt="" />
+          <button type="button" className="base__content__btn">
+            <LandingImg src={btn} alt="" aria-hidden="true" />
           </button>
         </div>
       </div>
