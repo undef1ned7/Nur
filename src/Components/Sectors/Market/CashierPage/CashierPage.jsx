@@ -733,6 +733,9 @@ const CashierPage = () => {
   const pendingQtyFocusRef = React.useRef(null); // { itemId?, productId?, salePackage? }
   /** Последнее значение из инпута количества, для которого запланирован debounced API */
   const pendingQtyLineInputRef = React.useRef(new Map());
+  const priceInputFocusRef = React.useRef({ itemId: null });
+  const pendingPricePatchRef = React.useRef(new Set());
+  const pendingDiscountPatchRef = React.useRef(new Set());
   const debouncedQtyApiByLine = useDebounceByKey(500);
   const debouncedDiscountApiByLine = useDebounceByKey(500);
   const pendingDiscountLineRef = useRef(new Map());
@@ -933,17 +936,6 @@ const CashierPage = () => {
 
     await addToCart(product);
   };
-
-  // Обновление только данных активной продажи (без POST /start/, чтобы не мигала корзина)
-  const refreshCurrentSale = useCallback(async () => {
-    const saleId = getSelectedSaleId();
-    if (!saleId) return;
-    try {
-      await dispatch(getSale({ id: saleId })).unwrap();
-    } catch (error) {
-      console.error("Ошибка при обновлении продажи:", error);
-    }
-  }, [dispatch, getSelectedSaleId]);
 
   const refreshSale = useCallback(async () => {
     if (getSelectedSaleId() && openShiftId) {
@@ -1535,7 +1527,12 @@ const CashierPage = () => {
           if (!isQtyFocused && !hasPendingQty) {
             newQuantities[item.id] = formatQuantity(item.quantity || 0);
           }
-          newPrices[item.id] = formatPrice(item.price ?? 0);
+          const isPriceFocused =
+            String(priceInputFocusRef.current.itemId) === lineKey;
+          const hasPendingPrice = pendingPricePatchRef.current.has(lineKey);
+          if (!isPriceFocused && !hasPendingPrice) {
+            newPrices[item.id] = formatPrice(item.price ?? 0);
+          }
         });
         setCartQuantities((prev) => mergeChangedMap(prev, newQuantities));
         setCartPrices((prev) => mergeChangedMap(prev, newPrices));
@@ -1545,6 +1542,8 @@ const CashierPage = () => {
           const modes = cartDiscountModesRef.current || {};
           let changed = false;
           orderedCart.forEach((item) => {
+            const lineKey = String(item.id);
+            if (pendingDiscountPatchRef.current.has(lineKey)) return;
             const mode = modes[item.id] || "amount";
             const lineTotal = (item.price || 0) * (item.quantity || 0);
             if (mode === "percent") {
@@ -2493,8 +2492,16 @@ const CashierPage = () => {
       return;
     }
     const cartItemId = item.itemId;
+    const lineKey = String(item.id);
     const num = normalizePrice(parseFloat(value) || 0);
     const hasDiscount = parseFloat(item.discountTotal ?? 0) > 0;
+    pendingPricePatchRef.current.add(lineKey);
+    setCartPrices((prev) => ({ ...prev, [item.id]: formatPrice(num) }));
+    setCart((prev) =>
+      prev.map((c) =>
+        String(c.id) === lineKey ? { ...c, price: num } : c,
+      ),
+    );
     if (!item.isCustom && item.productId && !hasDiscount) {
       const product = products.find((p) => p.id === item.productId);
       const purchasePrice = product ? parseFloat(product.purchase_price) : NaN;
@@ -2519,13 +2526,14 @@ const CashierPage = () => {
           data: { unit_price: String(num.toFixed(2)) },
         }),
       ).unwrap();
-      setCartPrices((prev) => ({ ...prev, [item.id]: formatPrice(num) }));
-      setCart((prev) =>
-        prev.map((c) =>
-          String(c.id) === String(item.id) ? { ...c, price: num } : c,
-        ),
-      );
-      await refreshCurrentSale();
+      if (cartDiscountModesRef.current[lineKey] === "percent") {
+        const lineTotal = num * (item.quantity || 0);
+        const discountSom = parseFloat(item.discountTotal ?? 0);
+        setCartDiscounts((prev) => ({
+          ...prev,
+          [item.id]: formatDiscountPercentFromLine(discountSom, lineTotal),
+        }));
+      }
     } catch (err) {
       console.error("Ошибка при изменении цены:", err);
       showAlert("error", "Ошибка", err?.message || "Не удалось изменить цену");
@@ -2533,6 +2541,13 @@ const CashierPage = () => {
         ...prev,
         [item.id]: formatPrice(item.price ?? 0),
       }));
+      setCart((prev) =>
+        prev.map((c) =>
+          String(c.id) === lineKey ? { ...c, price: item.price ?? 0 } : c,
+        ),
+      );
+    } finally {
+      pendingPricePatchRef.current.delete(lineKey);
     }
   };
 
@@ -2563,6 +2578,8 @@ const CashierPage = () => {
       );
     }
     const data = { discount_total: String(num.toFixed(2)) };
+    const lineKey = String(item.id);
+    pendingDiscountPatchRef.current.add(lineKey);
     try {
       await dispatch(
         updateProductInCart({
@@ -2587,7 +2604,6 @@ const CashierPage = () => {
           String(c.id) === String(item.id) ? { ...c, discountTotal: num } : c,
         ),
       );
-      await refreshCurrentSale();
     } catch (err) {
       console.error("Ошибка при изменении скидки:", err);
       showAlert(
@@ -2599,6 +2615,8 @@ const CashierPage = () => {
         ...prev,
         [item.id]: formatPrice(item.discountTotal ?? 0),
       }));
+    } finally {
+      pendingDiscountPatchRef.current.delete(lineKey);
     }
   };
 
@@ -3307,13 +3325,13 @@ const CashierPage = () => {
                               cancelPendingDiscountLineInput(item.id);
                               const lineTotal =
                                 (item.price || 0) * (item.quantity || 0);
-                              const lineDiscount = parseFloat(
+                              const discountSom = parseFloat(
                                 item.discountTotal ?? 0,
                               );
                               const discountToShow =
-                                lineTotal > 0 && lineDiscount > lineTotal
+                                lineTotal > 0 && discountSom > lineTotal
                                   ? lineTotal
-                                  : lineDiscount;
+                                  : discountSom;
                               setCartDiscountModes((prev) => ({
                                 ...prev,
                                 [item.id]: "amount",
@@ -3322,7 +3340,7 @@ const CashierPage = () => {
                                 ...prev,
                                 [item.id]: formatPrice(discountToShow),
                               }));
-                              if (lineTotal > 0 && lineDiscount > lineTotal) {
+                              if (lineTotal > 0 && discountSom > lineTotal) {
                                 patchCartItemDiscount(item, lineTotal);
                               }
                             }}
@@ -3338,58 +3356,24 @@ const CashierPage = () => {
                             }`}
                             onClick={() => {
                               cancelPendingDiscountLineInput(item.id);
-                              const wasAmount =
-                                (cartDiscountModes[item.id] || "amount") ===
-                                "amount";
                               const lineTotal =
                                 (item.price || 0) * (item.quantity || 0);
-                              const currentInput =
-                                cartDiscounts[item.id] ??
-                                formatPrice(item.discountTotal ?? 0);
-                              const num = parseFloat(currentInput);
+                              const discountSom = parseFloat(
+                                item.discountTotal ?? 0,
+                              );
+                              const displayPct = formatDiscountPercentFromLine(
+                                discountSom,
+                                lineTotal,
+                              );
 
                               setCartDiscountModes((prev) => ({
                                 ...prev,
                                 [item.id]: "percent",
                               }));
-
-                              if (
-                                wasAmount &&
-                                !isNaN(num) &&
-                                num >= 0 &&
-                                lineTotal > 0
-                              ) {
-                                const pct = Math.min(100, num);
-                                const displayPct =
-                                  pct === 100
-                                    ? "100"
-                                    : stripTrailingZerosAfterDecimal(pct) ||
-                                      "0";
-                                const discountSom = (lineTotal * pct) / 100;
-                                setCartDiscounts((prev) => ({
-                                  ...prev,
-                                  [item.id]: displayPct,
-                                }));
-                                patchCartItemDiscount(item, discountSom, {
-                                  mode: "percent",
-                                  displayValue: displayPct,
-                                });
-                              } else {
-                                const discountSom = parseFloat(
-                                  item.discountTotal ?? 0,
-                                );
-                                const pct =
-                                  lineTotal > 0 && discountSom > 0
-                                    ? formatDiscountPercentFromLine(
-                                        discountSom,
-                                        lineTotal,
-                                      )
-                                    : "";
-                                setCartDiscounts((prev) => ({
-                                  ...prev,
-                                  [item.id]: pct,
-                                }));
-                              }
+                              setCartDiscounts((prev) => ({
+                                ...prev,
+                                [item.id]: displayPct,
+                              }));
                             }}
                           >
                             %
@@ -3462,10 +3446,21 @@ const CashierPage = () => {
                                 }));
                               }
                             }}
+                            onFocus={() => {
+                              priceInputFocusRef.current.itemId = String(item.id);
+                            }}
                             onBlur={(e) => {
+                              priceInputFocusRef.current.itemId = null;
                               const v = e.target.value.trim();
                               const num = parseDecimalInput(v);
-                              if (v !== "" && !isNaN(num) && num !== item.price) {
+                              const currentPrice = normalizePrice(
+                                parseFloat(item.price ?? 0),
+                              );
+                              if (
+                                v !== "" &&
+                                !isNaN(num) &&
+                                normalizePrice(num) !== currentPrice
+                              ) {
                                 patchCartItemPrice(item, v);
                               } else {
                                 setCartPrices((prev) => ({

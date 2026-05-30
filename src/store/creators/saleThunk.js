@@ -151,7 +151,11 @@ export const updateProductInCart = createAsyncThunk(
   "sale/updateProductInCart",
   async ({ id, productId, data }, { rejectWithValue }) => {
     try {
-      await api.patch(`/main/pos/carts/${id}/items/${productId}/`, data);
+      const { data: response } = await api.patch(
+        `/main/pos/carts/${id}/items/${productId}/`,
+        data,
+      );
+      return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
