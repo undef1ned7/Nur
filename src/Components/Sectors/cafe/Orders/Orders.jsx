@@ -35,7 +35,7 @@ import { isStartPlan as checkStartPlan } from "../../../../utils/subscriptionPla
 import Pagination from "../../Market/Counterparties/components/Pagination";
 import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
@@ -296,6 +296,7 @@ const statusFilterOptions = [
    ========================================================= */
 const Orders = () => {
   const alert = useAlert();
+  const confirm = useConfirm();
   const { profile, company, tariff } = useUser();
   const startPlan = useMemo(
     () => checkStartPlan(tariff || company?.subscription_plan?.name),
@@ -483,23 +484,20 @@ const Orders = () => {
   };
 
   const hydrateOrdersDetails = async (list) => {
-    const ids = list
-      .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
-      .map((o) => o.id);
+    if (!list.length) return list;
 
-    if (!ids.length) return list;
-
+    // Список /cafe/orders/ часто отдаёт устаревшие items — всегда подтягиваем detail.
     const details = await Promise.all(
-      ids.map((id) =>
+      list.map((o) =>
         api
-          .get(`/cafe/orders/${id}/`)
-          .then((r) => ({ id, data: r.data }))
+          .get(`/cafe/orders/${o.id}/`)
+          .then((r) => ({ id: o.id, data: r.data }))
           .catch(() => null),
       ),
     );
 
     return list.map((o) => {
-      const d = details.find((x) => x && x.id === o.id)?.data;
+      const d = details.find((x) => x && String(x.id) === String(o.id))?.data;
       return d ? { ...o, ...d } : o;
     });
   };
@@ -565,6 +563,25 @@ const Orders = () => {
     })();
   }, [socketOrders?.orders]);
 
+  const refreshOrderDetailInList = (orderId, socketSnapshot) => {
+    const oid = String(orderId || "");
+    if (!oid) return;
+    api
+      .get(`/cafe/orders/${oid}/`)
+      .then((r) => {
+        const detail = r?.data;
+        if (!detail) return;
+        setOrders((cur) =>
+          cur.map((o) =>
+            String(o.id) === oid
+              ? { ...o, ...(socketSnapshot || {}), ...detail }
+              : o,
+          ),
+        );
+      })
+      .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+  };
+
   const mergeOrders = (p, so) => {
     const merged = { ...p, ...so };
     if ((so.table === null || so.table === undefined) && p.table) {
@@ -581,8 +598,19 @@ const Orders = () => {
     }
     const pItems = Array.isArray(p.items) ? p.items : [];
     const sItems = Array.isArray(so.items) ? so.items : [];
-    if (pItems.length > 0 && sItems.length === 0) {
+    if (sItems.length > 0) {
+      merged.items = sItems;
+    } else if (pItems.length > 0) {
       merged.items = pItems;
+    }
+    return merged;
+  };
+
+  const mergeSocketOrder = (p, so) => {
+    const merged = mergeOrders(p, so);
+    const sItems = Array.isArray(so?.items) ? so.items : [];
+    if (!sItems.length && so?.id) {
+      refreshOrderDetailInList(so.id, so);
     }
     return merged;
   };
@@ -613,7 +641,7 @@ const Orders = () => {
         const updated = prev.map((p) => {
           const so = socketById.get(String(p.id));
           if (!so) return p;
-          return mergeOrders(p, so);
+          return mergeSocketOrder(p, so);
         });
 
         // Add new orders from WS that are not yet in prev
@@ -660,7 +688,7 @@ const Orders = () => {
         return prev.map((p) => {
           const so = socketById.get(String(p.id));
           if (!so) return p;
-          return mergeOrders(p, so);
+          return mergeSocketOrder(p, so);
         });
       }
 
@@ -685,7 +713,7 @@ const Orders = () => {
             .catch(() => {});
           return so;
         }
-        return mergeOrders(p, so);
+        return mergeSocketOrder(p, so);
       });
     });
   }, [socketOrders?.orders]);
@@ -1460,6 +1488,18 @@ const Orders = () => {
           payload,
           "patch",
         );
+        try {
+          const { data: fresh } = await api.get(`/cafe/orders/${editingId}/`);
+          if (fresh) {
+            setOrders((prev) =>
+              prev.map((o) =>
+                String(o.id) === String(editingId) ? { ...o, ...fresh } : o,
+              ),
+            );
+          }
+        } catch {
+          // fetchOrders ниже подтянет список
+        }
       }
 
       setModalOpen(false);
@@ -2282,20 +2322,33 @@ const Orders = () => {
                     <button
                       type="button"
                       className="cafeOrders__btn cafeOrders__btn--danger"
-                      onClick={async () => {
+                      onClick={() => {
                         if (!editingId || saving) return;
-                        setSaving(true);
-                        try {
-                          await api.patch(`/cafe/orders/${editingId}/`, {
-                            status: "cancelled",
-                          });
-                          setModalOpen(false);
-                          await fetchOrders();
-                        } catch (err) {
-                          // Ошибка при отмене заказа
-                        } finally {
-                          setSaving(false);
-                        }
+                        confirm(
+                          "Отменить этот заказ? Заказ исчезнет из списка открытых.",
+                          async (ok) => {
+                            if (!ok) return;
+                            setSaving(true);
+                            try {
+                              await api.patch(`/cafe/orders/${editingId}/`, {
+                                status: "cancelled",
+                              });
+                              setModalOpen(false);
+                              setMenuOpen(false);
+                              setShowAddClient(false);
+                              setOpenSelectId(null);
+                              await fetchOrders();
+                            } catch (err) {
+                              const errorMessage = validateResErrors(
+                                err,
+                                "Ошибка при отмене заказа",
+                              );
+                              alert(errorMessage, true);
+                            } finally {
+                              setSaving(false);
+                            }
+                          },
+                        );
                       }}
                       disabled={saving}
                     >

@@ -95,32 +95,68 @@ export const normalizePosStartResponse = (data) => {
   };
 };
 
+const mergeSaleIntoStateStart = (state, sale) => {
+  if (!sale?.id) return;
+  const prev = state.start;
+  const prevId = prev?.id != null ? String(prev.id) : "";
+  const nextId = String(sale.id);
+  if (prev && prevId && nextId && prevId === nextId) {
+    const prevItems = prev.items ?? prev.cart?.items;
+    const nextItems = sale.items ?? sale.cart?.items;
+    // POST /start/ и иногда PATCH — sale без items: не затираем строки корзины
+    if (
+      Array.isArray(prevItems) &&
+      prevItems.length > 0 &&
+      (!Array.isArray(nextItems) || nextItems.length === 0)
+    ) {
+      state.start = { ...sale, items: prevItems };
+      return;
+    }
+  }
+  state.start = sale;
+};
+
 export const applyPosStartToState = (state, data) => {
   const { sale, carts, activeSaleId } = normalizePosStartResponse(data);
   if (sale) {
-    const prev = state.start;
-    const prevId = prev?.id != null ? String(prev.id) : "";
-    const nextId = sale.id != null ? String(sale.id) : "";
-    if (prev && prevId && nextId && prevId === nextId) {
-      const prevItems = prev.items ?? prev.cart?.items;
-      const nextItems = sale.items ?? sale.cart?.items;
-      // POST /start/ часто возвращает sale без items — не затираем строки корзины
-      if (
-        Array.isArray(prevItems) &&
-        prevItems.length > 0 &&
-        (!Array.isArray(nextItems) || nextItems.length === 0)
-      ) {
-        state.start = { ...sale, items: prevItems };
-      } else {
-        state.start = sale;
-      }
-    } else {
-      state.start = sale;
-    }
+    mergeSaleIntoStateStart(state, sale);
   }
   if (carts.length) state.posCarts = carts;
   if (activeSaleId) state.activeSaleId = activeSaleId;
   else if (sale?.id) state.activeSaleId = String(sale.id);
+};
+
+/**
+ * PATCH /main/pos/carts/{saleId}/items/{itemId}/ — ответ с одной продажей.
+ * Не подменяет список вкладок (posCarts), только активную продажу и метаданные вкладки.
+ */
+export const applyPosCartItemPatchToState = (state, data) => {
+  if (!data || typeof data !== "object") return;
+
+  if (Array.isArray(data.carts)) {
+    applyPosStartToState(state, data);
+    return;
+  }
+
+  const { sale } = normalizePosStartResponse(data);
+  const patchSale =
+    sale ?? (data.id != null || data.sale_id != null ? data : null);
+  if (!patchSale?.id) return;
+
+  const patchId = String(patchSale.id ?? patchSale.sale_id);
+  const activeId = state.activeSaleId
+    ? String(state.activeSaleId)
+    : state.start?.id != null
+      ? String(state.start.id)
+      : "";
+
+  if (activeId && patchId !== activeId) return;
+
+  mergeSaleIntoStateStart(state, patchSale);
+
+  if (Array.isArray(state.posCarts) && state.posCarts.length) {
+    state.posCarts = patchCartTabFromSale(state.posCarts, patchSale);
+  }
 };
 
 export const patchCartTabFromSale = (carts, sale) => {

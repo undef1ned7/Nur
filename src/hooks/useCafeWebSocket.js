@@ -316,8 +316,8 @@ export const useCafeOrdersWebSocket = (options = {}) => {
             case 'order_updated': {
                 const updatedOrder = message.data.order;
 
-                // ✅ Предотвращаем дубликаты
-                const updateKey = `updated-${updatedOrder.id}-${updatedOrder.status}`;
+                // ✅ Предотвращаем дубликаты одного и того же события (не блокируем повторные правки с тем же status)
+                const updateKey = `updated-${updatedOrder.id}-${updatedOrder.updated_at || updatedOrder.modified_at || updatedOrder.total_amount}-${(updatedOrder.items || []).length}`;
                 if (processedOrdersRef.current.has(updateKey)) {
                     return;
                 }
@@ -349,7 +349,7 @@ export const useCafeOrdersWebSocket = (options = {}) => {
                     } else {
                         // Обновляем заказ
                         return prev.map(order =>
-                            order.id === updatedOrder.id
+                            String(order.id) === String(updatedOrder.id)
                                 ? { ...order, ...updatedOrder }
                                 : order
                         );

@@ -27,6 +27,7 @@ import {
   getSale,
 } from "../creators/saleThunk";
 import {
+  applyPosCartItemPatchToState,
   applyPosStartToState,
   normalizePosStartResponse,
   patchCartTabFromSale,
@@ -185,14 +186,8 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(updateManualFilling.fulfilled, (state, { payload }) => {
-        // Обновляем state.start если payload содержит полные данные продажи
-        if (
-          payload &&
-          payload.id &&
-          state.start &&
-          state.start.id === payload.id
-        ) {
-          state.start = payload;
+        if (payload && typeof payload === "object") {
+          applyPosCartItemPatchToState(state, payload);
         }
         state.loading = false;
       })
@@ -250,10 +245,21 @@ const saleSlice = createSlice({
       })
 
       .addCase(updateProductInCart.pending, (state) => {
-        state.loading = true;
+        // Не ставим loading: иначе синхронизация корзины затирает локальную цену/скидку до ответа PATCH
       })
-      .addCase(updateProductInCart.fulfilled, (state) => {
+      .addCase(updateProductInCart.fulfilled, (state, { payload }) => {
         state.loading = false;
+        if (payload && typeof payload === "object") {
+          const hasSaleShape =
+            payload.id != null ||
+            payload.sale != null ||
+            Array.isArray(payload.carts) ||
+            Array.isArray(payload.items) ||
+            Array.isArray(payload.cart?.items);
+          if (hasSaleShape) {
+            applyPosCartItemPatchToState(state, payload);
+          }
+        }
       })
       .addCase(updateProductInCart.rejected, (state, action) => {
         state.error = ensureError(action);
