@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import LandingImg from "../../components/LandingImg";
 import phoneIcon from "../../assets/icons/phone.svg";
 import headerLogo from "../../assets/icons/headerLogo.svg";
 import { DEMO_SECTION_ID, scrollToDemoSection } from "../../utils/scrollToDemo";
@@ -47,7 +48,7 @@ const Header = () => {
       <div className="newHeader__container new-container">
         <div className="newHeader__left">
           <Link to="/" className="newHeader__logo" onClick={closeMenu}>
-            <img src={headerLogo} alt="NurCRM" />
+            <LandingImg src={headerLogo} alt="NurCRM" priority />
           </Link>
           <nav className="newHeader__nav" aria-label="Основная навигация">
             <ul className="newHeader__menu">
@@ -55,7 +56,9 @@ const Header = () => {
                 <li key={id} className="newHeader__menu-item">
                   <a
                     href={`/#${id}`}
-                    className={isLanding && currentHash === id ? "active" : undefined}
+                    className={
+                      isLanding && currentHash === id ? "active" : undefined
+                    }
                     onClick={(e) => handleSectionClick(e, id)}
                   >
                     {label}
@@ -65,7 +68,9 @@ const Header = () => {
               <li className="newHeader__menu-item">
                 <NavLink
                   to="/video-lessons"
-                  className={({ isActive }) => (isActive ? "active" : undefined)}
+                  className={({ isActive }) =>
+                    isActive ? "active" : undefined
+                  }
                   onClick={closeMenu}
                 >
                   База знаний
@@ -75,7 +80,9 @@ const Header = () => {
                 <a
                   href={`/#${DEMO_SECTION_ID}`}
                   className={
-                    isLanding && currentHash === DEMO_SECTION_ID ? "active" : undefined
+                    isLanding && currentHash === DEMO_SECTION_ID
+                      ? "active"
+                      : undefined
                   }
                   onClick={(e) => {
                     e.preventDefault();
@@ -90,11 +97,7 @@ const Header = () => {
           </nav>
         </div>
         <div className="newHeader__right">
-          <NavLink
-            to="/login"
-            className="newHeader__login"
-            onClick={closeMenu}
-          >
+          <NavLink to="/login" className="newHeader__login" onClick={closeMenu}>
             Логин
           </NavLink>
           <div className="newHeader__lang">
@@ -103,8 +106,8 @@ const Header = () => {
             <button type="button">KG</button>
           </div>
           <div className="newHeader__contacts">
-            <img src={phoneIcon} alt="" />
-            <a href="tel:+996557880182">+996 557 880 182</a>
+            <LandingImg src={phoneIcon} alt="" aria-hidden="true" />
+            <a href="tel:+996556900556">+996 (556) 900 556</a>
           </div>
           <button
             type="button"

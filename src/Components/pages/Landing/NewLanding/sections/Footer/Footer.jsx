@@ -1,3 +1,6 @@
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import LandingImg from "../../components/LandingImg";
+import { DEMO_SECTION_ID, scrollToDemoSection } from "../../utils/scrollToDemo";
 import "./Footer.scss";
 import logo from "./img/logo.svg";
 import call from "./img/call.svg";
@@ -9,15 +12,56 @@ import wa from "./img/wa.svg";
 import yt from "./img/yt.svg";
 import blur from "./img/blur.svg";
 
+const SECTION_LINKS = [
+  { id: "features", label: "Возможности" },
+  { id: "for-whom", label: "Для кого" },
+  { id: "interface", label: "Интерфейс" },
+  { id: "tariff", label: "Тариф" },
+  { id: "team", label: "Команда" },
+];
+
+const scrollToSection = (id) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", `/#${id}`);
+  }
+};
+
 const Footer = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isLanding = location.pathname === "/";
+
+  const handleSectionClick = (e, sectionId) => {
+    e.preventDefault();
+
+    if (isLanding) {
+      scrollToSection(sectionId);
+      return;
+    }
+
+    navigate({ pathname: "/", hash: sectionId });
+  };
+
+  const handleDemoClick = (e) => {
+    e.preventDefault();
+    scrollToDemoSection(navigate, location.pathname);
+  };
+
   return (
     <footer className="footer !mt-0">
-      <img className="footer__blur" src={blur} alt="" aria-hidden="true" />
+      <LandingImg
+        className="footer__blur"
+        src={blur}
+        alt=""
+        aria-hidden="true"
+      />
       <div className="footer__container new-container">
         {/* <hr /> */}
         <div className="footer__content">
           <div className="col-3 footer__content__first">
-            <img src={logo} alt="" />
+            <LandingImg src={logo} alt="NurCRM" />
             <p className="footer__description">
               NurCRM — система для управления бизнесом: продажи, склад, касса,
               аналитика и клиенты в одном месте.
@@ -27,27 +71,31 @@ const Footer = () => {
           <div className="col-3 footer__content__second">
             <h3 className="footer__subtitle">Навигация</h3>
             <ul className="footer__content__ul">
-              <a className="footer__content__link" href="#">
-                Возможности
-              </a>
-              <a className="footer__content__link" href="#">
-                Для кого
-              </a>
-              <a className="footer__content__link" href="#">
-                Интерфейс
-              </a>
-              <a className="footer__content__link" href="#">
-                Тариф
-              </a>
-              <a className="footer__content__link" href="#">
-                Команда
-              </a>
-              <a className="footer__content__link" href="#">
-                База знаний
-              </a>
-              <a className="footer__content__link" href="#">
-                FAQ
-              </a>
+              {SECTION_LINKS.map(({ id, label }) => (
+                <li key={id}>
+                  <a
+                    className="footer__content__link"
+                    href={`/#${id}`}
+                    onClick={(e) => handleSectionClick(e, id)}
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+              <li>
+                <NavLink className="footer__content__link" to="/video-lessons">
+                  База знаний
+                </NavLink>
+              </li>
+              <li>
+                <a
+                  className="footer__content__link"
+                  href={`/#${DEMO_SECTION_ID}`}
+                  onClick={handleDemoClick}
+                >
+                  FAQ
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -58,11 +106,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="#"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={call}
                   alt=""
+                  aria-hidden="true"
                 />
                 +996 (556) 900 556
               </a>
@@ -70,11 +118,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="#"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={gmail}
                   alt=""
+                  aria-hidden="true"
                 />
                 nurcrmkg@gmail.com
               </a>
@@ -82,11 +130,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="#"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={loc}
                   alt=""
+                  aria-hidden="true"
                 />
                 Улица Салиевой, 1/3, Ош, Кыргызстан
               </a>
@@ -100,11 +148,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="https://www.instagram.com/nurcrm.osh/"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={inst}
                   alt=""
+                  aria-hidden="true"
                 />
                 Instagram
               </a>
@@ -124,11 +172,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="#"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={wa}
                   alt=""
+                  aria-hidden="true"
                 />
                 WhatsApp
               </a>
@@ -136,11 +184,11 @@ const Footer = () => {
                 className="footer__content__link footer__content__link1"
                 href="https://www.youtube.com/@NURCRM25"
               >
-                <img
-                  className="footer__icon
-                "
+                <LandingImg
+                  className="footer__icon"
                   src={yt}
                   alt=""
+                  aria-hidden="true"
                 />
                 YouTube
               </a>

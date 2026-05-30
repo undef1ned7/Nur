@@ -1,4 +1,5 @@
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
+import LandingImg from "../../components/LandingImg";
 import "./BusinessProblems.scss";
 import cart1 from "./img/cart1.svg";
 import cart2 from "./img/cart2.svg";
@@ -35,30 +36,35 @@ const BusinessProblems = () => {
               Попробовать NurCRM ⭢
             </button>
             <div className="business__banner">
-              <img
+              <LandingImg
                 className="business__banner__img1"
                 src={logobanner1}
                 alt=""
+                aria-hidden="true"
               />
-              <img
+              <LandingImg
                 className="business__banner__img2"
                 src={logobanner2}
                 alt=""
+                aria-hidden="true"
               />
-              <img
+              <LandingImg
                 className="business__banner__img3"
                 src={logobanner3}
                 alt=""
+                aria-hidden="true"
               />
-              <img
+              <LandingImg
                 className="business__banner__img4"
                 src={logobanner4}
                 alt=""
+                aria-hidden="true"
               />
-              <img
+              <LandingImg
                 className="business__banner__img5"
                 src={logobanner5}
                 alt=""
+                aria-hidden="true"
               />
             </div>
           </div>
@@ -68,7 +74,7 @@ const BusinessProblems = () => {
               <div className="cols business__carts-col">
                 <div className="business__cart">
                   <div className="business__cart__up">
-                    <img className="business__cart__img" src={cart1} alt="" />
+                    <LandingImg className="business__cart__img" src={cart1} alt="" aria-hidden="true" />
                     <p className="business__cart__num">01 </p>
                   </div>
                   <h3 className="business__cart__title">Потеря клиентов</h3>
@@ -78,7 +84,7 @@ const BusinessProblems = () => {
                 </div>
                 <div className="business__cart">
                   <div className="business__cart__up">
-                    <img className="business__cart__img" src={cart2} alt="" />
+                    <LandingImg className="business__cart__img" src={cart2} alt="" aria-hidden="true" />
                     <p className="business__cart__num">02 </p>
                   </div>
                   <h3 className="business__cart__title">Нет контроля</h3>
@@ -90,7 +96,7 @@ const BusinessProblems = () => {
               <div className="cols business__carts-col">
                 <div className="business__cart">
                   <div className="business__cart__up">
-                    <img className="business__cart__img" src={cart3} alt="" />
+                    <LandingImg className="business__cart__img" src={cart3} alt="" aria-hidden="true" />
                     <p className="business__cart__num">03 </p>
                   </div>
                   <h3 className="business__cart__title">Хаос в данных</h3>
@@ -100,7 +106,7 @@ const BusinessProblems = () => {
                 </div>
                 <div className="business__cart">
                   <div className="business__cart__up">
-                    <img className="business__cart__img" src={cart4} alt="" />
+                    <LandingImg className="business__cart__img" src={cart4} alt="" aria-hidden="true" />
                     <p className="business__cart__num">04 </p>
                   </div>
                   <h3 className="business__cart__title">Нет аналитики</h3>

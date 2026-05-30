@@ -74,7 +74,23 @@ export default defineConfig({
     },
     build: {
         outDir: 'build',
-        sourcemap: true,
+        sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('swiper')) return 'vendor-swiper';
+                        if (id.includes('@mui') || id.includes('@emotion')) return 'vendor-mui';
+                        if (id.includes('react-router') || id.includes('react-dom') || id.includes('react/')) {
+                            return 'vendor-react';
+                        }
+                        if (id.includes('redux') || id.includes('@reduxjs')) return 'vendor-redux';
+                        if (id.includes('chart.js') || id.includes('recharts')) return 'vendor-charts';
+                        return 'vendor';
+                    }
+                },
+            },
+        },
     },
     css: {
         preprocessorOptions: {

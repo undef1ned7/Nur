@@ -1,6 +1,93 @@
+import { useEffect, useRef, useState } from "react";
 import "./Included.scss";
 
+const STATS = [
+  { value: 25, suffix: "%", label: "Рост прибыли" },
+  { value: -60, suffix: "%", label: "Меньше ошибок" },
+  { value: 3, suffix: "x", label: "Быстрее ответы" },
+  { static: "24/7", label: "Контроль бизнеса" },
+];
+
+const easeOutCubic = (t) => 1 - (1 - t) ** 3;
+
+const AnimatedStatValue = ({ stat, isVisible, delay = 0 }) => {
+  const [display, setDisplay] = useState(() =>
+    stat.static ? "" : `0${stat.suffix}`,
+  );
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (!isVisible) return undefined;
+
+    const revealTimer = window.setTimeout(() => setRevealed(true), delay);
+
+    if (stat.static) {
+      const staticTimer = window.setTimeout(() => {
+        setDisplay(stat.static);
+      }, delay);
+      return () => {
+        window.clearTimeout(revealTimer);
+        window.clearTimeout(staticTimer);
+      };
+    }
+
+    const duration = 1400;
+    let rafId = 0;
+    let startTime = null;
+
+    const tick = (now) => {
+      if (startTime === null) startTime = now;
+      const progress = Math.min((now - startTime) / duration, 1);
+      const current = Math.round(stat.value * easeOutCubic(progress));
+      setDisplay(`${current}${stat.suffix}`);
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(tick);
+      }
+    };
+
+    const startTimer = window.setTimeout(() => {
+      rafId = requestAnimationFrame(tick);
+    }, delay);
+
+    return () => {
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(startTimer);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isVisible, stat, delay]);
+
+  return (
+    <div
+      className={`included__stat-value${revealed ? " included__stat-value--visible" : ""}`}
+    >
+      {display}
+    </div>
+  );
+};
+
 const Included = () => {
+  const statsRef = useRef(null);
+  const [statsVisible, setStatsVisible] = useState(false);
+
+  useEffect(() => {
+    const node = statsRef.current;
+    if (!node) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStatsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section className="included">
       <div className="included__container new-container">
@@ -55,23 +142,24 @@ const Included = () => {
           </div>
         </div>
 
-        <div className="included__stats">
-          <div className="included__stat-box">
-            <div className="included__stat-value">25%</div>
-            <div className="included__stat-label">Рост прибыли</div>
-          </div>
-          <div className="included__stat-box">
-            <div className="included__stat-value">-60%</div>
-            <div className="included__stat-label">Меньше ошибок</div>
-          </div>
-          <div className="included__stat-box">
-            <div className="included__stat-value">3x</div>
-            <div className="included__stat-label">Быстрее ответы</div>
-          </div>
-          <div className="included__stat-box">
-            <div className="included__stat-value">24/7</div>
-            <div className="included__stat-label">Контроль бизнеса</div>
-          </div>
+        <div
+          ref={statsRef}
+          className={`included__stats${statsVisible ? " included__stats--visible" : ""}`}
+        >
+          {STATS.map((stat, index) => (
+            <div
+              key={stat.label}
+              className="included__stat-box"
+              style={{ "--stat-delay": `${index * 120}ms` }}
+            >
+              <AnimatedStatValue
+                stat={stat}
+                isVisible={statsVisible}
+                delay={index * 120}
+              />
+              <div className="included__stat-label">{stat.label}</div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

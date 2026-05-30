@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getIndustries } from "../../../../../../api/auth";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
+import { useLandingIndustries } from "../../hooks/useLandingIndustries";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "./Sphere.scss";
@@ -22,8 +22,7 @@ const Sphere = () => {
   const [pageCount, setPageCount] = useState(0);
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
-  const [industries, setIndustries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { industries, loading } = useLandingIndustries();
 
   const sphereCards = useMemo(
     () =>
@@ -34,34 +33,6 @@ const Sphere = () => {
       })),
     [industries]
   );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadIndustries = async () => {
-      setLoading(true);
-      try {
-        const data = await getIndustries();
-        if (!cancelled) {
-          setIndustries(Array.isArray(data) ? data : []);
-        }
-      } catch {
-        if (!cancelled) {
-          setIndustries([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadIndustries();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const updateSwiperState = useCallback((swiper) => {
     setActiveIndex(swiper.snapIndex ?? swiper.activeIndex);

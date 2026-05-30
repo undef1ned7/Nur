@@ -1,7 +1,59 @@
+import LandingImg from "../../components/LandingImg";
 import "./Rate.scss";
 import iconbutton from "./img/iconbutton.svg";
-import check from "./img/check.svg";
-import blur from './img/blur.svg';
+import blur from "./img/blur.svg";
+
+const PLANS = [
+  {
+    id: "start",
+    title: "Стандарт",
+    subtitle: "Для старта и небольших команд",
+    price: "499c",
+    note: "Лучший выбор для старта",
+    features: [
+      "CRM система",
+      "Клиенты и контакты",
+      "Базовая аналитика",
+      "Поддержка",
+    ],
+    variant: "default",
+  },
+  {
+    id: "growth",
+    title: "Стандарт",
+    subtitle: "Для растущего бизнеса",
+    price: "2990с",
+    note: "Бльше возможностей для роста",
+    features: [
+      "Автоматизация процессов",
+      "Все из тарифа “Старт”",
+      "Расширенная аналитика",
+      "И еще что то",
+    ],
+    variant: "hit",
+  },
+  {
+    id: "enterprise",
+    title: "Стандарт",
+    subtitle: "Для крупных компаний",
+    price: "9990с",
+    note: "Бльше возможностей для роста",
+    features: [
+      "Расширенные права доступа",
+      "Обучение и внедрение",
+      "Полная аналитика",
+      "Персональный менеджер",
+    ],
+    variant: "default",
+  },
+];
+
+const FeatureItem = ({ text }) => (
+  <p className="rate__cart__features-description">
+    <span className="rate__cart__features-check" aria-hidden="true" />
+    {text}
+  </p>
+);
 
 const Rate = () => {
   return (
@@ -11,178 +63,60 @@ const Rate = () => {
           Выберите тариф, который{" "}
           <span className="rate__title-span">подходит именно вам</span>
         </h1>
-        <button className="rate__button">
-          <img
+        <button type="button" className="rate__button">
+          <LandingImg
             className="rate__button-icon"
             src={iconbutton}
-            alt="iconbutton"
+            alt=""
+            aria-hidden="true"
           />
           Экономьте до 20% при оплате за год
         </button>
 
         <div className="rate__carts">
-          <div className="col-4 ">
-            <div className="rate__cart">
-              <h2 className="rate__cart__title">Стандарт</h2>
-              <p className="rate__cart__description">
-                Для старта и небольших команд
-              </p>
-              <p className="rate__cart__price">
-                <span className="rate__cart__price-num">499c</span>
-                <span className="rate__cart__price-month">/мес.</span>
-              </p>
-              <p className="rate__cart__description">Лучший выбор для старта</p>
-              <div className="rate__cart__features">
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  CRM система
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Клиенты и контакты
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Базовая аналитика
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Поддержка
-                </p>
-              </div>
-              <button className="rate__cart__button">
-                Попробовать бесплатно
-              </button>
-            </div>
-            <p  className="rate__descriptionend">10 дней бесплатно</p>
-          </div>
-
-          <div className="col-4 ">
-            <div className="rate__cart1">
-                <div className="rate__cart1__hit">
+          {PLANS.map((plan) => (
+            <div key={plan.id} className="col-4">
+              <div
+                className={
+                  plan.variant === "hit" ? "rate__cart1" : "rate__cart"
+                }
+              >
+                {plan.variant === "hit" && (
+                  <div className="rate__cart1__hit">
                     <p className="rate__cart1__hit-text">ХИТ</p>
+                  </div>
+                )}
+                <h2 className="rate__cart__title">{plan.title}</h2>
+                <p className="rate__cart__description">{plan.subtitle}</p>
+                <p className="rate__cart__price">
+                  <span className="rate__cart__price-num">{plan.price}</span>
+                  <span className="rate__cart__price-month">/мес.</span>
+                </p>
+                <p className="rate__cart__description">{plan.note}</p>
+                <div className="rate__cart__features">
+                  {plan.features.map((feature) => (
+                    <FeatureItem key={feature} text={feature} />
+                  ))}
                 </div>
-              <h2 className="rate__cart__title">Стандарт</h2>
-              <p className="rate__cart__description">Для растущего бизнеса</p>
-              <p className="rate__cart__price">
-                <span className="rate__cart__price-num">2990с</span>
-                <span className="rate__cart__price-month">/мес.</span>
-              </p>
-              <p className="rate__cart__description">
-                Бльше возможностей для роста
-              </p>
-              <div className="rate__cart__features">
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Автоматизация процессов
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Все из тарифа “Старт”
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Расширенная аналитика
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  И еще что то
-                </p>
+                <button
+                  type="button"
+                  className={
+                    plan.variant === "hit"
+                      ? "rate__cart__button rate__cart__button1"
+                      : "rate__cart__button"
+                  }
+                >
+                  Попробовать бесплатно
+                </button>
               </div>
-              <button className="rate__cart__button rate__cart__button1">
-                Попробовать бесплатно
-              </button>
+              <p className="rate__descriptionend">10 дней бесплатно</p>
             </div>
-            <p  className="rate__descriptionend">10 дней бесплатно</p>
-          </div>
-
-          <div className="col-4">
-            <div className=" rate__cart">
-              <h2 className="rate__cart__title">Стандарт</h2>
-              <p className="rate__cart__description">Для крупных компаний</p>
-              <p className="rate__cart__price">
-                <span className="rate__cart__price-num">9990с</span>
-                <span className="rate__cart__price-month">/мес.</span>
-              </p>
-              <p className="rate__cart__description">
-                Бльше возможностей для роста
-              </p>
-              <div className="rate__cart__features">
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Расширенные права доступа
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Обучение и внедрение
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Полная аналитика
-                </p>
-                <p className="rate__cart__features-description">
-                  <img
-                    className="rate__cart__features-img"
-                    src={check}
-                    alt="check"
-                  />
-                  Персональный менеджер
-                </p>
-              </div>
-              <button className="rate__cart__button">
-                Попробовать бесплатно
-              </button>
-            </div>
-            <p className="rate__descriptionend">10 дней бесплатно</p>
-          </div>
+          ))}
         </div>
-        <img className="rate__blur" src={blur} alt="blur" />
+        <LandingImg className="rate__blur" src={blur} alt="" aria-hidden="true" />
       </div>
     </section>
   );
 };
+
 export default Rate;

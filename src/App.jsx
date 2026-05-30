@@ -1,19 +1,55 @@
-import { useState, useCallback } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, useState, useCallback, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "./App.scss";
 import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard.jsx";
 import Layout from "./Components/Layout/Layout.jsx";
 import { ScrollToTop } from "./hooks/ScrollToTop.jsx";
-import { publicRoutes, crmRoutes } from "./config/routes.jsx";
+import { publicRoutes } from "./config/routes.jsx";
+import RouteFallback from "./Components/common/RouteFallback/RouteFallback.jsx";
 import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
-import "./i18n.js"
+import "./i18n.js";
 import { ModalProvider } from "./context/modal";
+
+function AppRoutes({ profile }) {
+  const { pathname } = useLocation();
+  const [crmRoutesElements, setCrmRoutesElements] = useState(null);
+
+  useEffect(() => {
+    if (!pathname.startsWith("/crm")) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    import("./config/crmRoutes").then((mod) => {
+      if (!cancelled) {
+        setCrmRoutesElements(mod.crmRoutes(profile));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, profile]);
+
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        {publicRoutes}
+        <Route path="/crm" element={<Layout />}>
+          {crmRoutesElements ?? (
+            <Route path="*" element={<RouteFallback />} />
+          )}
+        </Route>
+      </Routes>
+    </Suspense>
+  );
+}
 
 function App() {
   const [profile, setProfile] = useState(null);
 
-  // Используем useCallback чтобы функция не пересоздавалась при каждом рендере
   const handleProfileLoaded = useCallback((profileData) => {
     setProfile(profileData);
   }, []);
@@ -25,12 +61,7 @@ function App() {
           <Box sx={{ minHeight: "100vh", bgcolor: "transparent" }}>
             <BrowserRouter>
               <ScrollToTop />
-              <Routes>
-                {publicRoutes}
-                <Route path="/crm" element={<Layout />}>
-                  {crmRoutes(profile)}
-                </Route>
-              </Routes>
+              <AppRoutes profile={profile} />
             </BrowserRouter>
           </Box>
         </ModalProvider>
