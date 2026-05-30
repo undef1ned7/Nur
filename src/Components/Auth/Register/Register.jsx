@@ -1,12 +1,108 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import {
   registerUserAsync,
   getIndustriesAsync,
   getSubscriptionPlansAsync,
 } from "../../../store/creators/userCreators";
 import { useNavigate } from "react-router-dom";
+import RegisterLayout from "./RegisterLayout";
 import "./Register.scss";
+
+const COMPANY_REGIONS = [
+  { value: "bishkek", label: "Бишкек" },
+  { value: "osh_city", label: "город Ош" },
+  { value: "chuy", label: "Чуйская область" },
+  { value: "osh", label: "Ошская область" },
+  { value: "jalal_abad", label: "Джалал-Абадская область" },
+  { value: "issyk_kul", label: "Иссык-Кульская область" },
+  { value: "naryn", label: "Нарынская область" },
+  { value: "talas", label: "Таласская область" },
+  { value: "batken", label: "Баткенская область" },
+];
+
+function getRegisterErrorMessage(error) {
+  if (!error) return "";
+
+  if (typeof error.detail === "string") return error.detail;
+
+  if (Array.isArray(error.detail)) {
+    return error.detail.map(String).join(", ");
+  }
+
+  if (typeof error.detail === "object" && error.detail) {
+    return Object.entries(error.detail)
+      .map(([field, messages]) => {
+        const text = Array.isArray(messages)
+          ? messages.join(", ")
+          : String(messages);
+        return `${field}: ${text}`;
+      })
+      .join("; ");
+  }
+
+  if (Array.isArray(error.non_field_errors) && error.non_field_errors.length) {
+    return String(error.non_field_errors[0]);
+  }
+
+  try {
+    return JSON.stringify(error.detail || error);
+  } catch {
+    return "Ошибка регистрации";
+  }
+}
+
+const PasswordField = ({
+  id,
+  label,
+  value,
+  onChange,
+  hint,
+  hintType,
+  minLength = 8,
+}) => {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="register__field">
+      <label className="register__label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="register__password">
+        <input
+          className="register__input register__input--password"
+          type={visible ? "text" : "password"}
+          id={id}
+          name={id}
+          placeholder={label}
+          value={value}
+          onChange={onChange}
+          required
+          minLength={minLength}
+          autoComplete={id === "password" ? "new-password" : "new-password"}
+        />
+        <button
+          type="button"
+          className="register__toggle"
+          onClick={() => setVisible((prev) => !prev)}
+          aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+        >
+          {visible ? "Скрыть" : "Показать"}
+        </button>
+      </div>
+      {hint && (
+        <p
+          className={`register__field-hint${
+            hintType ? ` register__field-hint--${hintType}` : ""
+          }`}
+        >
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const Register = () => {
   const dispatch = useDispatch();
@@ -20,6 +116,9 @@ const Register = () => {
     subscriptionPlans,
   } = useSelector((state) => state.user);
 
+  const [formError, setFormError] = useState("");
+  const [selectedIndustryId, setSelectedIndustryId] = useState("");
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,6 +129,7 @@ const Register = () => {
     company_sector_id: "",
     subscription_plan_id: "",
     company_name: "",
+    company_region: "",
   });
 
   useEffect(() => {
@@ -39,64 +139,111 @@ const Register = () => {
 
   const handleSelectChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [id]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [id]: value }));
+    if (formError) setFormError("");
   };
 
   const handleIndustryChange = (e) => {
     const industryId = e.target.value;
+    setSelectedIndustryId(industryId);
 
-    // проверяем, что industries есть и массив не пустой
-    if (!industries || industries.length === 0) return;
+    if (!industries?.length) return;
 
-    const selected = industries.find((industry) => industry.id === industryId);
+    const selected = industries.find(
+      (industry) => String(industry.id) === industryId,
+    );
+    const firstSectorId = selected?.sectors?.[0]?.id || "";
 
-    if (!selected || !selected.sectors || selected.sectors.length === 0) return;
-
-    const firstSectorId = selected.sectors[0].id;
-
-    setFormData((prevData) => ({
-      ...prevData,
+    setFormData((prev) => ({
+      ...prev,
       company_sector_id: firstSectorId,
     }));
   };
 
+  const passwordsMatch =
+    !formData.password2 || formData.password === formData.password2;
+
+  const passwordHint = formData.password2
+    ? passwordsMatch
+      ? "Пароли совпадают"
+      : "Пароли не совпадают"
+    : "Минимум 8 символов";
+
+  const passwordHintType = formData.password2
+    ? passwordsMatch
+      ? "ok"
+      : "error"
+    : undefined;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError("");
 
-    if (formData.password !== formData.password2) {
-      alert("Пароли не совпадают!");
+    if (!formData.company_sector_id) {
+      setFormError("Выберите сферу деятельности компании");
       return;
     }
 
-    dispatch(registerUserAsync({ formData, navigate }));
+    if (!formData.subscription_plan_id) {
+      setFormError("Выберите тарифный план");
+      return;
+    }
+
+    if (formData.password !== formData.password2) {
+      setFormError("Пароли не совпадают");
+      return;
+    }
+
+    dispatch(
+      registerUserAsync({
+        formData: {
+          ...formData,
+          company_region: formData.company_region || null,
+        },
+        navigate,
+      }),
+    );
   };
 
+  const apiError = getRegisterErrorMessage(error);
+
   return (
-    <div className="register">
-      <div className="register__container">
-        <h2 className="register__title">Регистрация в NurCRM</h2>
-        <form className="register__form" onSubmit={handleSubmit}>
-          {isAuthenticated && currentUser && (
-            <p className="register__message register__message--success">
-              Пользователь <b>{currentUser.email}</b> успешно зарегистрирован!
-            </p>
-          )}
-          {error && (
-            <p className="register__message register__message--error">
-              Ошибка регистрации: {JSON.stringify(error.detail)}
-            </p>
-          )}
+    <RegisterLayout
+      title="Регистрация в NurCRM"
+      subtitle="Заполните данные — аккаунт будет создан за пару минут"
+      footer={
+        <div className="register__footer">
+          Уже есть аккаунт?{" "}
+          <Link to="/login" className="register__link">
+            Войдите
+          </Link>
+        </div>
+      }
+    >
+      {isAuthenticated && currentUser && (
+        <p
+          className="register__message register__message--success"
+          role="status"
+        >
+          Пользователь <strong>{currentUser.email}</strong> успешно
+          зарегистрирован!
+        </p>
+      )}
+
+      {(formError || apiError) && (
+        <p className="register__message register__message--error" role="alert">
+          {formError || apiError}
+        </p>
+      )}
+
+      <form className="register__form" onSubmit={handleSubmit} noValidate>
+        <section className="register__section">
+          <h3 className="register__section-title">Личные данные</h3>
 
           <div className="register__field">
             <label className="register__label" htmlFor="email">
@@ -107,470 +254,169 @@ const Register = () => {
               type="email"
               id="email"
               name="email"
-              placeholder="Введите email"
+              placeholder="name@company.kg"
               value={formData.email}
               onChange={handleChange}
               required
+              autoComplete="email"
             />
           </div>
 
-          <div className="register__field">
-            <label className="register__label" htmlFor="first_name">
-              Имя
-            </label>
-            <input
-              className="register__input"
-              type="text"
-              id="first_name"
-              name="first_name"
-              placeholder="Введите имя"
-              value={formData.first_name}
-              onChange={handleChange}
-              required
-            />
+          <div className="register__row">
+            <div className="register__field">
+              <label className="register__label" htmlFor="first_name">
+                Имя
+              </label>
+              <input
+                className="register__input"
+                type="text"
+                id="first_name"
+                name="first_name"
+                placeholder="Имя"
+                value={formData.first_name}
+                onChange={handleChange}
+                required
+                autoComplete="given-name"
+              />
+            </div>
+
+            <div className="register__field">
+              <label className="register__label" htmlFor="last_name">
+                Фамилия
+              </label>
+              <input
+                className="register__input"
+                type="text"
+                id="last_name"
+                name="last_name"
+                placeholder="Фамилия"
+                value={formData.last_name}
+                onChange={handleChange}
+                required
+                autoComplete="family-name"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="register__section">
+          <h3 className="register__section-title">Компания</h3>
+
+          <div className="register__row">
+            <div className="register__field">
+              <label className="register__label" htmlFor="company_name">
+                Название компании
+              </label>
+              <input
+                className="register__input"
+                type="text"
+                id="company_name"
+                name="company_name"
+                placeholder="ОсОО «Пример»"
+                value={formData.company_name}
+                onChange={handleChange}
+                required
+                autoComplete="organization"
+              />
+            </div>
+
+            <div className="register__field">
+              <label className="register__label" htmlFor="company_region">
+                Регион <span className="register__optional">необязательно</span>
+              </label>
+              <select
+                className="register__select"
+                name="company_region"
+                id="company_region"
+                value={formData.company_region}
+                onChange={handleSelectChange}
+              >
+                <option value="">Не выбрано</option>
+                {COMPANY_REGIONS.map((region) => (
+                  <option key={region.value} value={region.value}>
+                    {region.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="register__field">
-            <label className="register__label" htmlFor="last_name">
-              Фамилия
-            </label>
-            <input
-              className="register__input"
-              type="text"
-              id="last_name"
-              name="last_name"
-              placeholder="Введите фамилию"
-              value={formData.last_name}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="register__field">
-            <label className="register__label" htmlFor="company_name">
-              Название компании
-            </label>
-            <input
-              className="register__input"
-              type="text"
-              id="company_name"
-              name="company_name"
-              placeholder="Название компании"
-              value={formData.company_name}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          {/* выбор сферы (industry), но отправляем sector */}
           <div className="register__field">
             <label className="register__label" htmlFor="industry_id">
-              Выберите сферу деятельности компании
+              Сфера деятельности
             </label>
             <select
+              className="register__select"
               name="industry_id"
               id="industry_id"
+              value={selectedIndustryId}
               onChange={handleIndustryChange}
-              defaultValue=""
+              required
             >
               <option value="" disabled>
-                Выберите сферу деятельности
+                Выберите сферу
               </option>
-              {industries.length
-                ? industries.map((industry) => (
-                    <option key={industry.id} value={industry.id}>
-                      {industry.name}
-                    </option>
-                  ))
-                : null}
+              {(industries || []).map((industry) => (
+                <option key={industry.id} value={industry.id}>
+                  {industry.name}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="register__field">
             <label className="register__label" htmlFor="subscription_plan_id">
-              Выберите тарифный план
+              Тарифный план
             </label>
             <select
+              className="register__select"
               name="subscription_plan_id"
-              value={formData.subscription_plan_id}
               id="subscription_plan_id"
+              value={formData.subscription_plan_id}
               onChange={handleSelectChange}
+              required
             >
               <option value="" disabled>
-                Выберите тарифный план
+                Выберите тариф
               </option>
-              {subscriptionPlans.length
-                ? subscriptionPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name}
-                    </option>
-                  ))
-                : null}
+              {(subscriptionPlans || []).map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
             </select>
           </div>
+        </section>
 
-          <div className="register__field">
-            <label className="register__label" htmlFor="password">
-              Пароль
-            </label>
-            <input
-              className="register__input"
-              type="password"
-              id="password"
-              name="password"
-              placeholder="Введите пароль"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength="8"
-            />
-          </div>
+        <section className="register__section">
+          <h3 className="register__section-title">Безопасность</h3>
 
-          <div className="register__field">
-            <label className="register__label" htmlFor="password2">
-              Повторите пароль
-            </label>
-            <input
-              className="register__input"
-              type="password"
-              id="password2"
-              name="password2"
-              placeholder="Повторите пароль"
-              value={formData.password2}
-              onChange={handleChange}
-              required
-              minLength="1"
-            />
-          </div>
+          <PasswordField
+            id="password"
+            label="Пароль"
+            value={formData.password}
+            onChange={handleChange}
+          />
 
+          <PasswordField
+            id="password2"
+            label="Повторите пароль"
+            value={formData.password2}
+            onChange={handleChange}
+            hint={passwordHint}
+            hintType={passwordHintType}
+            minLength={1}
+          />
+        </section>
+
+        <div className="register__actions">
           <button className="register__button" type="submit" disabled={loading}>
             {loading ? "Регистрация..." : "Зарегистрироваться"}
           </button>
-        </form>
-        <a href="/login" className="register__link">
-          Уже есть аккаунт? Войдите
-        </a>
-      </div>
-    </div>
+        </div>
+      </form>
+    </RegisterLayout>
   );
 };
 
 export default Register;
-
-// import React, { useState, useEffect } from "react";
-// import { useDispatch, useSelector } from "react-redux";
-// import {
-//   registerUserAsync,
-//   getIndustriesAsync,
-//   getSubscriptionPlansAsync,
-// } from "../../../store/creators/userCreators";
-// import { useNavigate } from "react-router-dom";
-// import "./Register.scss";
-// import { id } from "date-fns/locale";
-
-// const Register = () => {
-//   const dispatch = useDispatch();
-//   const navigate = useNavigate();
-//   const {
-//     loading,
-//     error,
-//     currentUser,
-//     isAuthenticated,
-//     industries,
-//     subscriptionPlans,
-//   } = useSelector((state) => state.user);
-
-//   const [hoveredIndustryId, setHoveredIndustryId] = useState(null);
-//   const [selectedSector, setSelectedSector] = useState(null);
-
-//   const handleSectorClick = (industryId, sectorId) => {
-//     setSelectedSector(sectorId);
-//     handleSelectChange({
-//       target: {
-//         name: "company_sector_id",
-//         value: sectorId,
-//       },
-//     });
-//   };
-
-//   useEffect(() => {
-//     dispatch(getIndustriesAsync());
-//     dispatch(getSubscriptionPlansAsync());
-//   }, [dispatch]);
-
-//   const [formData, setFormData] = useState({
-//     email: "",
-//     password: "",
-//     password2: "",
-//     first_name: "",
-//     last_name: "",
-//     // role: '',
-//     avatar: "",
-//     company_sector_id: "",
-//     subscription_plan_id: "",
-//     company_name: "",
-//   });
-
-//   // console.log("formData", formData);
-
-//   const handleSelectChange = (e) => {
-//     const { name, value } = e.target;
-//     setFormData((prevData) => ({
-//       ...prevData,
-//       [name]: value,
-//     }));
-//   };
-//   const firstSectorId = selectedIndustry?.sectors?.[0]?.id || "";
-
-//   const handleChange = (e) => {
-//     const { id, value } = e.target;
-//     console.log("id", id, "val", value);
-
-//     setFormData((prevData) => ({
-//       ...prevData,
-//       [id]: value,
-//     }));
-
-//     console.log(formData);
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-
-//     if (formData.password !== formData.password2) {
-//       alert("Пароли не совпадают!");
-//       return;
-//     }
-
-//     dispatch(registerUserAsync({ formData, navigate }));
-//   };
-//   console.log(industries);
-
-//   return (
-//     <div className="register">
-//       <div className="register__container">
-//         <h2 className="register__title">Регистрация в NurCRM</h2>
-//         <form className="register__form" onSubmit={handleSubmit}>
-//           {isAuthenticated && currentUser && (
-//             <p className="register__message register__message--success">
-//               Пользователь **{currentUser.email}** успешно зарегистрирован!
-//             </p>
-//           )}
-//           {error && (
-//             <p className="register__message register__message--error">
-//               Ошибка регистрации: {JSON.stringify(error.detail)}
-//             </p>
-//           )}
-
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="email">
-//               Email
-//             </label>
-//             <input
-//               className="register__input"
-//               type="email"
-//               id="email"
-//               name="email"
-//               placeholder="Введите email"
-//               value={formData.email}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div>
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="first_name">
-//               Имя
-//             </label>
-//             <input
-//               className="register__input"
-//               type="text"
-//               id="first_name"
-//               name="first_name"
-//               placeholder="Введите имя"
-//               value={formData.first_name}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div>
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="last_name">
-//               Фамилия
-//             </label>
-//             <input
-//               className="register__input"
-//               type="text"
-//               id="last_name"
-//               name="last_name"
-//               placeholder="Введите фамилию"
-//               value={formData.last_name}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div>
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="last_name">
-//               Название компаний
-//             </label>
-//             <input
-//               className="register__input"
-//               type="text"
-//               id="company_name"
-//               name="company_name"
-//               placeholder="Название компании"
-//               value={formData.company_name}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div>
-
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="company_sector_id">
-//               Выберите сферу деятельности компании
-//             </label>
-//             <select
-//               name="company_sector_id"
-//               value={formData.company_sector_id}
-//               id="company_sector_id"
-//               onChange={(e) => {
-//                 const industryId = e.target.value;
-//                 const selectedIndustry = industries.find(
-//                   (industry) => industry.id === industryId
-//                 );
-
-//                 const firstSectorId = selectedIndustry?.sectors?.[0]?.id || "";
-
-//                 setFormData((prevData) => ({
-//                   ...prevData,
-//                   company_sector_id: firstSectorId,
-//                 }));
-//               }}
-//             >
-//               <option value="" disabled>
-//                 Выберите сферу деятельности
-//               </option>
-//               {industries.length
-//                 ? industries.map((industry) => (
-//                     <option key={industry.id} value={industry.id}>
-//                       {industry.name}
-//                     </option>
-//                   ))
-//                 : null}
-//             </select>
-//           </div>
-
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="last_name">
-//               Выберите тарифный план
-//             </label>
-//             <select
-//               name="subscription_plan_id"
-//               value={formData.subscription_plan_id}
-//               id="subscription_plan_id"
-//               onChange={handleSelectChange}
-//             >
-//               <option value="" disabled>
-//                 Выберите тарифный план
-//               </option>
-//               {subscriptionPlans.length
-//                 ? subscriptionPlans.map((plan) => (
-//                     <option
-//                       key={plan.id}
-//                       id={"subscription_plan_id"}
-//                       value={plan.id}
-//                     >
-//                       {plan.name}
-//                     </option>
-//                   ))
-//                 : null}
-//             </select>
-//           </div>
-
-//           {/* <div className="register__field">
-//             <label className="register__label" htmlFor="company_industry">Отрасль компании</label>
-//             <input
-//               className="register__input"
-//               type="text"
-//               id="company_industry"
-//               name="company_industry"
-//               placeholder="Введите отрасль компании"
-//               value={formData.company_industry}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div> */}
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="password">
-//               Пароль
-//             </label>
-//             <input
-//               className="register__input"
-//               type="password"
-//               id="password"
-//               name="password"
-//               placeholder="Введите пароль"
-//               value={formData.password}
-//               onChange={handleChange}
-//               required
-//               minLength="8"
-//             />
-//           </div>
-//           <div className="register__field">
-//             <label className="register__label" htmlFor="password2">
-//               Повторите пароль
-//             </label>
-//             <input
-//               className="register__input"
-//               type="password"
-//               id="password2"
-//               name="password2"
-//               placeholder="Повторите пароль"
-//               value={formData.password2}
-//               onChange={handleChange}
-//               required
-//               minLength="1"
-//             />
-//           </div>
-//           {/* <div className="register__field">
-//             <label className="register__label" htmlFor="role">Роль</label>
-//             <select
-//               className="register__input"
-//               id="role"
-//               name="role"
-//               value={formData.role}
-//               onChange={handleChange}
-//               required
-//             >
-//               <option value="" disabled>Выберите роль</option>
-//               <option value="admin">Админ</option>
-//               <option value="manager">Менеджер</option>
-//               <option value="user">Пользователь</option>
-//             </select>
-//           </div> */}
-
-//           {/* <div className="register__field">
-//             <label className="register__label" htmlFor="avatar">Аватар (URL)</label>
-//             <input
-//               className="register__input"
-//               type="url"
-//               id="avatar"
-//               name="avatar"
-//               placeholder="Введите URL аватара"
-//               value={formData.avatar}
-//               onChange={handleChange}
-//               maxLength="200"
-//             />
-//           </div> */}
-
-//           <button className="register__button" type="submit" disabled={loading}>
-//             {loading ? "Регистрация..." : "Зарегистрироваться"}
-//           </button>
-//         </form>
-//         <a href="/login" className="register__link">
-//           Уже есть аккаунт? Войдите
-//         </a>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Register;

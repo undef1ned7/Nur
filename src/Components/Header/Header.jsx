@@ -15,6 +15,7 @@ const pageTitles = {
   "/": "Главная",
   "/login": "Вход",
   "/register": "Регистрация",
+  "/register-access/settings": "Пароль регистрации",
   "/submit-application": "Заявка",
   "/get-application-list": "Заявки",
 

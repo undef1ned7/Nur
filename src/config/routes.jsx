@@ -4,7 +4,8 @@ import { useUser } from "../store/slices/userSlice";
 
 // Public routes
 import Login from "../Components/Auth/Login/Login";
-import Register from "../Components/Auth/Register/Register";
+import RegisterGate from "../Components/Auth/Register/RegisterGate";
+import RegisterAccessSettings from "../Components/Auth/Register/RegisterAccessSettings";
 import Landing from "../Components/pages/Landing/Landing";
 import SubmitApplication from "../Components/pages/SubmitApplication/SubmitApplication";
 import ApplicationList from "../Components/pages/SubmitApplication/ApplicationList";
@@ -421,7 +422,12 @@ export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/old-landing" path="/old-landing" element={<Landing />} />,
   <Route key="/" path="/" element={<NewLanding />} />,
-  <Route key="/register" path="/register" element={<Register />} />,
+  <Route key="/register" path="/register" element={<RegisterGate />} />,
+  <Route
+    key="/register-access/settings"
+    path="/register-access/settings"
+    element={<RegisterAccessSettings />}
+  />,
   <Route
     key="/video-lessons"
     path="/video-lessons"
