@@ -1378,6 +1378,216 @@
     border-radius: 12px;
     border-color: var(--costing-border);
   }
+
+  &__techcards-picker {
+    width: min(980px, calc(100vw - 28px));
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  &__techcards-picker-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  &__techcards-picker .cafe-costing-page__modal-head,
+  &__techcards-picker .cafe-costing-page__modal-actions {
+    flex-shrink: 0;
+  }
+
+  &__techcards-picker-search {
+    flex: 1 1 220px;
+    min-width: 200px;
+  }
+
+  &__techcards-picker-category {
+    flex: 0 1 200px;
+    min-width: 160px;
+  }
+
+  &__techcards-picker-select-all {
+    flex-shrink: 0;
+  }
+
+  &__techcards-picker-count {
+    margin-left: auto;
+    color: var(--costing-muted);
+    font-size: 13px;
+
+    strong {
+      color: var(--costing-text);
+    }
+  }
+
+  &__techcards-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-auto-rows: 228px;
+    align-content: start;
+    gap: 12px;
+    height: min(52vh, 480px);
+    min-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px;
+  }
+
+  &__techcards-picker-skeleton {
+    height: 228px;
+    min-height: 228px;
+    border-radius: 16px;
+  }
+
+  &__techcards-picker-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 28px 16px;
+  }
+
+  &__techcards-picker-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 228px;
+    min-height: 228px;
+    max-height: 228px;
+    border: 1px solid var(--costing-border);
+    border-radius: 16px;
+    background: #fff;
+    overflow: hidden;
+    transition:
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+
+    &--selected {
+      border-color: rgba(212, 184, 0, 0.65);
+      box-shadow: 0 8px 24px rgba(247, 215, 79, 0.18);
+    }
+  }
+
+  &__techcards-picker-check {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--costing-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--costing-muted);
+    cursor: pointer;
+
+    &--on {
+      border-color: rgba(212, 184, 0, 0.55);
+      background: rgba(247, 215, 79, 0.22);
+      color: #111827;
+    }
+
+    &:hover {
+      color: #111827;
+      border-color: rgba(17, 24, 39, 0.2);
+    }
+  }
+
+  &__techcards-picker-card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  &__techcards-picker-media {
+    flex: 0 0 128px;
+    height: 128px;
+    min-height: 128px;
+    max-height: 128px;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    span {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--costing-muted);
+    }
+  }
+
+  &__techcards-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--costing-border);
+    color: var(--costing-muted);
+    font-size: 13px;
+  }
+
+  &__techcards-picker-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 4px;
+    padding: 10px 12px 12px;
+    overflow: hidden;
+
+    strong {
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--costing-text);
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--costing-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    small {
+      font-size: 11px;
+      color: var(--costing-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
 }
 
 @keyframes cafe-costing-skeleton {

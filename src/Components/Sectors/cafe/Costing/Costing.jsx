@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Boxes,
@@ -15,6 +15,8 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import TechCardsPickerModal from "./TechCardsPickerModal";
 import {
   Document,
   Page,
@@ -23,7 +25,7 @@ import {
   View,
   pdf,
 } from "@react-pdf/renderer";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
@@ -98,8 +100,14 @@ const formatUnit = (value) => {
   if (!raw) return "—";
   return unitLabels[raw.toLowerCase()] || raw;
 };
-const ingredientTypeLabel = (value) =>
-  value === "preparation" ? "Заготовка" : "Товар";
+const isNewIngredientSchema = (row) =>
+  row?.ingredient_type === "product" || row?.ingredient_type === "preparation";
+
+const ingredientTypeLabel = (value, row) => {
+  if (row && !isNewIngredientSchema(row)) return "Товар";
+  return value === "preparation" ? "Заготовка" : "Товар";
+};
+
 const getIngredientName = (row) =>
   row?.product_title ||
   row?.product_name ||
@@ -107,6 +115,30 @@ const getIngredientName = (row) =>
   row?.preparation_title ||
   row?.name ||
   "Ингредиент";
+
+const getMenuItemListCost = (item) => {
+  if (!item) return null;
+  return {
+    cost_price: item?.cost_price,
+    margin_amount: item?.margin_amount,
+    margin_percent: item?.margin_percent_value ?? item?.margin_percent,
+    sale_price: item?.price,
+  };
+};
+
+const getTechCardCostForDisplay = (item, costsMap = {}) => {
+  const id = String(item?.id || "");
+  const exported = costsMap[id];
+  if (
+    exported &&
+    (exported.cost_price !== undefined ||
+      exported.sale_price !== undefined ||
+      exported.margin_amount !== undefined)
+  ) {
+    return exported;
+  }
+  return getMenuItemListCost(item) || {};
+};
 const normalizeIngredientRows = (rows) =>
   (Array.isArray(rows) ? rows : []).map((row) => {
     const processings = Array.isArray(row?.processings) ? row.processings : [];
@@ -133,13 +165,17 @@ const getIngredientRowsFromDetail = (detail, fallbackRows = []) => {
   return normalizeIngredientRows(rows);
 };
 const formatIngredientQuantity = (row) => {
-  const quantity = formatNumber(row?.quantity);
-  const unit = formatUnit(row?.unit);
+  const quantity = formatNumber(row?.quantity ?? row?.amount);
+  const unit = formatUnit(row?.unit || row?.product_unit);
   if (quantity === "—") return unit;
   return unit === "—" ? String(quantity) : `${quantity} ${unit}`;
 };
 const getIngredientCost = (row) =>
-  coalesceNumber(row?.total_cost, row?.ingredient_cost);
+  coalesceNumber(
+    row?.total_cost,
+    row?.ingredient_cost,
+    row?.cost_price_rub,
+  );
 const getProcessingCost = (row) => coalesceNumber(row?.processing_cost);
 const getProcessingLabel = (row) => {
   const items = Array.isArray(row?.processing_items) ? row.processing_items : [];
@@ -166,6 +202,10 @@ const getTotalWeightLabel = (rows) => {
   }, 0);
   return grams > 0 ? `${formatNumber(grams, 0)} г` : "—";
 };
+const TECHCARD_PICKER_SEARCH_PARAM = "techcard_q";
+const TECHCARD_PICKER_CATEGORY_PARAM = "techcard_category";
+const TECHCARD_LIST_PAGE_PARAM = "techcard_page";
+
 const buildTechCardPdfData = ({ detail, cost, rows }) => {
   const ingredients = normalizeIngredientRows(rows);
   const rowsCost = ingredients.reduce((sum, row) => {
@@ -200,6 +240,50 @@ const buildTechCardPdfData = ({ detail, cost, rows }) => {
       margin_percent: marginPercent,
     },
   };
+};
+
+const techCardItemsFromResponse = (data) => {
+  if (Array.isArray(data?.items)) return data.items;
+  return listFrom({ data: data?.results || data });
+};
+
+const normalizeTechCardBulkItem = (item) => {
+  const id = String(item?.id || "").trim();
+  if (!id) return null;
+  const ingredients = normalizeIngredientRows(
+    getIngredientRowsFromDetail(item, item?.ingredients),
+  );
+  const detail = { ...item, ingredients };
+  const cost = item?.cost ?? null;
+  const listRow = {
+    id,
+    title: detail.title || detail.name || "Блюдо",
+    name: detail.name,
+    price: detail.price,
+    category: detail.category_id ?? detail.category,
+    category_id: detail.category_id ?? detail.category,
+    category_title: detail.category_title || detail.category_name || "",
+    image_url: detail.image_url || detail.image || "",
+    image: detail.image,
+    is_active: detail.is_active,
+    ingredients,
+  };
+  return { id, detail, cost, listRow };
+};
+
+const mapExportItemToPdfData = (item) => {
+  const normalized = normalizeTechCardBulkItem(item);
+  if (!normalized) {
+    const detail = item?.menu_item || item?.dish || item;
+    const cost = item?.cost || {};
+    const rows = getIngredientRowsFromDetail(detail, item?.ingredients);
+    return buildTechCardPdfData({ detail, cost, rows });
+  }
+  return buildTechCardPdfData({
+    detail: normalized.detail,
+    cost: normalized.cost,
+    rows: normalized.detail.ingredients,
+  });
 };
 
 const techCardPdfStyles = StyleSheet.create({
@@ -351,167 +435,181 @@ const techCardPdfStyles = StyleSheet.create({
   },
 });
 
-function TechCardPdfDocument({ data }) {
+function TechCardPdfPage({ data, generatedAt }) {
   const rows = Array.isArray(data?.ingredients) ? data.ingredients : [];
-  const generatedAt = new Intl.DateTimeFormat("ru-RU").format(new Date());
   return (
-    <Document>
-      <Page size="A4" style={techCardPdfStyles.page}>
-        <View style={techCardPdfStyles.header}>
-          <Text style={techCardPdfStyles.eyebrow}>NUR CRM · Кафе</Text>
-          <Text style={techCardPdfStyles.title}>Технологическая карта блюда</Text>
-          <Text style={techCardPdfStyles.subtitle}>
-            Автоматически сформирована из текущей техкарты: состав, граммовки,
-            себестоимость, цена продажи и маржа.
-          </Text>
-        </View>
+    <Page size="A4" style={techCardPdfStyles.page}>
+      <View style={techCardPdfStyles.header}>
+        <Text style={techCardPdfStyles.eyebrow}>NUR CRM · Кафе</Text>
+        <Text style={techCardPdfStyles.title}>Технологическая карта блюда</Text>
+        <Text style={techCardPdfStyles.subtitle}>
+          Автоматически сформирована из текущей техкарты: состав, граммовки,
+          себестоимость, цена продажи и маржа.
+        </Text>
+      </View>
 
-        <View style={techCardPdfStyles.dishCard}>
-          <Text style={techCardPdfStyles.dishLabel}>Блюдо</Text>
-          <Text style={techCardPdfStyles.dishTitle}>{data?.title || "Блюдо"}</Text>
-          <View style={techCardPdfStyles.metaRow}>
-            <Text style={techCardPdfStyles.metaItem}>
-              Категория: {data?.category || "—"}
-            </Text>
-            <Text style={techCardPdfStyles.metaItem}>
-              Кухня: {data?.kitchen || "—"}
-            </Text>
-            <Text style={techCardPdfStyles.metaItem}>
-              Статус: {data?.status || "—"}
-            </Text>
-            <Text style={techCardPdfStyles.metaItem}>Дата: {generatedAt}</Text>
+      <View style={techCardPdfStyles.dishCard}>
+        <Text style={techCardPdfStyles.dishLabel}>Блюдо</Text>
+        <Text style={techCardPdfStyles.dishTitle}>{data?.title || "Блюдо"}</Text>
+        <View style={techCardPdfStyles.metaRow}>
+          <Text style={techCardPdfStyles.metaItem}>Категория: {data?.category || "—"}</Text>
+          <Text style={techCardPdfStyles.metaItem}>Кухня: {data?.kitchen || "—"}</Text>
+          <Text style={techCardPdfStyles.metaItem}>Статус: {data?.status || "—"}</Text>
+          <Text style={techCardPdfStyles.metaItem}>Дата: {generatedAt}</Text>
+        </View>
+      </View>
+
+      <View style={techCardPdfStyles.summary}>
+        {[
+          ["Ингредиенты", formatNumber(rows.length, 0)],
+          ["Граммовка", data?.totalWeight || "—"],
+          ["Себестоимость", formatMoney(data?.cost?.cost_price)],
+          ["Цена продажи", formatMoney(data?.cost?.sale_price)],
+          ["Маржа", formatMoney(data?.cost?.margin_amount)],
+          ["Маржа %", formatPercent(data?.cost?.margin_percent)],
+        ].map(([label, value]) => (
+          <View key={label} style={techCardPdfStyles.summaryItem}>
+            <Text style={techCardPdfStyles.summaryLabel}>{label}</Text>
+            <Text style={techCardPdfStyles.summaryValue}>{value}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={techCardPdfStyles.sectionTitle}>Состав блюда</Text>
+      <View style={techCardPdfStyles.table}>
+        <View style={[techCardPdfStyles.row, techCardPdfStyles.headerRow]}>
+          <View style={[techCardPdfStyles.cell, techCardPdfStyles.typeCell]}>
+            <Text style={techCardPdfStyles.headerText}>Тип</Text>
+          </View>
+          <View style={[techCardPdfStyles.cell, techCardPdfStyles.ingredientCell]}>
+            <Text style={techCardPdfStyles.headerText}>Ингредиент</Text>
+          </View>
+          <View style={[techCardPdfStyles.cell, techCardPdfStyles.qtyCell]}>
+            <Text style={techCardPdfStyles.headerText}>Граммовка</Text>
+          </View>
+          <View style={[techCardPdfStyles.cell, techCardPdfStyles.unitCostCell]}>
+            <Text style={techCardPdfStyles.headerText}>Себест. ед.</Text>
+          </View>
+          <View style={[techCardPdfStyles.cell, techCardPdfStyles.processingCell]}>
+            <Text style={techCardPdfStyles.headerText}>Обработки</Text>
+          </View>
+          <View
+            style={[
+              techCardPdfStyles.cell,
+              techCardPdfStyles.totalCell,
+              techCardPdfStyles.lastCell,
+            ]}
+          >
+            <Text style={techCardPdfStyles.headerText}>Итог</Text>
           </View>
         </View>
 
-        <View style={techCardPdfStyles.summary}>
-          {[
-            ["Ингредиенты", formatNumber(rows.length, 0)],
-            ["Граммовка", data?.totalWeight || "—"],
-            ["Себестоимость", formatMoney(data?.cost?.cost_price)],
-            ["Цена продажи", formatMoney(data?.cost?.sale_price)],
-            ["Маржа", formatMoney(data?.cost?.margin_amount)],
-            ["Маржа %", formatPercent(data?.cost?.margin_percent)],
-          ].map(([label, value]) => (
-            <View key={label} style={techCardPdfStyles.summaryItem}>
-              <Text style={techCardPdfStyles.summaryLabel}>{label}</Text>
-              <Text style={techCardPdfStyles.summaryValue}>{value}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={techCardPdfStyles.sectionTitle}>Состав блюда</Text>
-        <View style={techCardPdfStyles.table}>
-          <View style={[techCardPdfStyles.row, techCardPdfStyles.headerRow]}>
-            <View style={[techCardPdfStyles.cell, techCardPdfStyles.typeCell]}>
-              <Text style={techCardPdfStyles.headerText}>Тип</Text>
-            </View>
-            <View style={[techCardPdfStyles.cell, techCardPdfStyles.ingredientCell]}>
-              <Text style={techCardPdfStyles.headerText}>Ингредиент</Text>
-            </View>
-            <View style={[techCardPdfStyles.cell, techCardPdfStyles.qtyCell]}>
-              <Text style={techCardPdfStyles.headerText}>Граммовка</Text>
-            </View>
-            <View style={[techCardPdfStyles.cell, techCardPdfStyles.unitCostCell]}>
-              <Text style={techCardPdfStyles.headerText}>Себест. ед.</Text>
-            </View>
-            <View style={[techCardPdfStyles.cell, techCardPdfStyles.processingCell]}>
-              <Text style={techCardPdfStyles.headerText}>Обработки</Text>
-            </View>
+        {rows.length === 0 ? (
+          <View style={[techCardPdfStyles.row, { borderBottomWidth: 0 }]}>
             <View
               style={[
                 techCardPdfStyles.cell,
-                techCardPdfStyles.totalCell,
                 techCardPdfStyles.lastCell,
+                { width: "100%" },
               ]}
             >
-              <Text style={techCardPdfStyles.headerText}>Итог</Text>
-            </View>
-          </View>
-          {rows.length === 0 ? (
-            <View style={[techCardPdfStyles.row, { borderBottomWidth: 0 }]}>
-              <View
-                style={[
-                  techCardPdfStyles.cell,
-                  techCardPdfStyles.lastCell,
-                  { width: "100%" },
-                ]}
-              >
-                <Text style={techCardPdfStyles.mutedText}>
-                  Ингредиенты пока не добавлены
-                </Text>
-              </View>
-            </View>
-          ) : (
-            rows.map((row, idx) => (
-              <View
-                key={`${row?.id || "ingredient"}-${idx}`}
-                style={[
-                  techCardPdfStyles.row,
-                  idx === rows.length - 1 ? { borderBottomWidth: 0 } : {},
-                ]}
-                wrap={false}
-              >
-                <View style={[techCardPdfStyles.cell, techCardPdfStyles.typeCell]}>
-                  <Text>{ingredientTypeLabel(row?.ingredient_type)}</Text>
-                </View>
-                <View
-                  style={[techCardPdfStyles.cell, techCardPdfStyles.ingredientCell]}
-                >
-                  <Text>{getIngredientName(row)}</Text>
-                </View>
-                <View style={[techCardPdfStyles.cell, techCardPdfStyles.qtyCell]}>
-                  <Text>{formatIngredientQuantity(row)}</Text>
-                </View>
-                <View
-                  style={[techCardPdfStyles.cell, techCardPdfStyles.unitCostCell]}
-                >
-                  <Text>{formatMoney(row?.unit_cost)}</Text>
-                </View>
-                <View
-                  style={[techCardPdfStyles.cell, techCardPdfStyles.processingCell]}
-                >
-                  <Text>{getProcessingLabel(row)}</Text>
-                </View>
-                <View
-                  style={[
-                    techCardPdfStyles.cell,
-                    techCardPdfStyles.totalCell,
-                    techCardPdfStyles.lastCell,
-                  ]}
-                >
-                  <Text>{formatMoney(getIngredientCost(row))}</Text>
-                </View>
-              </View>
-            ))
-          )}
-          <View style={[techCardPdfStyles.row, techCardPdfStyles.totalRow]}>
-            <View
-              style={[
-                techCardPdfStyles.cell,
-                techCardPdfStyles.ingredientCell,
-                { width: "65%" },
-              ]}
-            >
-              <Text style={techCardPdfStyles.totalText}>Итого себестоимость</Text>
-            </View>
-            <View
-              style={[
-                techCardPdfStyles.cell,
-                techCardPdfStyles.totalCell,
-                techCardPdfStyles.lastCell,
-                { width: "35%" },
-              ]}
-            >
-              <Text style={techCardPdfStyles.totalText}>
-                {formatMoney(data?.cost?.cost_price)}
+              <Text style={techCardPdfStyles.mutedText}>
+                Ингредиенты пока не добавлены
               </Text>
             </View>
           </View>
+        ) : (
+          rows.map((row, idx) => (
+            <View
+              key={`${row?.id || "ingredient"}-${idx}`}
+              style={[
+                techCardPdfStyles.row,
+                idx === rows.length - 1 ? { borderBottomWidth: 0 } : {},
+              ]}
+              wrap={false}
+            >
+              <View style={[techCardPdfStyles.cell, techCardPdfStyles.typeCell]}>
+                <Text>{ingredientTypeLabel(row?.ingredient_type, row)}</Text>
+              </View>
+              <View style={[techCardPdfStyles.cell, techCardPdfStyles.ingredientCell]}>
+                <Text>{getIngredientName(row)}</Text>
+              </View>
+              <View style={[techCardPdfStyles.cell, techCardPdfStyles.qtyCell]}>
+                <Text>{formatIngredientQuantity(row)}</Text>
+              </View>
+              <View style={[techCardPdfStyles.cell, techCardPdfStyles.unitCostCell]}>
+                <Text>{formatMoney(row?.unit_cost)}</Text>
+              </View>
+              <View style={[techCardPdfStyles.cell, techCardPdfStyles.processingCell]}>
+                <Text>{getProcessingLabel(row)}</Text>
+              </View>
+              <View
+                style={[
+                  techCardPdfStyles.cell,
+                  techCardPdfStyles.totalCell,
+                  techCardPdfStyles.lastCell,
+                ]}
+              >
+                <Text>{formatMoney(getIngredientCost(row))}</Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        <View style={[techCardPdfStyles.row, techCardPdfStyles.totalRow]}>
+          <View
+            style={[
+              techCardPdfStyles.cell,
+              techCardPdfStyles.ingredientCell,
+              { width: "65%" },
+            ]}
+          >
+            <Text style={techCardPdfStyles.totalText}>Итого себестоимость</Text>
+          </View>
+          <View
+            style={[
+              techCardPdfStyles.cell,
+              techCardPdfStyles.totalCell,
+              techCardPdfStyles.lastCell,
+              { width: "35%" },
+            ]}
+          >
+            <Text style={techCardPdfStyles.totalText}>
+              {formatMoney(data?.cost?.cost_price)}
+            </Text>
+          </View>
         </View>
-        <Text style={techCardPdfStyles.footer}>
-          Документ создан при скачивании PDF и отражает актуальные данные блюда,
-          ингредиентов, граммовок и маржи.
-        </Text>
-      </Page>
+      </View>
+
+      <Text style={techCardPdfStyles.footer}>
+        Документ создан при скачивании PDF и отражает актуальные данные блюда,
+        ингредиентов, граммовок и маржи.
+      </Text>
+    </Page>
+  );
+}
+
+function TechCardPdfDocument({ data }) {
+  const generatedAt = new Intl.DateTimeFormat("ru-RU").format(new Date());
+  return (
+    <Document>
+      <TechCardPdfPage data={data} generatedAt={generatedAt} />
+    </Document>
+  );
+}
+
+function TechCardsPdfDocument({ items = [] }) {
+  const generatedAt = new Intl.DateTimeFormat("ru-RU").format(new Date());
+  const list = Array.isArray(items) ? items : [];
+  return (
+    <Document>
+      {list.map((data, idx) => (
+        <TechCardPdfPage
+          key={`${data?.id || "dish"}-${idx}`}
+          data={data}
+          generatedAt={generatedAt}
+        />
+      ))}
     </Document>
   );
 }
@@ -552,6 +650,7 @@ const emptyPreviewIngredient = {
 export default function CafeCosting() {
   const navigate = useNavigate();
   const { preparationId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const alert = useAlert();
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
@@ -577,6 +676,22 @@ export default function CafeCosting() {
     unit: "g",
   });
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [pdfAllDownloading, setPdfAllDownloading] = useState(false);
+  const [menuCategories, setMenuCategories] = useState([]);
+  const [techCardsPickerOpen, setTechCardsPickerOpen] = useState(false);
+  const [techCardsPickerSelectedIds, setTechCardsPickerSelectedIds] = useState(
+    () => new Set(),
+  );
+  const [pickerMenuItems, setPickerMenuItems] = useState([]);
+  const [pickerMenuItemsLoading, setPickerMenuItemsLoading] = useState(false);
+  const [pickerCategoryFilter, setPickerCategoryFilter] = useState("");
+  const debouncedPickerCategoryFilter = useDebouncedValue(pickerCategoryFilter, 300);
+  const techCardsMenuRequestIdRef = useRef(0);
+  const pickerMenuRequestIdRef = useRef(0);
+  const prevTechCardSearchRef = useRef("");
+  const [techCardsListCount, setTechCardsListCount] = useState(0);
+  const [techCardsListNext, setTechCardsListNext] = useState(null);
+  const [techCardsListPrevious, setTechCardsListPrevious] = useState(null);
   const [ingredientForm, setIngredientForm] = useState({
     ingredient_type: "product",
     product: "",
@@ -618,79 +733,251 @@ export default function CafeCosting() {
     ingredients: [emptyPreviewIngredient],
   });
   const [previewResult, setPreviewResult] = useState(null);
-  const [activeTab, setActiveTab] = useState("preparations");
+  const activeTab = useMemo(() => {
+    const raw = String(searchParams.get("tab") || "").trim().toLowerCase();
+    return raw === "techcards" || raw === "preview" || raw === "preparations"
+      ? raw
+      : "preparations";
+  }, [searchParams]);
+  const setActiveTab = useCallback(
+    (tab) => {
+      const next = String(tab || "").trim();
+      setSearchParams(
+        (prev) => {
+          const sp = new URLSearchParams(prev);
+          if (next) sp.set("tab", next);
+          else sp.delete("tab");
+          return sp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [preparationsViewMode, setPreparationsViewMode] = useState("cards");
   const [preparationSearch, setPreparationSearch] = useState("");
 
-  const loadTechCardData = async (rows) => {
-    const list = Array.isArray(rows) ? rows : [];
-    const pairs = await Promise.allSettled(
-      list.map(async (item) => {
-        const id = String(item?.id || "");
-        if (!id) return null;
-        const [detailRes, costRes] = await Promise.allSettled([
-          api.get(`/cafe/menu-items/${encodeURIComponent(id)}/`),
-          api.get(`/cafe/dishes/${encodeURIComponent(id)}/cost/`),
-        ]);
-        return {
-          id,
-          detail:
-            detailRes.status === "fulfilled"
-              ? {
-                  ...(detailRes.value?.data || {}),
-                  ingredients: getIngredientRowsFromDetail(detailRes.value?.data || {}),
-                }
-              : null,
-          cost: costRes.status === "fulfilled" ? costRes.value?.data || null : null,
-        };
-      }),
-    );
-    const nextDetails = {};
-    const nextCosts = {};
-    pairs.forEach((result) => {
-      if (result.status !== "fulfilled" || !result.value?.id) return;
-      nextDetails[result.value.id] = result.value.detail;
-      nextCosts[result.value.id] = result.value.cost;
+  const techCardPickerSearch = String(
+    searchParams.get(TECHCARD_PICKER_SEARCH_PARAM) || "",
+  );
+  const debouncedTechCardPickerSearch = useDebouncedValue(techCardPickerSearch, 400);
+  const techCardPickerCategory = String(
+    searchParams.get(TECHCARD_PICKER_CATEGORY_PARAM) || "",
+  );
+  const techCardListPage = useMemo(() => {
+    const page = parseInt(searchParams.get(TECHCARD_LIST_PAGE_PARAM) || "1", 10);
+    return Number.isFinite(page) && page > 0 ? page : 1;
+  }, [searchParams]);
+  const debouncedPreparationSearch = useDebouncedValue(preparationSearch, 400);
+
+  const setTechCardPickerSearch = useCallback(
+    (value) => {
+      setSearchParams(
+        (prev) => {
+          const sp = new URLSearchParams(prev);
+          const next = String(value || "").trim();
+          if (next) sp.set(TECHCARD_PICKER_SEARCH_PARAM, next);
+          else sp.delete(TECHCARD_PICKER_SEARCH_PARAM);
+          return sp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setTechCardPickerCategory = useCallback(
+    (value) => {
+      setSearchParams(
+        (prev) => {
+          const sp = new URLSearchParams(prev);
+          const next = String(value || "").trim();
+          if (next) sp.set(TECHCARD_PICKER_CATEGORY_PARAM, next);
+          else sp.delete(TECHCARD_PICKER_CATEGORY_PARAM);
+          return sp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const applyTechCardsFromItems = useCallback((items, { replace = true } = {}) => {
+    const list = [];
+    const details = {};
+    const costs = {};
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const normalized = normalizeTechCardBulkItem(item);
+      if (!normalized) return;
+      list.push(normalized.listRow);
+      details[normalized.id] = normalized.detail;
+      costs[normalized.id] = normalized.cost;
     });
-    setTechCardDetails(nextDetails);
-    setTechCardCosts(nextCosts);
-  };
+
+    if (replace) {
+      setTechCards(list);
+      setTechCardDetails(details);
+      setTechCardCosts(costs);
+      return;
+    }
+
+    setTechCards((prev) => {
+      const map = new Map(prev.map((row) => [String(row?.id || ""), row]));
+      list.forEach((row) => map.set(String(row.id), row));
+      return [...map.values()];
+    });
+    setTechCardDetails((prev) => ({ ...prev, ...details }));
+    setTechCardCosts((prev) => ({ ...prev, ...costs }));
+  }, []);
+
+  const fetchMenuItemsList = useCallback(
+    async ({ page = 1, search = "", category = "", signal } = {}) => {
+      const { data } = await api.get("/cafe/menu-items/", {
+        params: {
+          page,
+          search: search || "",
+          ...(category ? { category } : {}),
+        },
+        signal,
+      });
+      const payload = data || {};
+      const results = Array.isArray(payload?.results)
+        ? payload.results
+        : listFrom({ data: payload?.results || payload });
+      return {
+        results,
+        count: payload?.count ?? results.length,
+        next: payload?.next ?? null,
+        previous: payload?.previous ?? null,
+      };
+    },
+    [],
+  );
+
+  const syncMenuItemsToTechCards = useCallback((rows, { replace = true } = {}) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const details = {};
+    const costs = {};
+    list.forEach((item) => {
+      const id = String(item?.id || "");
+      if (!id) return;
+      details[id] = {
+        ...item,
+        ingredients: normalizeIngredientRows(getIngredientRowsFromDetail(item)),
+      };
+      costs[id] = getMenuItemListCost(item);
+    });
+
+    if (replace) {
+      setTechCards(list);
+      setTechCardDetails(details);
+      setTechCardCosts(costs);
+      return;
+    }
+
+    setTechCards((prev) => {
+      const map = new Map(prev.map((row) => [String(row?.id || ""), row]));
+      list.forEach((row) => {
+        const id = String(row?.id || "");
+        if (id) map.set(id, row);
+      });
+      return [...map.values()];
+    });
+    setTechCardDetails((prev) => ({ ...prev, ...details }));
+  }, []);
+
+  const fetchTechCardsBulk = useCallback(
+    async ({ dishIds, isAll = false, search = "", categoryId = "" } = {}) => {
+      if (!isAll && (!Array.isArray(dishIds) || dishIds.length === 0)) {
+        return [];
+      }
+      const { data } = await api.post("/cafe/tech-cards/export/", {
+        dish_ids: isAll ? [] : dishIds,
+        is_all: Boolean(isAll),
+        search: isAll ? search || "" : undefined,
+        category_id: isAll ? categoryId || null : undefined,
+      });
+      return techCardItemsFromResponse(data);
+    },
+    [],
+  );
+
+  const refreshTechCardById = useCallback(
+    async (id) => {
+      const techCardId = String(id || dishId || "").trim();
+      if (!techCardId) return null;
+      const items = await fetchTechCardsBulk({ dishIds: [techCardId] });
+      if (!items.length) return null;
+      applyTechCardsFromItems(items, { replace: false });
+      const normalized = normalizeTechCardBulkItem(items[0]);
+      if (!normalized) return null;
+      setDishId(techCardId);
+      setDishCost(normalized.cost);
+      setDishIngredients(normalized.detail.ingredients || []);
+      return normalized;
+    },
+    [applyTechCardsFromItems, dishId, fetchTechCardsBulk],
+  );
 
   const loadTechCardDetail = async (id) => {
     const techCardId = String(id || "").trim();
     if (!techCardId) return null;
-    const [detailRes, costRes] = await Promise.allSettled([
-      api.get(`/cafe/menu-items/${encodeURIComponent(techCardId)}/`),
-      api.get(`/cafe/dishes/${encodeURIComponent(techCardId)}/cost/`),
-    ]);
-    const detail =
-      detailRes.status === "fulfilled" ? detailRes.value?.data || null : null;
-    const cost = costRes.status === "fulfilled" ? costRes.value?.data || null : null;
-    const ingredients = getIngredientRowsFromDetail(detail);
-    const normalizedDetail = detail ? { ...detail, ingredients } : detail;
-    setTechCardDetails((prev) => ({ ...prev, [techCardId]: normalizedDetail }));
-    setTechCardCosts((prev) => ({ ...prev, [techCardId]: cost }));
-    setDishId(techCardId);
-    setDishCost(cost);
-    setDishIngredients(ingredients);
-    return { detail: normalizedDetail, cost };
+    const refreshed = await refreshTechCardById(techCardId);
+    if (!refreshed) return null;
+    return { detail: refreshed.detail, cost: refreshed.cost };
   };
+
+  const loadTechCardsMenuList = useCallback(
+    async ({ page = 1, search = "", category = "", signal } = {}) => {
+      const requestId = ++techCardsMenuRequestIdRef.current;
+      const { results, count, next, previous } = await fetchMenuItemsList({
+        page,
+        search,
+        category,
+        signal,
+      });
+      if (requestId !== techCardsMenuRequestIdRef.current) return results;
+      syncMenuItemsToTechCards(results);
+      setTechCardsListCount(count);
+      setTechCardsListNext(next);
+      setTechCardsListPrevious(previous);
+      return results;
+    },
+    [fetchMenuItemsList, syncMenuItemsToTechCards],
+  );
+
+  const setTechCardListPage = useCallback(
+    (page) => {
+      const nextPage = Math.max(1, Number(page) || 1);
+      setSearchParams(
+        (prev) => {
+          const sp = new URLSearchParams(prev);
+          if (nextPage > 1) sp.set(TECHCARD_LIST_PAGE_PARAM, String(nextPage));
+          else sp.delete(TECHCARD_LIST_PAGE_PARAM);
+          return sp;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const loadAll = async () => {
     try {
       setLoading(true);
-      const [productsRes, prepRes, procRes, menuRes] = await Promise.all([
+      const [productsRes, prepRes, procRes, categoriesRes] = await Promise.all([
         api.get("/cafe/warehouse/"),
         api.get("/cafe/preparations/"),
         api.get("/cafe/processing-types/"),
-        api.get("/cafe/menu-items/", { params: { page_size: 100 } }),
+        api.get("/cafe/categories/"),
       ]);
-      const menuRows = Array.isArray(listFrom(menuRes)) ? listFrom(menuRes) : [];
       setWarehouseProducts(Array.isArray(listFrom(productsRes)) ? listFrom(productsRes) : []);
       setPreparations(Array.isArray(listFrom(prepRes)) ? listFrom(prepRes) : []);
       setProcessingTypes(Array.isArray(listFrom(procRes)) ? listFrom(procRes) : []);
-      setTechCards(menuRows);
-      await loadTechCardData(menuRows);
+      setMenuCategories(
+        Array.isArray(listFrom(categoriesRes)) ? listFrom(categoriesRes) : [],
+      );
+      await loadTechCardsMenuList({ page: techCardListPage, search: "" });
     } catch (error) {
       alert(validateResErrors(error, "Ошибка загрузки данных себестоимости"), true);
     } finally {
@@ -701,6 +988,75 @@ export default function CafeCosting() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "techcards") return undefined;
+
+    if (prevTechCardSearchRef.current !== debouncedPreparationSearch) {
+      prevTechCardSearchRef.current = debouncedPreparationSearch;
+      if (techCardListPage > 1) {
+        setTechCardListPage(1);
+        return undefined;
+      }
+    }
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        await loadTechCardsMenuList({
+          page: techCardListPage,
+          search: debouncedPreparationSearch,
+          category: "",
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        alert(validateResErrors(error, "Ошибка загрузки списка техкарт"), true);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [activeTab, debouncedPreparationSearch, loadTechCardsMenuList, techCardListPage]);
+
+  useEffect(() => {
+    if (!techCardsPickerOpen) return undefined;
+
+    const controller = new AbortController();
+    const requestId = ++pickerMenuRequestIdRef.current;
+
+    (async () => {
+      try {
+        setPickerMenuItemsLoading(true);
+        const { results } = await fetchMenuItemsList({
+          page: 1,
+          search: debouncedTechCardPickerSearch,
+          category: debouncedPickerCategoryFilter,
+          signal: controller.signal,
+        });
+        if (requestId !== pickerMenuRequestIdRef.current) return;
+        setPickerMenuItems(results);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setPickerMenuItems([]);
+        alert(validateResErrors(error, "Ошибка загрузки списка блюд"), true);
+      } finally {
+        if (requestId === pickerMenuRequestIdRef.current) {
+          setPickerMenuItemsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    debouncedPickerCategoryFilter,
+    debouncedTechCardPickerSearch,
+    fetchMenuItemsList,
+    techCardsPickerOpen,
+  ]);
 
   useEffect(() => {
     if (!preparationId) {
@@ -777,27 +1133,16 @@ export default function CafeCosting() {
     };
   }, [preparations]);
 
-  const filteredTechCards = useMemo(() => {
-    const q = preparationSearch.trim().toLowerCase();
-    return techCards.filter((item) => {
-      const id = String(item?.id || "");
-      const detail = techCardDetails[id] || {};
-      const matchesSearch =
-        !q ||
-        String(item?.title || detail?.title || "").toLowerCase().includes(q) ||
-        String(item?.category_title || detail?.category_title || "")
-          .toLowerCase()
-          .includes(q);
-      return matchesSearch;
-    });
-  }, [preparationSearch, techCardDetails, techCards]);
+  const filteredTechCards = useMemo(() => techCards, [techCards]);
 
   const techCardStats = useMemo(() => {
     const costValues = techCards
-      .map((item) => Number(techCardCosts[String(item?.id)]?.cost_price))
+      .map((item) => Number(getTechCardCostForDisplay(item, techCardCosts)?.cost_price))
       .filter((value) => Number.isFinite(value));
     const marginValues = techCards
-      .map((item) => Number(techCardCosts[String(item?.id)]?.margin_percent))
+      .map((item) =>
+        Number(getTechCardCostForDisplay(item, techCardCosts)?.margin_percent),
+      )
       .filter((value) => Number.isFinite(value));
     const avgCost = costValues.length
       ? costValues.reduce((sum, value) => sum + value, 0) / costValues.length
@@ -826,6 +1171,43 @@ export default function CafeCosting() {
       [];
     return normalizeIngredientRows(rows);
   };
+
+  const mapMenuItemToPickerCard = useCallback(
+    (item) => {
+      const id = String(item?.id || "");
+      const detail = techCardDetails[id] || {};
+      const merged = { ...item, ...detail, id };
+      return {
+        ...merged,
+        title: merged?.title || merged?.name || "Блюдо",
+        category_title:
+          merged?.category_title ||
+          merged?.category_name ||
+          menuCategories.find(
+            (cat) => String(cat?.id) === String(merged?.category ?? merged?.category_id),
+          )?.title ||
+          "",
+        category_id: merged?.category ?? merged?.category_id ?? "",
+        image_url: merged?.image_url || merged?.image || "",
+        ingredients_count: getTechCardIngredients(merged).length,
+      };
+    },
+    [menuCategories, techCardDetails],
+  );
+
+  const pickerModalDishes = useMemo(
+    () => pickerMenuItems.map(mapMenuItemToPickerCard),
+    [mapMenuItemToPickerCard, pickerMenuItems],
+  );
+
+  const isAllPickerDishesSelected = useMemo(() => {
+    const ids = pickerModalDishes
+      .map((item) => String(item?.id || ""))
+      .filter(Boolean);
+    return (
+      ids.length > 0 && ids.every((id) => techCardsPickerSelectedIds.has(id))
+    );
+  }, [pickerModalDishes, techCardsPickerSelectedIds]);
 
   const getIngredientOptionId = (value) => {
     if (!value) return "";
@@ -857,46 +1239,10 @@ export default function CafeCosting() {
       return;
     }
     try {
-      const { data } = await api.get(`/cafe/dishes/${encodeURIComponent(id)}/cost/`);
-      setDishCost(data || null);
-      setTechCardCosts((prev) => ({ ...prev, [id]: data || null }));
+      await refreshTechCardById(id);
     } catch (error) {
       setDishCost(null);
       alert(validateResErrors(error, "Ошибка получения себестоимости блюда"), true);
-    }
-  };
-
-  const loadDishIngredients = async () => {
-    const id = String(dishId || "").trim();
-    if (!id) return;
-    try {
-      // Most compatible strategy: try dedicated list endpoint first
-      let rows = [];
-      try {
-        const res = await api.get("/cafe/dish-ingredients/", { params: { dish: id } });
-        rows = Array.isArray(listFrom(res)) ? listFrom(res) : [];
-      } catch {
-        const res = await api.get(`/cafe/menu-items/${encodeURIComponent(id)}/`);
-        const data = res?.data || {};
-        setTechCardDetails((prev) => ({ ...prev, [id]: data }));
-        rows = Array.isArray(data?.dish_ingredients)
-          ? data.dish_ingredients
-          : Array.isArray(data?.ingredients)
-            ? data.ingredients
-            : [];
-      }
-      const normalizedRows = normalizeIngredientRows(rows);
-      setDishIngredients(normalizedRows);
-      setTechCardDetails((prev) => ({
-        ...prev,
-        [id]: {
-          ...(prev[id] || {}),
-          ingredients: normalizedRows,
-        },
-      }));
-    } catch (error) {
-      setDishIngredients([]);
-      alert(validateResErrors(error, "Ошибка загрузки ингредиентов блюда"), true);
     }
   };
 
@@ -916,8 +1262,7 @@ export default function CafeCosting() {
         quantity: "",
         unit: "g",
       });
-      await loadDishIngredients();
-      await handleLoadDishCost();
+      await refreshTechCardById(id);
     } catch (error) {
       alert(validateResErrors(error, "Ошибка добавления ингредиента"), true);
     }
@@ -950,8 +1295,7 @@ export default function CafeCosting() {
         buildIngredientPayload(editIngredientForm),
       );
       cancelEditDishIngredient();
-      await loadDishIngredients();
-      await handleLoadDishCost();
+      await refreshTechCardById(dishId);
     } catch (error) {
       alert(validateResErrors(error, "Ошибка изменения ингредиента"), true);
     }
@@ -966,40 +1310,14 @@ export default function CafeCosting() {
       let pdfRows = normalizeIngredientRows(rows);
 
       if (techCardId) {
-        const [detailRes, costRes, ingredientRes] = await Promise.allSettled([
-          api.get(`/cafe/menu-items/${encodeURIComponent(techCardId)}/`),
-          api.get(`/cafe/dishes/${encodeURIComponent(techCardId)}/cost/`),
-          api.get("/cafe/dish-ingredients/", { params: { dish: techCardId } }),
-        ]);
-        if (detailRes.status === "fulfilled") {
-          pdfDetail = detailRes.value?.data || pdfDetail;
+        const items = await fetchTechCardsBulk({ dishIds: [techCardId] });
+        const normalized = items.length ? normalizeTechCardBulkItem(items[0]) : null;
+        if (normalized) {
+          pdfDetail = normalized.detail;
+          pdfCost = normalized.cost || pdfCost;
+          pdfRows = normalized.detail.ingredients || pdfRows;
+          applyTechCardsFromItems(items, { replace: false });
         }
-        if (costRes.status === "fulfilled") {
-          pdfCost = costRes.value?.data || pdfCost;
-        }
-        const detailRows = getIngredientRowsFromDetail(pdfDetail);
-        const ingredientRows =
-          ingredientRes.status === "fulfilled"
-            ? normalizeIngredientRows(listFrom(ingredientRes.value))
-            : [];
-        pdfRows =
-          detailRows.length > 0
-            ? detailRows
-            : ingredientRows.length > 0
-              ? ingredientRows
-              : pdfRows;
-
-        setTechCardDetails((prev) => ({
-          ...prev,
-          [techCardId]: {
-            ...(prev[techCardId] || {}),
-            ...pdfDetail,
-            ingredients: pdfRows,
-          },
-        }));
-        setTechCardCosts((prev) => ({ ...prev, [techCardId]: pdfCost }));
-        setDishIngredients(pdfRows);
-        setDishCost(pdfCost);
       }
 
       const pdfData = buildTechCardPdfData({
@@ -1018,14 +1336,108 @@ export default function CafeCosting() {
     }
   };
 
+  const fetchTechCardPdfItems = async ({
+    dishIds = [],
+    isAll = false,
+    search = "",
+    categoryId = "",
+  }) => {
+    const items = await fetchTechCardsBulk({
+      dishIds,
+      isAll,
+      search,
+      categoryId,
+    });
+    return items.map(mapExportItemToPdfData);
+  };
+
+  const handlePickerCategoryChange = useCallback((value) => {
+    setPickerCategoryFilter(String(value || "").trim());
+  }, []);
+
+  const openTechCardsPicker = () => {
+    setPickerCategoryFilter(techCardPickerCategory);
+    setTechCardsPickerSelectedIds(new Set());
+    setTechCardsPickerOpen(true);
+  };
+
+  const closeTechCardsPicker = () => {
+    setTechCardPickerCategory(pickerCategoryFilter);
+    setTechCardsPickerOpen(false);
+  };
+
+  const toggleTechCardPickerDish = (id) => {
+    const key = String(id || "").trim();
+    if (!key) return;
+    setTechCardsPickerSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleTechCardPickerSelectAll = () => {
+    const ids = pickerModalDishes
+      .map((item) => String(item?.id || ""))
+      .filter(Boolean);
+    setTechCardsPickerSelectedIds((prev) => {
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id));
+      if (allSelected) return new Set();
+      return new Set(ids);
+    });
+  };
+
+  const handleDownloadSelectedTechCardsPdf = async () => {
+    const selectedIds = [...techCardsPickerSelectedIds];
+    if (selectedIds.length === 0) {
+      alert("Выберите хотя бы одно блюдо", true);
+      return;
+    }
+
+    const filteredIds = pickerModalDishes
+      .map((item) => String(item?.id || ""))
+      .filter(Boolean);
+    const useIsAll =
+      filteredIds.length > 0 &&
+      filteredIds.every((id) => techCardsPickerSelectedIds.has(id)) &&
+      selectedIds.length === filteredIds.length;
+
+    try {
+      setPdfAllDownloading(true);
+      const idsForRequest = useIsAll ? filteredIds : selectedIds;
+      const items = await fetchTechCardPdfItems({
+        dishIds: idsForRequest,
+        isAll: useIsAll,
+        search: debouncedTechCardPickerSearch,
+        categoryId: pickerCategoryFilter,
+      });
+
+      if (items.length === 0) {
+        alert("Не удалось сформировать PDF: данные техкарт не получены", true);
+        return;
+      }
+
+      const blob = await pdf(<TechCardsPdfDocument items={items} />).toBlob();
+      downloadBlob(
+        blob,
+        `tech_cards_${new Intl.DateTimeFormat("ru-RU").format(new Date())}.pdf`,
+      );
+      closeTechCardsPicker();
+    } catch (error) {
+      alert(validateResErrors(error, "Ошибка скачивания PDF техкарт"), true);
+    } finally {
+      setPdfAllDownloading(false);
+    }
+  };
+
   const handleDeleteDishIngredient = async (id) => {
     if (!id) return;
     confirm("Удалить ингредиент?", async (ok) => {
       if (!ok) return;
       try {
         await api.delete(`/cafe/dish-ingredients/${encodeURIComponent(id)}/`);
-        await loadDishIngredients();
-        await handleLoadDishCost();
+        await refreshTechCardById(dishId);
       } catch (error) {
         alert(validateResErrors(error, "Ошибка удаления ингредиента"), true);
       }
@@ -1382,6 +1794,17 @@ export default function CafeCosting() {
                   Управление заготовками, обработками и расчетом себестоимости.
                 </p>
               </div>
+              {activeTab === "techcards" && (
+                <button
+                  className="cafe-costing-page__btn"
+                  type="button"
+                  disabled={pdfAllDownloading}
+                  onClick={openTechCardsPicker}
+                >
+                  <Download size={16} />
+                  {pdfAllDownloading ? "Скачивание..." : "Скачать техкарты"}
+                </button>
+              )}
             </div>
           )}
 
@@ -1791,7 +2214,12 @@ export default function CafeCosting() {
                         (item) => String(item?.id) === String(selectedTechCardId),
                       ) || {};
                     const detail = techCardDetails[selectedTechCardId] || selectedItem;
-                    const cost = dishCost || techCardCosts[selectedTechCardId] || {};
+                    const cost =
+                      dishCost ||
+                      getTechCardCostForDisplay(
+                        { ...selectedItem, id: selectedTechCardId },
+                        techCardCosts,
+                      );
                     const rows = Array.isArray(dishIngredients) ? dishIngredients : [];
                     return (
                       <>
@@ -1924,9 +2352,7 @@ export default function CafeCosting() {
                                           </select>
                                         ) : (
                                           <span className="cafe-costing-page__badge cafe-costing-page__badge--accent">
-                                            {row?.ingredient_type === "preparation"
-                                              ? "Заготовка"
-                                              : "Товар"}
+                                            {ingredientTypeLabel(row?.ingredient_type, row)}
                                           </span>
                                         )}
                                       </td>
@@ -2237,7 +2663,7 @@ export default function CafeCosting() {
                               filteredTechCards.map((item) => {
                                 const id = String(item?.id || "");
                                 const detail = techCardDetails[id] || {};
-                                const cost = techCardCosts[id] || {};
+                                const cost = getTechCardCostForDisplay(item, techCardCosts);
                                 const ingredients = getTechCardIngredients(item);
                                 const isActive =
                                   (detail?.is_active ?? item?.is_active) !== false;
@@ -2304,6 +2730,30 @@ export default function CafeCosting() {
                           </tbody>
                         </table>
                       </div>
+                      {(techCardsListNext || techCardsListPrevious) && (
+                        <div className="cafe-costing-page__techcards-pagination">
+                          <button
+                            type="button"
+                            className="cafe-costing-page__btn cafe-costing-page__btn--secondary"
+                            disabled={!techCardsListPrevious}
+                            onClick={() => setTechCardListPage(techCardListPage - 1)}
+                          >
+                            Назад
+                          </button>
+                          <span>
+                            Страница {techCardListPage}
+                            {techCardsListCount > 0 ? ` · всего ${techCardsListCount}` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            className="cafe-costing-page__btn cafe-costing-page__btn--secondary"
+                            disabled={!techCardsListNext}
+                            onClick={() => setTechCardListPage(techCardListPage + 1)}
+                          >
+                            Далее
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </section>
@@ -2449,6 +2899,24 @@ export default function CafeCosting() {
           )}
         </div>
       </DataContainer>
+
+      <TechCardsPickerModal
+        open={techCardsPickerOpen}
+        onClose={closeTechCardsPicker}
+        dishes={pickerModalDishes}
+        categories={menuCategories}
+        searchValue={techCardPickerSearch}
+        onSearchChange={setTechCardPickerSearch}
+        categoryId={pickerCategoryFilter}
+        onCategoryChange={handlePickerCategoryChange}
+        selectedIds={techCardsPickerSelectedIds}
+        onToggleDish={toggleTechCardPickerDish}
+        onToggleSelectAll={toggleTechCardPickerSelectAll}
+        isAllFilteredSelected={isAllPickerDishesSelected}
+        onDownload={handleDownloadSelectedTechCardsPdf}
+        downloading={pdfAllDownloading}
+        loadingDishes={pickerMenuItemsLoading}
+      />
 
       {prepModalOpen && (
         <div className="cafe-costing-page__overlay" onClick={() => setPrepModalOpen(false)}>
