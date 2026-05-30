@@ -212,7 +212,11 @@ const CashierPage = () => {
     loading: productsLoading,
   } = useProducts();
   const { list: clients } = useClient();
-  const { start: currentSale, loading: saleLoading } = useSale();
+  const {
+    start: currentSale,
+    loading: saleLoading,
+    startSaleLoading,
+  } = useSale();
   const { shifts } = useShifts();
   const { list: cashBoxes } = useCash();
   const { currentUser, profile, userId } = useUser();
@@ -930,7 +934,17 @@ const CashierPage = () => {
     await addToCart(product);
   };
 
-  // Функция для обновления продажи после запросов
+  // Обновление только данных активной продажи (без POST /start/, чтобы не мигала корзина)
+  const refreshCurrentSale = useCallback(async () => {
+    const saleId = getSelectedSaleId();
+    if (!saleId) return;
+    try {
+      await dispatch(getSale({ id: saleId })).unwrap();
+    } catch (error) {
+      console.error("Ошибка при обновлении продажи:", error);
+    }
+  }, [dispatch, getSelectedSaleId]);
+
   const refreshSale = useCallback(async () => {
     if (getSelectedSaleId() && openShiftId) {
       try {
@@ -1419,8 +1433,12 @@ const CashierPage = () => {
   // Синхронизируем локальную корзину с данными из API, сохраняя порядок
   useEffect(() => {
     if (currentSale) {
-      // startSale возвращает объект с полем items напрямую, а не cart.items
-      const items = currentSale.items || currentSale.cart?.items || [];
+      const rawItems = currentSale.items ?? currentSale.cart?.items;
+      // Ответ /start/ может прийти без items — не сбрасываем корзину
+      if (!Array.isArray(rawItems)) return;
+
+      const isSaleRefreshing = saleLoading || startSaleLoading;
+      const items = rawItems;
 
       if (items.length > 0) {
         // MARKET_POS_CART: unit_price — базовая цена, line_discount — скидка на строку (сумма).
@@ -1572,13 +1590,12 @@ const CashierPage = () => {
           });
           return changed ? next : prev;
         });
-      } else {
-        // Если корзина пуста
+      } else if (!isSaleRefreshing) {
         setCart([]);
         cartOrderRef.current = [];
       }
     }
-  }, [currentSale]);
+  }, [currentSale, saleLoading, startSaleLoading]);
 
   useEffect(() => {
     const pending = pendingQtyFocusRef.current;
@@ -2503,7 +2520,12 @@ const CashierPage = () => {
         }),
       ).unwrap();
       setCartPrices((prev) => ({ ...prev, [item.id]: formatPrice(num) }));
-      await refreshSale();
+      setCart((prev) =>
+        prev.map((c) =>
+          String(c.id) === String(item.id) ? { ...c, price: num } : c,
+        ),
+      );
+      await refreshCurrentSale();
     } catch (err) {
       console.error("Ошибка при изменении цены:", err);
       showAlert("error", "Ошибка", err?.message || "Не удалось изменить цену");
@@ -2560,7 +2582,12 @@ const CashierPage = () => {
         }
         return { ...prev, [item.id]: formatPrice(num) };
       });
-      await refreshSale();
+      setCart((prev) =>
+        prev.map((c) =>
+          String(c.id) === String(item.id) ? { ...c, discountTotal: num } : c,
+        ),
+      );
+      await refreshCurrentSale();
     } catch (err) {
       console.error("Ошибка при изменении скидки:", err);
       showAlert(
