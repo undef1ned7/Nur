@@ -20,6 +20,10 @@ import { convertEmployeeAccessesToLabels } from "./employeeAccessLabels";
 import "./Masters.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
+import {
+  resolveEmployeeRoleLabel,
+  ruLabelSys,
+} from "./resolveEmployeeRoleLabel";
 
 /* ===================== API endpoints ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
@@ -56,8 +60,6 @@ const normalizeEmployee = (e = {}) => ({
 const fullName = (e) =>
   [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim();
 
-const ruLabelSys = (c) =>
-  c === "owner" ? "Владелец" : c === "admin" ? "Администратор" : c || "";
 const sysCodeFromName = (n) => {
   const l = String(n || "")
     .trim()
@@ -352,7 +354,11 @@ const Masters = () => {
   /* ========= Derived ========= */
   const roleById = useMemo(() => {
     const m = new Map();
-    roles.forEach((r) => m.set(r.id, r));
+    roles.forEach((r) => {
+      if (r.id != null && String(r.id).trim() !== "") {
+        m.set(r.id, r);
+      }
+    });
     return m;
   }, [roles]);
 
@@ -1114,11 +1120,7 @@ const Masters = () => {
                   .trim()
                   .charAt(0)
                   .toUpperCase() || "•";
-              const roleLabel = u.role
-                ? ruLabelSys(u.role)
-                : roles.length
-                  ? roleById.get(u.custom_role)?.name || u.role_display || "—"
-                  : u.role_display || "—";
+              const roleLabel = resolveEmployeeRoleLabel(u, roleById);
               const cafeOpenDetail =
                 isCafeSector && u.role !== "owner";
               const marketOpenDetail =

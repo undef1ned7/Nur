@@ -355,7 +355,7 @@
   &__modal {
     background: #fff;
     border-radius: 16px;
-    padding: 20px;
+    padding: 0;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     width: min(720px, calc(100% - 24px));
     max-height: min(90dvh, 760px);
@@ -368,6 +368,7 @@
 
     &--confirm {
       max-width: 480px;
+      padding: 20px;
     }
   }
 
@@ -375,12 +376,11 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 20px 20px 12px;
     border-bottom: 1px solid var(--border);
     gap: 10px;
-    position: sticky;
-    top: 0;
     background: #fff;
     z-index: 1;
   }
@@ -425,6 +425,32 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  &__form--modal {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    gap: 0;
+    padding: 0;
+  }
+
+  &__formBody {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 20px 12px;
+  }
+
+  &__form--modal > &__formActions {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 12px 20px 20px;
+    border-top: 1px solid var(--border);
+    background: #fff;
   }
 
   &__formGrid {
@@ -541,6 +567,240 @@
     gap: 8px;
     align-items: stretch;
     width: 100%;
+    flex-wrap: wrap;
+
+    > *:first-child {
+      flex: 1 1 180px;
+      min-width: 0;
+    }
+  }
+
+  &__btn--picker {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* ===== Items picker (карточки) ===== */
+  &__pickerOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(15, 23, 42, 0.5);
+    display: grid;
+    place-items: center;
+    padding: 12px;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  &__pickerModal {
+    width: min(920px, 100%);
+    max-height: min(92dvh, 820px);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  &__pickerHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  &__pickerTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  &__pickerDesc {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 640px;
+  }
+
+  &__pickerToolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  &__pickerSearch {
+    flex: 1 1 200px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    min-height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--muted);
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font-size: 14px;
+      color: var(--text);
+    }
+  }
+
+  &__pickerCount {
+    font-size: 13px;
+    color: var(--muted);
+    margin-left: auto;
+
+    strong {
+      color: var(--text);
+    }
+  }
+
+  &__pickerGrid {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    align-content: start;
+  }
+
+  &__pickerEmpty {
+    grid-column: 1 / -1;
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: #f9fafb;
+  }
+
+  &__pickerCard {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: stretch;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+
+    &--selected {
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 2px rgba(247, 215, 79, 0.25);
+      background: #fffdf2;
+    }
+  }
+
+  &__pickerCheck {
+    align-self: start;
+    margin-top: 2px;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+
+    &--on {
+      color: var(--primary-dark);
+    }
+  }
+
+  &__pickerCardBody {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  &__pickerMedia {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 18px;
+    font-weight: 700;
+
+    span {
+      font-size: 16px;
+      font-weight: 700;
+      color: #334155;
+    }
+  }
+
+  &__pickerInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    strong {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    small {
+      font-size: 11px;
+      color: #64748b;
+    }
+  }
+
+  &__pickerActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 20px 18px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: #fff;
   }
 
   &__checkboxLabel {
@@ -1014,12 +1274,18 @@
       max-width: calc(100% - 12px);
       max-height: calc(100dvh - 12px);
       border-radius: 14px;
-      padding: 14px;
     }
 
     &__modalHeader {
-      margin-bottom: 10px;
-      padding-bottom: 10px;
+      padding: 14px 14px 10px;
+    }
+
+    &__formBody {
+      padding: 6px 14px 10px;
+    }
+
+    &__form--modal > &__formActions {
+      padding: 10px 14px 14px;
     }
 
     &__modalTitle {
@@ -1205,13 +1471,19 @@
       max-width: 100%;
       max-height: 100dvh;
       border-radius: 8px 8px 0 0;
-      padding: 12px;
       margin: 0;
     }
 
     &__modalHeader {
-      margin-bottom: 8px;
-      padding-bottom: 8px;
+      padding: 12px 12px 8px;
+    }
+
+    &__formBody {
+      padding: 4px 12px 8px;
+    }
+
+    &__form--modal > &__formActions {
+      padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
     }
 
     &__modalTitle {

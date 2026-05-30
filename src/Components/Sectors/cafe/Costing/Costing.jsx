@@ -28,6 +28,7 @@ import {
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { registerPdfFonts } from "@/pdf/registerFonts";
@@ -1092,6 +1093,15 @@ export default function CafeCosting() {
     [warehouseProducts],
   );
 
+  const sourceProductComboboxOptions = useMemo(
+    () =>
+      productOptions.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+      })),
+    [productOptions],
+  );
+
   const preparationOptions = useMemo(
     () =>
       preparations.map((p) => ({
@@ -1521,6 +1531,10 @@ export default function CafeCosting() {
 
   const handleSavePreparation = async (e) => {
     e.preventDefault();
+    if (!String(prepForm.source_product || "").trim()) {
+      alert("Выберите исходный товар", true);
+      return;
+    }
     try {
       setSaving(true);
       const normalizedProcessings = prepProcessings
@@ -2964,24 +2978,23 @@ export default function CafeCosting() {
                     required
                   />
                 </label>
-                <label className="cafe-costing-page__field">
+                <div className="cafe-costing-page__field">
                   <span className="cafe-costing-page__field-label">Исходный товар *</span>
-                  <select
-                    className="cafe-costing-page__input"
+                  <SearchableCombobox
                     value={prepForm.source_product}
-                    onChange={(e) =>
-                      setPrepForm((prev) => ({ ...prev, source_product: e.target.value }))
+                    onChange={(val) =>
+                      setPrepForm((prev) => ({
+                        ...prev,
+                        source_product: String(val || ""),
+                      }))
                     }
-                    required
-                  >
-                    <option value="">Выберите товар</option>
-                    {productOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={sourceProductComboboxOptions}
+                    placeholder="Поиск товара…"
+                    disabled={!sourceProductComboboxOptions.length}
+                    classNamePrefix="cafeCostingCombo"
+                    menuPortal
+                  />
+                </div>
               </div>
             </div>
 

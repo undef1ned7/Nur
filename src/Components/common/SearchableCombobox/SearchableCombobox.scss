@@ -383,6 +383,7 @@
 @include searchable-combo("cafeReservationsCombo");
 @include searchable-combo("cafeKassaCombo");
 @include searchable-combo("cafeStockCombo");
+@include searchable-combo("cafeCostingCombo");
 @include searchable-combo("searchableCombo"); // Универсальный префикс
 @include searchable-combo("barberservices__combo"); // Barber Services
 @include searchable-combo("barberhistory__combo"); // Barber History
