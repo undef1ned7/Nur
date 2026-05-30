@@ -9,9 +9,11 @@ import {
   FaClipboardList,
   FaCheckCircle,
   FaBoxes,
+  FaThList,
 } from "react-icons/fa";
 import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
+import InventoryItemsPickerModal from "./InventoryItemsPickerModal";
 import "./CafeInventory.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -97,6 +99,18 @@ const CafeInventory = () => {
     items: [], // [{product: id, qty_counted: number}]
   });
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // выбор карточками (оборудование / продукты)
+  const [equipmentPickerOpen, setEquipmentPickerOpen] = useState(false);
+  const [equipmentPickerSearch, setEquipmentPickerSearch] = useState("");
+  const [equipmentPickerSelected, setEquipmentPickerSelected] = useState(
+    () => new Set()
+  );
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [productPickerSearch, setProductPickerSearch] = useState("");
+  const [productPickerSelected, setProductPickerSelected] = useState(
+    () => new Set()
+  );
 
   // модалка просмотра акта сверки продуктов
   const [viewStockCheckModalOpen, setViewStockCheckModalOpen] = useState(false);
@@ -504,6 +518,196 @@ const CafeInventory = () => {
     return warehouseItems.find((p) => p.id === id);
   };
 
+  useEffect(() => {
+    if (!sessionModalOpen) {
+      setEquipmentPickerOpen(false);
+      setEquipmentPickerSearch("");
+      setEquipmentPickerSelected(new Set());
+    }
+  }, [sessionModalOpen]);
+
+  useEffect(() => {
+    if (!stockCheckModalOpen) {
+      setProductPickerOpen(false);
+      setProductPickerSearch("");
+      setProductPickerSelected(new Set());
+    }
+  }, [stockCheckModalOpen]);
+
+  const availableEquipmentForSession = useMemo(
+    () =>
+      equipment.filter(
+        (eq) => !sessionForm.items.some((i) => i.equipment === eq.id)
+      ),
+    [equipment, sessionForm.items]
+  );
+
+  const availableProductsForStockCheck = useMemo(
+    () =>
+      warehouseItems.filter(
+        (p) => !stockCheckForm.items.some((i) => i.product === p.id)
+      ),
+    [warehouseItems, stockCheckForm.items]
+  );
+
+  const equipmentPickerItems = useMemo(() => {
+    const q = equipmentPickerSearch.trim().toLowerCase();
+    return availableEquipmentForSession
+      .filter((eq) => {
+        if (!q) return true;
+        return (
+          (eq.title || "").toLowerCase().includes(q) ||
+          (eq.serial_number || "").toLowerCase().includes(q) ||
+          (eq.category || "").toLowerCase().includes(q)
+        );
+      })
+      .map((eq) => ({
+        id: String(eq.id),
+        title: eq.title || "Без названия",
+        subtitle: [eq.serial_number, eq.category].filter(Boolean).join(" · "),
+        meta: getConditionLabel(eq.condition),
+      }));
+  }, [availableEquipmentForSession, equipmentPickerSearch]);
+
+  const productPickerItems = useMemo(() => {
+    const q = productPickerSearch.trim().toLowerCase();
+    return availableProductsForStockCheck
+      .filter((p) => {
+        if (!q) return true;
+        return (
+          (p.title || "").toLowerCase().includes(q) ||
+          (p.code || "").toLowerCase().includes(q) ||
+          (p.unit || "").toLowerCase().includes(q)
+        );
+      })
+      .map((p) => ({
+        id: String(p.id),
+        title: p.title || "Без названия",
+        subtitle: p.code ? `Код: ${p.code}` : "",
+        meta: `Остаток: ${toNum(p.remainder)} ${p.unit || "шт"}`,
+      }));
+  }, [availableProductsForStockCheck, productPickerSearch]);
+
+  const isAllEquipmentPickerSelected =
+    equipmentPickerItems.length > 0 &&
+    equipmentPickerItems.every((item) => equipmentPickerSelected.has(item.id));
+
+  const isAllProductPickerSelected =
+    productPickerItems.length > 0 &&
+    productPickerItems.every((item) => productPickerSelected.has(item.id));
+
+  const openEquipmentPicker = () => {
+    setEquipmentPickerSearch("");
+    setEquipmentPickerSelected(new Set());
+    setEquipmentPickerOpen(true);
+  };
+
+  const openProductPicker = () => {
+    setProductPickerSearch("");
+    setProductPickerSelected(new Set());
+    setProductPickerOpen(true);
+  };
+
+  const toggleEquipmentPickerItem = (id) => {
+    setEquipmentPickerSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleProductPickerItem = (id) => {
+    setProductPickerSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleEquipmentPickerSelectAll = () => {
+    const ids = equipmentPickerItems.map((item) => item.id);
+    if (isAllEquipmentPickerSelected) {
+      setEquipmentPickerSelected((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      return;
+    }
+    setEquipmentPickerSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const toggleProductPickerSelectAll = () => {
+    const ids = productPickerItems.map((item) => item.id);
+    if (isAllProductPickerSelected) {
+      setProductPickerSelected((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      return;
+    }
+    setProductPickerSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const applyEquipmentPicker = () => {
+    if (equipmentPickerSelected.size === 0) return;
+
+    const newItems = [...equipmentPickerSelected]
+      .map((id) => equipment.find((eq) => String(eq.id) === id))
+      .filter(Boolean)
+      .map((eq) => ({
+        equipment: eq.id,
+        is_present: true,
+        condition: eq.condition || "good",
+        notes: "",
+      }));
+
+    setSessionForm((prev) => {
+      const existing = new Set(prev.items.map((i) => i.equipment));
+      const merged = [
+        ...prev.items,
+        ...newItems.filter((item) => !existing.has(item.equipment)),
+      ];
+      return { ...prev, items: merged };
+    });
+    setEquipmentPickerOpen(false);
+    setEquipmentPickerSelected(new Set());
+  };
+
+  const applyProductPicker = () => {
+    if (productPickerSelected.size === 0) return;
+
+    const newItems = [...productPickerSelected]
+      .map((id) => warehouseItems.find((p) => String(p.id) === id))
+      .filter(Boolean)
+      .map((prod) => ({
+        product: prod.id,
+        qty_counted: toNum(prod.remainder),
+      }));
+
+    setStockCheckForm((prev) => {
+      const existing = new Set(prev.items.map((i) => i.product));
+      const merged = [
+        ...prev.items,
+        ...newItems.filter((item) => !existing.has(item.product)),
+      ];
+      return { ...prev, items: merged };
+    });
+    setProductPickerOpen(false);
+    setProductPickerSelected(new Set());
+  };
+
   return (
     <section className="cafeInventory">
       <div className="cafeInventory__header">
@@ -823,7 +1027,11 @@ const CafeInventory = () => {
                 <FaTimes />
               </button>
             </div>
-            <form className="cafeInventory__form" onSubmit={saveEquipment}>
+            <form
+              className="cafeInventory__form cafeInventory__form--modal"
+              onSubmit={saveEquipment}
+            >
+              <div className="cafeInventory__formBody">
               <div className="cafeInventory__formGrid">
                 <div className="cafeInventory__field cafeInventory__field--full">
                   <label className="cafeInventory__label">Название *</label>
@@ -900,6 +1108,7 @@ const CafeInventory = () => {
                     ]}
                     placeholder="Выберите состояние…"
                     classNamePrefix="cafeInventoryCombo"
+                    menuPortal
                   />
                 </div>
 
@@ -919,6 +1128,7 @@ const CafeInventory = () => {
                     ]}
                     placeholder="Выберите…"
                     classNamePrefix="cafeInventoryCombo"
+                    menuPortal
                   />
                 </div>
 
@@ -933,6 +1143,7 @@ const CafeInventory = () => {
                     rows={3}
                   />
                 </div>
+              </div>
               </div>
 
               <div className="cafeInventory__formActions">
@@ -976,7 +1187,11 @@ const CafeInventory = () => {
                 <FaTimes />
               </button>
             </div>
-            <form className="cafeInventory__form" onSubmit={saveSession}>
+            <form
+              className="cafeInventory__form cafeInventory__form--modal"
+              onSubmit={saveSession}
+            >
+              <div className="cafeInventory__formBody">
               <div className="cafeInventory__formGrid">
                 <div className="cafeInventory__field cafeInventory__field--full">
                   <label className="cafeInventory__label">
@@ -1019,7 +1234,16 @@ const CafeInventory = () => {
                           label: `${eq.title}${eq.serial_number ? ` (${eq.serial_number})` : ""}`,
                         }))}
                       placeholder="Выберите оборудование…"
+                      menuPortal
                     />
+                    <button
+                      type="button"
+                      className="cafeInventory__btn cafeInventory__btn--secondary cafeInventory__btn--picker"
+                      onClick={openEquipmentPicker}
+                      disabled={availableEquipmentForSession.length === 0}
+                    >
+                      <FaThList /> Выбрать из списка
+                    </button>
                     <button
                       type="button"
                       className="cafeInventory__btn cafeInventory__btn--secondary"
@@ -1087,6 +1311,8 @@ const CafeInventory = () => {
                                     { value: "broken", label: "Списано" },
                                   ]}
                                   placeholder="Состояние…"
+                                  classNamePrefix="cafeInventoryCombo"
+                                  menuPortal
                                 />
                               </div>
                               <input
@@ -1123,6 +1349,7 @@ const CafeInventory = () => {
                     </div>
                   </div>
                 )}
+              </div>
               </div>
 
               <div className="cafeInventory__formActions">
@@ -1167,91 +1394,93 @@ const CafeInventory = () => {
                 <FaTimes />
               </button>
             </div>
-            <div className="cafeInventory__form">
-              <div className="cafeInventory__sessionDetails">
-                <div className="cafeInventory__sessionInfo">
-                  <div>
-                    <strong>Создан:</strong>{" "}
-                    {new Date(viewingSession.created_at).toLocaleString(
-                      "ru-RU"
-                    )}
-                  </div>
-                  {viewingSession.confirmed_at && (
+            <div className="cafeInventory__form cafeInventory__form--modal">
+              <div className="cafeInventory__formBody">
+                <div className="cafeInventory__sessionDetails">
+                  <div className="cafeInventory__sessionInfo">
                     <div>
-                      <strong>Подтвержден:</strong>{" "}
-                      {new Date(viewingSession.confirmed_at).toLocaleString(
+                      <strong>Создан:</strong>{" "}
+                      {new Date(viewingSession.created_at).toLocaleString(
                         "ru-RU"
                       )}
                     </div>
-                  )}
-                  <div>
-                    <strong>Статус:</strong>{" "}
-                    {viewingSession.is_confirmed ? "Подтвержден" : "Ожидает"}
-                  </div>
-                </div>
-
-                <div className="cafeInventory__sessionItemsList">
-                  <h4>Оборудование ({viewingSession.items?.length || 0}):</h4>
-                  {viewingSession.items?.map((item, idx) => (
-                    <div key={idx} className="cafeInventory__sessionItemView">
+                    {viewingSession.confirmed_at && (
                       <div>
-                        <strong>{item.equipment_title || "Неизвестно"}</strong>
-                        {item.serial_number && (
-                          <div style={{ fontSize: 12, color: "#6b7280" }}>
-                            {item.serial_number}
-                          </div>
+                        <strong>Подтвержден:</strong>{" "}
+                        {new Date(viewingSession.confirmed_at).toLocaleString(
+                          "ru-RU"
                         )}
                       </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "12px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span
-                          className={`cafeInventory__status cafeInventory__status--${
-                            item.is_present ? "success" : "danger"
-                          }`}
-                        >
-                          {item.is_present ? "На месте" : "Отсутствует"}
-                        </span>
-                        <span
-                          className={`cafeInventory__status cafeInventory__status--${getConditionColor(
-                            item.condition
-                          )}`}
-                        >
-                          {getConditionLabel(item.condition)}
-                        </span>
-                        {item.notes && (
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
-                            {item.notes}
-                          </span>
-                        )}
-                      </div>
+                    )}
+                    <div>
+                      <strong>Статус:</strong>{" "}
+                      {viewingSession.is_confirmed ? "Подтвержден" : "Ожидает"}
                     </div>
-                  ))}
-                </div>
-
-                {!viewingSession.is_confirmed && (
-                  <div className="cafeInventory__formActions">
-                    <button
-                      type="button"
-                      className="cafeInventory__btn cafeInventory__btn--secondary"
-                      onClick={() => setViewSessionModalOpen(false)}
-                    >
-                      Закрыть
-                    </button>
-                    <button
-                      type="button"
-                      className="cafeInventory__btn cafeInventory__btn--success"
-                      onClick={() => confirmSession(viewingSession.id)}
-                    >
-                      <FaCheckCircle /> Подтвердить акт
-                    </button>
                   </div>
-                )}
+
+                  <div className="cafeInventory__sessionItemsList">
+                    <h4>Оборудование ({viewingSession.items?.length || 0}):</h4>
+                    {viewingSession.items?.map((item, idx) => (
+                      <div key={idx} className="cafeInventory__sessionItemView">
+                        <div>
+                          <strong>{item.equipment_title || "Неизвестно"}</strong>
+                          {item.serial_number && (
+                            <div style={{ fontSize: 12, color: "#6b7280" }}>
+                              {item.serial_number}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "12px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            className={`cafeInventory__status cafeInventory__status--${
+                              item.is_present ? "success" : "danger"
+                            }`}
+                          >
+                            {item.is_present ? "На месте" : "Отсутствует"}
+                          </span>
+                          <span
+                            className={`cafeInventory__status cafeInventory__status--${getConditionColor(
+                              item.condition
+                            )}`}
+                          >
+                            {getConditionLabel(item.condition)}
+                          </span>
+                          {item.notes && (
+                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                              {item.notes}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+
+              {!viewingSession.is_confirmed && (
+                <div className="cafeInventory__formActions">
+                  <button
+                    type="button"
+                    className="cafeInventory__btn cafeInventory__btn--secondary"
+                    onClick={() => setViewSessionModalOpen(false)}
+                  >
+                    Закрыть
+                  </button>
+                  <button
+                    type="button"
+                    className="cafeInventory__btn cafeInventory__btn--success"
+                    onClick={() => confirmSession(viewingSession.id)}
+                  >
+                    <FaCheckCircle /> Подтвердить акт
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1278,7 +1507,11 @@ const CafeInventory = () => {
                 <FaTimes />
               </button>
             </div>
-            <form className="cafeInventory__form" onSubmit={saveStockCheck}>
+            <form
+              className="cafeInventory__form cafeInventory__form--modal"
+              onSubmit={saveStockCheck}
+            >
+              <div className="cafeInventory__formBody">
               <div className="cafeInventory__formGrid">
                 <div className="cafeInventory__field cafeInventory__field--full">
                   <label className="cafeInventory__label">Комментарий</label>
@@ -1317,7 +1550,16 @@ const CafeInventory = () => {
                           label: `${p.title} (${toNum(p.remainder)} ${p.unit || "шт"})`,
                         }))}
                       placeholder="Выберите продукт…"
+                      menuPortal
                     />
+                    <button
+                      type="button"
+                      className="cafeInventory__btn cafeInventory__btn--secondary cafeInventory__btn--picker"
+                      onClick={openProductPicker}
+                      disabled={availableProductsForStockCheck.length === 0}
+                    >
+                      <FaThList /> Выбрать из списка
+                    </button>
                     <button
                       type="button"
                       className="cafeInventory__btn cafeInventory__btn--secondary"
@@ -1412,6 +1654,7 @@ const CafeInventory = () => {
                   </div>
                 )}
               </div>
+              </div>
 
               <div className="cafeInventory__formActions">
                 <button
@@ -1455,100 +1698,102 @@ const CafeInventory = () => {
                 <FaTimes />
               </button>
             </div>
-            <div className="cafeInventory__form">
-              <div className="cafeInventory__sessionDetails">
-                <div className="cafeInventory__sessionInfo">
-                  <div>
-                    <strong>Создан:</strong>{" "}
-                    {new Date(viewingStockCheck.created_at).toLocaleString(
-                      "ru-RU"
-                    )}
-                  </div>
-                  {viewingStockCheck.confirmed_at && (
+            <div className="cafeInventory__form cafeInventory__form--modal">
+              <div className="cafeInventory__formBody">
+                <div className="cafeInventory__sessionDetails">
+                  <div className="cafeInventory__sessionInfo">
                     <div>
-                      <strong>Подтвержден:</strong>{" "}
-                      {new Date(viewingStockCheck.confirmed_at).toLocaleString(
+                      <strong>Создан:</strong>{" "}
+                      {new Date(viewingStockCheck.created_at).toLocaleString(
                         "ru-RU"
                       )}
                     </div>
-                  )}
-                  <div>
-                    <strong>Статус:</strong>{" "}
-                    {viewingStockCheck.is_confirmed ? "Подтвержден" : "Ожидает"}
+                    {viewingStockCheck.confirmed_at && (
+                      <div>
+                        <strong>Подтвержден:</strong>{" "}
+                        {new Date(viewingStockCheck.confirmed_at).toLocaleString(
+                          "ru-RU"
+                        )}
+                      </div>
+                    )}
+                    <div>
+                      <strong>Статус:</strong>{" "}
+                      {viewingStockCheck.is_confirmed ? "Подтвержден" : "Ожидает"}
+                    </div>
                   </div>
-                </div>
 
-                <div className="cafeInventory__sessionItemsList">
-                  <h4>Продукты ({viewingStockCheck.items?.length || 0}):</h4>
-                  {viewingStockCheck.items?.map((item, idx) => {
-                    const qtyExpected = toNum(item.qty_expected || 0);
-                    const qtyCounted = toNum(item.qty_counted || 0);
-                    const difference = toNum(item.difference || 0);
-                    return (
-                      <div key={idx} className="cafeInventory__sessionItemView">
-                        <div>
-                          <strong>{item.product_title || "Неизвестно"}</strong>
-                          <div style={{ fontSize: 12, color: "#6b7280" }}>
-                            Ед. измерения: {item.product_unit || "шт"}
+                  <div className="cafeInventory__sessionItemsList">
+                    <h4>Продукты ({viewingStockCheck.items?.length || 0}):</h4>
+                    {viewingStockCheck.items?.map((item, idx) => {
+                      const qtyExpected = toNum(item.qty_expected || 0);
+                      const qtyCounted = toNum(item.qty_counted || 0);
+                      const difference = toNum(item.difference || 0);
+                      return (
+                        <div key={idx} className="cafeInventory__sessionItemView">
+                          <div>
+                            <strong>{item.product_title || "Неизвестно"}</strong>
+                            <div style={{ fontSize: 12, color: "#6b7280" }}>
+                              Ед. измерения: {item.product_unit || "шт"}
+                            </div>
                           </div>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "12px",
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
-                            <strong>Ожидается:</strong> {qtyExpected}{" "}
-                            {item.product_unit || "шт"}
-                          </span>
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
-                            <strong>Фактически:</strong> {qtyCounted}{" "}
-                            {item.product_unit || "шт"}
-                          </span>
-                          <span
+                          <div
                             style={{
-                              fontSize: 12,
-                              color:
-                                difference > 0
-                                  ? "#10b981"
-                                  : difference < 0
-                                  ? "#ef4444"
-                                  : "#6b7280",
-                              fontWeight: "bold",
+                              display: "flex",
+                              gap: "12px",
+                              flexWrap: "wrap",
+                              alignItems: "center",
                             }}
                           >
-                            <strong>Разница:</strong>{" "}
-                            {difference > 0 ? "+" : ""}
-                            {difference.toFixed(2)} {item.product_unit || "шт"}
-                          </span>
+                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                              <strong>Ожидается:</strong> {qtyExpected}{" "}
+                              {item.product_unit || "шт"}
+                            </span>
+                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                              <strong>Фактически:</strong> {qtyCounted}{" "}
+                              {item.product_unit || "шт"}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color:
+                                  difference > 0
+                                    ? "#10b981"
+                                    : difference < 0
+                                    ? "#ef4444"
+                                    : "#6b7280",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              <strong>Разница:</strong>{" "}
+                              {difference > 0 ? "+" : ""}
+                              {difference.toFixed(2)} {item.product_unit || "шт"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {!viewingStockCheck.is_confirmed && (
-                  <div className="cafeInventory__formActions">
-                    <button
-                      type="button"
-                      className="cafeInventory__btn cafeInventory__btn--secondary"
-                      onClick={() => setViewStockCheckModalOpen(false)}
-                    >
-                      Закрыть
-                    </button>
-                    <button
-                      type="button"
-                      className="cafeInventory__btn cafeInventory__btn--success"
-                      onClick={() => openConfirmStockCheck(viewingStockCheck.id)}
-                    >
-                      <FaCheckCircle /> Подтвердить акт
-                    </button>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
               </div>
+
+              {!viewingStockCheck.is_confirmed && (
+                <div className="cafeInventory__formActions">
+                  <button
+                    type="button"
+                    className="cafeInventory__btn cafeInventory__btn--secondary"
+                    onClick={() => setViewStockCheckModalOpen(false)}
+                  >
+                    Закрыть
+                  </button>
+                  <button
+                    type="button"
+                    className="cafeInventory__btn cafeInventory__btn--success"
+                    onClick={() => openConfirmStockCheck(viewingStockCheck.id)}
+                  >
+                    <FaCheckCircle /> Подтвердить акт
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1682,6 +1927,58 @@ const CafeInventory = () => {
           </div>
         </div>
       )}
+
+      <InventoryItemsPickerModal
+        open={equipmentPickerOpen}
+        onClose={() => setEquipmentPickerOpen(false)}
+        title="Выбор оборудования"
+        description="Отметьте позиции для добавления в акт. Можно выбрать все сразу или по одной."
+        searchValue={equipmentPickerSearch}
+        onSearchChange={setEquipmentPickerSearch}
+        items={equipmentPickerItems}
+        selectedIds={equipmentPickerSelected}
+        onToggle={toggleEquipmentPickerItem}
+        onToggleSelectAll={toggleEquipmentPickerSelectAll}
+        isAllFilteredSelected={isAllEquipmentPickerSelected}
+        onConfirm={applyEquipmentPicker}
+        confirmLabel={
+          equipmentPickerSelected.size > 0
+            ? `Добавить (${equipmentPickerSelected.size})`
+            : "Добавить выбранные"
+        }
+        emptyText={
+          availableEquipmentForSession.length === 0
+            ? "Всё оборудование уже добавлено в акт"
+            : "Оборудование не найдено. Измените поиск."
+        }
+        icon={FaTools}
+      />
+
+      <InventoryItemsPickerModal
+        open={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        title="Выбор продуктов"
+        description="Отметьте продукты для сверки. Фактическое количество по умолчанию — текущий остаток на складе."
+        searchValue={productPickerSearch}
+        onSearchChange={setProductPickerSearch}
+        items={productPickerItems}
+        selectedIds={productPickerSelected}
+        onToggle={toggleProductPickerItem}
+        onToggleSelectAll={toggleProductPickerSelectAll}
+        isAllFilteredSelected={isAllProductPickerSelected}
+        onConfirm={applyProductPicker}
+        confirmLabel={
+          productPickerSelected.size > 0
+            ? `Добавить (${productPickerSelected.size})`
+            : "Добавить выбранные"
+        }
+        emptyText={
+          availableProductsForStockCheck.length === 0
+            ? "Все продукты уже добавлены в акт"
+            : "Продукты не найдены. Измените поиск."
+        }
+        icon={FaBoxes}
+      />
     </section>
   );
 };
