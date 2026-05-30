@@ -1,3 +1,4 @@
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import "./BusinessProblems.scss";
 import cart1 from "./img/cart1.svg";
 import cart2 from "./img/cart2.svg";
@@ -10,8 +11,10 @@ import logobanner4 from "./img/logobanner4.svg";
 import logobanner5 from "./img/logobanner5.svg";
 
 const BusinessProblems = () => {
+  const scrollToDemo = useScrollToDemo();
+
   return (
-    <section className="business pt-[100px]">
+    <section id="interface" className="business pt-[100px]">
       <div className="business__container new-container">
         <div className="business__wrapper">
           <div className="col-6">
@@ -28,7 +31,9 @@ const BusinessProblems = () => {
               бизнес теряет контроль.
             </p>
             <div className="business__line"></div>
-            <button className="business__btn">Попробовать NurCRM ⭢</button>
+            <button type="button" className="business__btn" onClick={scrollToDemo}>
+              Попробовать NurCRM ⭢
+            </button>
             <div className="business__banner">
               <img
                 className="business__banner__img1"

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Header from "../sections/Header/Header";
 import LessonsSidebar from "./components/LessonsSidebar";
 import LessonSearch from "./components/LessonSearch";
@@ -17,11 +18,11 @@ const VideoLessons = () => {
 
   const visibleLessons = useMemo(
     () => filterLessons(allLessons, { courseId: selectedCourseId, search }),
-    [allLessons, selectedCourseId, search]
+    [allLessons, selectedCourseId, search],
   );
 
   const pageTitle = selectedCourseId
-    ? courses.find((c) => c.id === selectedCourseId)?.title ?? "Видеоуроки"
+    ? (courses.find((c) => c.id === selectedCourseId)?.title ?? "Видеоуроки")
     : "Все видеоуроки";
 
   const handleToggleExpand = (courseId) => {
@@ -57,12 +58,15 @@ const VideoLessons = () => {
             <section className="vl-main">
               <div className="vl-main__head">
                 <h1 className="vl-main__title">{pageTitle}</h1>
-                <LessonSearch value={search} onChange={setSearch} />
+                <div className="vl-main__head-actions">
+                  <LessonSearch value={search} onChange={setSearch} />
+                  {/* <Link to="/video-lessons/admin" className="vl-main__admin-link">
+                    Управление
+                  </Link> */}
+                </div>
               </div>
 
-              {loading && (
-                <p className="vl-main__status">Загрузка уроков…</p>
-              )}
+              {loading && <p className="vl-main__status">Загрузка уроков…</p>}
 
               {error && !loading && (
                 <div className="vl-main__status vl-main__status--error">

@@ -3,7 +3,7 @@ import img from './img/img.svg'
 
 const Team = () => {
   return (
-    <section className="team">
+    <section id="team" className="team">
       <div className="team__container new-container">
         <div className="team__start">
           <div className="team__first">

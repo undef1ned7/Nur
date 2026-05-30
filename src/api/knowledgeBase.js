@@ -9,6 +9,43 @@ function normalizeCoursesList(data) {
   return [];
 }
 
+export function formatKnowledgeBaseErrors(data) {
+  if (!data || typeof data !== "object") return null;
+  if (typeof data.detail === "string") return data.detail;
+
+  const parts = [];
+
+  Object.entries(data).forEach(([key, value]) => {
+    if (Array.isArray(value) && value.length && typeof value[0] === "object") {
+      value.forEach((item, index) => {
+        Object.entries(item).forEach(([field, messages]) => {
+          const text = Array.isArray(messages) ? messages.join(", ") : messages;
+          parts.push(`Урок ${index + 1}, ${field}: ${text}`);
+        });
+      });
+      return;
+    }
+
+    const text = Array.isArray(value) ? value.join(", ") : String(value);
+    parts.push(`${key}: ${text}`);
+  });
+
+  return parts.length ? parts.join("\n") : null;
+}
+
+async function parseResponse(response) {
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      formatKnowledgeBaseErrors(data) ||
+      `Ошибка запроса (${response.status})`;
+    throw new Error(message);
+  }
+
+  return data;
+}
+
 export async function fetchKnowledgeBaseCourses() {
   const response = await fetch(`${KB_URL}/`);
   if (!response.ok) {
@@ -32,8 +69,23 @@ export async function fetchKnowledgeBaseCourses() {
 
 export async function fetchKnowledgeBaseCourse(courseId) {
   const response = await fetch(`${KB_URL}/${courseId}/`);
-  if (!response.ok) {
-    throw new Error("Не удалось загрузить курс");
-  }
-  return response.json();
+  return parseResponse(response);
+}
+
+export async function createKnowledgeBaseCourse(payload) {
+  const response = await fetch(`${KB_URL}/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
+}
+
+export async function updateKnowledgeBaseCourse(courseId, payload) {
+  const response = await fetch(`${KB_URL}/${courseId}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseResponse(response);
 }

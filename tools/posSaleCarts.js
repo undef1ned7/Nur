@@ -97,7 +97,27 @@ export const normalizePosStartResponse = (data) => {
 
 export const applyPosStartToState = (state, data) => {
   const { sale, carts, activeSaleId } = normalizePosStartResponse(data);
-  if (sale) state.start = sale;
+  if (sale) {
+    const prev = state.start;
+    const prevId = prev?.id != null ? String(prev.id) : "";
+    const nextId = sale.id != null ? String(sale.id) : "";
+    if (prev && prevId && nextId && prevId === nextId) {
+      const prevItems = prev.items ?? prev.cart?.items;
+      const nextItems = sale.items ?? sale.cart?.items;
+      // POST /start/ часто возвращает sale без items — не затираем строки корзины
+      if (
+        Array.isArray(prevItems) &&
+        prevItems.length > 0 &&
+        (!Array.isArray(nextItems) || nextItems.length === 0)
+      ) {
+        state.start = { ...sale, items: prevItems };
+      } else {
+        state.start = sale;
+      }
+    } else {
+      state.start = sale;
+    }
+  }
   if (carts.length) state.posCarts = carts;
   if (activeSaleId) state.activeSaleId = activeSaleId;
   else if (sale?.id) state.activeSaleId = String(sale.id);

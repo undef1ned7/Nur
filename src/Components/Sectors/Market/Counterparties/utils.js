@@ -178,3 +178,50 @@ export const groupCounterpartiesByAgent = (counterparties, getAgentDisplayFn = g
   return result;
 };
 
+const getCounterpartyResults = (payload) =>
+  payload?.results ?? (Array.isArray(payload) ? payload : []);
+
+/**
+ * Объединяет несколько ответов listCounterparties без дублей по id.
+ */
+export const mergeCounterpartyLists = (...payloads) => {
+  const ids = new Set();
+  const merged = [];
+  for (const payload of payloads) {
+    if (!payload) continue;
+    for (const c of getCounterpartyResults(payload)) {
+      if (!c?.id || ids.has(c.id)) continue;
+      ids.add(c.id);
+      merged.push(c);
+    }
+  }
+  return {
+    count: merged.length,
+    next: null,
+    previous: null,
+    results: merged,
+  };
+};
+
+/**
+ * Подмешивает analytics за период (из урезанного ответа API) в полный список контрагентов.
+ * Бэкенд с period_start/period_end возвращает только контрагентов с движениями за период.
+ */
+export const mergeCounterpartyPeriodAnalytics = (fullPayload, periodPayload) => {
+  const fullResults = getCounterpartyResults(fullPayload);
+  const periodResults = getCounterpartyResults(periodPayload);
+  if (!periodResults.length) return fullPayload;
+
+  const periodById = new Map(periodResults.map((c) => [c.id, c]));
+  const mergedResults = fullResults.map((c) => {
+    const withPeriod = periodById.get(c.id);
+    if (!withPeriod?.analytics) return c;
+    return { ...c, analytics: withPeriod.analytics };
+  });
+
+  if (fullPayload?.results) {
+    return { ...fullPayload, results: mergedResults };
+  }
+  return mergedResults;
+};
+

@@ -75,8 +75,11 @@ const counterpartySlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Загрузка списка контрагентов
-      .addCase(fetchWarehouseCounterparties.pending, (state) => {
-        state.loading = true;
+      .addCase(fetchWarehouseCounterparties.pending, (state, action) => {
+        const skipLoading = action.meta?.arg?._skipLoadingIfCached;
+        if (!skipLoading || state.list.length === 0) {
+          state.loading = true;
+        }
         state.error = null;
       })
       .addCase(fetchWarehouseCounterparties.fulfilled, (state, action) => {

@@ -5,7 +5,7 @@ import blur from './img/blur.svg';
 
 const Rate = () => {
   return (
-    <section className="rate">
+    <section id="tariff" className="rate">
       <div className="rate__container new-container">
         <h1 className="rate__title">
           Выберите тариф, который{" "}

@@ -191,6 +191,29 @@
     flex-wrap: wrap;
   }
 
+  &__head-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__admin-link {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #f5ebd0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #232025;
+    text-decoration: none;
+    white-space: nowrap;
+
+    &:hover {
+      background: #eed9a8;
+    }
+  }
+
   &__title {
     margin: 0;
     font-size: 28px;

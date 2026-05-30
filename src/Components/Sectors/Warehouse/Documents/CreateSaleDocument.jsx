@@ -2359,10 +2359,11 @@ const CreateSaleDocument = () => {
         return warehouseAPI.createPurchaseReturnDocument(payload);
       case "INVENTORY":
         return warehouseAPI.createInventoryDocument(payload);
-      case "RECEIPT": {
-        const { doc_type: _docType, ...receiptBody } = payload;
-        return warehouseAPI.createReceiptDocument(receiptBody);
-      }
+      case "RECEIPT":
+        return warehouseAPI.createReceiptDocument({
+          ...payload,
+          doc_type: payload.doc_type || "RECEIPT",
+        });
       case "WRITE_OFF":
         return warehouseAPI.createWriteOffDocument(payload);
       case "TRANSFER":

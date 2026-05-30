@@ -1,4 +1,5 @@
 import React from "react";
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import banner from "../../assets/banner/banner.svg";
 import smartphone from "../../assets/icons/smartphone.svg";
 import shop from "../../assets/icons/shop.svg";
@@ -8,6 +9,8 @@ import blur2 from "./img/blur2.svg";
 import "./Banner.scss";
 
 const Banner = () => {
+  const scrollToDemo = useScrollToDemo();
+
   return (
     <section className="banner">
       <div className="banner__container new-container">
@@ -22,10 +25,18 @@ const Banner = () => {
           в NurCRM
         </p>
         <div className="banner__buttons">
-          <button className="banner__buttons-btn banner__buttons-btn--primary">
+          <button
+            type="button"
+            className="banner__buttons-btn banner__buttons-btn--primary"
+            onClick={scrollToDemo}
+          >
             Оставить заявку
           </button>
-          <button className="banner__buttons-btn banner__buttons-btn--secondary">
+          <button
+            type="button"
+            className="banner__buttons-btn banner__buttons-btn--secondary"
+            onClick={scrollToDemo}
+          >
             Бесплатная консультация
           </button>
         </div>
