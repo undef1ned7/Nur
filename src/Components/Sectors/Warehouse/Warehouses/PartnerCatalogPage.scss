@@ -1,0 +1,225 @@
+.partner-catalog-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.partner-catalog-direction {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.partner-catalog-direction-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  border: 2px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.08);
+  }
+
+  &.active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.12);
+  }
+
+  &--send.active {
+    border-color: #059669;
+    background: #ecfdf5;
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.12);
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  &--send &__icon {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  &__title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary, #111827);
+  }
+
+  &__desc {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-secondary, #6b7280);
+  }
+
+  &__flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  &__flow-badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+}
+
+.partner-catalog-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: #f9fafb;
+  border: 1px solid var(--border, #e5e7eb);
+  font-size: 14px;
+  color: #4b5563;
+
+  strong {
+    color: #111827;
+  }
+}
+
+.partner-catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+
+  &__search {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 14px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  &__refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.partner-catalog-warehouses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.partner-catalog-warehouse-chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #93c5fd;
+  }
+
+  &.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+  }
+
+  &--send.active {
+    background: #059669;
+    border-color: #059669;
+  }
+}
+
+.partner-catalog-products {
+  .warehouse-table__action-btn {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .warehouse-table__action-btn--receive {
+    color: #2563eb;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+
+    &:hover:not(:disabled) {
+      background: #dbeafe;
+    }
+  }
+
+  .warehouse-table__action-btn--send {
+    color: #059669;
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+
+    &:hover:not(:disabled) {
+      background: #d1fae5;
+    }
+  }
+}
+
+.partner-catalog-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 15px;
+  border: 1px dashed var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+@media (max-width: 768px) {
+  .partner-catalog-page {
+    padding: 16px 12px;
+  }
+
+  .partner-catalog-direction {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-catalog-direction-card {
+    padding: 16px;
+  }
+}

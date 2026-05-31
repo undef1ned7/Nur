@@ -15,6 +15,7 @@ import {
   updateItemsMake,
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
+import { toDecimal2, toDecimal3 } from "../itemMakeHelpers";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
@@ -32,7 +33,13 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
   const { list: clients = [] } = useClient();
 
   // если item не передан — блокируем форму
-  const { itemId, itemName } = useMemo(() => ({ itemId: item.id, itemName: item.name }), [item]);
+  const { itemId, itemName } = useMemo(
+    () => ({
+      itemId: item?.id ?? item,
+      itemName: item?.name ?? "Сырьё",
+    }),
+    [item],
+  );
   const [qty, setQty] = useState("");
   // const [purchasePrice, setPurchasePrice] = useState(
   //   item?.purchase_price != null ? String(item.purchase_price) : ""
@@ -48,7 +55,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
   const [prepayment, setPrepayment] = useState("");
   const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
 
-  const stockQty = useMemo(() => toNum(item?.quantity), [item]);
+  const stockQty = useMemo(() => toNum(item?.quantity), [item?.quantity]);
   const { q, rp } = useMemo(() => ({ q: toNum(qty), rp: toNum(retailPrice) }), [qty, retailPrice]);
   const expense = useMemo(() => +(q * rp).toFixed(2), [q, rp]);
   const suppliers = useMemo(
@@ -129,9 +136,8 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
         updateItemsMake({
           id: itemId,
           updatedData: {
-            quantity: stockQty + q,
-            // purchase_price: pp,
-            price: rp,
+            quantity: toDecimal3(stockQty + q),
+            price: toDecimal2(rp),
           },
         })
       ).unwrap();

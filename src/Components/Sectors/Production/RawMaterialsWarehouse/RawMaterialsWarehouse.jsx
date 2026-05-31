@@ -1,29 +1,22 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useDispatch } from "react-redux";
 import {
-  createItemMake,
   fetchCategoriesAsync,
   fetchProductsAsync,
   getItemsMake,
-  // EDIT: добавлены санки редактирования/удаления сырья
+  getProcessedItemsMake,
   updateItemsMake,
   deleteItemsMake,
 } from "../../../../store/creators/productCreators";
 import {
-  createClientAsync,
-  fetchClientsAsync,
-} from "../../../../store/creators/clientCreators";
-import { createDeal } from "../../../../store/creators/saleThunk";
-import {
-  addCashFlows,
   getCashBoxes,
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { Plus, X, Search, LayoutGrid, Table2 } from "lucide-react";
-import { useUser } from "../../../../store/slices/userSlice";
-import { useClient } from "../../../../store/slices/ClientSlice";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
+import RawMaterialAddModal from "./RawMaterialAddModal";
 import "../../Market/Warehouse/Warehouse.scss";
 import {
   useAlert,
@@ -33,7 +26,12 @@ import {
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
-import api from "../../../../api";
+import {
+  canProcessItem,
+  getKindLabel,
+  getProcessingStatusLabel,
+  isRawItem,
+} from "../itemMakeHelpers";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -50,482 +48,6 @@ const safeDate = (s) => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 };
-const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
-
-/* =========================================
-   AddModal — добавление сырья
-   ========================================= */
-const AddModal = ({ onClose, selectCashBox, onSaved }) => {
-  const alert = useAlert();
-  const error = useErrorModal();
-  const { company } = useUser();
-  const { list: clients = [] } = useClient();
-  const [state, setState] = useState({
-    name: "",
-    price: "",
-    quantity: "",
-    unit: "",
-    client: "",
-  });
-  const [paymentType, setPaymentType] = useState("full");
-  const [debtMonths, setDebtMonths] = useState("1");
-  const [prepayment, setPrepayment] = useState("");
-  const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
-  const [showSupplierForm, setShowSupplierForm] = useState(false);
-  const [creatingSupplier, setCreatingSupplier] = useState(false);
-  const [supplierForm, setSupplierForm] = useState({
-    full_name: "",
-    phone: "",
-    email: "",
-    date: new Date().toISOString().split("T")[0],
-    type: "suppliers",
-    llc: "",
-    inn: "",
-    okpo: "",
-    score: "",
-    bik: "",
-    address: "",
-  });
-  const dispatch = useDispatch();
-  const [cashData, setCashData] = useState({
-    cashbox: "",
-    type: "expense",
-    name: "",
-    amount: "",
-    source_cashbox_flow_id: "",
-    source_business_operation_id: "Сырье",
-    status:
-      company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
-  });
-  const suppliers = useMemo(
-    () =>
-      (Array.isArray(clients) ? clients : []).filter(
-        (c) => c.type === "suppliers",
-      ),
-    [clients],
-  );
-  const selectedSupplier = useMemo(
-    () => suppliers.find((s) => String(s.id) === String(state.client)),
-    [suppliers, state.client],
-  );
-
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setState((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const onSupplierFormChange = (e) => {
-    const { name, value } = e.target;
-    setSupplierForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleCreateSupplier = async () => {
-    if (!supplierForm.full_name?.trim()) {
-      error("Укажите ФИО или название поставщика");
-      return;
-    }
-    setCreatingSupplier(true);
-    try {
-      const created = await dispatch(createClientAsync(supplierForm)).unwrap();
-      const newId = created?.id ?? created?.uuid;
-      await dispatch(fetchClientsAsync()).unwrap();
-      if (newId != null) {
-        setState((prev) => ({ ...prev, client: String(newId) }));
-      }
-      setSupplierForm({
-        full_name: "",
-        phone: "",
-        email: "",
-        date: new Date().toISOString().split("T")[0],
-        type: "suppliers",
-        llc: "",
-        inn: "",
-        okpo: "",
-        score: "",
-        bik: "",
-        address: "",
-      });
-      setShowSupplierForm(false);
-      alert("Поставщик создан", () => {});
-    } catch (err) {
-      const msg = validateResErrors(err, "Не удалось создать поставщика");
-      error(msg);
-    } finally {
-      setCreatingSupplier(false);
-    }
-  };
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const totalAmount =
-        (Number(state?.price) || 0) * (Number(state?.quantity) || 0);
-
-      if (paymentType === "debt" || paymentType === "prepayment") {
-        if (!state.client) {
-          error("Выберите поставщика для этой операции");
-          return;
-        }
-        if (!debtMonths || Number(debtMonths) <= 0) {
-          error("Введите корректный срок долга");
-          return;
-        }
-        if (!firstPaymentDate) {
-          error("Укажите дату первой оплаты");
-          return;
-        }
-      }
-      if (paymentType === "prepayment") {
-        const prepaymentValue = Number(prepayment || 0);
-        if (!prepaymentValue || prepaymentValue <= 0) {
-          error("Введите корректную сумму предоплаты");
-          return;
-        }
-        if (prepaymentValue > totalAmount) {
-          error("Сумма предоплаты не может превышать общую сумму");
-          return;
-        }
-      }
-
-      // EDIT: count -> quantity
-      const result = await dispatch(createItemMake(state)).unwrap();
-
-      if (
-        (paymentType === "debt" || paymentType === "prepayment") &&
-        state.client
-      ) {
-        const prepaymentValue = Number(prepayment || 0);
-        const remainingDebt =
-          paymentType === "prepayment"
-            ? Math.max(0, totalAmount - prepaymentValue)
-            : totalAmount;
-
-        if (company?.subscription_plan?.name === "Старт" && remainingDebt > 0) {
-          await api.post("/main/debts/", {
-            name:
-              selectedSupplier?.full_name ||
-              selectedSupplier?.name ||
-              "Поставщик",
-            phone: selectedSupplier?.phone || "",
-            due_date: firstPaymentDate,
-            amount: remainingDebt,
-          });
-        }
-
-        await dispatch(
-          createDeal({
-            clientId: state.client,
-            title: `${paymentType === "prepayment" ? "Предоплата" : "Долг"} ${selectedSupplier?.full_name || state.name || "Поставщик"}`,
-            statusRu: paymentType === "prepayment" ? "Предоплата" : "Долги",
-            amount: totalAmount,
-            debtMonths: Number(debtMonths || 1),
-            prepayment:
-              paymentType === "prepayment" ? prepaymentValue : undefined,
-            first_due_date: firstPaymentDate,
-          }),
-        ).unwrap();
-      }
-
-      if (paymentType !== "debt") {
-        await dispatch(
-          addCashFlows({
-            ...cashData,
-            amount:
-              paymentType === "prepayment"
-                ? Number(prepayment || 0)
-                : totalAmount,
-            source_cashbox_flow_id: result.id,
-          }),
-        ).unwrap();
-      }
-
-      alert("Сырье добавлен!", () => {
-        onSaved?.();
-        onClose();
-      });
-    } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при добавлении сырья");
-      error(errorMessage);
-    }
-  };
-
-  useEffect(() => {
-    setCashData((prev) => ({
-      ...prev,
-      cashbox: selectCashBox,
-      name: state.name,
-      amount: state.price,
-    }));
-  }, [state, selectCashBox]);
-
-  useEffect(() => {
-    dispatch(fetchClientsAsync());
-  }, [dispatch]);
-
-  return (
-    <div className="add-modal raw-modal">
-      <div className="add-modal__overlay z-50!" onClick={onClose} />
-      <form className="add-modal__content z-50!" onSubmit={onSubmit}>
-        <div className="add-modal__header">
-          <h3>Добавление сырья</h3>
-          <button
-            className="add-modal__close-icon"
-            onClick={onClose}
-            type="button"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="add-modal__section">
-          <label>Название *</label>
-          <input
-            name="name"
-            value={state.name}
-            onChange={onChange}
-            required
-            placeholder="Название *"
-            className="add-modal__input"
-          />
-        </div>
-
-        <div className="add-modal__section">
-          <label>Ед. измерения *</label>
-          <input
-            name="unit"
-            value={state.unit}
-            onChange={onChange}
-            required
-            placeholder="Ед. измерения *"
-            className="add-modal__input"
-          />
-        </div>
-
-        <div className="add-modal__section">
-          <label>Цена *</label>
-          <input
-            name="price"
-            type="number"
-            min="0"
-            step="0.01"
-            value={state.price}
-            onChange={onChange}
-            required
-            placeholder="Цена *"
-            className="add-modal__input"
-          />
-        </div>
-
-        <div className="add-modal__section">
-          <label>Количество *</label>
-          <input
-            name="quantity"
-            type="number"
-            min="0"
-            step="0.0001"
-            value={state.quantity}
-            onChange={onChange}
-            required
-            placeholder="Количество *"
-            className="add-modal__input"
-          />
-        </div>
-
-        <div className="add-modal__section">
-          <label>Поставщик</label>
-          <select
-            name="client"
-            value={state.client}
-            onChange={onChange}
-            className="add-modal__input"
-          >
-            <option value="">-- Выберите поставщика --</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.full_name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="add-modal__cancel"
-            style={{ marginTop: 8, width: "100%" }}
-            onClick={() => setShowSupplierForm((v) => !v)}
-          >
-            {showSupplierForm ? "Отменить создание" : "Создать поставщика"}
-          </button>
-          {showSupplierForm && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                rowGap: "10px",
-                marginTop: "10px",
-              }}
-            >
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                placeholder="ФИО или название *"
-                name="full_name"
-                value={supplierForm.full_name}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="llc"
-                placeholder="ОсОО"
-                value={supplierForm.llc}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="inn"
-                placeholder="ИНН"
-                value={supplierForm.inn}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="okpo"
-                placeholder="ОКПО"
-                value={supplierForm.okpo}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="score"
-                placeholder="Р/счёт"
-                value={supplierForm.score}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="bik"
-                placeholder="БИК"
-                value={supplierForm.bik}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="address"
-                placeholder="Адрес"
-                value={supplierForm.address}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="text"
-                name="phone"
-                placeholder="Телефон"
-                value={supplierForm.phone}
-              />
-              <input
-                className="add-modal__input"
-                onChange={onSupplierFormChange}
-                type="email"
-                name="email"
-                placeholder="Почта"
-                value={supplierForm.email}
-              />
-              <div style={{ display: "flex", columnGap: "10px" }}>
-                <button
-                  type="button"
-                  className="add-modal__cancel"
-                  onClick={() => setShowSupplierForm(false)}
-                  disabled={creatingSupplier}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="add-modal__save"
-                  onClick={handleCreateSupplier}
-                  disabled={creatingSupplier}
-                >
-                  {creatingSupplier ? "Создание…" : "Создать"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {!!state.client && (
-          <>
-            <div className="add-modal__section">
-              <label>Тип оплаты *</label>
-              <select
-                value={paymentType}
-                onChange={(e) => setPaymentType(e.target.value)}
-                className="add-modal__input"
-              >
-                <option value="full">Полная оплата</option>
-                <option value="prepayment">Предоплата</option>
-                <option value="debt">В долг</option>
-              </select>
-            </div>
-
-            {(paymentType === "debt" || paymentType === "prepayment") && (
-              <>
-                {paymentType === "prepayment" && (
-                  <div className="add-modal__section">
-                    <label>Сумма предоплаты *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={prepayment}
-                      onChange={(e) => setPrepayment(e.target.value)}
-                      className="add-modal__input"
-                      placeholder="Сумма предоплаты"
-                    />
-                  </div>
-                )}
-                <div className="add-modal__section">
-                  <label>Срок долга (мес.) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={debtMonths}
-                    onChange={(e) => setDebtMonths(e.target.value)}
-                    className="add-modal__input"
-                    placeholder="Срок долга"
-                  />
-                </div>
-
-                <div className="add-modal__section">
-                  <label>Дата первой оплаты *</label>
-                  <input
-                    type="date"
-                    value={firstPaymentDate}
-                    onChange={(e) => setFirstPaymentDate(e.target.value)}
-                    className="add-modal__input"
-                  />
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        <div className="add-modal__footer">
-          <button className="add-modal__cancel" onClick={onClose} type="button">
-            Отмена
-          </button>
-          <button className="add-modal__save">Добавить</button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
 /* =========================================
    EditModal — редактирование/удаление сырья
    Поля: name, unit, price, quantity
@@ -558,8 +80,6 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
       setSaving(true);
       const payload = {
         ...form,
-        price: Number(form.price),
-        quantity: Number(form.quantity),
       };
 
       await dispatch(
@@ -614,6 +134,18 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
           <X className="add-modal__close-icon" onClick={onClose} />
         </div>
 
+        {(item?.kind || item?.source_name) && (
+          <div className="add-modal__section" style={{ marginBottom: 0 }}>
+            <small style={{ opacity: 0.75 }}>
+              Тип: {getKindLabel(item)}
+              {getProcessingStatusLabel(item)
+                ? ` · ${getProcessingStatusLabel(item)}`
+                : ""}
+              {item?.source_name ? ` · Исходное: ${item.source_name}` : ""}
+            </small>
+          </div>
+        )}
+
         <div className="add-modal__section">
           <label>Название *</label>
           <input
@@ -656,7 +188,7 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
             type="number"
             name="quantity"
             min="0"
-            step="0.0001"
+            step="0.001"
             max={2147483647}
             value={form.quantity}
             onChange={onChange}
@@ -690,7 +222,8 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
    Основной экран «Склад сырья»
    ========================================= */
 const RawMaterialsWarehouse = () => {
-  const { categories, loading, error, itemsMake: products } = useProducts();
+  const navigate = useNavigate();
+  const { loading, error, itemsMake: products } = useProducts();
   const { list: cashBoxes } = useCash();
   const dispatch = useDispatch();
 
@@ -706,9 +239,21 @@ const RawMaterialsWarehouse = () => {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [kindFilter, setKindFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const listQueryParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (kindFilter === "processing_queue") {
+      params.kind = "raw";
+      params.needs_processing = true;
+    } else if (kindFilter) {
+      params.kind = kindFilter;
+    }
+    return params;
+  }, [kindFilter, debouncedSearch]);
 
   // View mode (table/cards)
   const STORAGE_KEY = "raw_materials_view_mode";
@@ -757,8 +302,11 @@ const RawMaterialsWarehouse = () => {
     dispatch(fetchProductsAsync());
     dispatch(fetchCategoriesAsync());
     dispatch(getCashBoxes());
-    dispatch(getItemsMake());
   }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(getItemsMake(listQueryParams));
+  }, [dispatch, listQueryParams]);
 
   // Автоматически выбираем первую кассу по индексу
   useEffect(() => {
@@ -772,37 +320,25 @@ const RawMaterialsWarehouse = () => {
   }, [cashBoxes, selectCashBox]);
 
   const refresh = () => {
-    dispatch(getItemsMake());
+    dispatch(getItemsMake(listQueryParams));
+    dispatch(getProcessedItemsMake());
   };
 
-  // --- Filtering ---
+  // --- Filtering (даты — локально; kind/search — на сервере) ---
   const filtered = useMemo(() => {
     const from = dateFrom ? toStartOfDay(dateFrom) : null;
     const to = dateTo ? toEndOfDay(dateTo) : null;
-    const q = debouncedSearch.trim().toLowerCase();
 
     return (products || [])
       .filter((p) => {
-        if (
-          q &&
-          !String(p.name || "")
-            .toLowerCase()
-            .includes(q)
-        )
-          return false;
-
-        if (categoryId && String(p.category) !== String(categoryId))
-          return false;
-
         const created = safeDate(p.created_at);
         if (!created) return false;
         if (from && created < from) return false;
         if (to && created > to) return false;
-
         return true;
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [products, debouncedSearch, categoryId, dateFrom, dateTo]);
+  }, [products, dateFrom, dateTo]);
 
   const filteredTotalValue = useMemo(
     () =>
@@ -823,7 +359,7 @@ const RawMaterialsWarehouse = () => {
 
   const resetFilters = () => {
     setSearch("");
-    setCategoryId("");
+    setKindFilter("");
     setDateFrom("");
     setDateTo("");
   };
@@ -831,6 +367,10 @@ const RawMaterialsWarehouse = () => {
   const openEdit = (item) => {
     setSelectedItem(item);
     setShowEditModal(true);
+  };
+
+  const openProcess = (item) => {
+    navigate(`/crm/production/warehouse/raw-materials/process/${item.id}`);
   };
 
   return (
@@ -876,19 +416,17 @@ const RawMaterialsWarehouse = () => {
             Всего: {products?.length || 0} • Найдено: {filtered.length}
           </span>
 
-          {/* Category filter */}
+          {/* Kind filter */}
           <select
             className="warehouse-search__input"
-            style={{ width: "auto", minWidth: "180px" }}
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            style={{ width: "auto", minWidth: "160px" }}
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value)}
           >
-            <option value="">Все категории</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
+            <option value="">Все</option>
+            <option value="raw">Сырьё</option>
+            <option value="processed">Обработанное</option>
+            <option value="processing_queue">Очередь на обработку</option>
           </select>
 
           {/* Date filters */}
@@ -914,7 +452,7 @@ const RawMaterialsWarehouse = () => {
               />
             </div>
 
-            {(dateFrom || dateTo || search || categoryId) && (
+            {(dateFrom || dateTo || search || kindFilter) && (
               <button
                 type="button"
                 className="warehouse-search__filter-btn"
@@ -964,11 +502,12 @@ const RawMaterialsWarehouse = () => {
           {/* ===== TABLE ===== */}
           {viewMode === "table" && (
             <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <table className="warehouse-table w-full min-w-[900px]">
+              <table className="warehouse-table w-full min-w-[1100px]">
                 <thead>
                   <tr>
                     <th>№</th>
                     <th>Название</th>
+                    <th>Тип</th>
                     <th>Ед.</th>
                     <th>Дата</th>
                     <th>Цена</th>
@@ -980,19 +519,19 @@ const RawMaterialsWarehouse = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="warehouse-table__loading">
+                      <td colSpan={8} className="warehouse-table__loading">
                         Загрузка...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={7} className="warehouse-table__empty">
+                      <td colSpan={8} className="warehouse-table__empty">
                         Ошибка загрузки
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="warehouse-table__empty">
+                      <td colSpan={8} className="warehouse-table__empty">
                         Сырье не найдено
                       </td>
                     </tr>
@@ -1003,6 +542,73 @@ const RawMaterialsWarehouse = () => {
                         <td className="warehouse-table__name">
                           <div className="warehouse-table__name-cell">
                             <span>{item.name || "—"}</span>
+                            {item.supplier_name && isRawItem(item) && (
+                              <small
+                                style={{
+                                  display: "block",
+                                  opacity: 0.65,
+                                  fontSize: 11,
+                                }}
+                              >
+                                {item.supplier_name}
+                              </small>
+                            )}
+                            {item.source_name && (
+                              <small
+                                style={{
+                                  display: "block",
+                                  opacity: 0.65,
+                                  fontSize: 11,
+                                }}
+                              >
+                                из: {item.source_name}
+                              </small>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 4,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                fontSize: 11,
+                                background:
+                                  item.kind === "processed" || item.is_processed
+                                    ? "#dbeafe"
+                                    : "#f3f4f6",
+                                color:
+                                  item.kind === "processed" || item.is_processed
+                                    ? "#1d4ed8"
+                                    : "#374151",
+                              }}
+                            >
+                              {getKindLabel(item)}
+                            </span>
+                            {getProcessingStatusLabel(item) && (
+                              <span
+                                style={{
+                                  padding: "2px 8px",
+                                  borderRadius: 6,
+                                  fontSize: 10,
+                                  background: item.needs_processing
+                                    ? "#fff7ed"
+                                    : "#ecfdf5",
+                                  color: item.needs_processing
+                                    ? "#c2410c"
+                                    : "#047857",
+                                }}
+                              >
+                                {getProcessingStatusLabel(item)}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td>{item.unit || "—"}</td>
@@ -1035,30 +641,44 @@ const RawMaterialsWarehouse = () => {
                               flexWrap: "wrap",
                             }}
                           >
+                            {isRawItem(item) && (
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#f7d74f",
+                                  color: "black",
+                                }}
+                                onClick={() => handleOpen(item.id)}
+                              >
+                                Добавить
+                              </button>
+                            )}
                             <button
                               className="warehouse-header__create-btn"
                               style={{
                                 padding: "6px 12px",
                                 fontSize: "12px",
-                                background: "#f7d74f",
-                                color: "black",
-                              }}
-                              onClick={() => handleOpen(item)}
-                            >
-                              Добавить
-                            </button>
-                            <button
-                              className="warehouse-header__create-btn"
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                // background: "#3b82f6",
-                                // color: "#fff",
                               }}
                               onClick={() => openEdit(item)}
                             >
                               Редактировать
                             </button>
+                            {canProcessItem(item) && (
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                background: "#f7d74f",
+                                color: "black",
+                                }}
+                                onClick={() => openProcess(item)}
+                              >
+                                Обработать
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1096,8 +716,24 @@ const RawMaterialsWarehouse = () => {
                         <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
                           {item.name || "—"}
                         </div>
+                        {item.source_name && (
+                          <div className="text-xs text-slate-500">
+                            из: {item.source_name}
+                          </div>
+                        )}
 
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <span className="whitespace-nowrap">
+                            Тип:{" "}
+                            <span className="font-medium">
+                              {getKindLabel(item)}
+                            </span>
+                          </span>
+                          {getProcessingStatusLabel(item) && (
+                            <span className="whitespace-nowrap">
+                              {getProcessingStatusLabel(item)}
+                            </span>
+                          )}
                           <span className="whitespace-nowrap">
                             Ед. изм:{" "}
                             <span className="font-medium">
@@ -1148,26 +784,27 @@ const RawMaterialsWarehouse = () => {
                         className="mt-4 flex flex-wrap gap-2"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        {isRawItem(item) && (
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f7d74f",
+                              color: "black",
+                              flex: "1",
+                              minWidth: "80px",
+                            }}
+                            onClick={() => handleOpen(item.id)}
+                          >
+                            Добавить
+                          </button>
+                        )}
                         <button
                           className="warehouse-header__create-btn"
                           style={{
                             padding: "6px 12px",
                             fontSize: "12px",
-                            background: "#f7d74f",
-                            color: "black",
-                            flex: "1",
-                            minWidth: "80px",
-                          }}
-                          onClick={() => handleOpen(item)}
-                        >
-                          Добавить
-                        </button>
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            // background: "#3b82f6",
                             color: "#000",
                             flex: "1",
                             minWidth: "80px",
@@ -1176,6 +813,22 @@ const RawMaterialsWarehouse = () => {
                         >
                           Редактировать
                         </button>
+                        {canProcessItem(item) && (
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                                background: "#f7d74f",
+                                color: "black",
+                              flex: "1",
+                              minWidth: "80px",
+                            }}
+                            onClick={() => openProcess(item)}
+                          >
+                            Обработать
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1187,7 +840,7 @@ const RawMaterialsWarehouse = () => {
       </DataContainer>
 
       {showAddModal && (
-        <AddModal
+        <RawMaterialAddModal
           onClose={() => setShowAddModal(false)}
           selectCashBox={selectCashBox}
           onSaved={refresh}
@@ -1205,11 +858,12 @@ const RawMaterialsWarehouse = () => {
           onDeleted={refresh}
         />
       )}
+
       {showAddProductModal && (
         <AddRawMaterials
           onClose={() => setShowAddProductModal(false)}
-          onChanged={() => dispatch(getItemsMake()).unwrap()}
-          item={itemId}
+          onChanged={refresh}
+          item={products?.find((p) => p.id === itemId) || { id: itemId }}
         />
       )}
     </div>

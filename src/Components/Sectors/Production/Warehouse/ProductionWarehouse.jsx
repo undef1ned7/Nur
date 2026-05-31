@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import FinishedGoods from "../FinishedGoods/FinishedGoods";
 import RawMaterialsWarehouse from "../RawMaterialsWarehouse/RawMaterialsWarehouse";
 import TransferStatusModal from "../TransferStatus/TransferStatus";
@@ -689,7 +690,8 @@ const PendingModal = ({ onClose, onChanged }) => {
                                   handleAcceptReturn(group.agentId)
                                 }
                                 disabled={
-                                  acceptingReturn === `agent:${group.agentId}` ||
+                                  acceptingReturn ===
+                                    `agent:${group.agentId}` ||
                                   (acceptingReturn &&
                                     acceptingReturn.startsWith(
                                       `product:${group.agentId}:`,
@@ -727,11 +729,12 @@ const PendingModal = ({ onClose, onChanged }) => {
                                           : productGroup.items[0]?.id ||
                                             productGroup.label;
                                       const bulkKey = `product:${group.agentId}:${productKey}`;
-                                      const totalQty = productGroup.items.reduce(
-                                        (s, r) =>
-                                          s + (Number(r.qty || 0) || 0),
-                                        0,
-                                      );
+                                      const totalQty =
+                                        productGroup.items.reduce(
+                                          (s, r) =>
+                                            s + (Number(r.qty || 0) || 0),
+                                          0,
+                                        );
                                       return (
                                         <div
                                           key={bulkKey}
@@ -799,9 +802,7 @@ const PendingModal = ({ onClose, onChanged }) => {
                                             {productGroup.items.map(
                                               (returnItem, itemIdx) => (
                                                 <li
-                                                  key={
-                                                    returnItem.id || itemIdx
-                                                  }
+                                                  key={returnItem.id || itemIdx}
                                                 >
                                                   qty:{" "}
                                                   <strong>
@@ -1141,8 +1142,15 @@ const PendingModal = ({ onClose, onChanged }) => {
 };
 
 const ProductionWarehouse = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "raw") {
+      setActiveTab(1);
+    }
+  }, [searchParams]);
   const { list: products } = useProducts();
   const { tariff, company } = useUser();
   const startPlanProduction = isStartPlan(
