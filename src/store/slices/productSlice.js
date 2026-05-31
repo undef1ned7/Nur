@@ -14,6 +14,8 @@ import {
   createProductWithBarcode,
   scanWarehouseProductAsync,
   getItemsMake,
+  getProcessedItemsMake,
+  processItemMake,
   createItemMake,
   consumeItemsMake,
   setItemMakeQuantity,
@@ -33,6 +35,7 @@ const initialState = {
   loading: false,
   error: null,
   itemsMake: [],
+  itemsMakeProcessed: [],
   itemsMakeLoading: false,
 
   brands: [],
@@ -209,6 +212,31 @@ const productSlice = createSlice({
         state.itemsMake = action.payload;
       })
       .addCase(getItemsMake.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(getProcessedItemsMake.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(getProcessedItemsMake.fulfilled, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.itemsMakeProcessed = action.payload;
+      })
+      .addCase(getProcessedItemsMake.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(processItemMake.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(processItemMake.fulfilled, (state) => {
+        state.itemsMakeLoading = false;
+      })
+      .addCase(processItemMake.rejected, (state, action) => {
         state.itemsMakeLoading = false;
         state.error = action.payload;
       })

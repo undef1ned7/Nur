@@ -13,6 +13,12 @@ const formatPrice = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
+const getProductQty = (product) => {
+  const raw = product?.qty ?? product?.quantity ?? product?.stock;
+  const n = Number(String(raw ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+};
+
 const extractErrorMessage = (err) => {
   if (!err) return "Неизвестная ошибка";
   if (typeof err === "string") return err;
@@ -23,31 +29,30 @@ const extractErrorMessage = (err) => {
 };
 
 const StockPartnershipTransferModal = ({
+  mode = "receive",
   open,
   onClose,
   product,
   warehouseFromId,
   partnerCompanyName,
-  ownWarehouses,
+  targetWarehouses,
   onTransferred,
 }) => {
+  const isSend = mode === "send";
   const [toWarehouseId, setToWarehouseId] = useState("");
   const [qty, setQty] = useState("");
   const [comment, setComment] = useState("межкомпанейское перемещение");
   const [submitting, setSubmitting] = useState(false);
 
-  const maxQty = useMemo(() => {
-    const n = Number(String(product?.qty ?? "").replace(",", "."));
-    return Number.isFinite(n) ? n : 0;
-  }, [product?.qty]);
+  const maxQty = useMemo(() => getProductQty(product), [product]);
 
   useEffect(() => {
     if (!open) return;
     setToWarehouseId("");
-    setQty(product?.qty ? formatQty(product.qty) : "1.000");
+    setQty(maxQty > 0 ? formatQty(maxQty) : "1.000");
     setComment("межкомпанейское перемещение");
     setSubmitting(false);
-  }, [open, product]);
+  }, [open, product, maxQty]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,7 +84,7 @@ const StockPartnershipTransferModal = ({
           },
         ],
       });
-      if (typeof onTransferred === "function") onTransferred();
+      if (typeof onTransferred === "function") onTransferred(mode, warehouseFromId);
       onClose();
     } catch (error) {
       console.error("Stock partnership transfer error:", error);
@@ -91,17 +96,24 @@ const StockPartnershipTransferModal = ({
 
   if (!open) return null;
 
+  const warehouseLabel = (w) =>
+    w.name || w.title || `Склад #${w.id}${w.branch_name ? ` (${w.branch_name})` : ""}`;
+
   return (
     <div className="warehouse-filter-overlay" onClick={onClose} role="presentation">
       <div className="warehouse-filter-modal" onClick={(e) => e.stopPropagation()}>
         <div className="warehouse-filter-modal__header">
-          <h3 className="warehouse-filter-modal__title">Перемещение от партнёра</h3>
+          <h3 className="warehouse-filter-modal__title">
+            {isSend ? "Отправка партнёру" : "Получение от партнёра"}
+          </h3>
           <button className="warehouse-filter-modal__close" onClick={onClose} type="button">
             <X size={20} />
           </button>
         </div>
         <p className="warehouse-filter-modal__subtitle">
-          Из склада партнёра «{partnerCompanyName || "—"}» на ваш склад
+          {isSend
+            ? `С вашего склада партнёру «${partnerCompanyName || "—"}»`
+            : `Из склада партнёра «${partnerCompanyName || "—"}» на ваш склад`}
         </p>
         <form className="warehouse-filter-modal__content" onSubmit={handleSubmit}>
           <div className="warehouse-filter-modal__section">
@@ -128,7 +140,9 @@ const StockPartnershipTransferModal = ({
             )}
           </div>
           <div className="warehouse-filter-modal__section">
-            <label className="warehouse-filter-modal__label">Ваш склад-получатель</label>
+            <label className="warehouse-filter-modal__label">
+              {isSend ? "Склад партнёра-получатель" : "Ваш склад-получатель"}
+            </label>
             <select
               className="warehouse-filter-modal__select"
               value={toWarehouseId}
@@ -137,9 +151,9 @@ const StockPartnershipTransferModal = ({
               required
             >
               <option value="">Выберите склад</option>
-              {(ownWarehouses || []).map((w) => (
+              {(targetWarehouses || []).map((w) => (
                 <option key={w.id} value={w.id}>
-                  {w.name || w.title || `Склад #${w.id}`}
+                  {warehouseLabel(w)}
                 </option>
               ))}
             </select>
@@ -156,7 +170,7 @@ const StockPartnershipTransferModal = ({
           </div>
           <div className="warehouse-filter-modal__footer">
             <button className="warehouse-filter-modal__apply-btn" type="submit" disabled={submitting}>
-              {submitting ? "Перемещаем..." : "Переместить"}
+                  {submitting ? "Перемещаем..." : isSend ? "Передать" : "Забрать"}
             </button>
             <button
               className="warehouse-filter-modal__cancel-btn"

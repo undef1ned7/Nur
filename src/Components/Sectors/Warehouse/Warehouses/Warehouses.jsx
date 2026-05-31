@@ -26,7 +26,30 @@ const Warehouses = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const [pageTab, setPageTab] = useState(PAGE_TABS.WAREHOUSES);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const pageTab =
+    searchParams.get("tab") === PAGE_TABS.PARTNERSHIPS
+      ? PAGE_TABS.PARTNERSHIPS
+      : PAGE_TABS.WAREHOUSES;
+
+  const setPageTab = useCallback(
+    (tab) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (tab === PAGE_TABS.PARTNERSHIPS) {
+            next.set("tab", PAGE_TABS.PARTNERSHIPS);
+          } else {
+            next.delete("tab");
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   // Состояния модальных окон
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -35,7 +58,6 @@ const Warehouses = () => {
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
-  const [searchParams] = useSearchParams();
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(

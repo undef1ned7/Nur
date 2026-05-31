@@ -1,19 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { Check, Plus, RefreshCw, Send, X } from "lucide-react";
 import { useUser } from "../../../../../store/slices/userSlice";
 import {
   acceptStockPartnershipRequest,
   cancelStockPartnershipRequest,
   createStockPartnershipRequest,
-  getStockPartnerCatalog,
   listActiveStockPartners,
   listStockPartnershipRequests,
   rejectStockPartnershipRequest,
   searchAgentCompanies,
 } from "../../../../../api/warehouse";
-import { fetchWarehousesAsync } from "../../../../../store/creators/warehouseCreators";
-import StockPartnershipTransferModal from "./StockPartnershipTransferModal";
+import { extractPartnershipError } from "../partnership/partnershipHelpers";
 import "../Warehouses.scss";
 
 const fmtDateTime = (iso) => {
@@ -53,17 +51,6 @@ const statusClass = (status) => {
     default:
       return "badge--draft";
   }
-};
-
-const extractError = (err) => {
-  if (!err) return "Неизвестная ошибка";
-  if (typeof err === "string") return err;
-  if (err.detail) return String(err.detail);
-  const parts = Object.entries(err).map(([k, v]) => {
-    if (typeof v === "object") return `${k}: ${JSON.stringify(v)}`;
-    return `${k}: ${v}`;
-  });
-  return parts.length ? parts.join("; ") : JSON.stringify(err);
 };
 
 const normalizeCompanies = (data) => {
@@ -174,12 +161,10 @@ const RequestTable = ({
 );
 
 const StockPartnershipPanel = () => {
-  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { profile } = useUser();
   const isOwnerOrAdmin =
     profile?.role === "owner" || profile?.role === "admin";
-
-  const ownWarehouses = useSelector((state) => state.warehouse.list || []);
 
   const [subTab, setSubTab] = useState("incoming");
   const [loading, setLoading] = useState(false);
@@ -197,18 +182,6 @@ const StockPartnershipPanel = () => {
   const [inviteBusy, setInviteBusy] = useState(false);
   const companySearchTimerRef = useRef(null);
 
-  const [catalogPartner, setCatalogPartner] = useState(null);
-  const [catalogLoading, setCatalogLoading] = useState(false);
-  const [catalogError, setCatalogError] = useState("");
-  const [catalogData, setCatalogData] = useState(null);
-
-  const [transferState, setTransferState] = useState({
-    open: false,
-    product: null,
-    warehouseFromId: null,
-    partnerName: "",
-  });
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -222,7 +195,7 @@ const StockPartnershipPanel = () => {
       setPartners(partnersData?.partners || []);
     } catch (e) {
       console.error(e);
-      setError(extractError(e));
+      setError(extractPartnershipError(e));
       setIncoming([]);
       setOutgoing([]);
       setPartners([]);
@@ -233,8 +206,7 @@ const StockPartnershipPanel = () => {
 
   useEffect(() => {
     loadAll();
-    dispatch(fetchWarehousesAsync({ page_size: 1000 }));
-  }, [loadAll, dispatch]);
+  }, [loadAll]);
 
   useEffect(() => {
     if (!showInvite) return undefined;
@@ -271,7 +243,7 @@ const StockPartnershipPanel = () => {
       await acceptStockPartnershipRequest(id);
       await loadAll();
     } catch (e) {
-      alert(extractError(e));
+      alert(extractPartnershipError(e));
     } finally {
       setActionBusyId(null);
     }
@@ -284,7 +256,7 @@ const StockPartnershipPanel = () => {
       await rejectStockPartnershipRequest(id);
       await loadAll();
     } catch (e) {
-      alert(extractError(e));
+      alert(extractPartnershipError(e));
     } finally {
       setActionBusyId(null);
     }
@@ -297,7 +269,7 @@ const StockPartnershipPanel = () => {
       await cancelStockPartnershipRequest(id);
       await loadAll();
     } catch (e) {
-      alert(extractError(e));
+      alert(extractPartnershipError(e));
     } finally {
       setActionBusyId(null);
     }
@@ -318,53 +290,16 @@ const StockPartnershipPanel = () => {
       await loadAll();
       setSubTab("outgoing");
     } catch (e) {
-      alert(extractError(e));
+      alert(extractPartnershipError(e));
     } finally {
       setInviteBusy(false);
     }
   };
 
-  const openCatalog = async (partner) => {
+  const openPartnerCatalog = (partner) => {
     if (!partner?.id) return;
-    setCatalogPartner(partner);
-    setCatalogLoading(true);
-    setCatalogError("");
-    setCatalogData(null);
-    try {
-      const data = await getStockPartnerCatalog(partner.id);
-      setCatalogData(data);
-    } catch (e) {
-      setCatalogError(extractError(e));
-    } finally {
-      setCatalogLoading(false);
-    }
+    navigate(`/crm/warehouse/partners/${partner.id}`);
   };
-
-  const closeCatalog = () => {
-    setCatalogPartner(null);
-    setCatalogData(null);
-    setCatalogError("");
-  };
-
-  const openTransfer = (product, warehouseFromId) => {
-    setTransferState({
-      open: true,
-      product,
-      warehouseFromId,
-      partnerName:
-        catalogData?.partner_company?.name || catalogPartner?.name || "",
-    });
-  };
-
-  const closeTransfer = () => {
-    setTransferState({
-      open: false,
-      product: null,
-      warehouseFromId: null,
-      partnerName: "",
-    });
-  };
-
 
   return (
     <section className="warehouse-partnership">
@@ -393,7 +328,15 @@ const StockPartnershipPanel = () => {
               {loading ? <tr><td colSpan={3} className="warehouse-table__loading">Загрузка…</td></tr> : partners.length === 0 ? (
                 <tr><td colSpan={3} className="warehouse-table__empty">Нет активных партнёров</td></tr>
               ) : partners.map((p, idx) => (
-                <tr key={p.id}><td>{idx + 1}</td><td className="warehouse-table__name">{p.name || "—"}</td><td><button type="button" className="warehouse-table__action-btn" onClick={() => openCatalog(p)}>Каталог</button></td></tr>
+                <tr key={p.id}>
+                  <td>{idx + 1}</td>
+                  <td className="warehouse-table__name">{p.name || "—"}</td>
+                  <td>
+                    <button type="button" className="warehouse-table__action-btn" onClick={() => openPartnerCatalog(p)}>
+                      Обмен товарами
+                    </button>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -409,7 +352,10 @@ const StockPartnershipPanel = () => {
             <div className="warehouse-filter-modal__content">
               <div className="warehouse-filter-modal__section">
                 <label className="warehouse-filter-modal__label">Поиск компании</label>
-                <input className="warehouse-filter-modal__select" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} disabled={inviteBusy} />
+                <input className="warehouse-filter-modal__select" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} disabled={inviteBusy} placeholder="Начните вводить название…" />
+                {companySearchLoading && (
+                  <p className="warehouse-filter-modal__subtitle">Поиск…</p>
+                )}
                 <ul className="warehouse-partnership-search-list">
                   {companySearchResults.map((c) => (
                     <li key={c.id}><span>{c.name}</span><button type="button" className="warehouse-partnership-btn warehouse-partnership-btn--approve" onClick={() => handleInvite(c)} disabled={inviteBusy}><Send size={14} /> Отправить</button></li>
@@ -424,45 +370,6 @@ const StockPartnershipPanel = () => {
           </div>
         </div>
       )}
-      {catalogPartner && (
-        <div className="warehouse-filter-overlay" onClick={closeCatalog}>
-          <div className="warehouse-filter-modal warehouse-partnership-catalog-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="warehouse-filter-modal__header">
-              <h3 className="warehouse-filter-modal__title">Каталог: {catalogData?.partner_company?.name || catalogPartner.name}</h3>
-              <button type="button" className="warehouse-filter-modal__close" onClick={closeCatalog}><X size={20} /></button>
-            </div>
-            {catalogLoading && <p className="warehouse-filter-modal__subtitle">Загрузка…</p>}
-            {catalogError && <div className="warehouse-partnership-error">{catalogError}</div>}
-            {!catalogLoading && !catalogError && (
-              <div className="warehouse-partnership-catalog">
-                {(catalogData?.warehouses || []).map((wh) => (
-                  <details key={wh.id} className="warehouse-partnership-warehouse" open>
-                    <summary>{wh.name}{wh.branch_name ? ` (${wh.branch_name})` : ""}</summary>
-                    <div className="warehouse-table-scroll warehouse-table-scroll--catalog">
-                    <table className="warehouse-table warehouse-partnership-products">
-                      <thead><tr><th>Товар</th><th>Артикул</th><th>Остаток</th><th></th></tr></thead>
-                      <tbody>
-                        {(wh.products || []).map((p) => (
-                          <tr key={p.id}>
-                            <td>{p.name}</td>
-                            <td>{p.article || "—"}</td>
-                            <td>{p.qty} {p.unit || ""}</td>
-                            <td>
-                              <button type="button" className="warehouse-table__action-btn" onClick={() => openTransfer(p, wh.id)} disabled={Number(p.qty) <= 0}>К нам</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      <StockPartnershipTransferModal open={transferState.open} onClose={closeTransfer} product={transferState.product} warehouseFromId={transferState.warehouseFromId} partnerCompanyName={transferState.partnerName} ownWarehouses={ownWarehouses} onTransferred={loadAll} />
     </section>
   );
 };

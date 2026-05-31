@@ -9,7 +9,9 @@ import {
 } from "../Components/pages/Landing/NewLanding/lazyRoutes";
 
 const Login = lazy(() => import("../Components/Auth/Login/Login"));
-const RegisterGate = lazy(() => import("../Components/Auth/Register/RegisterGate"));
+const RegisterGate = lazy(
+  () => import("../Components/Auth/Register/RegisterGate"),
+);
 const RegisterAccessSettings = lazy(
   () => import("../Components/Auth/Register/RegisterAccessSettings"),
 );

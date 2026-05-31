@@ -19,7 +19,7 @@ import "./ProductionWarehouseProductDetail.scss";
 import {
   fetchBrandsAsync,
   fetchCategoriesAsync,
-  getItemsMake,
+  getProcessedItemsMake,
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
@@ -27,6 +27,7 @@ import { useProducts } from "../../../../store/slices/productSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { toDecimal3 } from "../itemMakeHelpers";
 
 const toIdArray = (value) => {
   if (!Array.isArray(value)) return [];
@@ -47,7 +48,7 @@ const ProductionWarehouseProductDetail = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { brands, categories, itemsMake, itemsMakeLoading } = useProducts();
+  const { brands, categories, itemsMakeProcessed, itemsMakeLoading } = useProducts();
   const { list: clients } = useClient();
   const suppliers = useMemo(
     () => (clients || []).filter((c) => c.type === "suppliers"),
@@ -120,7 +121,7 @@ const ProductionWarehouseProductDetail = () => {
     dispatch(fetchBrandsAsync());
     dispatch(fetchCategoriesAsync());
     dispatch(fetchClientsAsync());
-    dispatch(getItemsMake());
+    dispatch(getProcessedItemsMake());
   }, [dispatch]);
 
   useEffect(() => {
@@ -169,14 +170,14 @@ const ProductionWarehouseProductDetail = () => {
 
   const filteredMaterials = useMemo(() => {
     const q = String(materialsQuery || "").toLowerCase().trim();
-    const list = Array.isArray(itemsMake) ? itemsMake : [];
+    const list = Array.isArray(itemsMakeProcessed) ? itemsMakeProcessed : [];
     if (!q) return list;
     return list.filter((m) =>
       String(m?.name || "")
         .toLowerCase()
         .includes(q)
     );
-  }, [itemsMake, materialsQuery]);
+  }, [itemsMakeProcessed, materialsQuery]);
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -260,16 +261,13 @@ const ProductionWarehouseProductDetail = () => {
     setSaving(true);
     setSaveError("");
     try {
-      // API рецепта допускает до 3 знаков после запятой
-      const roundTo3 = (v) => Math.round(Number(v) * 1000) / 1000;
-
       const recipe = Array.from(selectedMaterials.values())
         .map((mid) => {
           const qty = recipeMap.get(String(mid));
-          const qtyNum = roundTo3(qty ?? 0);
+          const qtyNum = toDecimal3(qty ?? 0);
           return { id: String(mid), qty_per_unit: qtyNum };
         })
-        .filter((r) => r.qty_per_unit > 0);
+        .filter((r) => Number(r.qty_per_unit) > 0);
 
       const updatedData = {
         name: String(form.name || "").trim(),
@@ -311,7 +309,7 @@ const ProductionWarehouseProductDetail = () => {
 
   const selectedMaterialsList = Array.from(selectedMaterials.values())
     .map((mid) =>
-      (Array.isArray(itemsMake) ? itemsMake : []).find(
+      (Array.isArray(itemsMakeProcessed) ? itemsMakeProcessed : []).find(
         (m) => String(m.id) === String(mid)
       )
     )
@@ -661,6 +659,11 @@ const ProductionWarehouseProductDetail = () => {
                                 />
                                 <span className="production-product-detail__materialName">
                                   {m.name || `#${m.id}`}
+                                  {m.source_name && (
+                                    <small style={{ display: "block", opacity: 0.65 }}>
+                                      из {m.source_name}
+                                    </small>
+                                  )}
                                 </span>
                               </span>
                               <span className="production-product-detail__materialMeta">
@@ -685,7 +688,12 @@ const ProductionWarehouseProductDetail = () => {
                     </div>
                     {selectedMaterialsList.length ? (
                       <ul className="production-product-detail__selectedList">
-                        {selectedMaterialsList.map((m) => (
+                        {selectedMaterialsList.map((m) => {
+                          const apiLine = (Array.isArray(product?.recipe)
+                            ? product.recipe
+                            : []
+                          ).find((r) => String(r.id) === String(m.id));
+                          return (
                           <li
                             key={m.id}
                             className="production-product-detail__selectedItem"
@@ -711,7 +719,9 @@ const ProductionWarehouseProductDetail = () => {
                                 </span>
                               ) : (
                                 <span style={{ opacity: 0.8 }}>
-                                  на 1 товар: {recipeMap.get(String(m.id)) ?? "—"}
+                                  на 1 товар: {recipeMap.get(String(m.id)) ?? apiLine?.qty_per_unit ?? "—"}
+                                  {apiLine?.unit_price != null &&
+                                    ` × ${apiLine.unit_price} = ${apiLine.line_cost ?? "—"} сом`}
                                 </span>
                               )}
                             </span>
@@ -725,7 +735,8 @@ const ProductionWarehouseProductDetail = () => {
                               </button>
                             )}
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     ) : (
                       <div className="production-product-detail__empty">

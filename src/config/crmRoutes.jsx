@@ -142,6 +142,7 @@ import AddWarehouseProductPage from "../Components/Sectors/Warehouse/Stocks/AddW
 import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
+import PartnerCatalogPage from "../Components/Sectors/Warehouse/Warehouses/PartnerCatalogPage";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
 import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/DocumentsLayout";
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
@@ -161,6 +162,7 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 import ProductionSell from "../Components/Sectors/Production/Sell/ProductionSell";
 import ProductionSellStartPage from "../Components/Sectors/Production/Sell/ProductionSellStartPage";
 import ProductionFinishedGoodsAddPage from "../Components/Sectors/Production/FinishedGoods/ProductionFinishedGoodsAddPage";
+import RawMaterialProcessPage from "../Components/Sectors/Production/RawMaterialsWarehouse/RawMaterialProcessPage";
 import ProductionStartAgentGate from "../Components/Sectors/Production/ProductionStartAgentGate";
 
 // Pilorama
@@ -630,6 +632,7 @@ export const crmRoutes = (profile) => [
     "warehouse/warehouses",
     profile?.role !== "owner" ? AgentStocks : Warehouses,
   ),
+  createProtectedRoute("warehouse/partners/:partnerId", PartnerCatalogPage),
   createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),
   <Route
@@ -711,6 +714,10 @@ export const crmRoutes = (profile) => [
   createProtectedRoute(
     "production/warehouse/add-product",
     ProductionFinishedGoodsAddPage,
+  ),
+  createProtectedRoute(
+    "production/warehouse/raw-materials/process/:id",
+    RawMaterialProcessPage,
   ),
   createProtectedRoute(
     "production/warehouse/:id",

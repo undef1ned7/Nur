@@ -197,13 +197,81 @@ export const deleteCategoryAsync = createAsyncThunk(
 /*                              ITEMS MAKE                             */
 /* =================================================================== */
 
-// список сырья
+import {
+  buildItemMakeCreatePayload,
+  buildItemMakeUpdatePayload,
+  buildProcessPayload,
+  parseItemsMakeResponse,
+  toDecimal3,
+} from "../../Components/Sectors/Production/itemMakeHelpers";
+
+// список сырья (params: kind, search, unit, ordering)
 export const getItemsMake = createAsyncThunk(
   "itemsMake/fetchAll",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const query = {};
+      if (params.kind) query.kind = params.kind;
+      if (params.search) query.search = params.search;
+      if (params.unit) query.unit = params.unit;
+      if (params.ordering) query.ordering = params.ordering;
+      if (params.for_recipe != null && params.for_recipe !== "")
+        query.for_recipe = params.for_recipe;
+      if (params.needs_processing != null && params.needs_processing !== "")
+        query.needs_processing = params.needs_processing;
+      const { data } = await api.get("/main/items-make/", {
+        params: Object.keys(query).length ? query : undefined,
+      });
+      return parseItemsMakeResponse(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+// сырьё для рецепта: processed + raw без needs_processing (for_recipe=1)
+export const getProcessedItemsMake = createAsyncThunk(
+  "itemsMake/fetchProcessed",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/main/items-make/");
-      return data?.results ?? [];
+      const { data } = await api.get("/main/items-make/", {
+        params: { for_recipe: 1 },
+      });
+      return parseItemsMakeResponse(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+/** Очередь на обработку: kind=raw & needs_processing=true */
+export const getProcessingQueueItemsMake = createAsyncThunk(
+  "itemsMake/fetchProcessingQueue",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/main/items-make/", {
+        params: { kind: "raw", needs_processing: true },
+      });
+      return parseItemsMakeResponse(data);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+// обработка сырья: POST /items-make/{id}/process/
+export const processItemMake = createAsyncThunk(
+  "itemsMake/process",
+  async ({ id, ...form }, { rejectWithValue, dispatch }) => {
+    try {
+      const { data } = await api.post(
+        `/main/items-make/${id}/process/`,
+        buildProcessPayload(form)
+      );
+      try {
+        await dispatch(getProcessedItemsMake()).unwrap();
+      } catch (_) {}
+      return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
     }
@@ -214,9 +282,13 @@ export const updateItemsMake = createAsyncThunk(
   "itemsMake/updateItem",
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
+      const payload =
+        updatedData && typeof updatedData === "object"
+          ? buildItemMakeUpdatePayload(updatedData)
+          : updatedData;
       const { data: response } = await api.patch(
         `/main/items-make/${id}/`,
-        updatedData
+        payload
       );
       return response;
     } catch (error) {
@@ -237,12 +309,15 @@ export const deleteItemsMake = createAsyncThunk(
   }
 );
 
-// создание сырья
+// создание сырья (всегда kind=raw)
 export const createItemMake = createAsyncThunk(
   "itemsMake/create",
   async (item, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/main/items-make/", item);
+      const { data } = await api.post(
+        "/main/items-make/",
+        buildItemMakeCreatePayload(item)
+      );
       return data;
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
@@ -257,9 +332,8 @@ export const setItemMakeQuantity = createAsyncThunk(
     try {
       if (!id) throw new Error("id is required");
       // API: не более 3 знаков после запятой
-      const qty = Math.round(Number(quantity) * 1000) / 1000;
       const { data } = await api.patch(`/main/items-make/${id}/`, {
-        quantity: qty,
+        quantity: toDecimal3(quantity),
       });
       // рефреш списка после удачного PATCH
       try {
