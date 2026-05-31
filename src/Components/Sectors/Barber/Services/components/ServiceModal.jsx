@@ -4,6 +4,10 @@ import api from "../../../../../api";
 import BarberSelect from "../../common/BarberSelect";
 import ReactPortal from "../../../../common/Portal/ReactPortal";
 import ConfirmModal from "../../../../common/ConfirmModal/ConfirmModal";
+import { mapEmployee } from "../BarberServicesUtils";
+
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
 const normalizeName = (s) =>
   String(s || "")
@@ -79,11 +83,47 @@ const ServiceModal = ({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [employees, setEmployees] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [selectedBarberIds, setSelectedBarberIds] = useState([]);
 
-  // Обновляем категорию при смене услуги
   useEffect(() => {
     setSelectedCategory(currentService?.categoryId ? String(currentService.categoryId) : "");
+    setSelectedBarberIds(
+      Array.isArray(currentService?.barbers)
+        ? currentService.barbers.map(String)
+        : []
+    );
   }, [currentService]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const loadEmployees = async () => {
+      setEmployeesLoading(true);
+      try {
+        const { data } = await api.get("/users/employees/", {
+          params: { page_size: 1000, ordering: "last_name,first_name" },
+        });
+        if (!cancelled) {
+          setEmployees(asArray(data).map(mapEmployee));
+        }
+      } catch (e) {
+        if (!cancelled) setEmployees([]);
+        console.error(e);
+      } finally {
+        if (!cancelled) setEmployeesLoading(false);
+      }
+    };
+
+    loadEmployees();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -100,12 +140,30 @@ const ServiceModal = ({
     ...categoriesForSelect.map((c) => ({ value: String(c.id), label: c.name })),
   ];
 
+  const employeeOptions = employees
+    .filter((emp) => !selectedBarberIds.includes(String(emp.id)))
+    .map((emp) => ({ value: String(emp.id), label: emp.name }));
+
   const handleClose = () => {
     if (saving || deleting) return;
     setFieldErrors({});
     setModalAlerts([]);
     setConfirmDelete(false);
+    setSelectedBarberIds([]);
     onClose();
+  };
+
+  const addBarber = (id) => {
+    const sid = String(id);
+    if (!sid) return;
+    setSelectedBarberIds((prev) =>
+      prev.includes(sid) ? prev : [...prev, sid]
+    );
+  };
+
+  const removeBarber = (id) => {
+    const sid = String(id);
+    setSelectedBarberIds((prev) => prev.filter((x) => x !== sid));
   };
 
   const handleSubmit = async (e) => {
@@ -141,6 +199,7 @@ const ServiceModal = ({
         is_active: active,
         time: time || null,
         category: categoryId ? categoryId : null,
+        barbers: selectedBarberIds,
         company: localStorage.getItem("company"),
       };
 
@@ -338,6 +397,54 @@ const ServiceModal = ({
                     />
                     <span className="barberservices__slider" />
                   </label>
+                </div>
+
+                <div className="barberservices__field barberservices__field--barbers">
+                  <span className="barberservices__label">Сотрудники</span>
+                  {employeesLoading ? (
+                    <div className="barberservices__barbersEmpty">Загрузка…</div>
+                  ) : employees.length === 0 ? (
+                    <div className="barberservices__barbersEmpty">
+                      Нет доступных сотрудников
+                    </div>
+                  ) : (
+                    <>
+                      <BarberSelect
+                        value=""
+                        onChange={addBarber}
+                        options={employeeOptions}
+                        placeholder={
+                          employeeOptions.length
+                            ? "Выберите сотрудника"
+                            : "Все сотрудники выбраны"
+                        }
+                        disabled={!employeeOptions.length}
+                        hideClear
+                      />
+                      {selectedBarberIds.length > 0 && (
+                        <div className="barberservices__barbersTags">
+                          {selectedBarberIds.map((id) => {
+                            const emp = employees.find(
+                              (e) => String(e.id) === id
+                            );
+                            return (
+                              <span key={id} className="barberservices__barberTag">
+                                {emp?.name || id}
+                                <button
+                                  type="button"
+                                  className="barberservices__barberTagRemove"
+                                  aria-label="Убрать"
+                                  onClick={() => removeBarber(id)}
+                                >
+                                  <FaTimes />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 

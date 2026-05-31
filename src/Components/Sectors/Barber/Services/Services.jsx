@@ -1,5 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { FaPlus, FaThLarge, FaList, FaSearch, FaFilter, FaTimes } from "react-icons/fa";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
+import {
+  FaPlus,
+  FaThLarge,
+  FaList,
+  FaSearch,
+  FaFilter,
+  FaTimes,
+} from "react-icons/fa";
 import api from "../../../../api";
 import BarberSelect from "../common/BarberSelect";
 import { ServiceModal, CategoryModal, Pager } from "./components";
@@ -9,6 +22,7 @@ import {
   fmtMoney,
   mapService,
   mapCategory,
+  formatBarberNames,
 } from "./BarberServicesUtils";
 import "./Services.scss";
 
@@ -26,7 +40,7 @@ const Services = () => {
 
   // Определяем начальный режим просмотра в зависимости от размера экрана
   const getInitialViewMode = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       return window.innerWidth <= 600 ? "cards" : "table";
     }
     return "table";
@@ -49,7 +63,8 @@ const Services = () => {
 
   // Server-side список категорий: состояние query
   const [categoriesSearch, setCategoriesSearch] = useState("");
-  const [categoriesDebouncedSearch, setCategoriesDebouncedSearch] = useState("");
+  const [categoriesDebouncedSearch, setCategoriesDebouncedSearch] =
+    useState("");
   const [categoriesSortBy, setCategoriesSortBy] = useState("name_asc");
   const [categoriesPage, setCategoriesPage] = useState(1);
 
@@ -174,9 +189,12 @@ const Services = () => {
       const ordering = getOrderingForAPI(sortBy);
       params.append("ordering", ordering);
 
-      const { data } = await api.get(`/barbershop/services/?${params.toString()}`, {
-        signal: controller.signal,
-      });
+      const { data } = await api.get(
+        `/barbershop/services/?${params.toString()}`,
+        {
+          signal: controller.signal,
+        },
+      );
 
       // Race condition защита
       if (currentRequestId !== servicesRequestIdRef.current) {
@@ -197,9 +215,7 @@ const Services = () => {
         return;
       }
 
-      setServicesError(
-        e?.response?.data?.detail || "Ошибка загрузки услуг."
-      );
+      setServicesError(e?.response?.data?.detail || "Ошибка загрузки услуг.");
       console.error(e);
     } finally {
       if (currentRequestId === servicesRequestIdRef.current) {
@@ -233,9 +249,12 @@ const Services = () => {
       const ordering = categoriesSortBy === "name_desc" ? "-name" : "name";
       params.append("ordering", ordering);
 
-      const { data } = await api.get(`/barbershop/service-categories/?${params.toString()}`, {
-        signal: controller.signal,
-      });
+      const { data } = await api.get(
+        `/barbershop/service-categories/?${params.toString()}`,
+        {
+          signal: controller.signal,
+        },
+      );
 
       // Race condition защита
       if (currentRequestId !== categoriesRequestIdRef.current) {
@@ -257,7 +276,7 @@ const Services = () => {
       }
 
       setCategoriesError(
-        e?.response?.data?.detail || "Ошибка загрузки категорий."
+        e?.response?.data?.detail || "Ошибка загрузки категорий.",
       );
       console.error(e);
     } finally {
@@ -270,12 +289,14 @@ const Services = () => {
   // Fetch категорий для фильтра (все категории, один раз)
   const fetchCategoriesForFilter = useCallback(async () => {
     try {
-      const { data } = await api.get("/barbershop/service-categories/?page_size=1000");
+      const { data } = await api.get(
+        "/barbershop/service-categories/?page_size=1000",
+      );
       const listRaw = Array.isArray(data?.results)
         ? data.results
         : Array.isArray(data)
-        ? data
-        : [];
+          ? data
+          : [];
       setCategoriesForFilter(listRaw.map(mapCategory));
     } catch (e) {
       console.error(e);
@@ -321,7 +342,7 @@ const Services = () => {
         label: c.name,
       })),
     ],
-    [categoriesForFilter]
+    [categoriesForFilter],
   );
 
   const isServicesTab = mainTab === "services";
@@ -416,6 +437,7 @@ const Services = () => {
           <span className="barberservices__cat">
             {s.categoryName || "Общее"}
           </span>
+          <span className="barberservices__tag">{formatBarberNames(s)}</span>
         </div>
       </div>
     </article>
@@ -430,12 +452,13 @@ const Services = () => {
             <th>Цена</th>
             <th>Длительность</th>
             <th>Категория</th>
+            <th>Сотрудники</th>
           </tr>
         </thead>
         <tbody>
           {services.map((s) => (
-            <tr 
-              key={s.id} 
+            <tr
+              key={s.id}
               className={`barberservices__row ${!s.active ? "barberservices__row--inactive" : ""}`}
               onClick={() => openServiceModal(s)}
             >
@@ -443,6 +466,7 @@ const Services = () => {
               <td className="barberservices__cellPrice">{fmtMoney(s.price)}</td>
               <td>{formatDuration(s.time)}</td>
               <td>{s.categoryName || "Общее"}</td>
+              <td>{formatBarberNames(s)}</td>
             </tr>
           ))}
         </tbody>
@@ -486,14 +510,20 @@ const Services = () => {
             className="barberservices__searchInput"
             placeholder={isServicesTab ? "Поиск..." : "Поиск..."}
             value={isServicesTab ? servicesSearch : categoriesSearch}
-            onChange={(e) => isServicesTab ? setServicesSearch(e.target.value) : setCategoriesSearch(e.target.value)}
+            onChange={(e) =>
+              isServicesTab
+                ? setServicesSearch(e.target.value)
+                : setCategoriesSearch(e.target.value)
+            }
             aria-label="Поиск"
           />
         </div>
 
         <button
           className="barberservices__btn barberservices__btn--primary barberservices__btn--icon"
-          onClick={() => isServicesTab ? openServiceModal() : openCategoryModal()}
+          onClick={() =>
+            isServicesTab ? openServiceModal() : openCategoryModal()
+          }
           aria-label={isServicesTab ? "Добавить" : "Добавить"}
           title={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
         >
@@ -511,7 +541,9 @@ const Services = () => {
                 <FaFilter />
                 <span>Фильтры</span>
                 {activeFiltersCount > 0 && (
-                  <span className="barberservices__filtersBadge">{activeFiltersCount}</span>
+                  <span className="barberservices__filtersBadge">
+                    {activeFiltersCount}
+                  </span>
                 )}
               </button>
             </div>
@@ -541,7 +573,10 @@ const Services = () => {
       {/* Модальное окно фильтров */}
       {filtersOpen && (
         <>
-          <div className="barberservices__filtersOverlay" onClick={() => setFiltersOpen(false)} />
+          <div
+            className="barberservices__filtersOverlay"
+            onClick={() => setFiltersOpen(false)}
+          />
           <div className="barberservices__filtersPanel">
             <div className="barberservices__filtersPanelHeader">
               <span className="barberservices__filtersPanelTitle">Фильтры</span>
@@ -556,7 +591,9 @@ const Services = () => {
 
             <div className="barberservices__filtersPanelBody">
               <div className="barberservices__filtersPanelRow">
-                <label className="barberservices__filtersPanelLabel">Категория</label>
+                <label className="barberservices__filtersPanelLabel">
+                  Категория
+                </label>
                 <BarberSelect
                   value={categoryFilter}
                   onChange={setCategoryFilter}
@@ -566,7 +603,9 @@ const Services = () => {
               </div>
 
               <div className="barberservices__filtersPanelRow">
-                <label className="barberservices__filtersPanelLabel">Сортировка</label>
+                <label className="barberservices__filtersPanelLabel">
+                  Сортировка
+                </label>
                 <BarberSelect
                   value={sortBy}
                   onChange={setSortBy}

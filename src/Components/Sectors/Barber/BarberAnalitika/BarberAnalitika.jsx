@@ -106,8 +106,12 @@ const BarberAnalitika = () => {
   const handleCardClick = async (tabType) => {
     try {
       const { data } = await api.get("/construction/cashboxes/");
-      const boxes = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      
+      const boxes = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+          ? data
+          : [];
+
       if (boxes.length === 0) {
         alert("Нет доступных касс");
         return;
@@ -115,7 +119,7 @@ const BarberAnalitika = () => {
 
       const firstBox = boxes[0];
       const firstBoxId = firstBox?.id || firstBox?.uuid || "";
-      
+
       if (!firstBoxId) {
         alert("Не удалось определить ID кассы");
         return;
@@ -263,7 +267,7 @@ const BarberAnalitika = () => {
     },
     {
       key: "clientsBarber",
-      title: "Клиенты барбершоп",
+      title: "Клиенты",
       value: fmtInt(totalClientsBarber),
       icon: <FiUsers size={20} />,
       iconMod: "green",
@@ -589,9 +593,7 @@ const BarberAnalitika = () => {
       {/* Статусы заявок (кроме новых) */}
       {bookingsStatusesData && bookingsStatusesData.length > 0 && (
         <section className="barber-analitika__panel barber-analitika__panel--request-statuses">
-          <h3 className="barber-analitika__panel-title">
-            Статусы заявок
-          </h3>
+          <h3 className="barber-analitika__panel-title">Статусы заявок</h3>
           <div className="barber-analitika__request-statuses-list">
             {bookingsStatusesData.map((item) => (
               <div
@@ -613,10 +615,15 @@ const BarberAnalitika = () => {
       {/* Топ 5 услуг по заявкам */}
       {topServicesByBookings && topServicesByBookings.length > 0 && (
         <section className="barber-analitika__panel barber-analitika__panel--top-services">
-          <h3 className="barber-analitika__panel-title">Топ 5 услуг по заявкам</h3>
+          <h3 className="barber-analitika__panel-title">
+            Топ 5 услуг по заявкам
+          </h3>
           <div className="barber-analitika__top-services-list">
             {topServicesByBookings.map((service, idx) => (
-              <div key={service.id || idx} className="barber-analitika__top-service-item">
+              <div
+                key={service.id || idx}
+                className="barber-analitika__top-service-item"
+              >
                 <div className="barber-analitika__top-service-left">
                   <div className="barber-analitika__top-service-rank">
                     {idx + 1}
@@ -799,7 +806,9 @@ const BarberAnalitika = () => {
             </>
           ) : (
             <>
-              <h3 className="barber-analitika__panel-title">Клиенты (продажи)</h3>
+              <h3 className="barber-analitika__panel-title">
+                Клиенты (продажи)
+              </h3>
               <ul className="barber-analitika__top-list">
                 {clientsSalesRows.slice(0, 5).map((r, idx) => (
                   <li key={idx} className="barber-analitika__top-item">

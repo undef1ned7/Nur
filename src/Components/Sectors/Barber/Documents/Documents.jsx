@@ -321,22 +321,25 @@ export default function BarberDocuments() {
       alert("Выберите папку");
       return;
     }
-    if (!createDocFile) {
-      alert("Выберите файл");
-      return;
-    }
 
     setCreateDocBusy(true);
     setDocErr("");
     try {
-      const fd = new FormData();
-      fd.append("folder", createDocFolder.trim());
-      if (createDocName.trim()) fd.append("name", createDocName.trim());
-      fd.append("file", createDocFile);
-
-      const { data } = await api.post("/barbershop/documents/", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      let data;
+      if (createDocFile) {
+        const fd = new FormData();
+        fd.append("folder", createDocFolder.trim());
+        if (createDocName.trim()) fd.append("name", createDocName.trim());
+        fd.append("file", createDocFile);
+        ({ data } = await api.post("/barbershop/documents/", fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }));
+      } else {
+        ({ data } = await api.post("/barbershop/documents/", {
+          folder: createDocFolder.trim(),
+          ...(createDocName.trim() ? { name: createDocName.trim() } : {}),
+        }));
+      }
 
       await loadDocs();
       if (data?.id) {
@@ -954,7 +957,7 @@ export default function BarberDocuments() {
 
                     <div className="docs__field">
                       <label className="docs__label">
-                        Файл <span className="docs__req">*</span>
+                        Файл (необязательно)
                       </label>
                       <input
                         className="docs__input"
@@ -962,7 +965,6 @@ export default function BarberDocuments() {
                         onChange={(e) =>
                           setCreateDocFile(e.target.files?.[0] || null)
                         }
-                        required
                       />
                     </div>
                   </div>
@@ -979,11 +981,7 @@ export default function BarberDocuments() {
                     <button
                       type="submit"
                       className="btn btn--primary"
-                      disabled={
-                        createDocBusy ||
-                        !createDocFolder.trim() ||
-                        !createDocFile
-                      }
+                      disabled={createDocBusy || !createDocFolder.trim()}
                     >
                       Создать
                     </button>

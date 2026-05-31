@@ -796,6 +796,10 @@
       padding-right: 2px;
     }
 
+    &--barbers {
+      grid-column: 1 / -1;
+    }
+
     &--invalid .barberservices__label {
       color: #dc2626;
     }
@@ -865,6 +869,53 @@
 
     input {
       display: none;
+    }
+  }
+
+  &__barbersEmpty {
+    padding: 10px 12px;
+    border: 1px dashed rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    font-size: 13px;
+    color: #9ca3af;
+    background: #fafafa;
+  }
+
+  &__barbersTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  &__barberTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  &__barberTagRemove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 11px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--text);
     }
   }
 
