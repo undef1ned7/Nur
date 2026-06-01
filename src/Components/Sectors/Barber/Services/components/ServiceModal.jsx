@@ -3,7 +3,7 @@ import { FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../../api";
 import BarberSelect from "../../common/BarberSelect";
 import ReactPortal from "../../../../common/Portal/ReactPortal";
-import ConfirmModal from "../../../../common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 import { mapEmployee } from "../BarberServicesUtils";
 
 const asArray = (d) =>
@@ -42,7 +42,7 @@ const validateService = ({ name, price, services, currentService }) => {
     const duplicate = services.some(
       (s) =>
         normalizeName(s.name) === nn &&
-        (!currentService?.id || s.id !== currentService.id)
+        (!currentService?.id || s.id !== currentService.id),
     );
     if (duplicate) {
       errs.name = true;
@@ -88,11 +88,13 @@ const ServiceModal = ({
   const [selectedBarberIds, setSelectedBarberIds] = useState([]);
 
   useEffect(() => {
-    setSelectedCategory(currentService?.categoryId ? String(currentService.categoryId) : "");
+    setSelectedCategory(
+      currentService?.categoryId ? String(currentService.categoryId) : "",
+    );
     setSelectedBarberIds(
       Array.isArray(currentService?.barbers)
         ? currentService.barbers.map(String)
-        : []
+        : [],
     );
   }, [currentService]);
 
@@ -157,7 +159,7 @@ const ServiceModal = ({
     const sid = String(id);
     if (!sid) return;
     setSelectedBarberIds((prev) =>
-      prev.includes(sid) ? prev : [...prev, sid]
+      prev.includes(sid) ? prev : [...prev, sid],
     );
   };
 
@@ -208,10 +210,13 @@ const ServiceModal = ({
       if (currentService?.id) {
         await api.patch(
           `/barbershop/services/${encodeURIComponent(currentService.id)}/`,
-          payload
+          payload,
         );
       } else {
-        const { data: created } = await api.post("/barbershop/services/", payload);
+        const { data: created } = await api.post(
+          "/barbershop/services/",
+          payload,
+        );
         createdId = created?.id || null;
       }
 
@@ -222,7 +227,7 @@ const ServiceModal = ({
       if (typeof data === "string") msgs.push(data);
       else if (data && typeof data === "object") {
         Object.values(data).forEach((v) =>
-          msgs.push(String(Array.isArray(v) ? v[0] : v))
+          msgs.push(String(Array.isArray(v) ? v[0] : v)),
         );
       }
       if (!msgs.length) msgs.push("Ошибка сохранения.");
@@ -256,9 +261,7 @@ const ServiceModal = ({
     } catch (e) {
       const data = e?.response?.data;
       const msg =
-        typeof data === "string"
-          ? data
-          : data?.detail || "Ошибка удаления.";
+        typeof data === "string" ? data : data?.detail || "Ошибка удаления.";
       setModalAlerts([msg]);
       console.error(e);
     } finally {
@@ -269,13 +272,13 @@ const ServiceModal = ({
   return (
     <>
       <ReactPortal wrapperId="barber-service-modal">
-        <div 
-          className="barberservices__overlay" 
-          onClick={handleClose} 
-          style={{ 
+        <div
+          className="barberservices__overlay"
+          onClick={handleClose}
+          style={{
             opacity: confirmDelete ? 0 : 1,
-            pointerEvents: confirmDelete ? 'none' : 'auto',
-            transition: 'opacity 0.2s ease'
+            pointerEvents: confirmDelete ? "none" : "auto",
+            transition: "opacity 0.2s ease",
           }}
         >
           <div
@@ -313,7 +316,11 @@ const ServiceModal = ({
               </div>
             )}
 
-            <form className="barberservices__form" onSubmit={handleSubmit} noValidate>
+            <form
+              className="barberservices__form"
+              onSubmit={handleSubmit}
+              noValidate
+            >
               <div className="barberservices__grid">
                 <label
                   className={
@@ -352,7 +359,9 @@ const ServiceModal = ({
                   <input
                     name="price"
                     defaultValue={
-                      currentService?.price !== undefined ? String(currentService.price) : ""
+                      currentService?.price !== undefined
+                        ? String(currentService.price)
+                        : ""
                     }
                     className={
                       fieldErrors.price
@@ -365,7 +374,9 @@ const ServiceModal = ({
                 </label>
 
                 <label className="barberservices__field">
-                  <span className="barberservices__label">Длительность (мин)</span>
+                  <span className="barberservices__label">
+                    Длительность (мин)
+                  </span>
                   <input
                     name="time"
                     type="text"
@@ -378,7 +389,11 @@ const ServiceModal = ({
 
                 <div className="barberservices__field">
                   <span className="barberservices__label">Категория</span>
-                  <input type="hidden" name="category" value={selectedCategory} />
+                  <input
+                    type="hidden"
+                    name="category"
+                    value={selectedCategory}
+                  />
                   <BarberSelect
                     value={selectedCategory}
                     onChange={setSelectedCategory}
@@ -402,7 +417,9 @@ const ServiceModal = ({
                 <div className="barberservices__field barberservices__field--barbers">
                   <span className="barberservices__label">Сотрудники</span>
                   {employeesLoading ? (
-                    <div className="barberservices__barbersEmpty">Загрузка…</div>
+                    <div className="barberservices__barbersEmpty">
+                      Загрузка…
+                    </div>
                   ) : employees.length === 0 ? (
                     <div className="barberservices__barbersEmpty">
                       Нет доступных сотрудников
@@ -425,10 +442,13 @@ const ServiceModal = ({
                         <div className="barberservices__barbersTags">
                           {selectedBarberIds.map((id) => {
                             const emp = employees.find(
-                              (e) => String(e.id) === id
+                              (e) => String(e.id) === id,
                             );
                             return (
-                              <span key={id} className="barberservices__barberTag">
+                              <span
+                                key={id}
+                                className="barberservices__barberTag"
+                              >
                                 {emp?.name || id}
                                 <button
                                   type="button"

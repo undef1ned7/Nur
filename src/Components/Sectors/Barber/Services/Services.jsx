@@ -17,7 +17,7 @@ import api from "../../../../api";
 import BarberSelect from "../common/BarberSelect";
 import { ServiceModal, CategoryModal, Pager } from "./components";
 import Loading from "../../../common/Loading/Loading";
-import ConfirmModal from "../../../common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 import {
   fmtMoney,
   mapService,

@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import WarehouseHeader from "./components/WarehouseHeader";
 import StockPartnershipTransferModal from "./components/StockPartnershipTransferModal";
+import Pagination from "./components/Pagination";
+import { usePagination } from "./hooks/usePagination";
+import { useSearch } from "./hooks/useSearch";
+import { PAGE_SIZE } from "./constants";
 import {
   extractPartnershipError,
   filterProducts,
@@ -33,6 +37,12 @@ const DIRECTION = {
   SEND: "send",
 };
 
+const parsePaginationMeta = (data, listLength) => ({
+  count: typeof data?.count === "number" ? data.count : listLength,
+  next: data?.next ?? null,
+  previous: data?.previous ?? null,
+});
+
 const PartnerCatalogPage = () => {
   const { partnerId } = useParams();
   const navigate = useNavigate();
@@ -45,15 +55,21 @@ const PartnerCatalogPage = () => {
       : DIRECTION.RECEIVE;
 
   const ownWarehouses = useSelector((state) => state.warehouse.list || []);
-  const ownProductsCacheRef = useRef({});
+  const { searchTerm: productSearch, debouncedSearchTerm, setSearchTerm: setProductSearch } =
+    useSearch();
 
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
   const [catalogData, setCatalogData] = useState(null);
-  const [productSearch, setProductSearch] = useState("");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
-  const [ownProductsByWarehouse, setOwnProductsByWarehouse] = useState({});
-  const [ownProductsLoading, setOwnProductsLoading] = useState({});
+  const [ownProducts, setOwnProducts] = useState({
+    list: [],
+    count: 0,
+    next: null,
+    previous: null,
+  });
+  const [ownProductsLoading, setOwnProductsLoading] = useState(false);
+  const prevDebouncedSearchRef = useRef(debouncedSearchTerm);
 
   const [transferState, setTransferState] = useState({
     open: false,
@@ -74,6 +90,11 @@ const PartnerCatalogPage = () => {
     return ownWarehouses;
   }, [isReceive, partnerWarehouses, ownWarehouses]);
 
+  const currentPageFromUrl = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams],
+  );
+
   const loadCatalog = useCallback(async () => {
     if (!partnerId) return;
     setCatalogLoading(true);
@@ -90,22 +111,37 @@ const PartnerCatalogPage = () => {
     }
   }, [partnerId]);
 
-  const loadOwnWarehouseProducts = useCallback(async (warehouseId, force = false) => {
-    if (!warehouseId) return;
-    if (!force && ownProductsCacheRef.current[warehouseId]) return;
-    setOwnProductsLoading((prev) => ({ ...prev, [warehouseId]: true }));
-    try {
-      const data = await listWarehouseProducts(warehouseId, { page_size: 500 });
-      const list = normalizeList(data).map(mapOwnProductRow);
-      ownProductsCacheRef.current[warehouseId] = true;
-      setOwnProductsByWarehouse((prev) => ({ ...prev, [warehouseId]: list }));
-    } catch (e) {
-      console.error(e);
-      setOwnProductsByWarehouse((prev) => ({ ...prev, [warehouseId]: [] }));
-    } finally {
-      setOwnProductsLoading((prev) => ({ ...prev, [warehouseId]: false }));
-    }
-  }, []);
+  const loadOwnWarehouseProducts = useCallback(
+    async (warehouseId, page = 1, search = "") => {
+      if (!warehouseId) return;
+      setOwnProductsLoading(true);
+      try {
+        const params = {
+          page,
+          page_size: PAGE_SIZE,
+        };
+        const trimmedSearch = search.trim();
+        if (trimmedSearch) {
+          params.search = trimmedSearch;
+        }
+        const data = await listWarehouseProducts(warehouseId, params);
+        const list = normalizeList(data).map(mapOwnProductRow);
+        const meta = parsePaginationMeta(data, list.length);
+        setOwnProducts({ list, ...meta });
+      } catch (e) {
+        console.error(e);
+        setOwnProducts({
+          list: [],
+          count: 0,
+          next: null,
+          previous: null,
+        });
+      } finally {
+        setOwnProductsLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     dispatch(fetchWarehousesAsync({ page_size: 1000 }));
@@ -115,10 +151,21 @@ const PartnerCatalogPage = () => {
   useEffect(() => {
     setProductSearch("");
     setSelectedWarehouseId("");
-    ownProductsCacheRef.current = {};
-    setOwnProductsByWarehouse({});
-    setOwnProductsLoading({});
-  }, [direction, partnerId]);
+    setOwnProducts({
+      list: [],
+      count: 0,
+      next: null,
+      previous: null,
+    });
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("page");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [direction, partnerId, setProductSearch, setSearchParams]);
 
   useEffect(() => {
     if (!selectedWarehouseId && activeWarehouses.length > 0) {
@@ -126,11 +173,106 @@ const PartnerCatalogPage = () => {
     }
   }, [activeWarehouses, selectedWarehouseId]);
 
+  const productsForSelectedWarehouse = useMemo(() => {
+    if (!selectedWarehouseId) return [];
+    if (isReceive) {
+      const wh = partnerWarehouses.find(
+        (w) => String(w.id) === String(selectedWarehouseId),
+      );
+      return wh?.products || [];
+    }
+    return ownProducts.list;
+  }, [
+    isReceive,
+    selectedWarehouseId,
+    partnerWarehouses,
+    ownProducts.list,
+  ]);
+
+  const filteredPartnerProducts = useMemo(
+    () => filterProducts(productsForSelectedWarehouse, debouncedSearchTerm),
+    [productsForSelectedWarehouse, debouncedSearchTerm],
+  );
+
+  const productsCount = isReceive
+    ? filteredPartnerProducts.length
+    : ownProducts.count;
+
+  const totalPagesEstimate = useMemo(
+    () => Math.max(1, Math.ceil((productsCount || 0) / PAGE_SIZE)),
+    [productsCount],
+  );
+
+  const paginationNext = useMemo(() => {
+    if (isReceive) {
+      return currentPageFromUrl < totalPagesEstimate ? "1" : null;
+    }
+    return ownProducts.next;
+  }, [isReceive, currentPageFromUrl, totalPagesEstimate, ownProducts.next]);
+
+  const paginationPrevious = useMemo(() => {
+    if (isReceive) {
+      return currentPageFromUrl > 1 ? "1" : null;
+    }
+    return ownProducts.previous;
+  }, [isReceive, currentPageFromUrl, ownProducts.previous]);
+
+  const {
+    currentPage,
+    totalPages,
+    hasNextPage,
+    hasPrevPage,
+    handlePageChange,
+    resetToFirstPage,
+  } = usePagination(productsCount, paginationNext, paginationPrevious);
+
   useEffect(() => {
     if (!isReceive && selectedWarehouseId) {
-      loadOwnWarehouseProducts(selectedWarehouseId);
+      loadOwnWarehouseProducts(
+        selectedWarehouseId,
+        currentPage,
+        debouncedSearchTerm,
+      );
     }
-  }, [isReceive, selectedWarehouseId, loadOwnWarehouseProducts]);
+  }, [
+    isReceive,
+    selectedWarehouseId,
+    currentPage,
+    debouncedSearchTerm,
+    loadOwnWarehouseProducts,
+  ]);
+
+  useEffect(() => {
+    if (prevDebouncedSearchRef.current !== debouncedSearchTerm) {
+      prevDebouncedSearchRef.current = debouncedSearchTerm;
+      resetToFirstPage();
+    }
+  }, [debouncedSearchTerm, resetToFirstPage]);
+
+  useEffect(() => {
+    if (isReceive && currentPage > totalPages) {
+      resetToFirstPage();
+    }
+  }, [isReceive, currentPage, totalPages, resetToFirstPage]);
+
+  const displayProducts = useMemo(() => {
+    if (!isReceive) {
+      return productsForSelectedWarehouse;
+    }
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredPartnerProducts.slice(start, start + PAGE_SIZE);
+  }, [
+    isReceive,
+    productsForSelectedWarehouse,
+    filteredPartnerProducts,
+    currentPage,
+  ]);
+
+  const productsLoading = !isReceive && ownProductsLoading;
+
+  const hasNoProducts = isReceive
+    ? filteredPartnerProducts.length === 0
+    : ownProducts.count === 0 && !productsLoading;
 
   const setDirection = (next) => {
     setSearchParams(
@@ -141,35 +283,12 @@ const PartnerCatalogPage = () => {
         } else {
           params.delete("direction");
         }
+        params.delete("page");
         return params;
       },
       { replace: true },
     );
   };
-
-  const productsForSelectedWarehouse = useMemo(() => {
-    if (!selectedWarehouseId) return [];
-    if (isReceive) {
-      const wh = partnerWarehouses.find(
-        (w) => String(w.id) === String(selectedWarehouseId),
-      );
-      return wh?.products || [];
-    }
-    return ownProductsByWarehouse[selectedWarehouseId] || [];
-  }, [
-    isReceive,
-    selectedWarehouseId,
-    partnerWarehouses,
-    ownProductsByWarehouse,
-  ]);
-
-  const visibleProducts = useMemo(
-    () => filterProducts(productsForSelectedWarehouse, productSearch),
-    [productsForSelectedWarehouse, productSearch],
-  );
-
-  const productsLoading =
-    !isReceive && !!selectedWarehouseId && ownProductsLoading[selectedWarehouseId];
 
   const openTransfer = (mode, product, warehouseFromId) => {
     setTransferState({ open: true, mode, product, warehouseFromId });
@@ -187,14 +306,60 @@ const PartnerCatalogPage = () => {
   const handleTransferred = async (mode, warehouseFromId) => {
     await loadCatalog();
     if (mode === DIRECTION.SEND && warehouseFromId) {
-      delete ownProductsCacheRef.current[warehouseFromId];
-      await loadOwnWarehouseProducts(warehouseFromId, true);
+      await loadOwnWarehouseProducts(
+        warehouseFromId,
+        currentPage,
+        debouncedSearchTerm,
+      );
     }
   };
 
   const handleBack = () => {
     navigate("/crm/warehouse/warehouses?tab=partnerships");
   };
+
+  const handleWarehouseSelect = (warehouseId) => {
+    setSelectedWarehouseId(String(warehouseId));
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("page");
+        return params;
+      },
+      { replace: true },
+    );
+    resetToFirstPage();
+  };
+
+  const handleRefresh = () => {
+    loadCatalog();
+    if (!isReceive && selectedWarehouseId) {
+      loadOwnWarehouseProducts(
+        selectedWarehouseId,
+        currentPage,
+        debouncedSearchTerm,
+      );
+    }
+  };
+
+  const productCountLabel = useMemo(() => {
+    if (productsCount === 0) return null;
+    if (totalPages <= 1) {
+      return `${productsCount} ${productsCount === 1 ? "товар" : "товаров"}${
+        debouncedSearchTerm.trim() ? " по запросу" : " на выбранном складе"
+      }`;
+    }
+    const from = (currentPage - 1) * PAGE_SIZE + 1;
+    const to = Math.min(currentPage * PAGE_SIZE, productsCount);
+    return `Показано ${from}–${to} из ${productsCount} ${
+      productsCount === 1 ? "товара" : "товаров"
+    }${debouncedSearchTerm.trim() ? " по запросу" : ""}`;
+  }, [
+    productsCount,
+    totalPages,
+    currentPage,
+    debouncedSearchTerm,
+  ]);
 
   const renderProductsTable = () => {
     if (catalogLoading || productsLoading) {
@@ -221,10 +386,10 @@ const PartnerCatalogPage = () => {
       );
     }
 
-    if (visibleProducts.length === 0) {
+    if (hasNoProducts) {
       return (
         <div className="partner-catalog-empty">
-          {productSearch.trim()
+          {debouncedSearchTerm.trim()
             ? "Ничего не найдено по запросу"
             : "На выбранном складе нет товаров"}
         </div>
@@ -232,68 +397,80 @@ const PartnerCatalogPage = () => {
     }
 
     return (
-      <div className="warehouse-table-container w-full partner-catalog-products">
-        <div className="warehouse-table-scroll warehouse-table-scroll--catalog">
-          <table className="warehouse-table warehouse-partnership-products">
-            <thead>
-              <tr>
-                <th>Товар</th>
-                <th>Артикул</th>
-                <th>Остаток</th>
-                <th>Действие</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleProducts.map((p) => {
-                const qty = getProductQty(p);
-                const canTransfer = qty > 0;
-                return (
-                  <tr key={p.id}>
-                    <td className="warehouse-table__name">{p.name}</td>
-                    <td>{p.article || "—"}</td>
-                    <td>
-                      {qty} {p.unit || ""}
-                    </td>
-                    <td>
-                      {isReceive ? (
-            <button
-              type="button"
-              className="warehouse-table__action-btn warehouse-table__action-btn--receive"
-              disabled={!canTransfer}
-              onClick={() =>
-                openTransfer(
-                  DIRECTION.RECEIVE,
-                  p,
-                  selectedWarehouseId,
-                )
-              }
-            >
-              Забрать к себе
-            </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="warehouse-table__action-btn warehouse-table__action-btn--send"
-                          disabled={!canTransfer}
-                          onClick={() =>
-                            openTransfer(
-                              DIRECTION.SEND,
-                              p,
-                              selectedWarehouseId,
-                            )
-                          }
-                        >
-                          Отправить партнёру
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <>
+        <div className="warehouse-table-container w-full partner-catalog-products">
+          <div className="warehouse-table-scroll warehouse-table-scroll--catalog">
+            <table className="warehouse-table warehouse-partnership-products">
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th>Артикул</th>
+                  <th>Остаток</th>
+                  <th>Действие</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayProducts.map((p) => {
+                  const qty = getProductQty(p);
+                  const canTransfer = qty > 0;
+                  return (
+                    <tr key={p.id}>
+                      <td className="warehouse-table__name">{p.name}</td>
+                      <td>{p.article || "—"}</td>
+                      <td>
+                        {qty} {p.unit || ""}
+                      </td>
+                      <td>
+                        {isReceive ? (
+                          <button
+                            type="button"
+                            className="warehouse-table__action-btn warehouse-table__action-btn--receive"
+                            disabled={!canTransfer}
+                            onClick={() =>
+                              openTransfer(
+                                DIRECTION.RECEIVE,
+                                p,
+                                selectedWarehouseId,
+                              )
+                            }
+                          >
+                            Забрать к себе
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="warehouse-table__action-btn warehouse-table__action-btn--send"
+                            disabled={!canTransfer}
+                            onClick={() =>
+                              openTransfer(
+                                DIRECTION.SEND,
+                                p,
+                                selectedWarehouseId,
+                              )
+                            }
+                          >
+                            Отправить партнёру
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          count={productsCount}
+          countLabel="товаров"
+          loading={productsLoading}
+          hasNextPage={hasNextPage}
+          hasPrevPage={hasPrevPage}
+          onPageChange={handlePageChange}
+        />
+      </>
     );
   };
 
@@ -413,13 +590,7 @@ const PartnerCatalogPage = () => {
         <button
           type="button"
           className="partner-catalog-toolbar__refresh"
-          onClick={() => {
-            loadCatalog();
-            if (!isReceive && selectedWarehouseId) {
-              delete ownProductsCacheRef.current[selectedWarehouseId];
-              loadOwnWarehouseProducts(selectedWarehouseId, true);
-            }
-          }}
+          onClick={handleRefresh}
           disabled={catalogLoading}
           aria-label="Обновить"
         >
@@ -447,7 +618,7 @@ const PartnerCatalogPage = () => {
               key={wh.id}
               type="button"
               className={`partner-catalog-warehouse-chip ${!isReceive ? "partner-catalog-warehouse-chip--send" : ""} ${String(selectedWarehouseId) === String(wh.id) ? "active" : ""}`}
-              onClick={() => setSelectedWarehouseId(String(wh.id))}
+              onClick={() => handleWarehouseSelect(wh.id)}
             >
               {warehouseLabel(wh)}
             </button>
@@ -455,7 +626,7 @@ const PartnerCatalogPage = () => {
         </div>
       )}
 
-      {!catalogLoading && activeWarehouses.length > 0 && (
+      {!catalogLoading && activeWarehouses.length > 0 && productCountLabel && (
         <p
           style={{
             display: "flex",
@@ -467,9 +638,7 @@ const PartnerCatalogPage = () => {
           }}
         >
           <Package size={16} />
-          {visibleProducts.length}{" "}
-          {visibleProducts.length === 1 ? "товар" : "товаров"}
-          {productSearch.trim() ? " по запросу" : " на выбранном складе"}
+          {productCountLabel}
         </p>
       )}
 

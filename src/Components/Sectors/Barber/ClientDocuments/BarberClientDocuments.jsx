@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { FaSearch, FaTimes, FaTrash, FaUpload } from "react-icons/fa";
 import api from "../../../../api";
-import ConfirmModal from "../../../common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 import { parseApiError } from "../Clients/barberClientUtils";
 import "./BarberClientDocuments.scss";
 
