@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../../api";
 import ReactPortal from "../../../../common/Portal/ReactPortal";
-import ConfirmModal from "../../../../common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 
 const normalizeName = (s) =>
   String(s || "")
@@ -22,7 +22,7 @@ const validateCategory = ({ name, categories, currentCategory }) => {
     const duplicate = categories.some(
       (c) =>
         normalizeName(c.name) === nn &&
-        (!currentCategory?.id || c.id !== currentCategory.id)
+        (!currentCategory?.id || c.id !== currentCategory.id),
     );
     if (duplicate) {
       errs.name = true;
@@ -88,9 +88,9 @@ const CategoryModal = ({
       if (currentCategory?.id) {
         await api.patch(
           `/barbershop/service-categories/${encodeURIComponent(
-            currentCategory.id
+            currentCategory.id,
           )}/`,
-          payload
+          payload,
         );
       } else {
         await api.post("/barbershop/service-categories/", payload);
@@ -103,7 +103,7 @@ const CategoryModal = ({
       if (typeof data === "string") msgs.push(data);
       else if (data && typeof data === "object") {
         Object.values(data).forEach((v) =>
-          msgs.push(String(Array.isArray(v) ? v[0] : v))
+          msgs.push(String(Array.isArray(v) ? v[0] : v)),
         );
       }
       if (!msgs.length) msgs.push("Ошибка сохранения.");
@@ -137,9 +137,7 @@ const CategoryModal = ({
     } catch (e) {
       const data = e?.response?.data;
       const msg =
-        typeof data === "string"
-          ? data
-          : data?.detail || "Ошибка удаления.";
+        typeof data === "string" ? data : data?.detail || "Ошибка удаления.";
       setCatAlerts([msg]);
       console.error(e);
     } finally {
@@ -150,13 +148,13 @@ const CategoryModal = ({
   return (
     <>
       <ReactPortal wrapperId="barber-category-modal">
-        <div 
-          className="barberservices__overlay" 
-          onClick={handleClose} 
-          style={{ 
+        <div
+          className="barberservices__overlay"
+          onClick={handleClose}
+          style={{
             opacity: catConfirmDelete ? 0 : 1,
-            pointerEvents: catConfirmDelete ? 'none' : 'auto',
-            transition: 'opacity 0.2s ease'
+            pointerEvents: catConfirmDelete ? "none" : "auto",
+            transition: "opacity 0.2s ease",
           }}
         >
           <div
@@ -230,10 +228,7 @@ const CategoryModal = ({
                   style={{ gridColumn: "1 / -1" }}
                 >
                   <span className="barberservices__label">Активна</span>
-                  <label
-                    className="barberservices__switch"
-                    title="Активность"
-                  >
+                  <label className="barberservices__switch" title="Активность">
                     <input
                       type="checkbox"
                       name="cat_active"

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./Documents.scss";
 import api from "../../../../api";
 import BarberSelect from "../common/BarberSelect";
-import ConfirmModal from "../../../common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 
 /* ===== helpers ===== */
 const normalizeResp = (data) =>
@@ -223,7 +223,12 @@ export default function BarberDocuments() {
         } catch (err) {
           setFoldErr(err?.response?.data?.detail || "Ошибка удаления папки");
         }
-        setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+        setConfirmModal({
+          open: false,
+          title: "",
+          message: "",
+          onConfirm: null,
+        });
       },
     });
   };
@@ -240,7 +245,7 @@ export default function BarberDocuments() {
     } catch (e2) {
       setFoldErr(
         e2?.response?.data?.detail ||
-          "Не удалось удалить папку. Убедитесь, что в папке нет документов."
+          "Не удалось удалить папку. Убедитесь, что в папке нет документов.",
       );
     }
   };
@@ -420,7 +425,12 @@ export default function BarberDocuments() {
         } catch (err) {
           setDocErr(err?.response?.data?.detail || "Ошибка удаления документа");
         }
-        setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+        setConfirmModal({
+          open: false,
+          title: "",
+          message: "",
+          onConfirm: null,
+        });
       },
     });
   };
@@ -469,7 +479,7 @@ export default function BarberDocuments() {
 
   const currentDoc = useMemo(
     () => docFiltered.find((r) => r.id === selectedDocId) || null,
-    [docFiltered, selectedDocId]
+    [docFiltered, selectedDocId],
   );
 
   const onSelectDoc = async (row) => {
@@ -1079,7 +1089,12 @@ export default function BarberDocuments() {
       <ConfirmModal
         isOpen={confirmModal.open}
         onClose={() =>
-          setConfirmModal({ open: false, title: "", message: "", onConfirm: null })
+          setConfirmModal({
+            open: false,
+            title: "",
+            message: "",
+            onConfirm: null,
+          })
         }
         onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
