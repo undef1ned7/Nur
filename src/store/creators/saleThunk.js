@@ -219,6 +219,7 @@ export const historySellProduct = createAsyncThunk(
         params: {
           ...params,
           page: params.page || 1,
+          limit: params.limit ?? params.page_size ?? 100,
           search: params.search || "",
         },
       });
@@ -270,6 +271,7 @@ export const historySellObjects = createAsyncThunk(
         params: {
           ...params,
           page: params.page || 1,
+          limit: params.limit ?? params.page_size ?? 100,
           search: params.search || "",
         },
       });

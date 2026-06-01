@@ -74,6 +74,20 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 20px;
+
+    &--header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 0;
+      align-self: center;
+    }
+
+    &--loading {
+      opacity: 0.65;
+      pointer-events: none;
+    }
   }
 
   &__summary-item {
@@ -85,6 +99,13 @@
     border: 1px solid var(--border);
     border-radius: 14px;
     color: var(--text);
+    min-width: 140px;
+
+    strong {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
   }
 
   &__summary-label {
@@ -689,13 +710,22 @@
 
 @media (max-width: 900px) {
   .market-receipt-page {
+    .warehouse-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__summary--header {
+      justify-content: stretch;
+      width: 100%;
+    }
+
     &__card {
       padding: 14px;
       border-radius: 14px;
     }
 
-    &__toolbar,
-    &__summary {
+    &__toolbar {
       flex-direction: column;
       align-items: stretch;
       gap: 10px;

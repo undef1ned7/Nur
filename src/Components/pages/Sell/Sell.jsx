@@ -1,5 +1,15 @@
-import { Plus, Search } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import {
+  Banknote,
+  CheckSquare,
+  Eye,
+  Plus,
+  Receipt,
+  Search,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 // import "./Sklad.scss";
@@ -27,7 +37,7 @@ import SellDetail from "./SellDetail";
 import SellModal from "./SellModal";
 import SellMainStart from "./SellMainStart";
 import "./sell.scss";
-import { useAlert } from "../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import DataContainer from "../../common/DataContainer/DataContainer";
 import Modal from "../../common/Modal/Modal";
 
@@ -97,6 +107,14 @@ const PAGE_SIZE = 100;
 const Sell = () => {
   const navigate = useNavigate();
   const alert = useAlert();
+  const confirmDialog = useConfirm();
+  const askConfirm = useCallback(
+    (message) =>
+      new Promise((resolve) => {
+        confirmDialog(message, (ok) => resolve(Boolean(ok)));
+      }),
+    [confirmDialog],
+  );
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const { company, profile, userId } = useUser();
@@ -107,9 +125,11 @@ const Sell = () => {
     start,
     historyObjects,
     historyCount,
+    historyTotalAmount,
     historyNext,
     historyPrevious,
     historyObjectsCount,
+    historyObjectsTotalAmount,
     historyObjectsNext,
     historyObjectsPrevious,
     loading,
@@ -228,6 +248,7 @@ const Sell = () => {
     isStartPlanCompany,
     filterField,
     count,
+    listTotalAmount,
     totalPages,
     hasNextPage,
     hasPrevPage,
@@ -247,6 +268,9 @@ const Sell = () => {
     ).filter((item) => !hidden.has(String(item?.id ?? "")));
     const filterField = isBuildingCompany ? filterObjects : filterSell;
     const count = isBuildingCompany ? historyObjectsCount : historyCount;
+    const listTotalAmount = isBuildingCompany
+      ? historyObjectsTotalAmount
+      : historyTotalAmount;
     const next = isBuildingCompany ? historyObjectsNext : historyNext;
     const previous = isBuildingCompany
       ? historyObjectsPrevious
@@ -260,6 +284,7 @@ const Sell = () => {
       filterSell,
       filterField,
       count,
+      listTotalAmount,
       next,
       previous,
       totalPages,
@@ -272,10 +297,12 @@ const Sell = () => {
     historyObjects,
     hiddenIds,
     historyObjectsCount,
+    historyObjectsTotalAmount,
     historyObjectsNext,
     historyObjectsPrevious,
     historyPrevious,
     historyCount,
+    historyTotalAmount,
     historyNext,
   ]);
 
@@ -339,7 +366,7 @@ const Sell = () => {
 
   // поиск по истории (дебаунс)
   const debouncedSearch = useDebounce((v) => {
-    const requestParams = { ...historyBaseParams, search: v, page: 1 };
+    const requestParams = { ...historyBaseParams, search: v, page: 1, limit: PAGE_SIZE };
     dispatch(historySellProduct(requestParams));
     if (isBuildingCompany) {
       dispatch(historySellObjects(requestParams));
@@ -353,7 +380,7 @@ const Sell = () => {
 
   useEffect(() => {
     if (showSellMainStart) return;
-    const params = { ...historyBaseParams, search: "", page: currentPage };
+    const params = { ...historyBaseParams, search: "", page: currentPage, limit: PAGE_SIZE };
     dispatch(
       historySellProduct(params),
     );
@@ -523,88 +550,96 @@ const Sell = () => {
     }
   };
 
+  const bulkDeleteSales = async (ids, { cancelPaidMessage, successMessage, reloadPage }) => {
+    const doRequest = async (allowPaid) => {
+      const res = await fetch("https://app.nurcrm.kg/api/main/sales/bulk-delete/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          ids,
+          allow_paid: allowPaid,
+        }),
+      });
+      return res;
+    };
+
+    let res = await doRequest(false);
+
+    if (!res.ok && res.status === 400) {
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        // оставляем data = null
+      }
+
+      const paidIds = Array.isArray(data?.paid_ids) ? data.paid_ids : [];
+      if (paidIds.length > 0) {
+        const msg =
+          data?.detail ||
+          "Среди выбранных продаж есть оплаченные. Удалить их тоже?";
+        const confirmPaid = await askConfirm(
+          `${msg}\n\nОплаченные продажи:\n${paidIds.join("\n")}`,
+        );
+        if (!confirmPaid) {
+          alert(cancelPaidMessage);
+          return false;
+        }
+        res = await doRequest(true);
+      } else {
+        throw new Error(data?.detail || "Запрос отклонён (400)");
+      }
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+
+    clearSelection();
+    alert(successMessage);
+    dispatch(
+      historySellProduct({
+        ...historyBaseParams,
+        search: "",
+        page: reloadPage,
+        limit: PAGE_SIZE,
+      }),
+    );
+    if (isBuildingCompany) {
+      dispatch(
+        historySellObjects({
+          ...historyBaseParams,
+          search: "",
+          page: reloadPage,
+          limit: PAGE_SIZE,
+        }),
+      );
+    }
+    return true;
+  };
+
   // массовое удаление выбранных
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Удалить выбранные ${selectedIds.size} запись(и)?`))
-      return;
+    const ok = await askConfirm(`Удалить выбранные ${selectedIds.size} запись(и)?`);
+    if (!ok) return;
+
     try {
       setBulkDeleting(true);
       const ids = Array.from(selectedIds);
-
-      const doRequest = async (allowPaid) => {
-        const res = await fetch(
-          "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-            },
-            credentials: "include",
-            body: JSON.stringify({
-              ids,
-              allow_paid: allowPaid,
-            }),
-          },
-        );
-        return res;
-      };
-
-      let res = await doRequest(false);
-
-      if (!res.ok && res.status === 400) {
-        let data = null;
-        try {
-          data = await res.json();
-        } catch {
-          // оставляем data = null
-        }
-
-        const paidIds = Array.isArray(data?.paid_ids) ? data.paid_ids : [];
-        if (paidIds.length > 0) {
-          const msg =
-            data?.detail ||
-            "Среди выбранных продаж есть оплаченные. Удалить их тоже?";
-          const confirmPaid = window.confirm(
-            `${msg}\n\nОплаченные продажи:\n${paidIds.join("\n")}`,
-          );
-          if (!confirmPaid) {
-            alert("Удаление отменено. Оплаченные продажи не были удалены.");
-            return;
-          }
-          res = await doRequest(true);
-        } else {
-          throw new Error(data?.detail || "Запрос отклонён (400)");
-        }
-      }
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-
-      clearSelection();
-      alert("Выбранные записи удалены");
-      dispatch(
-        historySellProduct({
-          ...historyBaseParams,
-          search: "",
-          page: currentPage,
-        }),
-      );
-      if (isBuildingCompany) {
-        dispatch(
-          historySellObjects({
-            ...historyBaseParams,
-            search: "",
-            page: currentPage,
-          }),
-        );
-      }
+      await bulkDeleteSales(ids, {
+        cancelPaidMessage: "Удаление отменено. Оплаченные продажи не были удалены.",
+        successMessage: "Выбранные записи удалены",
+        reloadPage: currentPage,
+      });
     } catch (e) {
-      alert("Не удалось удалить: " + e.message);
+      alert("Не удалось удалить: " + e.message, true);
     } finally {
       setBulkDeleting(false);
     }
@@ -612,128 +647,36 @@ const Sell = () => {
 
   // очистить ВСЮ историю
   const handleClearAllHistory = async () => {
-    if (!window.confirm("Удалить ВСЮ историю? Действие необратимо.")) return;
+    const ok = await askConfirm("Удалить ВСЮ историю? Действие необратимо.");
+    if (!ok) return;
+
     try {
       setClearing(true);
       const list = Array.isArray(filterField) ? filterField : [];
       const ids = list.map((i) => i.id);
       if (ids.length === 0) throw new Error("Нечего удалять");
 
-      const doRequest = async (allowPaid) => {
-        const res = await fetch(
-          "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-            },
-            credentials: "include",
-            body: JSON.stringify({ ids, allow_paid: allowPaid }),
-          },
-        );
-        return res;
-      };
+      const deleted = await bulkDeleteSales(ids, {
+        cancelPaidMessage:
+          "Очистка отменена. Оплаченные продажи не были удалены, история сохранена.",
+        successMessage: "История удалена",
+        reloadPage: 1,
+      });
 
-      let res = await doRequest(false);
-
-      if (!res.ok && res.status === 400) {
-        let data = null;
-        try {
-          data = await res.json();
-        } catch {
-          // оставляем data = null
-        }
-
-        const paidIds = Array.isArray(data?.paid_ids) ? data.paid_ids : [];
-        if (paidIds.length > 0) {
-          const msg =
-            data?.detail ||
-            "Среди переданных продаж есть оплаченные. Удалить их тоже?";
-          const confirmPaid = window.confirm(
-            `${msg}\n\nОплаченные продажи:\n${paidIds.join("\n")}`,
-          );
-          if (!confirmPaid) {
-            alert(
-              "Очистка отменена. Оплаченные продажи не были удалены, история сохранена.",
-            );
-            return;
-          }
-          res = await doRequest(true);
-        } else {
-          throw new Error(data?.detail || "Запрос отклонён (400)");
-        }
-      }
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-
-      clearSelection();
-      alert("История удалена");
-      // После удаления всех записей возвращаемся на первую страницу
-      const params = new URLSearchParams(searchParams);
-      params.delete("page");
-      setSearchParams(params, { replace: true });
-      dispatch(
-        historySellProduct({
-          ...historyBaseParams,
-          search: "",
-          page: 1,
-        }),
-      );
-      if (isBuildingCompany) {
-        dispatch(
-          historySellObjects({
-            ...historyBaseParams,
-            search: "",
-            page: 1,
-          }),
-        );
+      if (deleted) {
+        const params = new URLSearchParams(searchParams);
+        params.delete("page");
+        setSearchParams(params, { replace: true });
       }
     } catch (e) {
-      alert("Не удалось очистить историю: " + e.message);
+      alert("Не удалось очистить историю: " + e.message, true);
     } finally {
       setClearing(false);
     }
   };
 
-  const SelectionActions = ({ pageItems }) => {
-    const allOnPageChecked =
-      pageItems.length > 0 && pageItems.every((i) => selectedIds.has(i.id));
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <>
-          {/* <span style={{ opacity: 0.75 }}>Выбрано: {selectedIds.size}</span> */}
-          <button
-            className="sell__delete"
-            // style={{ background: "#e53935" }}
-            onClick={handleBulkDelete}
-            disabled={bulkDeleting}
-            title="Массовое удаление выбранных"
-          >
-            {bulkDeleting ? "Удаляем..." : "Удалить"}
-          </button>
-          <button
-            className="sell__reset"
-            onClick={clearSelection}
-            style={{ cursor: "pointer" }}
-            title="Снять выбор"
-          >
-            Очистить
-          </button>
-        </>
-      </div>
-    );
-  };
+  const allOnPageSelected =
+    filterField.length > 0 && filterField.every((i) => selectedIds.has(i.id));
 
   return (
     <div>
@@ -768,45 +711,126 @@ const Sell = () => {
               Начать продажу
             </button>
           )}
-          {selectedIds.size > 0 ? (
-            <SelectionActions pageItems={filterField} />
-          ) : (
-            <>
-              {isBuildingCompany ? (
-                <button
-                  className="sklad__add"
-                  onClick={() => setShowBuilding(true)}
-                >
-                  <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
-                </button>
-              ) : !isStartPlanCompany && !isMarketCompany ? (
-                <>
-                  <button
-                    className="sell__header-btn"
-                    onClick={() => setShowAddCashboxModal(true)}
-                  >
-                    Прочие расходы
-                  </button>
-                </>
-              ) : null}
-            </>
-          )}
+          {isBuildingCompany ? (
+            <button
+              className="sklad__add"
+              onClick={() => setShowBuilding(true)}
+            >
+              <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
+            </button>
+          ) : !isStartPlanCompany && !isMarketCompany ? (
+            <button
+              className="sell__header-btn"
+              onClick={() => setShowAddCashboxModal(true)}
+            >
+              Прочие расходы
+            </button>
+          ) : null}
         </div>
         <div className="sell__history">
           <div className="sell__history-toolbar">
-            <label className="sell__selectAll">
-              <input
-                type="checkbox"
-                checked={
-                  filterField.length > 0 &&
-                  filterField.every((i) => selectedIds.has(i.id))
+            <div className="sell__history-toolbarLeft">
+              <button
+                type="button"
+                className={`sell__iconBtn sell__iconBtn--select${allOnPageSelected ? " sell__iconBtn--active" : ""}`}
+                onClick={() => toggleSelectAllOnPage(filterField)}
+                disabled={filterField.length === 0 || loading}
+                title={
+                  allOnPageSelected
+                    ? "Снять выбор со страницы"
+                    : "Выбрать все на странице"
                 }
-                onChange={() => toggleSelectAllOnPage(filterField)}
-              />
-              <span>Выбрать все на странице</span>
-            </label>
+                aria-label={
+                  allOnPageSelected
+                    ? "Снять выбор со страницы"
+                    : "Выбрать все на странице"
+                }
+                aria-pressed={allOnPageSelected}
+              >
+                {allOnPageSelected ? (
+                  <CheckSquare size={20} strokeWidth={2.2} />
+                ) : (
+                  <Square size={20} strokeWidth={2.2} />
+                )}
+              </button>
+
+              {selectedIds.size > 0 && (
+                <div
+                  className="sell__history-selectionActions"
+                  role="group"
+                  aria-label="Действия с выбранными продажами"
+                >
+                  <button
+                    type="button"
+                    className="sell__iconBtn sell__iconBtn--danger"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={bulkDeleting}
+                    title={`Удалить выбранные (${selectedIds.size})`}
+                    aria-label={`Удалить выбранные (${selectedIds.size})`}
+                  >
+                    <Trash2 size={18} strokeWidth={2.2} />
+                  </button>
+                  <button
+                    type="button"
+                    className="sell__iconBtn sell__iconBtn--muted"
+                    onClick={clearSelection}
+                    disabled={bulkDeleting}
+                    title="Снять выбор"
+                    aria-label="Снять выбор"
+                  >
+                    <X size={18} strokeWidth={2.2} />
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="sell__history-toolbarRight">
+              <div
+                className={`sell__history-stats${loading ? " sell__history-stats--loading" : ""}`}
+                aria-label="Сводка по продажам"
+              >
+                <div className="sell__history-stat">
+                  <span
+                    className="sell__history-stat-icon sell__history-stat-icon--sales"
+                    aria-hidden
+                  >
+                    <Receipt size={18} strokeWidth={2.2} />
+                  </span>
+                  <div className="sell__history-stat-body">
+                    <span className="sell__history-stat-label">Всего продаж</span>
+                    <strong className="sell__history-stat-value">{count || 0}</strong>
+                  </div>
+                </div>
+                <div className="sell__history-stat">
+                  <span
+                    className="sell__history-stat-icon sell__history-stat-icon--amount"
+                    aria-hidden
+                  >
+                    <Banknote size={18} strokeWidth={2.2} />
+                  </span>
+                  <div className="sell__history-stat-body">
+                    <span className="sell__history-stat-label">Общая сумма</span>
+                    <strong className="sell__history-stat-value">
+                      {listTotalAmount != null
+                        ? `${formatMoney(listTotalAmount)} сом`
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+                <div className="sell__history-stat sell__history-stat--page">
+                  <span
+                    className="sell__history-stat-icon sell__history-stat-icon--page"
+                    aria-hidden
+                  >
+                    <Eye size={18} strokeWidth={2.2} />
+                  </span>
+                  <div className="sell__history-stat-body">
+                    <span className="sell__history-stat-label">На странице</span>
+                    <strong className="sell__history-stat-value">{filterField.length}</strong>
+                  </div>
+                </div>
+              </div>
+
               <div
                 className="sell__viewToggle"
                 role="group"
@@ -830,11 +854,6 @@ const Sell = () => {
                 >
                   Карточки
                 </button>
-              </div>
-
-              <div className="sell__history-meta">
-                <span>Показано: {filterField.length}</span>
-                <span>Всего: {count || 0}</span>
               </div>
             </div>
           </div>

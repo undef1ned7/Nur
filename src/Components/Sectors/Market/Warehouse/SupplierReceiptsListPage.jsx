@@ -1,21 +1,70 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Wallet, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, RefreshCw, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
+import Pagination from "./components/Pagination";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
-import {
-  addCashFlows,
-  getCashBoxes,
-  useCash,
-} from "../../../../store/slices/cashSlice";
-import { useUser } from "../../../../store/slices/userSlice";
 import "./SupplierReceiptPage.scss";
 
+const DEFAULT_LIMIT = 20;
+
 const listFrom = (res) => res?.data?.results || res?.data || [];
+
+const parseFiltersFromSearchParams = (searchParams) => ({
+  supplier_id: searchParams.get("supplier_id") || "",
+  date_from: searchParams.get("date_from") || "",
+  date_to: searchParams.get("date_to") || "",
+});
+
+const parsePageFromSearchParams = (searchParams) => {
+  const page = parseInt(searchParams.get("page") || "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+};
+
+const parseLimitFromSearchParams = (searchParams) => {
+  const limit = parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10);
+  return Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_LIMIT;
+};
+
+const buildProcurementSearchParams = ({
+  page = 1,
+  limit = DEFAULT_LIMIT,
+  supplier_id = "",
+  date_from = "",
+  date_to = "",
+}) => {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  if (supplier_id) params.set("supplier_id", supplier_id);
+  if (date_from) params.set("date_from", date_from);
+  if (date_to) params.set("date_to", date_to);
+  return params;
+};
+
+const parseReceiptsListResponse = (res) => {
+  const data = res?.data;
+  const rows = listFrom(res);
+  const list = Array.isArray(rows) ? rows : [];
+  const meta = data?.meta && typeof data.meta === "object" ? data.meta : {};
+  const rawTotal =
+    meta.total_amount ?? data?.total_amount ?? meta.procurements_total_amount ?? null;
+  const totalAmount =
+    rawTotal != null && rawTotal !== "" && Number.isFinite(Number(rawTotal))
+      ? Number(rawTotal)
+      : null;
+
+  return {
+    list,
+    count: Number(data?.count) || list.length,
+    next: data?.next ?? null,
+    previous: data?.previous ?? null,
+    totalAmount,
+  };
+};
 
 const fmtDateTime = (value) => {
   if (!value) return "—";
@@ -61,12 +110,26 @@ const calcReceiptTotal = (items) =>
     0,
   );
 
+const receiptRowTotal = (row) => {
+  if (!row || typeof row !== "object") return 0;
+  const preset = row.total_amount ?? row.amount ?? row.sum;
+  if (preset != null && preset !== "" && Number.isFinite(Number(preset))) {
+    return Number(preset);
+  }
+  return calcReceiptTotal(row.items);
+};
+
 export default function SupplierReceiptsListPage() {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const alert = useAlert();
-  const { list: cashBoxes } = useCash();
-  const { company } = useUser();
+
+  const page = useMemo(() => parsePageFromSearchParams(searchParams), [searchParams]);
+  const limit = useMemo(() => parseLimitFromSearchParams(searchParams), [searchParams]);
+  const appliedFilters = useMemo(
+    () => parseFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
 
   const [loading, setLoading] = useState(false);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
@@ -75,12 +138,13 @@ export default function SupplierReceiptsListPage() {
   const [createSupplierPhone, setCreateSupplierPhone] = useState("");
   const [createSupplierSaving, setCreateSupplierSaving] = useState(false);
   const [receipts, setReceipts] = useState([]);
+  const [listCount, setListCount] = useState(0);
+  const [listNext, setListNext] = useState(null);
+  const [listPrevious, setListPrevious] = useState(null);
+  const [totalAmount, setTotalAmount] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [detailReceipt, setDetailReceipt] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [payCashBox, setPayCashBox] = useState("");
-  const [payAmount, setPayAmount] = useState("");
-  const [payingReceipt, setPayingReceipt] = useState(false);
 
   const openReceiptDetail = async (row) => {
     if (!row) return;
@@ -114,8 +178,6 @@ export default function SupplierReceiptsListPage() {
   const closeReceiptDetail = () => {
     setDetailReceipt(null);
     setDetailLoading(false);
-    setPayAmount("");
-    setPayingReceipt(false);
   };
   const emptyFilters = useMemo(
     () => ({
@@ -125,8 +187,34 @@ export default function SupplierReceiptsListPage() {
     }),
     [],
   );
-  const [filtersDraft, setFiltersDraft] = useState(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
+  const [filtersDraft, setFiltersDraft] = useState(() =>
+    parseFiltersFromSearchParams(searchParams),
+  );
+
+  const replaceListSearchParams = useCallback(
+    (patch) => {
+      setSearchParams(
+        (prev) => {
+          const current = {
+            page: parsePageFromSearchParams(prev),
+            limit: parseLimitFromSearchParams(prev),
+            ...parseFiltersFromSearchParams(prev),
+            ...patch,
+          };
+          const next = buildProcurementSearchParams(current);
+          if (prev.toString() === next.toString()) return prev;
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  useEffect(() => {
+    setFiltersDraft(parseFiltersFromSearchParams(searchParams));
+  }, [searchParams]);
+
   const hasPendingChanges = useMemo(
     () => JSON.stringify(filtersDraft) !== JSON.stringify(appliedFilters),
     [filtersDraft, appliedFilters],
@@ -171,25 +259,37 @@ export default function SupplierReceiptsListPage() {
     }
   };
 
-  const loadReceipts = async () => {
+  const loadReceipts = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = {
+        page,
+        limit,
+      };
       if (appliedFilters.supplier_id) params.supplier_id = appliedFilters.supplier_id;
       if (appliedFilters.date_from) params.date_from = appliedFilters.date_from;
       if (appliedFilters.date_to) params.date_to = appliedFilters.date_to;
 
       const res = await api.get("/main/suppliers/receipts/", { params });
-      const rows = listFrom(res);
-      setReceipts(Array.isArray(rows) ? rows : []);
+      const { list, count, next, previous, totalAmount: metaTotal } =
+        parseReceiptsListResponse(res);
+      setReceipts(list);
+      setListCount(count);
+      setListNext(next);
+      setListPrevious(previous);
+      setTotalAmount(metaTotal);
     } catch (error) {
       setReceipts([]);
+      setListCount(0);
+      setListNext(null);
+      setListPrevious(null);
+      setTotalAmount(null);
       const errorMessage = validateResErrors(error, "Ошибка загрузки списка закупок");
       alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
-  };
+  }, [appliedFilters.date_from, appliedFilters.date_to, appliedFilters.supplier_id, limit, page]);
 
   const handleCreateSupplier = async () => {
     const full_name = String(createSupplierName || "").trim();
@@ -227,88 +327,44 @@ export default function SupplierReceiptsListPage() {
 
   useEffect(() => {
     void loadSuppliers();
-    dispatch(getCashBoxes());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!cashBoxes?.length || payCashBox) return;
-    const firstId = cashBoxes[0]?.id || cashBoxes[0]?.uuid || "";
-    if (firstId) setPayCashBox(String(firstId));
-  }, [cashBoxes, payCashBox]);
-
-  useEffect(() => {
-    if (!detailReceipt) return;
-    const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
-    const total = calcReceiptTotal(items);
-    setPayAmount(total > 0 ? String(total.toFixed(2)) : "");
-  }, [detailReceipt]);
-
-  useEffect(() => {
     void loadReceipts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters.supplier_id, appliedFilters.date_from, appliedFilters.date_to]);
+  }, [loadReceipts]);
+
+  const totalPages = useMemo(
+    () => (listCount && limit ? Math.max(1, Math.ceil(listCount / limit)) : 1),
+    [listCount, limit],
+  );
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    replaceListSearchParams({ page: newPage });
+  };
 
   const handleApplyFilters = () => {
     if (dateRangeInvalid) {
       alert("Дата 'до' не может быть раньше даты 'от'.", true);
       return;
     }
-    setAppliedFilters(filtersDraft);
+    replaceListSearchParams({
+      page: 1,
+      supplier_id: filtersDraft.supplier_id,
+      date_from: filtersDraft.date_from,
+      date_to: filtersDraft.date_to,
+    });
   };
 
   const handleResetFilters = () => {
     setFiltersDraft(emptyFilters);
-    setAppliedFilters(emptyFilters);
-  };
-
-  const handlePayReceipt = async () => {
-    if (!detailReceipt) return;
-
-    const amount = Number(String(payAmount || "").replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      alert("Укажите корректную сумму оплаты", true);
-      return;
-    }
-
-    if (!Array.isArray(cashBoxes) || cashBoxes.length === 0) {
-      alert("Нет доступных касс. Создайте кассу в разделе «Кассы».", true);
-      return;
-    }
-
-    if (!payCashBox) {
-      alert("Выберите кассу для списания расхода.", true);
-      return;
-    }
-
-    const receiptId = detailReceipt.id ?? detailReceipt.uuid ?? null;
-    const supplierName = detailReceipt.supplier_name || "Поставщик";
-
-    try {
-      setPayingReceipt(true);
-      await dispatch(
-        addCashFlows({
-          cashbox: payCashBox,
-          type: "expense",
-          name: `Оплата накладной: ${supplierName}`,
-          amount: amount.toFixed(2),
-          ...(receiptId != null && { source_cashbox_flow_id: receiptId }),
-          source_business_operation_id: "Закупки",
-          status:
-            company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
-        }),
-      ).unwrap();
-      alert("Расход по накладной создан");
-      closeReceiptDetail();
-    } catch (error) {
-      const errorMessage = validateResErrors(
-        error,
-        "Не удалось создать расход по накладной",
-      );
-      alert(errorMessage, true);
-    } finally {
-      setPayingReceipt(false);
-    }
+    replaceListSearchParams({
+      page: 1,
+      supplier_id: "",
+      date_from: "",
+      date_to: "",
+    });
   };
 
   return (
@@ -320,6 +376,20 @@ export default function SupplierReceiptsListPage() {
             <p className="warehouse-header__subtitle">Список оприходований поставщиков</p>
           </div>
         </div>
+        {!dateRangeInvalid && (
+          <div
+            className={`market-receipt-page__summary market-receipt-page__summary--header${loading ? " market-receipt-page__summary--loading" : ""}`}
+          >
+            <div className="market-receipt-page__summary-item">
+              <span className="market-receipt-page__summary-label">Всего закупок</span>
+              <strong>{listCount}</strong>
+            </div>
+            <div className="market-receipt-page__summary-item">
+              <span className="market-receipt-page__summary-label">Общая сумма</span>
+              <strong>{totalAmount != null ? fmtNum(totalAmount) : "—"}</strong>
+            </div>
+          </div>
+        )}
       </div>
 
       <DataContainer>
@@ -432,10 +502,7 @@ export default function SupplierReceiptsListPage() {
                   {receipts.map((row, rowIdx) => {
                     const rowKey = row.id ?? row.uuid ?? `receipt-row-${rowIdx}`;
                     const items = Array.isArray(row.items) ? row.items : [];
-                    const total = items.reduce(
-                      (sum, it) => sum + Number(it.qty || 0) * Number(it.purchase_price || 0),
-                      0,
-                    );
+                    const total = receiptRowTotal(row);
                     return (
                       <tr
                         key={rowKey}
@@ -461,6 +528,19 @@ export default function SupplierReceiptsListPage() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!loading && !dateRangeInvalid && totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              count={listCount}
+              countLabel="закупок"
+              loading={loading}
+              hasNextPage={Boolean(listNext)}
+              hasPrevPage={Boolean(listPrevious)}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
       </DataContainer>
@@ -542,77 +622,11 @@ export default function SupplierReceiptsListPage() {
                 </div>
               );
             })()}
-            {(() => {
-              const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
-              const total = calcReceiptTotal(items);
-              if (total <= 0) return null;
-              return (
-                <div className="market-receipt-page__payment market-receipt-page__payment--detail">
-                  <h4 className="market-receipt-page__payment-title">Оплата накладной</h4>
-                  <div className="market-receipt-page__payment-grid">
-                    <div className="market-receipt-page__field">
-                      <label className="market-receipt-page__label">Касса</label>
-                      <select
-                        className="market-receipt-page__qty-input"
-                        value={payCashBox}
-                        onChange={(e) => setPayCashBox(e.target.value)}
-                        disabled={payingReceipt || !cashBoxes?.length}
-                      >
-                        {!cashBoxes?.length ? (
-                          <option value="">Нет касс</option>
-                        ) : (
-                          cashBoxes.map((box) => {
-                            const boxId = String(box.id || box.uuid || "");
-                            return (
-                              <option key={boxId} value={boxId}>
-                                {box.name || box.title || `Касса #${boxId}`}
-                              </option>
-                            );
-                          })
-                        )}
-                      </select>
-                    </div>
-                    <div className="market-receipt-page__field">
-                      <label className="market-receipt-page__label">Сумма расхода</label>
-                      <input
-                        className="market-receipt-page__qty-input"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={payAmount}
-                        onChange={(e) => setPayAmount(e.target.value)}
-                        disabled={payingReceipt}
-                      />
-                    </div>
-                  </div>
-                  <p className="market-receipt-page__payment-hint">
-                    Сумма накладной: <strong>{fmtNum(total)}</strong>
-                  </p>
-                </div>
-              );
-            })()}
             <div className="market-receipt-page__actions">
-              {(() => {
-                const items = Array.isArray(detailReceipt.items) ? detailReceipt.items : [];
-                const total = calcReceiptTotal(items);
-                if (total <= 0) return null;
-                return (
-                  <button
-                    type="button"
-                    className="market-receipt-page__primary-button"
-                    onClick={() => void handlePayReceipt()}
-                    disabled={payingReceipt || detailLoading}
-                  >
-                    <Wallet size={16} />
-                    {payingReceipt ? "Списываем..." : "Оплатить (расход)"}
-                  </button>
-                );
-              })()}
               <button
                 type="button"
                 className="market-receipt-page__secondary-button"
                 onClick={closeReceiptDetail}
-                disabled={payingReceipt}
               >
                 Закрыть
               </button>
