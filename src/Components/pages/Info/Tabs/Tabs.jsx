@@ -84,6 +84,11 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
     return sectorName === "кафе" || sectorName.includes("кафе") || sectorName.includes("ресторан");
   }, [sectorName]);
 
+  // Определяем, является ли сфера "производство"
+  const isProductionSector = useMemo(() => {
+    return sectorName === "производство" || sectorName === "production" || sectorName.includes("производ");
+  }, [sectorName]);
+
   const isOwner = useMemo(() => profile?.role === "owner", [profile?.role]);
 
   const canViewOnline = useMemo(() => {
@@ -91,9 +96,10 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
     const canViewShowcase = Boolean(profile?.can_view_showcase);
     // Показываем владельцу всегда, а сотрудникам — если есть доступ к витрине и slug
     // Для барбершопа, кафе и магазина показываем вкладку "Онлайн"
-    const hasSectorWithOnline = isBarberSector || isCafeSector || isMarketSector;
+    const hasSectorWithOnline =
+      isBarberSector || isCafeSector || isMarketSector || isProductionSector;
     return hasSlug && hasSectorWithOnline && (isOwner || canViewShowcase);
-  }, [company?.slug, profile?.can_view_showcase, isOwner, isBarberSector, isCafeSector, isMarketSector]);
+  }, [company?.slug, profile?.can_view_showcase, isOwner, isBarberSector, isCafeSector, isMarketSector, isProductionSector]);
 
   const visibleTabs = useMemo(() => {
     return allTabs.filter((tab) => {
