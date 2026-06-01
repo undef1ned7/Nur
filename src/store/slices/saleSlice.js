@@ -62,6 +62,7 @@ const initialState = {
   checkout: null,
   history: [],
   historyCount: 0,
+  historyTotalAmount: null,
   historyNext: null,
   historyPrevious: null,
   historyDetail: null,
@@ -71,6 +72,7 @@ const initialState = {
   lastDeal: null,
   historyObjects: [],
   historyObjectsCount: 0,
+  historyObjectsTotalAmount: null,
   historyObjectsNext: null,
   historyObjectsPrevious: null,
   historyObjectDetail: null,
@@ -84,6 +86,15 @@ const initialState = {
 
 const ensureError = (action) =>
   action.payload ?? { message: action.error?.message };
+
+const parseListTotalAmount = (payload) => {
+  const meta = payload?.meta && typeof payload.meta === "object" ? payload.meta : {};
+  const raw =
+    meta.total_amount ?? payload?.total_amount ?? meta.sales_total_amount ?? null;
+  if (raw == null || raw === "") return null;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : null;
+};
 
 const saleSlice = createSlice({
   name: "sale",
@@ -325,12 +336,14 @@ const saleSlice = createSlice({
       .addCase(historySellProduct.fulfilled, (state, { payload }) => {
         state.history = payload?.results || (Array.isArray(payload) ? payload : []);
         state.historyCount = payload?.count || payload?.length || 0;
+        state.historyTotalAmount = parseListTotalAmount(payload);
         state.historyNext = payload?.next || null;
         state.historyPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellProduct.rejected, (state, action) => {
         state.error = ensureError(action);
+        state.historyTotalAmount = null;
         state.loading = false;
       })
 
@@ -340,12 +353,14 @@ const saleSlice = createSlice({
       .addCase(historySellObjects.fulfilled, (state, { payload }) => {
         state.historyObjects = payload?.results || (Array.isArray(payload) ? payload : []);
         state.historyObjectsCount = payload?.count || payload?.length || 0;
+        state.historyObjectsTotalAmount = parseListTotalAmount(payload);
         state.historyObjectsNext = payload?.next || null;
         state.historyObjectsPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellObjects.rejected, (state, action) => {
         state.error = ensureError(action);
+        state.historyObjectsTotalAmount = null;
         state.loading = false;
       })
 

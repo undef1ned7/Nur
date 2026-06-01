@@ -8,6 +8,7 @@ const Pagination = ({
   currentPage,
   totalPages,
   count,
+  countLabel = "товаров",
   loading,
   hasNextPage,
   hasPrevPage,
@@ -27,7 +28,7 @@ const Pagination = ({
       </button>
       <span className="warehouse-pagination__info">
         Страница {currentPage} из {totalPages ?? 1}
-        {count ? ` (${count} товаров)` : ""}
+        {count ? ` (${count} ${countLabel})` : ""}
       </span>
       <button
         type="button"
