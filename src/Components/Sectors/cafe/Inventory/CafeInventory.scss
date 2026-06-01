@@ -1539,4 +1539,127 @@
       width: 100%;
     }
   }
+
+  &__household {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+  }
+
+  &__householdSubTabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__householdAdd {
+    margin-left: auto;
+  }
+
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  &__modal {
+    width: min(420px, 96vw);
+    max-height: 90vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+
+    &--wide {
+      width: min(560px, 96vw);
+    }
+  }
+
+  &__modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    button {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--muted);
+    }
+  }
+
+  &__form {
+    display: grid;
+    gap: 12px;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 550;
+      color: var(--muted);
+    }
+
+    input {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+    }
+  }
+
+  &__formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  &__sessionLines {
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  &__sessionLine {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    font-size: 13px;
+
+    input {
+      width: 88px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+  }
+
+  &__iconBtn--danger {
+    color: #b91c1c;
+  }
 }

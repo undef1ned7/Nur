@@ -191,6 +191,30 @@ const CafeAnalyticsModalContent = ({
   if (!modalKey) return null;
 
   if (modalKey === "revenue") {
+    const inflowRows = Array.isArray(revenueInflowRows) ? revenueInflowRows : [];
+
+    const incomeItems = Array.isArray(financeBlock?.income_items)
+      ? [...financeBlock.income_items].sort((a, b) => {
+          const ta = new Date(a?.paid_at || a?.created_at || 0).getTime();
+          const tb = new Date(b?.paid_at || b?.created_at || 0).getTime();
+          const na = Number.isFinite(ta) ? ta : 0;
+          const nb = Number.isFinite(tb) ? tb : 0;
+          return nb - na;
+        })
+      : [];
+
+    const kindLabel = (k) => {
+      const v = String(k || "").toLowerCase();
+      if (v === "order_payment") return "Оплата";
+      if (v === "refund") return "Возврат";
+      return k ? String(k) : "—";
+    };
+
+    const tableNum = (n) => {
+      if (n === null || n === undefined || n === "") return "—";
+      return String(n);
+    };
+
     return (
       <div className="cafeAnalytics__modalContent">
         <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
@@ -205,30 +229,76 @@ const CafeAnalyticsModalContent = ({
         </div>
 
         <div className="cafeAnalytics__modalBlock">
-          <div className="cafeAnalytics__modalBlockTitle">Топ блюд по выручке</div>
+          <div className="cafeAnalytics__modalBlockTitle">Оплаты по способу</div>
+          <div className="cafeAnalytics__modalTableWrap">
+            <table className="cafeAnalytics__modalTable">
+              <thead>
+                <tr>
+                  <th>Способ</th>
+                  <th>Оплат</th>
+                  <th>Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inflowRows.map((x) => (
+                  <tr key={x._id}>
+                    <td className="cafeAnalytics__modalTdTitle" title={x.label}>
+                      {x.label}
+                    </td>
+                    <td>{fmtInt(x.orders_count)}</td>
+                    <td>{fmtMoney(toNum(x.amount))}</td>
+                  </tr>
+                ))}
+                {!inflowRows.length && (
+                  <tr>
+                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
+                      Нет данных за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="cafeAnalytics__modalBlock">
+          <div className="cafeAnalytics__modalBlockTitle">
+            Разбивка по способу оплаты
+          </div>
           <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
             <table className="cafeAnalytics__modalTable">
               <thead>
                 <tr>
-                  <th>Блюдо</th>
-                  <th>Кол-во</th>
-                  <th>Выручка</th>
+                  <th>Дата и время</th>
+                  <th>Тип</th>
+                  <th>Способ</th>
+                  <th>Сумма</th>
+                  <th>Стол</th>
                 </tr>
               </thead>
               <tbody>
-                {salesItems.map((x) => (
-                  <tr key={x.menu_item_id || x.title}>
-                    <td className="cafeAnalytics__modalTdTitle" title={x.title}>
-                      {x.title}
+                {incomeItems.map((x, idx) => (
+                  <tr key={String(x.id ?? x.uuid ?? idx)}>
+                    <td>{fmtDateTime(x.paid_at || x.created_at || x.date)}</td>
+                    <td>{kindLabel(x.kind)}</td>
+                    <td
+                      className="cafeAnalytics__modalTdTitle"
+                      title={x.payment_method_label}
+                    >
+                      {x.payment_method_label ||
+                        pickPaymentLabel(x.payment_method || x.method) ||
+                        "—"}
                     </td>
-                    <td>{fmtInt(x.qty)}</td>
-                    <td>{fmtMoney(toNum(x.revenue))}</td>
+                    <td>{fmtMoney(toNum(x.amount ?? x.total ?? x.sum))}</td>
+                    <td>{tableNum(x.table_number)}</td>
                   </tr>
                 ))}
-                {!salesItems.length && (
+                {!incomeItems.length && (
                   <tr>
-                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
-                      Нет данных.
+                    <td colSpan={5} className="cafeAnalytics__modalEmpty">
+                      {inflowRows.length
+                        ? "Детальный список платежей недоступен для этого периода."
+                        : "Нет данных за период."}
                     </td>
                   </tr>
                 )}
@@ -646,127 +716,6 @@ const CafeAnalyticsModalContent = ({
                   <tr>
                     <td colSpan={5} className="cafeAnalytics__modalEmpty">
                       Нет данных за выбранный период.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (modalKey === "payment_inflow") {
-    const rows = Array.isArray(revenueInflowRows) ? revenueInflowRows : [];
-    const sumAmt = rows.reduce((a, x) => a + toNum(x?.amount), 0);
-    const sumOrd = rows.reduce((a, x) => a + toNum(x?.orders_count), 0);
-
-    const incomeItems = Array.isArray(financeBlock?.income_items)
-      ? [...financeBlock.income_items].sort((a, b) => {
-          const ta = new Date(a?.paid_at || a?.created_at || 0).getTime();
-          const tb = new Date(b?.paid_at || b?.created_at || 0).getTime();
-          const na = Number.isFinite(ta) ? ta : 0;
-          const nb = Number.isFinite(tb) ? tb : 0;
-          return nb - na;
-        })
-      : [];
-
-    const kindLabel = (k) => {
-      const v = String(k || "").toLowerCase();
-      if (v === "order_payment") return "Оплата";
-      if (v === "refund") return "Возврат";
-      return k ? String(k) : "—";
-    };
-
-    const tableNum = (n) => {
-      if (n === null || n === undefined || n === "") return "—";
-      return String(n);
-    };
-
-    return (
-      <div className="cafeAnalytics__modalContent">
-        <div className="cafeAnalytics__modalKpiRow cafeAnalytics__modalKpiRow--2">
-          <div className="cafeAnalytics__modalKpi">
-            <div className="cafeAnalytics__modalKLabel">Сумма по способам</div>
-            <div className="cafeAnalytics__modalKVal">{fmtMoney(sumAmt)}</div>
-          </div>
-          <div className="cafeAnalytics__modalKpi">
-            <div className="cafeAnalytics__modalKLabel">
-              {incomeItems.length ? "Платежей в списке" : "Заказов (строк)"}
-            </div>
-            <div className="cafeAnalytics__modalKVal">
-              {fmtInt(incomeItems.length || sumOrd)}
-            </div>
-          </div>
-        </div>
-
-        <div className="cafeAnalytics__modalBlock">
-          <div className="cafeAnalytics__modalBlockTitle">Оплаты по способу</div>
-          <div className="cafeAnalytics__modalTableWrap">
-            <table className="cafeAnalytics__modalTable">
-              <thead>
-                <tr>
-                  <th>Способ</th>
-                  <th>Оплат</th>
-                  <th>Сумма</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((x) => (
-                  <tr key={x._id}>
-                    <td className="cafeAnalytics__modalTdTitle" title={x.label}>
-                      {x.label}
-                    </td>
-                    <td>{fmtInt(x.orders_count)}</td>
-                    <td>{fmtMoney(toNum(x.amount))}</td>
-                  </tr>
-                ))}
-                {!rows.length && (
-                  <tr>
-                    <td colSpan={3} className="cafeAnalytics__modalEmpty">
-                      Нет данных за период.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="cafeAnalytics__modalBlock">
-          <div className="cafeAnalytics__modalBlockTitle">Разбивка по способу оплаты</div>
-          <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
-            <table className="cafeAnalytics__modalTable">
-              <thead>
-                <tr>
-                  <th>Дата и время</th>
-                  <th>Тип</th>
-                  <th>Способ</th>
-                  <th>Сумма</th>
-                  <th>Стол</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incomeItems.map((x, idx) => (
-                  <tr key={String(x.id ?? x.uuid ?? idx)}>
-                    <td>{fmtDateTime(x.paid_at || x.created_at || x.date)}</td>
-                    <td>{kindLabel(x.kind)}</td>
-                    <td className="cafeAnalytics__modalTdTitle" title={x.payment_method_label}>
-                      {x.payment_method_label ||
-                        pickPaymentLabel(x.payment_method || x.method) ||
-                        "—"}
-                    </td>
-                    <td>{fmtMoney(toNum(x.amount ?? x.total ?? x.sum))}</td>
-                    <td>{tableNum(x.table_number)}</td>
-                  </tr>
-                ))}
-                {!incomeItems.length && (
-                  <tr>
-                    <td colSpan={5} className="cafeAnalytics__modalEmpty">
-                      {rows.length
-                        ? "Детальный список платежей недоступен для этого периода."
-                        : "Нет данных за период."}
                     </td>
                   </tr>
                 )}

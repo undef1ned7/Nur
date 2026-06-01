@@ -20,6 +20,7 @@ import {
   Legend,
 } from "chart.js";
 import api from "../../../../api";
+import { fetchCafeSalesDynamicsSeries } from "../../../../../tools/cafeAnalyticsDynamics";
 import "./reports.scss";
 import { Modal, ReportsModalContent } from "./ReportsModals";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -68,42 +69,6 @@ const addDays = (d, days) => {
   const x = new Date(d);
   x.setDate(x.getDate() + days);
   return x;
-};
-
-const clampRangeDays = (fromStr, toStr, maxDays = 62) => {
-  if (!fromStr || !toStr) return { ok: true, days: 0 };
-  const from = new Date(`${fromStr}T00:00:00`);
-  const to = new Date(`${toStr}T00:00:00`);
-  const diff = Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
-  return { ok: diff <= maxDays, days: diff };
-};
-
-const buildBuckets = (fromStr, toStr) => {
-  if (!fromStr || !toStr) return [];
-  const from = new Date(`${fromStr}T00:00:00`);
-  const to = new Date(`${toStr}T00:00:00`);
-
-  const { ok } = clampRangeDays(fromStr, toStr, 62);
-  const step = ok ? 1 : 7;
-
-  const buckets = [];
-  let cur = new Date(from);
-
-  while (cur.getTime() <= to.getTime()) {
-    const start = new Date(cur);
-    const end = addDays(cur, step - 1);
-    const endClamped = end.getTime() > to.getTime() ? new Date(to) : end;
-
-    buckets.push({
-      key: step === 1 ? isoDate(start) : `${isoDate(start)}—${isoDate(endClamped)}`,
-      date_from: isoDate(start),
-      date_to: isoDate(endClamped),
-    });
-
-    cur = addDays(cur, step);
-  }
-
-  return buckets;
 };
 
 /* DRF fetch-all (для клиентов) */
@@ -326,38 +291,13 @@ const Reports = () => {
       setRevenueSeries([]);
       return;
     }
-    const buckets = buildBuckets(dateFrom, dateTo);
-    if (!buckets.length) {
-      setRevenueSeries([]);
-      return;
-    }
 
     try {
-      const chunkSize = 8;
-      const out = [];
-
-      for (let i = 0; i < buckets.length; i += chunkSize) {
-        const part = buckets.slice(i, i + chunkSize);
-
-        // eslint-disable-next-line no-await-in-loop
-        const resArr = await Promise.all(
-          part.map((b) =>
-            api
-              .get("/cafe/analytics/sales/summary/", {
-                params: { date_from: b.date_from, date_to: b.date_to },
-              })
-              .catch(() => ({ data: null }))
-          )
-        );
-
-        for (let j = 0; j < part.length; j += 1) {
-          const b = part[j];
-          const payload = resArr[j]?.data;
-          out.push({ label: b.key, value: toNum(payload?.revenue) });
-        }
-      }
-
-      setRevenueSeries(out);
+      const series = await fetchCafeSalesDynamicsSeries({
+        dateFrom,
+        dateTo,
+      });
+      setRevenueSeries(series);
     } catch (e) {
       console.error("Reports fetchRevenueSeries error:", e);
       setRevenueSeries([]);

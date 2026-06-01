@@ -10,7 +10,9 @@ import {
   FaCheckCircle,
   FaBoxes,
   FaThList,
+  FaUtensils,
 } from "react-icons/fa";
+import HouseholdInventoryTab from "./HouseholdInventoryTab";
 import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import InventoryItemsPickerModal from "./InventoryItemsPickerModal";
@@ -724,8 +726,10 @@ const CafeInventory = () => {
                 activeTab === "equipment"
                   ? "Поиск оборудования…"
                   : activeTab === "sessions"
-                  ? "Поиск актов инвентаризации…"
-                  : "Поиск актов сверки продуктов…"
+                    ? "Поиск актов инвентаризации…"
+                    : activeTab === "household"
+                      ? "Поиск посуды и расходников…"
+                      : "Поиск актов сверки продуктов…"
               }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -746,7 +750,7 @@ const CafeInventory = () => {
             >
               <FaPlus /> Новый акт
             </button>
-          ) : (
+          ) : activeTab === "household" ? null : (
             <button
               className="cafeInventory__btn cafeInventory__btn--primary"
               onClick={openCreateStockCheck}
@@ -783,11 +787,25 @@ const CafeInventory = () => {
         >
           <FaBoxes /> Сверка продуктов
         </button>
+        <button
+          className={`cafeInventory__tab ${
+            activeTab === "household" ? "cafeInventory__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("household")}
+        >
+          <FaUtensils /> Посуда и расходники
+        </button>
       </div>
 
       {/* List */}
       <div className="cafeInventory__list">
-        {loading && <div className="cafeInventory__alert">Загрузка…</div>}
+        {activeTab === "household" ? (
+          <HouseholdInventoryTab query={query} />
+        ) : null}
+
+        {activeTab !== "household" && loading && (
+          <div className="cafeInventory__alert">Загрузка…</div>
+        )}
 
         {activeTab === "equipment" && (
           <>
