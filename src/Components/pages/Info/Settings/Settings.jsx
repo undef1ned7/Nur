@@ -1599,6 +1599,14 @@ const Settings = () => {
     );
   }, [sectorName]);
 
+  const isProductionSector = useMemo(() => {
+    return (
+      sectorName === "производство" ||
+      sectorName === "production" ||
+      sectorName.includes("производ")
+    );
+  }, [sectorName]);
+
   const onlineMenuUrl = useMemo(() => {
     if (!company?.slug) return "";
 
@@ -1611,13 +1619,16 @@ const Settings = () => {
     // Генерируем URL в зависимости от типа сектора
     if (isMarket) {
       return `${safeOrigin()}/catalog/${company.slug}`;
-    } else if (isCafeSector) {
+    }
+    if (isProductionSector) {
+      return `${safeOrigin()}/production/${company.slug}`;
+    }
+    if (isCafeSector) {
       return `${safeOrigin()}/cafe/${company.slug}/menu`;
     }
 
-    // По умолчанию для кафе
-    return `${safeOrigin()}/cafe/${company.slug}/menu`;
-  }, [company?.slug, sectorName, isCafeSector]);
+    return "";
+  }, [company?.slug, sectorName, isCafeSector, isProductionSector]);
 
   const onlineBookingUrl = useMemo(() => {
     if (!company?.slug || !isBarberSector) return "";
@@ -2185,12 +2196,16 @@ const Settings = () => {
                   </div>
                 )}
 
-                {/* Онлайн-меню/каталог для кафе и магазинов */}
-                {(isCafeSector || isMarketSector) && (
+                {/* Онлайн-меню/каталог для кафе, магазинов и производства */}
+                {(isCafeSector || isMarketSector || isProductionSector) && (
                   <div className="settings__onlineCard">
                     <div className="settings__onlineHead">
                       <div className="settings__onlineTitle">
-                        {isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}
+                        {isCafeSector
+                          ? "🍽️ Онлайн-меню"
+                          : isProductionSector
+                            ? "🏭 Онлайн-витрина"
+                            : "🛒 Онлайн-каталог"}
                       </div>
                       <div className="settings__onlineHint">
                         У каждой компании своя ссылка по slug
@@ -2243,7 +2258,10 @@ const Settings = () => {
                 )}
 
                 {/* Fallback если не определён тип сектора */}
-                {!isBarberSector && !isCafeSector && !isMarketSector && (
+                {!isBarberSector &&
+                  !isCafeSector &&
+                  !isMarketSector &&
+                  !isProductionSector && (
                   <div className="settings__onlineCard">
                     <div className="settings__onlineHead">
                       <div className="settings__onlineTitle">

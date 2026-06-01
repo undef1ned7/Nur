@@ -25,6 +25,9 @@ const ApplicationList = lazy(
 const OnlineCatalog = lazy(
   () => import("../Components/Sectors/Market/Catalog/Catalog"),
 );
+const ProductionShowcase = lazy(
+  () => import("../Components/Sectors/Production/Catalog/ProductionShowcase"),
+);
 const CafeMenuOnline = lazy(
   () => import("../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline"),
 );
@@ -65,6 +68,11 @@ export const publicRoutes = [
     key="/catalog/:slug"
     path="/catalog/:slug"
     element={<OnlineCatalog />}
+  />,
+  <Route
+    key="/production/:slug"
+    path="/production/:slug"
+    element={<ProductionShowcase />}
   />,
   <Route
     key="/cafe/:company_slug/menu"

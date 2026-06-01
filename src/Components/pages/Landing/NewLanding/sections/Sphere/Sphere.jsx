@@ -8,6 +8,19 @@ import "./Sphere.scss";
 
 const DESKTOP_SLIDES = 4;
 
+const LANDING_SPHERE_NAMES = [
+  "Строительная сфера",
+  "Парикмахерские",
+  "Кафе",
+  "Магазины",
+  "Склад",
+  "Производство",
+  "Услуги",
+  "Стоматология",
+  // "Старт Производство",
+  // "Подрядчики (Производство)",
+];
+
 const getIndustryDescription = (industry) => {
   if (industry.sectors?.length) {
     return industry.sectors.map((sector) => sector.name).join(", ");
@@ -24,15 +37,19 @@ const Sphere = () => {
   const [isEnd, setIsEnd] = useState(false);
   const { industries, loading } = useLandingIndustries();
 
-  const sphereCards = useMemo(
-    () =>
-      industries.map((industry) => ({
+  const sphereCards = useMemo(() => {
+    const byName = new Map(
+      industries.map((industry) => [industry.name, industry]),
+    );
+
+    return LANDING_SPHERE_NAMES.map((name) => byName.get(name))
+      .filter(Boolean)
+      .map((industry) => ({
         id: industry.id,
         title: industry.name,
         text: getIndustryDescription(industry),
-      })),
-    [industries]
-  );
+      }));
+  }, [industries]);
 
   const updateSwiperState = useCallback((swiper) => {
     setActiveIndex(swiper.snapIndex ?? swiper.activeIndex);
@@ -138,7 +155,11 @@ const Sphere = () => {
 
         {showControls && (
           <div className="spheres__controls">
-            <div className="spheres__dots" role="tablist" aria-label="Страницы сфер">
+            <div
+              className="spheres__dots"
+              role="tablist"
+              aria-label="Страницы сфер"
+            >
               {Array.from({ length: pageCount }, (_, index) => (
                 <button
                   key={index}

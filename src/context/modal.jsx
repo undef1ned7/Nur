@@ -1,6 +1,6 @@
 import { createContext, useState, useContext, useCallback } from "react";
 import GlobalAlertModal from "../Components/common/AlertModal/GlobalAlertModal";
-import ConfirmModal from "../Components/common/ConfirmModal/ConfirmModal";
+import ConfirmModal from "../Components/pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 
 const ModalContext = createContext();
 

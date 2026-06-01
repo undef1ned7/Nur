@@ -7,7 +7,9 @@ import Banner from "./sections/Banner/Banner";
 import BusinessProblems from "./sections/BusinessProblems/BusinessProblems";
 import Footer from "./sections/Footer/Footer";
 
-const UnitedBusiness = lazy(() => import("./sections/UnitedBusiness/UnitedBusiness"));
+const UnitedBusiness = lazy(
+  () => import("./sections/UnitedBusiness/UnitedBusiness"),
+);
 const Sphere = lazy(() => import("./sections/Sphere/Sphere"));
 const Rate = lazy(() => import("./sections/Rate/Rate"));
 const Included = lazy(() => import("./sections/Included/Included"));

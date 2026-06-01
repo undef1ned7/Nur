@@ -14,7 +14,7 @@ import {
   FaChevronRight,
 } from "react-icons/fa";
 import api from "../../../../api";
-import "./Catalog.scss";
+import "../../Market/Catalog/Catalog.scss";
 
 /* =======================
    helpers
@@ -501,7 +501,7 @@ const SideCart = ({
 /* =======================
    Page: Catalog
 ======================= */
-const Catalog = () => {
+const ProductionShowcase = () => {
   const { slug = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -522,7 +522,7 @@ const Catalog = () => {
   const [activeProductId, setActiveProductId] = useState("");
 
   const storageKey = useMemo(
-    () => `public_cart_${String(slug || "").trim()}`,
+    () => `production_showcase_cart_${String(slug || "").trim()}`,
     [slug],
   );
   const [cart, setCart] = useState({});
@@ -826,7 +826,7 @@ const Catalog = () => {
       .join("\n");
 
     const text =
-      `Заказ с витрины: ${company?.name || ""}\n` +
+      `Заказ с витрины (производство): ${company?.name || ""}\n` +
       `Номер клиента: ${String(clientPhone).trim()}\n\n` +
       `Товары:\n${linesText}\n\n` +
       `Итого: ${money(total)} сом`;
@@ -853,7 +853,7 @@ const Catalog = () => {
           <div className="shopfront__empty">
             <div className="shopfront__emptyTitle">Slug компании не найден</div>
             <div className="shopfront__emptyText">
-              Проверь роут: <b>/catalog/:slug</b>. Сейчас URL:{" "}
+              Проверь роут: <b>/production/:slug</b>. Сейчас URL:{" "}
               <b>{location.pathname}</b>
             </div>
           </div>
@@ -964,7 +964,7 @@ const Catalog = () => {
         <div className="sfhead">
           <div className="sfhead__left">
             <div className="sfhead__title">
-              <FaShoppingCart /> Все товары
+              <FaShoppingCart /> Вся продукция
             </div>
             {qState.q && (
               <div className="sfhead__searchInfo">
@@ -1007,7 +1007,7 @@ const Catalog = () => {
                 <div className="sfgrid__emptyText">
                   {qState.q || qState.category
                     ? "Попробуйте изменить параметры поиска или выберите другую категорию"
-                    : "В каталоге пока нет товаров"}
+                    : "На витрине пока нет продукции"}
                 </div>
               </div>
             </div>
@@ -1112,4 +1112,4 @@ const Catalog = () => {
   );
 };
 
-export default Catalog;
+export default ProductionShowcase;
