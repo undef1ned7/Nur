@@ -518,6 +518,86 @@
     padding: 20px;
   }
 
+  &__debt-hint {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+
+  &__deferred-prepay-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      width: 16px;
+      height: 16px;
+      accent-color: #f7d617;
+    }
+  }
+
+  &__deferred-prepay {
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+  }
+
+  &__deferred-prepay-field {
+    margin-bottom: 16px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .payment-page__debt-days-input {
+      width: 100%;
+    }
+
+    .payment-page__debt-days-label {
+      margin-bottom: 8px;
+    }
+  }
+
+  &__deferred-prepay-method-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding: 3px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+
+  &__deferred-prepay-method {
+    flex: 1;
+    border: none;
+    background: transparent;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &--active {
+      background: #fff7cc;
+      color: #111827;
+      box-shadow: 0 1px 3px rgba(17, 24, 39, 0.08);
+    }
+  }
+
   &__debt-days {
     margin: 20px 0;
     padding: 16px;
@@ -533,8 +613,16 @@
     margin-bottom: 8px;
   }
 
+  &__debt-days-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    position: relative;
+  }
+
   &__debt-days-input {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: 12px 16px;
     border: 1px solid #d1d5db;
     border-radius: 8px;
@@ -546,6 +634,51 @@
 
     &:focus {
       border-color: #f7d617;
+    }
+  }
+
+  &__debt-days-calendar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    flex-shrink: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #374151;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      background: #fffbeb;
+      border-color: #f7d617;
+      color: #111827;
+    }
+  }
+
+  &__debt-date-input {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    right: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &__debt-days-hint {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.45;
+
+    strong {
+      color: #111827;
+      font-weight: 700;
     }
   }
 

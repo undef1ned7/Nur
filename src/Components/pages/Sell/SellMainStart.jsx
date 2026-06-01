@@ -33,6 +33,7 @@ import { fetchProductsAsync } from "../../../store/creators/productCreators";
 import { useSale } from "../../../store/slices/saleSlice";
 import useBarcodeToCart from "./useBarcodeToCart";
 import { createDebt } from "./Sell";
+import { calcDaysUntilIsoDate } from "../../../tools/deferredPaymentDates";
 // Импорт модулей
 import {
   handleCheckoutResponseForPrinting,
@@ -864,11 +865,12 @@ const SellMainStart = () => {
 
       // Стартовый тариф: создаём запись в /main/debts/
       if (debt === "Долги" && company.subscription_plan.name === "Старт") {
+        const debtAmount = start?.total;
         await createDebt({
           name: pickClient?.full_name,
           phone: state.phone,
           due_date: state.dueDate,
-          amount: start?.total,
+          amount: debtAmount,
         });
       }
 
@@ -887,7 +889,8 @@ const SellMainStart = () => {
 
         if (debt === "Долги" || debt === "Предоплата") {
           dealPayload.debtMonths = Number(debtMonths || 0);
-          dealPayload.first_due_date = state.dueDate; // <-- Дата платежа
+          dealPayload.debtDays = calcDaysUntilIsoDate(state.dueDate);
+          dealPayload.first_due_date = state.dueDate;
         }
 
         await dispatch(createDeal(dealPayload)).unwrap();
@@ -1089,6 +1092,7 @@ const SellMainStart = () => {
             statusRu: debt,
             amount: totalForDeal,
             debtMonths: Number(debtMonths || 0),
+            debtDays: calcDaysUntilIsoDate(state.dueDate),
             first_due_date: state.dueDate,
           };
 
@@ -1140,6 +1144,7 @@ const SellMainStart = () => {
             amount: totalForDeal,
             prepayment: Number(amount),
             debtMonths: Number(debtMonths || 0),
+            debtDays: calcDaysUntilIsoDate(state.dueDate),
             first_due_date: state.dueDate,
           };
           const checkoutParams = {
@@ -1150,6 +1155,17 @@ const SellMainStart = () => {
             amount: 0,
             cash_received: Number(amount),
           };
+          if (
+            company?.subscription_plan?.name === "Старт" &&
+            Number(amount) < Number(totalForDeal)
+          ) {
+            await createDebt({
+              name: pickClient?.full_name,
+              phone: state.phone,
+              due_date: state.dueDate,
+              amount: Number(totalForDeal) - Number(amount),
+            });
+          }
           await dispatch(createDeal(dealPayload)).unwrap();
           const result = await run(productCheckout(checkoutParams));
           try {

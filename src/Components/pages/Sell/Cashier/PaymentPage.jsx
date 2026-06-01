@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, User, X, CheckCircle } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { ArrowLeft, Calendar, User, X, CheckCircle } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   productCheckout,
@@ -24,6 +24,12 @@ import api from "@/api";
 import "./PaymentPage.scss";
 import { createDebt } from "../Sell";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  addCalendarDaysToIso,
+  calcDaysUntilIsoDate,
+  formatDaysLabel,
+  getTodayIsoDate,
+} from "../../../../tools/deferredPaymentDates";
 
 const PaymentPage = ({
   cart,
@@ -43,15 +49,19 @@ const PaymentPage = ({
   const [amountReceived, setAmountReceived] = useState(
     total ? total.toFixed(2) : "0.00"
   );
-  const [debtMonths, setDebtMonths] = useState(1); // Количество месяцев для рассрочки
+  const [debtDays, setDebtDays] = useState(30);
+  const [deferredDueDate, setDeferredDueDate] = useState(() => addCalendarDaysToIso(30));
+  const [deferredPrepaymentEnabled, setDeferredPrepaymentEnabled] = useState(false);
+  const [deferredPrepaymentAmount, setDeferredPrepaymentAmount] = useState("");
+  const [deferredPrepaymentMethod, setDeferredPrepaymentMethod] = useState("cash");
+  const [deferredPrepaymentBank, setDeferredPrepaymentBank] = useState("");
+  const deferredDueDateInputRef = useRef(null);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
   const [selectedBank, setSelectedBank] = useState("");
   const [receiptData, setReceiptData] = useState(null);
-  const [prePayment, setPrePayment] = useState(0);
-  const [firstPaymentDate, setFirstPaymentDate] = useState('')
   const [printing, setPrinting] = useState(false);
   const [alertModal, setAlertModal] = useState({
     open: false,
@@ -168,10 +178,44 @@ const PaymentPage = ({
     { id: "other", name: "Другой банк", logo: null },
   ];
 
+  const deferredPrepaymentValue = useMemo(() => {
+    if (!deferredPrepaymentEnabled) return 0;
+    const n = parseFloat(String(deferredPrepaymentAmount || "").replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [deferredPrepaymentEnabled, deferredPrepaymentAmount]);
+
+  const deferredSaleDebtRemaining = useMemo(
+    () => Math.max(0, total - deferredPrepaymentValue),
+    [total, deferredPrepaymentValue],
+  );
+
   const customerDebt =
     selectedCustomer?.debt || selectedCustomer?.total_debt || 0;
   const totalDebt =
-    paymentMethod === "deferred" ? total + customerDebt : customerDebt;
+    paymentMethod === "deferred"
+      ? deferredSaleDebtRemaining + customerDebt
+      : customerDebt;
+
+  const setDebtDaysFromDate = useCallback((isoDate) => {
+    setDeferredDueDate(isoDate);
+    setDebtDays(calcDaysUntilIsoDate(isoDate));
+  }, []);
+
+  const setDebtDaysAndSyncDate = useCallback((days) => {
+    const safeDays = Math.max(1, Number(days) || 1);
+    setDebtDays(safeDays);
+    setDeferredDueDate(addCalendarDaysToIso(safeDays));
+  }, []);
+
+  const openDeferredDueDatePicker = () => {
+    const input = deferredDueDateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.click();
+  };
 
   const handleSelectCustomer = () => {
     setShowCustomerModal(true);
@@ -203,14 +247,41 @@ const PaymentPage = ({
       return;
     }
 
-    // Валидация для отсрочки - требуется клиент
     if (paymentMethod === "deferred") {
       if (!selectedCustomer?.id) {
         showAlert(
           "warning",
           "Требуется клиент",
-          "Для оформления отсрочки необходимо выбрать клиента"
+          "Для оформления отсрочки необходимо выбрать клиента",
         );
+        return;
+      }
+      if (deferredPrepaymentEnabled) {
+        if (deferredPrepaymentValue <= 0) {
+          showAlert("warning", "Предоплата", "Укажите сумму предоплаты");
+          return;
+        }
+        if (deferredPrepaymentValue > total) {
+          showAlert(
+            "warning",
+            "Предоплата",
+            "Сумма предоплаты не может быть больше суммы заказа",
+          );
+          return;
+        }
+        if (deferredPrepaymentMethod === "cashless" && !deferredPrepaymentBank) {
+          showAlert(
+            "warning",
+            "Требуется банк",
+            "Выберите банк для безналичной предоплаты",
+          );
+          return;
+        }
+      }
+      const daysNum =
+        typeof debtDays === "number" ? debtDays : parseInt(String(debtDays), 10);
+      if (!Number.isFinite(daysNum) || daysNum < 1) {
+        showAlert("warning", "Срок рассрочки", "Укажите срок рассрочки не менее 1 дня");
         return;
       }
     }
@@ -253,7 +324,12 @@ const PaymentPage = ({
           paymentMethodApi = "transfer"; // По умолчанию для безналичных
         }
       } else if (paymentMethod === "deferred") {
-        paymentMethodApi = "debt"; // Отправляем как долг
+        paymentMethodApi = "debt";
+      }
+
+      let checkoutCashReceived = null;
+      if (paymentMethod === "deferred" && deferredPrepaymentValue > 0) {
+        checkoutCashReceived = deferredPrepaymentValue.toFixed(2);
       }
 
       // Сначала проверяем подключение тихо, без окна.
@@ -277,26 +353,31 @@ const PaymentPage = ({
           bool: isPrinterConnected, // print_receipt - только если принтер подключен
           clientId: selectedCustomer?.id || null,
           payment_method: paymentMethodApi,
-          cash_received: prePayment || (parseFloat(amountReceived) || total) - (prePayment || 0)
+          cash_received:
+            paymentMethod === "deferred"
+              ? checkoutCashReceived
+              : paymentMethod === "cash"
+                ? parseFloat(amountReceived) || total
+                : null,
         })
       );
 
       if (result.type === "products/productCheckout/fulfilled") {
-        // Создаем долг при отсрочке
         if (paymentMethod === "deferred" && selectedCustomer?.id) {
           try {
-            // Для тарифа "Старт" создаем запись в /main/debts/
-            if (company?.subscription_plan?.name === "Старт") {
-              // Вычисляем дату платежа: добавляем debtMonths месяцев к текущей дате
-              const currentDate = new Date();
-              const dueDate = new Date(
-                currentDate.getFullYear(),
-                currentDate.getMonth() +
-                (typeof debtMonths === "number" ? debtMonths : 1),
-                currentDate.getDate()
-              );
-              const dueDateString = dueDate.toISOString().split("T")[0]; // Формат YYYY-MM-DD
+            const daysAdd =
+              typeof debtDays === "number" && debtDays >= 1
+                ? debtDays
+                : calcDaysUntilIsoDate(deferredDueDate);
+            const dueDateString =
+              deferredDueDate || addCalendarDaysToIso(daysAdd);
+            const isPrepaymentDeal =
+              deferredPrepaymentValue > 0 && deferredPrepaymentValue < total;
+            const debtRecordAmount = isPrepaymentDeal
+              ? deferredSaleDebtRemaining
+              : total;
 
+            if (company?.subscription_plan?.name === "Старт") {
               try {
                 await createDebt({
                   name:
@@ -304,55 +385,83 @@ const PaymentPage = ({
                     selectedCustomer.name ||
                     "Клиент",
                   phone: selectedCustomer.phone || "",
-                  due_date: firstPaymentDate || dueDateString,
+                  due_date: dueDateString,
                   amount:
-                    typeof total === "number"
-                      ? total.toFixed(2)
-                      : String(total),
-                })
+                    typeof debtRecordAmount === "number"
+                      ? debtRecordAmount.toFixed(2)
+                      : String(debtRecordAmount),
+                });
               } catch (startDebtError) {
                 console.warn(
                   "Ошибка при создании долга для тарифа Старт:",
-                  startDebtError
+                  startDebtError,
                 );
-                const errorMessage = validateResErrors(startDebtError, "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ")
-                // Не блокируем успешную оплату, если ошибка с долгом
-                showAlert(
-                  "warning",
-                  "Предупреждение",
-                  errorMessage
+                const errorMessage = validateResErrors(
+                  startDebtError,
+                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ",
                 );
+                showAlert("warning", "Предупреждение", errorMessage);
                 return;
               }
             }
 
-            // Создаем сделку через createDeal
             await dispatch(
               createDeal({
                 clientId: selectedCustomer.id,
-                title: `${(prePayment || 0) ? 'Предоплата' : 'Долг'} ${selectedCustomer.full_name || selectedCustomer.name ||
+                title: `${isPrepaymentDeal ? "Предоплата" : "Долг"} ${
+                  selectedCustomer.full_name ||
+                  selectedCustomer.name ||
                   "Клиент"
-                  }`,
-                statusRu: "Долги",
-                prepayment: prePayment,
+                }`,
+                statusRu: isPrepaymentDeal ? "Предоплата" : "Долги",
                 amount: total,
-                debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
-                first_due_date: firstPaymentDate || null, // Можно добавить поле для выбора даты
-              })
+                prepayment:
+                  deferredPrepaymentValue > 0 ? deferredPrepaymentValue : undefined,
+                debtDays: daysAdd,
+                first_due_date: dueDateString,
+              }),
             ).unwrap();
           } catch (debtError) {
             console.warn("Ошибка при создании долга:", debtError);
-            const errorMessage = validateResErrors(debtError, "Оплата оформлена, но не удалось создать запись о долге. ")
-            // Не блокируем успешную оплату, если ошибка с долгом
-            showAlert(
-              "warning",
-              "Предупреждение",
-              errorMessage
+            const errorMessage = validateResErrors(
+              debtError,
+              "Оплата оформлена, но не удалось создать запись о долге. ",
             );
+            showAlert("warning", "Предупреждение", errorMessage);
           }
         }
 
-        // Отправляем запрос на кассу для наличных и переводов (не для отсрочки)
+        if (
+          paymentMethod === "deferred" &&
+          deferredPrepaymentValue > 0 &&
+          selectCashBox
+        ) {
+          const prepayMethodLabel =
+            deferredPrepaymentMethod === "cashless"
+              ? banks.find((b) => b.id === deferredPrepaymentBank)?.name ||
+                "Безналичные"
+              : "Наличные";
+          try {
+            await dispatch(
+              addCashFlows({
+                cashbox: selectCashBox,
+                type: "income",
+                name: `Предоплата (${prepayMethodLabel})`,
+                amount: deferredPrepaymentValue.toFixed(2),
+                source_cashbox_flow_id:
+                  result.payload?.sale_id || result.payload?.id,
+                source_business_operation_id: "Продажа",
+                status:
+                  company?.subscription_plan?.name === "Старт"
+                    ? "approved"
+                    : "pending",
+              }),
+            ).unwrap();
+          } catch (cashError) {
+            console.warn("Ошибка при создании денежного потока предоплаты:", cashError);
+          }
+        }
+
         if (paymentMethod !== "deferred" && selectCashBox && total > 0) {
           try {
             await dispatch(
@@ -827,86 +936,197 @@ const PaymentPage = ({
           {paymentMethod === "deferred" ? (
             <div className="payment-page__debt-section">
               <div className="payment-page__debt-amount">
-                <div className="payment-page__debt-label">СУММА ДОЛГА</div>
-                <div className="payment-page__debt-value">
-                  {total.toFixed(2)}
+                <div className="payment-page__debt-label">
+                  {deferredPrepaymentValue > 0 ? "ОСТАТОК В ДОЛГ" : "СУММА ДОЛГА"}
                 </div>
+                <div className="payment-page__debt-value">
+                  {deferredSaleDebtRemaining.toFixed(2)}
+                </div>
+                {deferredPrepaymentValue > 0 && (
+                  <p className="payment-page__debt-hint">
+                    Сумма заказа {total.toFixed(2)} сом · предоплата{" "}
+                    {deferredPrepaymentValue.toFixed(2)} сом
+                  </p>
+                )}
               </div>
-              <div className="payment-page__debt-months">
-                <label className="payment-page__debt-months-label">
-                  Дата первой оплаты:
-                </label>
-                <input
-                  type="date"
-                  className="payment-page__debt-months-input"
-                  value={firstPaymentDate}
-                  onChange={(e) => {
-                    setFirstPaymentDate(e.target.value)
-                  }}
 
-                />
-              </div>
-              <div className="payment-page__debt-months">
-                <label className="payment-page__debt-months-label">
-                  Предоплата:
-                </label>
+              <label className="payment-page__deferred-prepay-toggle">
                 <input
-                  type="text"
-                  className="payment-page__debt-months-input"
-                  value={prePayment || ''}
+                  type="checkbox"
+                  checked={deferredPrepaymentEnabled}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    const numValue = parseInt(value);
-                    setPrePayment(numValue || 0)
-                    // Если это валидное число, устанавливаем его (минимум 1)
-                    if (!isNaN(numValue)) {
-                      setPrePayment(Math.max(0, numValue || 0));
+                    const checked = e.target.checked;
+                    setDeferredPrepaymentEnabled(checked);
+                    if (!checked) {
+                      setDeferredPrepaymentAmount("");
+                      setDeferredPrepaymentBank("");
                     }
                   }}
-                  onBlur={(e) => {
-                    // При потере фокуса валидируем значение
-                    const value = parseInt(e.target.value, 10);
-                    if (isNaN(value) || value < 1) {
-                      setDebtMonths(1);
-                    }
-                  }}
-                  min="0"
-                  step="1"
-                  placeholder="(необязательно)"
                 />
-              </div>
-              <div className="payment-page__debt-months">
-                <label className="payment-page__debt-months-label">
-                  Срок рассрочки (месяцев):
+                <span>Предоплата при отсрочке</span>
+              </label>
+
+              {deferredPrepaymentEnabled && (
+                <div className="payment-page__deferred-prepay">
+                  <div className="payment-page__deferred-prepay-field">
+                    <label className="payment-page__debt-days-label">
+                      Сумма предоплаты (сом)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={total}
+                      step="0.01"
+                      className="payment-page__debt-days-input"
+                      value={deferredPrepaymentAmount}
+                      onChange={(e) => setDeferredPrepaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="payment-page__deferred-prepay-field">
+                    <span className="payment-page__debt-days-label">Способ предоплаты</span>
+                    <div className="payment-page__deferred-prepay-method-row">
+                      <button
+                        type="button"
+                        className={`payment-page__deferred-prepay-method${
+                          deferredPrepaymentMethod === "cash"
+                            ? " payment-page__deferred-prepay-method--active"
+                            : ""
+                        }`}
+                        onClick={() => {
+                          setDeferredPrepaymentMethod("cash");
+                          setDeferredPrepaymentBank("");
+                        }}
+                      >
+                        Наличные
+                      </button>
+                      <button
+                        type="button"
+                        className={`payment-page__deferred-prepay-method${
+                          deferredPrepaymentMethod === "cashless"
+                            ? " payment-page__deferred-prepay-method--active"
+                            : ""
+                        }`}
+                        onClick={() => setDeferredPrepaymentMethod("cashless")}
+                      >
+                        Безналичные
+                      </button>
+                    </div>
+                  </div>
+                  {deferredPrepaymentMethod === "cashless" && (
+                    <div className="payment-page__deferred-prepay-field">
+                      <p className="payment-page__debt-days-label">Банк предоплаты</p>
+                      <div className="payment-page__banks">
+                        {banks
+                          .filter((b) => b.id !== "other" && b.id !== "demir")
+                          .map((bank) => (
+                            <button
+                              key={bank.id}
+                              type="button"
+                              className={`payment-page__bank ${
+                                deferredPrepaymentBank === bank.id
+                                  ? "payment-page__bank--active"
+                                  : ""
+                              }`}
+                              onClick={() => setDeferredPrepaymentBank(bank.id)}
+                            >
+                              <div className="payment-page__bank-content">
+                                {bank.logo ? (
+                                  typeof bank.logo === "string" ? (
+                                    <img
+                                      src={bank.logo}
+                                      alt={bank.name}
+                                      className="payment-page__bank-logo"
+                                    />
+                                  ) : (
+                                    <div className="payment-page__bank-svg">{bank.logo}</div>
+                                  )
+                                ) : (
+                                  <div className="payment-page__bank-name">{bank.name}</div>
+                                )}
+                              </div>
+                              {deferredPrepaymentBank === bank.id && (
+                                <div className="payment-page__bank-check">✓</div>
+                              )}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="payment-page__debt-days">
+                <label className="payment-page__debt-days-label" htmlFor="sell-deferred-debt-days">
+                  Срок рассрочки (дней):
                 </label>
-                <input
-                  type="text"
-                  className="payment-page__debt-months-input"
-                  value={debtMonths}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Разрешаем пустое значение во время ввода
-                    if (value === "") {
-                      setDebtMonths("");
-                      return;
-                    }
-                    const numValue = parseInt(value, 10);
-                    // Если это валидное число, устанавливаем его (минимум 1)
-                    if (!isNaN(numValue)) {
-                      setDebtMonths(Math.max(1, numValue));
-                    }
-                  }}
-                  onBlur={(e) => {
-                    // При потере фокуса валидируем значение
-                    const value = parseInt(e.target.value, 10);
-                    if (isNaN(value) || value < 1) {
-                      setDebtMonths(1);
-                    }
-                  }}
-                  min="1"
-                  step="1"
-                />
+                <div className="payment-page__debt-days-row">
+                  <input
+                    id="sell-deferred-debt-days"
+                    type="text"
+                    className="payment-page__debt-days-input"
+                    value={debtDays}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "") {
+                        setDebtDays("");
+                        return;
+                      }
+                      const numValue = parseInt(value, 10);
+                      if (!Number.isNaN(numValue)) {
+                        setDebtDaysAndSyncDate(numValue);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (Number.isNaN(value) || value < 1) {
+                        setDebtDaysAndSyncDate(30);
+                      }
+                    }}
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className="payment-page__debt-days-calendar-btn"
+                    onClick={openDeferredDueDatePicker}
+                    title="Выбрать дату погашения"
+                    aria-label="Выбрать дату погашения в календаре"
+                  >
+                    <Calendar size={20} strokeWidth={2} />
+                  </button>
+                  <input
+                    ref={deferredDueDateInputRef}
+                    type="date"
+                    className="payment-page__debt-date-input"
+                    value={deferredDueDate}
+                    min={getTodayIsoDate()}
+                    onChange={(e) => setDebtDaysFromDate(e.target.value)}
+                    tabIndex={-1}
+                    aria-hidden
+                  />
+                </div>
+                <p className="payment-page__debt-days-hint">
+                  Дата погашения:{" "}
+                  <strong>
+                    {deferredDueDate
+                      ? new Date(`${deferredDueDate}T12:00:00`).toLocaleDateString("ru-RU")
+                      : "—"}
+                  </strong>
+                  {" · "}
+                  {typeof debtDays === "number"
+                    ? debtDays
+                    : calcDaysUntilIsoDate(deferredDueDate)}{" "}
+                  {formatDaysLabel(
+                    typeof debtDays === "number"
+                      ? debtDays
+                      : calcDaysUntilIsoDate(deferredDueDate),
+                  )}
+                </p>
               </div>
+
               <div className="payment-page__total-debt">
                 <span>ОБЩИЙ ДОЛГ</span>
                 <span className="payment-page__total-debt-amount">
@@ -1000,9 +1220,23 @@ const PaymentPage = ({
           onPrint={handlePrintReceipt}
           printing={printing}
           total={total}
-          cashAmount={paymentAmounts.cash + prePayment}
-          cashlessAmount={paymentAmounts.cashless}
-          deferredAmount={paymentAmounts.deferred - prePayment}
+          cashAmount={
+            paymentMethod === "deferred"
+              ? deferredPrepaymentMethod === "cash"
+                ? deferredPrepaymentValue
+                : 0
+              : paymentAmounts.cash
+          }
+          cashlessAmount={
+            paymentMethod === "deferred" && deferredPrepaymentMethod === "cashless"
+              ? deferredPrepaymentValue
+              : paymentAmounts.cashless
+          }
+          deferredAmount={
+            paymentMethod === "deferred"
+              ? deferredSaleDebtRemaining
+              : paymentAmounts.deferred
+          }
           amountReceived={parseFloat(amountReceived) || 0}
           change={change}
           saleId={receiptData?.saleId}
