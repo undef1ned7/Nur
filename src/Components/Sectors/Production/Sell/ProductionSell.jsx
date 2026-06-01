@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Banknote, Receipt, Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
@@ -12,6 +12,7 @@ import ProductionSellDetail from "./ProductionSellDetail";
 import ProductionRefundPurchase from "./ProductionRefundPurchase";
 import "../../../pages/Sell/sell.scss";
 import "./ProductionSell.scss";
+import { parsePosSalesListResponse } from "../../../../tools/posSalesListResponse";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Все" },
@@ -48,6 +49,8 @@ const ProductionSell = () => {
   const navigate = useNavigate();
   const { profile } = useUser();
   const [list, setList] = useState([]);
+  const [listCount, setListCount] = useState(0);
+  const [listTotalAmount, setListTotalAmount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showDetail, setShowDetail] = useState(false);
@@ -86,8 +89,10 @@ const ProductionSell = () => {
 
     fetchSalesList(params)
       .then((data) => {
-        const arr = Array.isArray(data) ? data : (data?.results ?? []);
-        setList(arr);
+        const parsed = parsePosSalesListResponse(data);
+        setList(parsed.list);
+        setListCount(parsed.count);
+        setListTotalAmount(parsed.totalAmount);
       })
       .catch((err) => {
         const msg =
@@ -96,6 +101,8 @@ const ProductionSell = () => {
           "Не удалось загрузить список продаж";
         setError(msg);
         setList([]);
+        setListCount(0);
+        setListTotalAmount(null);
       })
       .finally(() => setLoading(false));
   }, [fetchSalesList, start, end, status, ordering, search]);
@@ -249,6 +256,24 @@ const ProductionSell = () => {
             </div>
           </div>
           <div className="sell__history-toolbarRight">
+            <div className="sell__history-stats" aria-label="Сводка по продажам">
+              <div className="sell__history-stat">
+                <Receipt size={16} aria-hidden />
+                <span className="sell__history-stat-label">Всего продаж</span>
+                <span className="sell__history-stat-value">
+                  {listCount > 0 ? listCount : list.length || "—"}
+                </span>
+              </div>
+              <div className="sell__history-stat">
+                <Banknote size={16} aria-hidden />
+                <span className="sell__history-stat-label">Общая сумма</span>
+                <span className="sell__history-stat-value">
+                  {listTotalAmount != null
+                    ? `${formatMoney(listTotalAmount)} сом`
+                    : "—"}
+                </span>
+              </div>
+            </div>
             <div
               className="sell__viewToggle"
               role="group"
@@ -270,7 +295,7 @@ const ProductionSell = () => {
               </button>
             </div>
             <div className="sell__history-meta">
-              <span>Показано: {list.length}</span>
+              <span>На странице: {list.length}</span>
             </div>
           </div>
         </div>
