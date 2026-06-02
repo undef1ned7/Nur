@@ -4,7 +4,12 @@ import api from "./index";
 export const fetchProductsApi = async (params = {}) => {
   try {
     // Убираем служебные параметры из запроса
-    const { warehouse, _cacheKey, ...restParams } = params;
+    const {
+      warehouse,
+      _cacheKey,
+      _skipLoadingIfCached,
+      ...restParams
+    } = params;
     let url = "main/products/list/";
 
     if (warehouse) {

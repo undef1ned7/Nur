@@ -59,8 +59,6 @@ const Stock = () => {
   const [warehouseCount, setWarehouseCount] = useState(0);
   const [warehouseNext, setWarehouseNext] = useState(null);
   const [warehousePrevious, setWarehousePrevious] = useState(null);
-  const [cashboxes, setCashboxes] = useState([]);
-  const [cashboxId, setCashboxId] = useState("");
 
   // модалка товара
   const [modalOpen, setModalOpen] = useState(false);
@@ -216,24 +214,6 @@ const Stock = () => {
     [supplierLabelById]
   );
 
-  useEffect(() => {
-    const fetchCashboxes = async () => {
-      try {
-        const r = await api.get("/construction/cashboxes/");
-        const arr = listFrom(r) || [];
-        const list = Array.isArray(arr) ? arr : [];
-        setCashboxes(list);
-        const firstKey = String(list?.[0]?.id || list?.[0]?.uuid || "");
-        if (firstKey) setCashboxId(firstKey);
-      } catch (err) {
-        const errorMessage = validateResErrors(err, "Ошибка загрузки касс");
-        alert(errorMessage, true);
-        setCashboxes([]);
-      }
-    };
-    fetchCashboxes();
-  }, []);
-
   const isLow = (s) => toNum(s.remainder) <= toNum(s.minimum);
 
   const openCreate = () => {
@@ -274,29 +254,6 @@ const Stock = () => {
     setModalOpen(true);
   };
 
-  const postCashflowDelta = async ({ title, deltaAmount }) => {
-    const boxId =
-      cashboxId ||
-      String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
-    if (!boxId) return;
-
-    const amt = toNum(deltaAmount);
-    if (!Number.isFinite(amt) || Math.abs(amt) < 1e-9) return;
-
-    const type = amt > 0 ? "expense" : "income";
-    const amount = Math.abs(amt);
-    const signLabel = amt > 0 ? "Расход" : "Приход";
-
-    api
-      .post("/construction/cashflows/", {
-        cashbox: boxId,
-        type,
-        name: `${signLabel} (корректировка склада): ${title}`,
-        amount,
-      })
-      .catch(() => {});
-  };
-
   const saveItem = async (e) => {
     e.preventDefault();
 
@@ -326,7 +283,6 @@ const Stock = () => {
 
     try {
       if (editingId == null) {
-        // Создание товара
         await api.post("/cafe/warehouse/", payload);
         setModalOpen(false);
         if (warehousePage === 1) {
@@ -334,32 +290,10 @@ const Stock = () => {
         } else {
           setWarehousePage(1);
         }
-        // Запись в кассу (расход — закупка нового товара): количество × цена
-        const boxId = cashboxId || String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
-        if (boxId) {
-          const amount = remainderNum * unitPriceNum;
-          api.post("/construction/cashflows/", {
-            cashbox: boxId,
-            type: "expense",
-            name: `Новый товар на склад: ${title}`,
-            amount,
-          }).catch(() => { });
-        }
       } else {
-        // Редактирование товара
-        const prevItem = items.find((s) => s.id === editingId);
-        const prevQty = toNum(prevItem?.remainder);
-        const prevPrice = toNum(prevItem?.unit_price);
-        const prevTotal = prevQty * prevPrice;
-        const nextTotal = Math.max(0, remainderNum) * Math.max(0, unitPriceNum);
-        const deltaTotal = nextTotal - prevTotal;
-
         const res = await api.put(`/cafe/warehouse/${editingId}/`, payload);
         setItems((prev) => prev.map((s) => (s.id === editingId ? res.data : s)));
         setModalOpen(false);
-
-        // Корректировка кассы только на разницу (в зависимости от знака суммы)
-        await postCashflowDelta({ title, deltaAmount: deltaTotal });
       }
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка сохранения товара");
@@ -377,15 +311,6 @@ const Stock = () => {
     try {
       await api.delete(`/cafe/warehouse/${deleteItem.id}/`);
       setDeleteOpen(false);
-
-      // При удалении корректируем кассу на всю "стоимость" остатка (как разницу до нуля)
-      const prevTotal =
-        Math.max(0, toNum(deleteItem.remainder)) *
-        Math.max(0, toNum(deleteItem.unit_price));
-      await postCashflowDelta({
-        title: deleteItem.title,
-        deltaAmount: 0 - prevTotal,
-      });
 
       const nextPage =
         items.length <= 1 && warehousePage > 1 ? warehousePage - 1 : warehousePage;
@@ -418,37 +343,44 @@ const Stock = () => {
 
     if (!(qtyNum > 0)) return;
 
-    const current = toNum(moveItem.remainder);
-    const nextQty = current + qtyNum;
-
     const unitPriceNum = toNum(moveUnitPrice);
-    const payload = {
-      title: moveItem.title,
-      unit: moveItem.unit,
-      remainder: numStr(nextQty),
-      minimum: numStr(toNum(moveItem.minimum)),
-      unit_price: numStr(unitPriceNum >= 0 ? unitPriceNum : toNum(moveItem.unit_price)),
+    const price = unitPriceNum >= 0 ? unitPriceNum : toNum(moveItem.unit_price);
+    const receiveBody = {
+      quantity: numStr(qtyNum),
+      unit_price: numStr(Math.max(0, price)),
     };
     const moveSupId = normalizeSupplierId(moveItem);
-    if (moveSupId) payload.supplier = moveSupId;
+    if (moveSupId) receiveBody.supplier = moveSupId;
 
     try {
-      const res = await api.put(`/cafe/warehouse/${moveItem.id}/`, payload);
-      setItems((prev) => prev.map((s) => (s.id === moveItem.id ? res.data : s)));
-      setMoveOpen(false);
-      // Запись в кассу (расход — приход товара на склад): количество × цена
-      const boxId = cashboxId || String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
-      if (boxId) {
-        const price = unitPriceNum > 0 ? unitPriceNum : toNum(moveItem.unit_price);
-        const amount = qtyNum * price;
-        const moveName = `Приход на склад: ${moveItem.title}, ${numStr(qtyNum)} ${moveItem.unit}`;
-        api.post("/construction/cashflows/", {
-          cashbox: boxId,
-          type: "expense",
-          name: moveName,
-          amount,
-        }).catch(() => { });
+      let updatedItem = null;
+      try {
+        const res = await api.post(
+          `/cafe/warehouse/${moveItem.id}/receive/`,
+          receiveBody,
+        );
+        updatedItem = res.data?.item ?? res.data;
+      } catch (receiveErr) {
+        if (receiveErr?.response?.status !== 404) throw receiveErr;
+        const current = toNum(moveItem.remainder);
+        const payload = {
+          title: moveItem.title,
+          unit: moveItem.unit,
+          remainder: numStr(current + qtyNum),
+          minimum: numStr(toNum(moveItem.minimum)),
+          unit_price: numStr(Math.max(0, price)),
+        };
+        if (moveSupId) payload.supplier = moveSupId;
+        const res = await api.put(`/cafe/warehouse/${moveItem.id}/`, payload);
+        updatedItem = res.data;
       }
+
+      if (updatedItem) {
+        setItems((prev) =>
+          prev.map((s) => (s.id === moveItem.id ? updatedItem : s)),
+        );
+      }
+      setMoveOpen(false);
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка применения движения");
       alert(errorMessage, true);

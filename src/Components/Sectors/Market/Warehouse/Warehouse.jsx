@@ -284,13 +284,18 @@ const Warehouse = () => {
     }
   }, [dispatch, selectedRows, requestParams]);
 
-  const handleApplyFilters = useCallback((newFilters) => {
-    setFilters(newFilters);
-  }, []);
+  const handleApplyFilters = useCallback(
+    (newFilters) => {
+      setFilters(newFilters);
+      resetToFirstPage();
+    },
+    [resetToFirstPage],
+  );
 
   const handleResetFilters = useCallback(() => {
     setFilters({});
-  }, []);
+    resetToFirstPage();
+  }, [resetToFirstPage]);
 
   const handleCreateProduct = useCallback(() => {
     navigate("/crm/sklad/add-product");

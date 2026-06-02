@@ -10,11 +10,14 @@ import {
   FaCheckCircle,
   FaBoxes,
   FaThList,
+  FaUtensils,
 } from "react-icons/fa";
+import HouseholdInventoryTab from "./HouseholdInventoryTab";
 import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import InventoryItemsPickerModal from "./InventoryItemsPickerModal";
 import "./CafeInventory.scss";
+import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
@@ -724,8 +727,10 @@ const CafeInventory = () => {
                 activeTab === "equipment"
                   ? "Поиск оборудования…"
                   : activeTab === "sessions"
-                  ? "Поиск актов инвентаризации…"
-                  : "Поиск актов сверки продуктов…"
+                    ? "Поиск актов инвентаризации…"
+                    : activeTab === "household"
+                      ? "Поиск посуды и расходников…"
+                      : "Поиск актов сверки продуктов…"
               }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -746,7 +751,7 @@ const CafeInventory = () => {
             >
               <FaPlus /> Новый акт
             </button>
-          ) : (
+          ) : activeTab === "household" ? null : (
             <button
               className="cafeInventory__btn cafeInventory__btn--primary"
               onClick={openCreateStockCheck}
@@ -783,11 +788,25 @@ const CafeInventory = () => {
         >
           <FaBoxes /> Сверка продуктов
         </button>
+        <button
+          className={`cafeInventory__tab ${
+            activeTab === "household" ? "cafeInventory__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("household")}
+        >
+          <FaUtensils /> Посуда и расходники
+        </button>
       </div>
 
       {/* List */}
       <div className="cafeInventory__list">
-        {loading && <div className="cafeInventory__alert">Загрузка…</div>}
+        {activeTab === "household" ? (
+          <HouseholdInventoryTab query={query} />
+        ) : null}
+
+        {activeTab !== "household" && loading && (
+          <div className="cafeInventory__alert">Загрузка…</div>
+        )}
 
         {activeTab === "equipment" && (
           <>
@@ -1006,16 +1025,23 @@ const CafeInventory = () => {
 
       {/* Модалка оборудования */}
       {modalOpen && (
+        <ReactPortal wrapperId="cafe-inventory-equipment-modal">
         <div
           className="cafeInventory__modalOverlay"
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="cafeInventory__modal"
+            className="cafeInventory__modal cafeInventory__modal--form cafeInventory__modal--equipment"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cafe-equipment-modal-title"
           >
             <div className="cafeInventory__modalHeader">
-              <h3 className="cafeInventory__modalTitle">
+              <h3
+                id="cafe-equipment-modal-title"
+                className="cafeInventory__modalTitle"
+              >
                 {editingId == null
                   ? "Новое оборудование"
                   : "Изменить оборудование"}
@@ -1164,6 +1190,7 @@ const CafeInventory = () => {
             </form>
           </div>
         </div>
+        </ReactPortal>
       )}
 
       {/* Модалка создания акта */}

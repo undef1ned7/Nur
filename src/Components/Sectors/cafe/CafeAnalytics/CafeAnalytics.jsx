@@ -8,7 +8,6 @@ import {
   FaShoppingCart,
   FaUsers,
   FaDownload,
-  FaMoneyBillWave,
   FaBan,
   FaReceipt,
   FaExclamationTriangle,
@@ -30,6 +29,7 @@ import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer
 import api from "../../../../api";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { fetchCafeSalesDynamicsSeries } from "../../../../../tools/cafeAnalyticsDynamics";
 import {
   checkPrinterConnection,
   printFinanceCashReportToReceiptPrinter,
@@ -194,42 +194,6 @@ const readSavedCafeAnalyticsDateFilter = () => {
   } catch {
     return null;
   }
-};
-
-const clampRangeDays = (fromStr, toStr, maxDays = 62) => {
-  if (!fromStr || !toStr) return { ok: true, days: 0 };
-  const from = new Date(`${fromStr}T00:00:00`);
-  const to = new Date(`${toStr}T00:00:00`);
-  const diff = Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
-  return { ok: diff <= maxDays, days: diff };
-};
-
-const buildBuckets = (fromStr, toStr) => {
-  if (!fromStr || !toStr) return [];
-  const from = new Date(`${fromStr}T00:00:00`);
-  const to = new Date(`${toStr}T00:00:00`);
-
-  const { ok } = clampRangeDays(fromStr, toStr, 62);
-  const step = ok ? 1 : 7;
-
-  const buckets = [];
-  let cur = new Date(from);
-
-  while (cur.getTime() <= to.getTime()) {
-    const start = new Date(cur);
-    const end = addDays(cur, step - 1);
-    const endClamped = end.getTime() > to.getTime() ? new Date(to) : end;
-
-    buckets.push({
-      key: step === 1 ? isoDate(start) : `${isoDate(start)}—${isoDate(endClamped)}`,
-      date_from: isoDate(start),
-      date_to: isoDate(endClamped),
-    });
-
-    cur = addDays(cur, step);
-  }
-
-  return buckets;
 };
 
 /* DRF fetch-all (для клиентов) */
@@ -413,8 +377,71 @@ const normalizeRejectionRows = (data) => {
   }));
 };
 
-const normalizeExpensesBlock = (data) => {
-  if (!data)
+const normalizeExpenseLineItem = (x, idx = 0) => {
+  const title = String(x?.title ?? x?.name ?? "").trim() || "—";
+  const noteRaw = String(x?.note ?? x?.comment ?? "").trim();
+  const category = String(
+    x?.category_name ?? x?.category ?? x?.category_title ?? "",
+  ).trim() || "—";
+
+  return {
+    _id: x?.id ?? x?.uuid ?? `exp-${idx}-${title}`,
+    title,
+    note: noteRaw || "—",
+    category,
+    amount: toNum(x?.amount ?? x?.sum ?? x?.total),
+    date: x?.expense_date ?? x?.created_at ?? x?.date ?? null,
+  };
+};
+
+const collectExpenseLineItems = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) {
+    return data.map((x, idx) => normalizeExpenseLineItem(x, idx));
+  }
+  if (typeof data !== "object") return [];
+
+  const buckets = [
+    data.items,
+    data.expenses,
+    data.records,
+    data.lines,
+    data.details,
+    data.other_expenses_section?.items,
+  ];
+
+  const out = [];
+  const seen = new Set();
+
+  for (const bucket of buckets) {
+    for (const raw of apiListPayload(bucket)) {
+      const row = normalizeExpenseLineItem(raw, out.length);
+      const key = String(raw?.id ?? raw?.uuid ?? `${row.title}|${row.note}|${row.amount}|${row.date}`);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(row);
+    }
+  }
+
+  return out;
+};
+
+const mergeExpenseLineItems = (...lists) => {
+  const out = [];
+  const seen = new Set();
+  for (const list of lists) {
+    for (const row of list || []) {
+      const key = String(row._id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(row);
+    }
+  }
+  return out;
+};
+
+const normalizeExpensesBlock = (data, extraItems = []) => {
+  if (!data && !extraItems.length)
     return {
       total: 0,
       count: 0,
@@ -424,6 +451,7 @@ const normalizeExpensesBlock = (data) => {
       other_expenses_section: { items: [], expenses_by_day: [] },
     };
   if (Array.isArray(data)) {
+    const lineItems = collectExpenseLineItems(data);
     const categories = data.map((x, idx) => ({
       _id: x.category ?? x.id ?? idx,
       name:
@@ -435,11 +463,26 @@ const normalizeExpensesBlock = (data) => {
       amount: toNum(x.amount ?? x.sum ?? x.total),
       count: toNum(x.count ?? x.expenses_count ?? 1),
     }));
+    const items = mergeExpenseLineItems(lineItems, extraItems);
     return {
-      total: sumBy(categories, "amount"),
-      count: categories.reduce((a, c) => a + toNum(c.count), 0) || categories.length,
+      total: sumBy(categories, "amount") || sumBy(items, "amount"),
+      count:
+        categories.reduce((a, c) => a + toNum(c.count), 0) ||
+        items.length ||
+        categories.length,
       categories,
-      items: [],
+      items,
+      expenses_by_day: [],
+      other_expenses_section: { items: [], expenses_by_day: [] },
+    };
+  }
+  if (!data) {
+    const items = mergeExpenseLineItems([], extraItems);
+    return {
+      total: sumBy(items, "amount"),
+      count: items.length,
+      categories: [],
+      items,
       expenses_by_day: [],
       other_expenses_section: { items: [], expenses_by_day: [] },
     };
@@ -450,7 +493,7 @@ const normalizeExpensesBlock = (data) => {
   const count = toNum(
     data.count ?? data.expenses_count ?? data.items_count ?? data.cafe_expenses_count
   );
-  const rawCat = data.by_category ?? data.categories ?? data.breakdown ?? data.items;
+  const rawCat = data.by_category ?? data.categories ?? data.breakdown;
   const catList = apiListPayload(rawCat);
   const categories = catList.map((x, idx) => ({
     _id: x.category_id ?? x.category ?? x.id ?? idx,
@@ -464,7 +507,7 @@ const normalizeExpensesBlock = (data) => {
     count: toNum(x.count ?? x.expenses_count ?? 1),
   }));
   const catSum = sumBy(categories, "amount");
-  const items = apiListPayload(data.items);
+  const items = mergeExpenseLineItems(collectExpenseLineItems(data), extraItems);
   const expensesByDay = apiListPayload(data.expenses_by_day);
   const otherSection =
     data.other_expenses_section && typeof data.other_expenses_section === "object"
@@ -476,8 +519,8 @@ const normalizeExpensesBlock = (data) => {
       : { items: [], expenses_by_day: [] };
 
   return {
-    total: total || catSum,
-    count: count || categories.reduce((a, c) => a + toNum(c.count), 0),
+    total: total || catSum || sumBy(items, "amount"),
+    count: count || items.length || categories.reduce((a, c) => a + toNum(c.count), 0),
     categories,
     items,
     expenses_by_day: expensesByDay,
@@ -688,7 +731,7 @@ const CafeAnalytics = () => {
   });
 
   // modal
-  const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters | payment_inflow | rejections | expenses | debts | salary_waiters
+  const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters | rejections | expenses | debts | salary_waiters
   const [staffQ, setStaffQ] = useState("");
   const [staffSort, setStaffSort] = useState("revenue_desc"); // revenue_desc | orders_desc | avg_desc | name_asc
   const [exportReport, setExportReport] = useState("analytics");
@@ -814,6 +857,7 @@ const CafeAnalytics = () => {
         rInflow,
         rRejections,
         rExpenses,
+        rExpensesList,
         rDebts,
         rSalary,
         rFinance,
@@ -831,6 +875,9 @@ const CafeAnalytics = () => {
             params: { ...params, limit: 500 },
           })
           .catch(() => ({ data: null })),
+        api
+          .get("/cafe/expenses/", { params: { ...params, page_size: 500 } })
+          .catch(() => ({ data: [] })),
         api.get("/cafe/analytics/debts/", { params }).catch(() => ({ data: null })),
         salaryReq,
         financeReq,
@@ -854,7 +901,10 @@ const CafeAnalytics = () => {
           : normalizeRevenueInflowRows(rInflow?.data),
       );
       setRejectionRows(normalizeRejectionRows(rRejections?.data));
-      setExpensesBlock(normalizeExpensesBlock(rExpenses?.data));
+      const expenseListRows = listFrom(rExpensesList).map((x, idx) =>
+        normalizeExpenseLineItem(x, idx),
+      );
+      setExpensesBlock(normalizeExpensesBlock(rExpenses?.data, expenseListRows));
       setDebtRows(normalizeDebtRows(rDebts?.data));
       setWaiterSalaryRows(
         hideKitchenStaffKpi ? [] : normalizeWaiterSalaryRows(rSalary?.data)
@@ -896,38 +946,13 @@ const CafeAnalytics = () => {
       setRevenueSeries([]);
       return;
     }
-    const buckets = buildBuckets(dateFrom, dateTo);
-    if (!buckets.length) {
-      setRevenueSeries([]);
-      return;
-    }
 
     try {
-      const chunkSize = 8;
-      const out = [];
-
-      for (let i = 0; i < buckets.length; i += chunkSize) {
-        const part = buckets.slice(i, i + chunkSize);
-
-        // eslint-disable-next-line no-await-in-loop
-        const resArr = await Promise.all(
-          part.map((b) =>
-            api
-              .get("/cafe/analytics/sales/summary/", {
-                params: { date_from: b.date_from, date_to: b.date_to },
-              })
-              .catch(() => ({ data: null }))
-          )
-        );
-
-        for (let j = 0; j < part.length; j += 1) {
-          const b = part[j];
-          const payload = resArr[j]?.data;
-          out.push({ label: b.key, value: toNum(payload?.revenue) });
-        }
-      }
-
-      setRevenueSeries(out);
+      const series = await fetchCafeSalesDynamicsSeries({
+        dateFrom,
+        dateTo,
+      });
+      setRevenueSeries(series);
     } catch (e) {
       console.error("CafeAnalytics fetchRevenueSeries error:", e);
       setRevenueSeries([]);
@@ -1025,10 +1050,6 @@ const CafeAnalytics = () => {
   const cooksCount = useMemo(() => cooksRows.length, [cooksRows]);
   const waitersCount = useMemo(() => waitersRows.length, [waitersRows]);
 
-  const inflowTotal = useMemo(
-    () => sumBy(revenueInflowRows, "amount"),
-    [revenueInflowRows]
-  );
   const rejectionLinesTotal = useMemo(
     () => sumBy(rejectionRows, "qty"),
     [rejectionRows]
@@ -1096,7 +1117,6 @@ const CafeAnalytics = () => {
     if (modalKey === "cooks") return "По кухням";
     if (modalKey === "waiters") return "Официанты (выручка)";
     if (modalKey === "export") return "Экспорт отчета";
-    if (modalKey === "payment_inflow") return "Оплаты по способу";
     if (modalKey === "rejections") return "Отказы по позициям";
     if (modalKey === "menu_all") return "Все блюда";
     if (modalKey === "expenses") return "Операционные расходы";
@@ -1367,21 +1387,6 @@ const CafeAnalytics = () => {
       <div className="cafeAnalytics__opsSection">
         <div className="cafeAnalytics__opsSectionTitle">Дополнительная аналитика</div>
         <div className="cafeAnalytics__opsMinis">
-          <button
-            className="cafeAnalytics__mini"
-            type="button"
-            onClick={() => openModal("payment_inflow")}
-          >
-            <div className="cafeAnalytics__miniTop">
-              <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
-                <FaMoneyBillWave />
-              </div>
-              <div className="cafeAnalytics__miniLabel">Оплаты</div>
-            </div>
-            <div className="cafeAnalytics__miniValue">{fmtMoney(inflowTotal)}</div>
-            <div className="cafeAnalytics__miniMeta">По способу оплаты за период</div>
-          </button>
-
           <button
             className="cafeAnalytics__mini"
             type="button"

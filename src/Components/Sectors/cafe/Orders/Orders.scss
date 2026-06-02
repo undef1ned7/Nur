@@ -1284,8 +1284,211 @@
     }
   }
 
+  &__checkout {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 2px solid #e5e7eb;
+    display: grid;
+    gap: 12px;
+  }
+
+  &__checkoutTitle {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  &__methods {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+
+    &--sm {
+      gap: 6px;
+    }
+  }
+
+  &__methodCard {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 76px;
+    max-width: 96px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px 8px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      box-shadow 0.15s;
+
+    &:hover:not(:disabled) {
+      border-color: #d1d5db;
+    }
+
+    &--active {
+      border-color: var(--primary-dark, #e5b800);
+      background: #fffbeb;
+      box-shadow: 0 0 0 1px rgba(247, 215, 79, 0.35);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .cafeOrdersPay__methods--sm & {
+      min-width: 68px;
+      max-width: 84px;
+      padding: 8px 6px 6px;
+    }
+  }
+
+  &__methodIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 15px;
+
+    .cafeOrdersPay__methodCard--active & {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .cafeOrdersPay__methods--sm & {
+      width: 24px;
+      height: 24px;
+      font-size: 13px;
+    }
+  }
+
+  &__methodLabel {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    color: #111827;
+  }
+
+  &__methodCheck {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary-dark, #f7d617);
+    color: #111827;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  &__guestRow {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    min-width: 0;
+
+    > .cafeOrdersPayCombo {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  &__guestAddBtn {
+    flex-shrink: 0;
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: var(--primary-dark, #e5b800);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__debtBox {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+  }
+
+  &__debtLabel {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #92400e;
+  }
+
+  &__debtValue {
+    margin-top: 4px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #78350f;
+  }
+
+  &__debtHint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #a16207;
+    font-weight: 500;
+  }
+
+  &__split {
+    display: grid;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+  }
+
+  &__splitTotal {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--muted);
+  }
+
   &__form {
-    margin-top: 14px;
     display: grid;
     gap: 12px;
   }
@@ -1398,6 +1601,59 @@
   .cafeOrdersPay__name {
     text-decoration: line-through;
     color: var(--muted);
+  }
+}
+
+.cafeOrdersPayGuestModal {
+  width: min(360px, 92vw);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+
+    h4 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  &__form {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+
+    .cafeOrdersPay__label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
   }
 }
 

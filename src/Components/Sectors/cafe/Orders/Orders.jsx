@@ -9,6 +9,11 @@ import {
   FaEdit,
   FaCheckCircle,
   FaMinus,
+  FaMoneyBillWave,
+  FaCreditCard,
+  FaUniversity,
+  FaExchangeAlt,
+  FaClock,
 } from "react-icons/fa";
 import api from "../../../../api";
 import { getAll as getAllClients, createClient } from "../Clients/clientStore";
@@ -38,6 +43,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
   normalizeOrderPayload,
@@ -138,29 +144,79 @@ const getOrderClientId = (order) => {
   return String(c).trim();
 };
 
-const PAY_CHECKOUT_METHODS = [
-  { value: "cash", label: "Наличные", search: "наличные нал cash" },
-  { value: "card", label: "Карта", search: "карта card" },
-  { value: "transfer", label: "Перевод", search: "перевод transfer" },
-  { value: "debt", label: "В долг", search: "долг debt" },
+const PAY_METHOD_CARDS = [
+  { id: "cash", label: "Наличные", Icon: FaMoneyBillWave },
+  { id: "card", label: "Карта", Icon: FaCreditCard },
+  { id: "transfer", label: "Перевод", Icon: FaUniversity },
+  { id: "split", label: "Смешанная", Icon: FaExchangeAlt },
+  { id: "debt", label: "В долг", Icon: FaClock },
 ];
 
-const normalizePaymentMethod = (v) => {
-  const m = String(v || "")
-    .trim()
-    .toLowerCase();
-  if (["наличные", "нал", "cash"].includes(m)) return "cash";
-  if (["карта", "card"].includes(m)) return "card";
-  if (["перевод", "transfer"].includes(m)) return "transfer";
-  if (["долг", "в долг", "debt"].includes(m)) return "debt";
-  if (["cash", "card", "transfer", "debt"].includes(m)) return m;
-  return "";
+const PREPAID_METHOD_CARDS = [
+  { id: "cash", label: "Наличные", Icon: FaMoneyBillWave },
+  { id: "card", label: "Карта", Icon: FaCreditCard },
+  { id: "transfer", label: "Перевод", Icon: FaUniversity },
+];
+
+const SPLIT_ONLINE_METHOD_CARDS = [
+  { id: "card", label: "Карта", Icon: FaCreditCard },
+  { id: "transfer", label: "Перевод", Icon: FaUniversity },
+];
+
+const formatSplitInput = (value) => {
+  if (value === "") return { raw: "", amount: 0 };
+  const amount = Number(String(value).replace(",", "."));
+  if (!Number.isFinite(amount)) return { raw: "", amount: 0 };
+  const clamped = Math.max(0, amount);
+  return {
+    raw: clamped === amount ? value : clamped.toFixed(2),
+    amount: clamped,
+  };
 };
 
 const pickClientLabel = (c) =>
   String(
     c?.full_name || c?.name || c?.title || c?.company_name || "Без имени",
   ).trim() || "Без имени";
+
+const CafePayMethodCards = ({
+  methods,
+  value,
+  onChange,
+  disabled,
+  size = "md",
+}) => (
+  <div
+    className={`cafeOrdersPay__methods cafeOrdersPay__methods--${size}`}
+    role="listbox"
+    aria-label="Способ оплаты"
+  >
+    {methods.map(({ id, label, Icon }) => {
+      const active = value === id;
+      return (
+        <button
+          key={id}
+          type="button"
+          role="option"
+          aria-selected={active}
+          className={`cafeOrdersPay__methodCard${active ? " cafeOrdersPay__methodCard--active" : ""}`}
+          onClick={() => onChange(id)}
+          disabled={disabled}
+        >
+          <span className="cafeOrdersPay__methodIcon" aria-hidden>
+            <Icon />
+          </span>
+          <span className="cafeOrdersPay__methodLabel">{label}</span>
+          {active && (
+            <span className="cafeOrdersPay__methodCheck" aria-hidden>
+              ✓
+            </span>
+          )}
+        </button>
+      );
+    })}
+  </div>
+);
 
 /** Заголовок позиции в UI / печати (меню или услуга). */
 const orderItemTitle = (it) => {
@@ -1555,6 +1611,10 @@ const Orders = () => {
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payOrder, setPayOrder] = useState(null);
+  const [payAddClientOpen, setPayAddClientOpen] = useState(false);
+  const [payNewClientName, setPayNewClientName] = useState("");
+  const [payNewClientPhone, setPayNewClientPhone] = useState("");
+  const [payAddClientSaving, setPayAddClientSaving] = useState(false);
   const [payForm, setPayForm] = useState({
     paymentMethod: "cash",
     discountAmount: "0",
@@ -1562,6 +1622,9 @@ const Orders = () => {
     usePrepaid: false,
     prepaidAmount: "",
     prepaidPaymentMethod: "cash",
+    splitOnlineMethod: "card",
+    splitOnlineAmount: "",
+    splitCashAmount: "",
     clientId: "",
     debtAmount: "",
     debtPaymentMethod: "cash",
@@ -1588,6 +1651,9 @@ const Orders = () => {
       usePrepaid: false,
       prepaidAmount: "",
       prepaidPaymentMethod: "cash",
+      splitOnlineMethod: "card",
+      splitOnlineAmount: "",
+      splitCashAmount: numStr(due),
       clientId: getOrderClientId(order),
       debtAmount: bal > 0 ? numStr(bal) : "",
       debtPaymentMethod: "cash",
@@ -1601,6 +1667,59 @@ const Orders = () => {
     if (paying) return;
     setPayOpen(false);
     setPayOrder(null);
+    setPayAddClientOpen(false);
+    setPayNewClientName("");
+    setPayNewClientPhone("");
+  };
+
+  const applyPayMethodChange = useCallback((nextMethod, prevForm, order) => {
+    const d = checkoutDue(order, prevForm.discountAmount);
+    const next = {
+      ...prevForm,
+      paymentMethod: nextMethod,
+      payNow: numStr(d),
+    };
+    if (nextMethod !== "debt") {
+      next.usePrepaid = false;
+      next.prepaidAmount = "";
+      next.prepaidPaymentMethod = "cash";
+    }
+    if (nextMethod !== "split") {
+      next.splitOnlineAmount = "";
+      next.splitCashAmount = "";
+    } else {
+      next.splitCashAmount = numStr(d);
+      next.splitOnlineAmount = "0";
+    }
+    if (nextMethod === "debt" && !String(next.clientId || "").trim()) {
+      next.clientId = getOrderClientId(order) || "";
+    }
+    return next;
+  }, [checkoutDue]);
+
+  const handleCreatePayClient = async (e) => {
+    e?.preventDefault?.();
+    if (!payNewClientName.trim()) {
+      alert("Укажите имя гостя.", true);
+      return;
+    }
+    try {
+      setPayAddClientSaving(true);
+      const c = await createClient({
+        full_name: payNewClientName.trim(),
+        phone: payNewClientPhone.trim(),
+        notes: "",
+      });
+      setClients((prev) => [c, ...(Array.isArray(prev) ? prev : [])]);
+      setPayForm((f) => ({ ...f, clientId: String(c.id) }));
+      setPayNewClientName("");
+      setPayNewClientPhone("");
+      setPayAddClientOpen(false);
+    } catch (err) {
+      alert(validateResErrors(err, "Не удалось создать гостя"), true);
+    } finally {
+      setPayAddClientSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -1674,6 +1793,10 @@ const Orders = () => {
           alert("Укажите сумму предоплаты.", true);
           return;
         }
+        if (pre > due + 0.009) {
+          alert("Сумма предоплаты не может быть больше суммы к оплате.", true);
+          return;
+        }
         payload = stripEmpty({
           payment_method: "debt",
           prepaid_amount: numStr(pre),
@@ -1691,6 +1814,33 @@ const Orders = () => {
           client_id: clientId,
         });
       }
+    } else if (pm === "split") {
+      const check = validateSplitAmounts(
+        due,
+        payForm.splitOnlineAmount,
+        payForm.splitCashAmount,
+      );
+      if (!check.ok) {
+        alert(check.message, true);
+        return;
+      }
+      const onlineMethod =
+        payForm.splitOnlineMethod === "transfer" ? "transfer" : "card";
+      const payments = [
+        ...(check.online > 0
+          ? [{ method: onlineMethod, amount: numStr(check.online) }]
+          : []),
+        ...(check.transfer > 0
+          ? [{ method: "cash", amount: numStr(check.transfer) }]
+          : []),
+      ];
+      payload = stripEmpty({
+        payment_method: "split",
+        payments,
+        discount_amount,
+        close_order: true,
+        idempotency_key: newIdempotencyKey(),
+      });
     } else {
       const payNowNum =
         payForm.payNow.trim() === "" ? due : Math.max(0, toNum(payForm.payNow));
@@ -2508,162 +2658,277 @@ const Orders = () => {
                           </div>
                         </div>
                       )}
-                      <div className="cafeOrdersPay__field">
-                        <label className="cafeOrdersPay__label">
-                          Гость (для долга)
-                          {payForm.paymentMethod === "debt" ? " *" : ""}
-                        </label>
-                        <SearchableCombobox
-                          value={payForm.clientId}
-                          onChange={(v) =>
-                            setPayForm((f) => {
-                              const nextId = String(v || "").trim();
-                              if (f.paymentMethod === "debt" && !nextId)
-                                return f;
-                              return { ...f, clientId: nextId };
-                            })
-                          }
-                          options={payClientOptions}
-                          placeholder="Выберите гостя…"
-                          disabled={paying}
-                          hideClear={payForm.paymentMethod === "debt"}
-                          classNamePrefix="cafeOrdersPayCombo"
-                        />
-                      </div>
-                      <div className="cafeOrdersPay__field">
-                        <label className="cafeOrdersPay__label">
-                          Способ оплаты
-                        </label>
-                        <SearchableCombobox
-                          value={payForm.paymentMethod}
-                          onChange={(v) =>
-                            setPayForm((f) => {
-                              const nextMethod =
-                                normalizePaymentMethod(v) || "cash";
-                              const next = { ...f, paymentMethod: nextMethod };
-                              if (
-                                nextMethod === "debt" &&
-                                !String(next.clientId || "").trim()
-                              ) {
-                                next.clientId =
-                                  getOrderClientId(payOrder) || "";
-                              }
-                              return next;
-                            })
-                          }
-                          options={PAY_CHECKOUT_METHODS}
-                          placeholder="Способ…"
-                          disabled={paying}
-                          hideClear
-                          classNamePrefix="cafeOrdersPayCombo"
-                        />
-                      </div>
-                      <div className="cafeOrdersPay__field">
-                        <label className="cafeOrdersPay__label">
-                          Способ предоплаты
-                        </label>
-                        <SearchableCombobox
-                          value={payForm.prepaidPaymentMethod}
-                          onChange={(v) =>
-                            setPayForm((f) => ({
-                              ...f,
-                              prepaidPaymentMethod: v,
-                            }))
-                          }
-                          options={[
-                            { value: "cash", label: "Наличные" },
-                            { value: "card", label: "Карта" },
-                            { value: "transfer", label: "Перевод" },
-                          ]}
-                          placeholder="Способ…"
-                          disabled={paying}
-                          classNamePrefix="cafeOrdersPayCombo"
-                        />
-                      </div>
 
-                      <div className="cafeOrdersPay__form">
-                        <div className="cafeOrdersPay__field">
-                          <label className="cafeOrdersPay__label">
-                            Скидка (сумма)
-                          </label>
-                          <input
-                            className="cafeOrdersPay__input"
-                            type="text"
-                            inputMode="decimal"
-                            value={payForm.discountAmount}
-                            onChange={(e) => {
-                              const v = e.target.value.replace(",", ".");
-                              setPayForm((f) => {
-                                const next = { ...f, discountAmount: v };
-                                const d = checkoutDue(payOrder, v);
-                                next.payNow = numStr(d);
-                                return next;
-                              });
-                            }}
-                          />
+                      <div className="cafeOrdersPay__checkout">
+                        <div className="cafeOrdersPay__checkoutTitle">
+                          Способ оплаты
                         </div>
 
-                        {payForm.paymentMethod !== "debt" && (
+                        <CafePayMethodCards
+                          methods={PAY_METHOD_CARDS}
+                          value={payForm.paymentMethod}
+                          onChange={(id) =>
+                            setPayForm((f) =>
+                              applyPayMethodChange(id, f, payOrder),
+                            )
+                          }
+                          disabled={paying}
+                        />
+
+                        <div className="cafeOrdersPay__field">
+                          <label className="cafeOrdersPay__label">
+                            Гость
+                            {payForm.paymentMethod === "debt" ? " *" : ""}
+                          </label>
+                          <div className="cafeOrdersPay__guestRow">
+                            <SearchableCombobox
+                              value={payForm.clientId}
+                              onChange={(v) =>
+                                setPayForm((f) => {
+                                  const nextId = String(v || "").trim();
+                                  if (f.paymentMethod === "debt" && !nextId)
+                                    return f;
+                                  return { ...f, clientId: nextId };
+                                })
+                              }
+                              options={payClientOptions}
+                              placeholder="Выберите гостя…"
+                              disabled={paying || payAddClientSaving}
+                              hideClear={payForm.paymentMethod === "debt"}
+                              classNamePrefix="cafeOrdersPayCombo"
+                            />
+                            <button
+                              type="button"
+                              className="cafeOrdersPay__guestAddBtn"
+                              onClick={() => setPayAddClientOpen(true)}
+                              disabled={paying || payAddClientSaving}
+                              title="Добавить гостя"
+                              aria-label="Добавить гостя"
+                            >
+                              <FaPlus />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="cafeOrdersPay__form">
                           <div className="cafeOrdersPay__field">
                             <label className="cafeOrdersPay__label">
-                              Сумма сейчас (остаток в долг, если меньше{" "}
-                              {fmtMoney(due)})
+                              Скидка (сумма)
                             </label>
                             <input
                               className="cafeOrdersPay__input"
                               type="text"
                               inputMode="decimal"
-                              value={payForm.payNow}
-                              onChange={(e) =>
-                                setPayForm((f) => ({
-                                  ...f,
-                                  payNow: e.target.value.replace(",", "."),
-                                }))
-                              }
+                              value={payForm.discountAmount}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(",", ".");
+                                setPayForm((f) => {
+                                  const next = { ...f, discountAmount: v };
+                                  const d = checkoutDue(payOrder, v);
+                                  next.payNow = numStr(d);
+                                  if (f.paymentMethod === "split") {
+                                    const online = toNum(f.splitOnlineAmount);
+                                    next.splitCashAmount = numStr(
+                                      Math.max(0, d - online),
+                                    );
+                                  }
+                                  return next;
+                                });
+                              }}
                             />
                           </div>
-                        )}
-                        {payForm.paymentMethod === "debt" && (
-                          <label className="cafeOrdersPay__check">
-                            <input
-                              type="checkbox"
-                              checked={payForm.usePrepaid}
-                              onChange={(e) =>
-                                setPayForm((f) => ({
-                                  ...f,
-                                  usePrepaid: e.target.checked,
-                                }))
-                              }
-                              disabled={paying}
-                            />
-                            <span>Предоплата + долг на остаток</span>
-                          </label>
-                        )}
-                        {payForm.paymentMethod === "debt" &&
-                          payForm.usePrepaid && (
-                            <>
+
+                          {payForm.paymentMethod === "debt" && (
+                            <div className="cafeOrdersPay__debtBox">
+                              <div className="cafeOrdersPay__debtLabel">
+                                {payForm.usePrepaid &&
+                                toNum(payForm.prepaidAmount) > 0
+                                  ? "Остаток в долг"
+                                  : "Сумма долга"}
+                              </div>
+                              <div className="cafeOrdersPay__debtValue">
+                                {fmtMoney(
+                                  Math.max(
+                                    0,
+                                    due - toNum(payForm.prepaidAmount),
+                                  ),
+                                )}
+                              </div>
+                              {payForm.usePrepaid &&
+                                toNum(payForm.prepaidAmount) > 0 && (
+                                  <p className="cafeOrdersPay__debtHint">
+                                    К оплате {fmtMoney(due)} · предоплата{" "}
+                                    {fmtMoney(payForm.prepaidAmount)}
+                                  </p>
+                                )}
+                            </div>
+                          )}
+
+                          {payForm.paymentMethod === "split" && (
+                            <div className="cafeOrdersPay__split">
                               <div className="cafeOrdersPay__field">
                                 <label className="cafeOrdersPay__label">
-                                  Предоплата
+                                  Безнал
+                                </label>
+                                <CafePayMethodCards
+                                  methods={SPLIT_ONLINE_METHOD_CARDS}
+                                  value={payForm.splitOnlineMethod}
+                                  onChange={(id) =>
+                                    setPayForm((f) => ({
+                                      ...f,
+                                      splitOnlineMethod: id,
+                                    }))
+                                  }
+                                  disabled={paying}
+                                  size="sm"
+                                />
+                              </div>
+                              <div className="cafeOrdersPay__field">
+                                <label className="cafeOrdersPay__label">
+                                  Сумма безналом
                                 </label>
                                 <input
                                   className="cafeOrdersPay__input"
                                   type="text"
                                   inputMode="decimal"
-                                  value={payForm.prepaidAmount}
+                                  value={payForm.splitOnlineAmount}
+                                  onChange={(e) => {
+                                    const { raw, amount } = formatSplitInput(
+                                      e.target.value.replace(",", "."),
+                                    );
+                                    setPayForm((f) => ({
+                                      ...f,
+                                      splitOnlineAmount: raw,
+                                      splitCashAmount: numStr(
+                                        Math.max(0, due - amount),
+                                      ),
+                                    }));
+                                  }}
+                                />
+                              </div>
+                              <div className="cafeOrdersPay__field">
+                                <label className="cafeOrdersPay__label">
+                                  Сумма наличными
+                                </label>
+                                <input
+                                  className="cafeOrdersPay__input"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={payForm.splitCashAmount}
+                                  onChange={(e) => {
+                                    const { raw, amount } = formatSplitInput(
+                                      e.target.value.replace(",", "."),
+                                    );
+                                    setPayForm((f) => ({
+                                      ...f,
+                                      splitCashAmount: raw,
+                                      splitOnlineAmount: numStr(
+                                        Math.max(0, due - amount),
+                                      ),
+                                    }));
+                                  }}
+                                />
+                              </div>
+                              <p className="cafeOrdersPay__splitTotal">
+                                Итого частей:{" "}
+                                {fmtMoney(
+                                  toNum(payForm.splitOnlineAmount) +
+                                    toNum(payForm.splitCashAmount),
+                                )}{" "}
+                                / {fmtMoney(due)}
+                              </p>
+                            </div>
+                          )}
+
+                          {payForm.paymentMethod !== "debt" &&
+                            payForm.paymentMethod !== "split" && (
+                              <div className="cafeOrdersPay__field">
+                                <label className="cafeOrdersPay__label">
+                                  Сумма сейчас (остаток в долг, если меньше{" "}
+                                  {fmtMoney(due)})
+                                </label>
+                                <input
+                                  className="cafeOrdersPay__input"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={payForm.payNow}
                                   onChange={(e) =>
                                     setPayForm((f) => ({
                                       ...f,
-                                      prepaidAmount: e.target.value.replace(
-                                        ",",
-                                        ".",
-                                      ),
+                                      payNow: e.target.value.replace(",", "."),
                                     }))
                                   }
                                 />
                               </div>
-                            </>
+                            )}
+
+                          {payForm.paymentMethod === "debt" && (
+                            <label className="cafeOrdersPay__check">
+                              <input
+                                type="checkbox"
+                                checked={payForm.usePrepaid}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setPayForm((f) => ({
+                                    ...f,
+                                    usePrepaid: checked,
+                                    ...(checked
+                                      ? {}
+                                      : {
+                                          prepaidAmount: "",
+                                          prepaidPaymentMethod: "cash",
+                                        }),
+                                  }));
+                                }}
+                                disabled={paying}
+                              />
+                              <span>Предоплата + долг на остаток</span>
+                            </label>
                           )}
+
+                          {payForm.paymentMethod === "debt" &&
+                            payForm.usePrepaid && (
+                              <>
+                                <div className="cafeOrdersPay__field">
+                                  <label className="cafeOrdersPay__label">
+                                    Предоплата
+                                  </label>
+                                  <input
+                                    className="cafeOrdersPay__input"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={payForm.prepaidAmount}
+                                    onChange={(e) =>
+                                      setPayForm((f) => ({
+                                        ...f,
+                                        prepaidAmount: e.target.value.replace(
+                                          ",",
+                                          ".",
+                                        ),
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="cafeOrdersPay__field">
+                                  <label className="cafeOrdersPay__label">
+                                    Способ предоплаты
+                                  </label>
+                                  <CafePayMethodCards
+                                    methods={PREPAID_METHOD_CARDS}
+                                    value={payForm.prepaidPaymentMethod}
+                                    onChange={(id) =>
+                                      setPayForm((f) => ({
+                                        ...f,
+                                        prepaidPaymentMethod: id,
+                                      }))
+                                    }
+                                    disabled={paying}
+                                    size="sm"
+                                  />
+                                </div>
+                              </>
+                            )}
+                        </div>
                       </div>
                     </>
                   );
@@ -2702,6 +2967,77 @@ const Orders = () => {
               </div>
             </div>
           </div>
+          {payAddClientOpen && (
+            <div
+              className="cafeOrdersPayGuestModal__overlay"
+              onClick={() => {
+                if (!payAddClientSaving) setPayAddClientOpen(false);
+              }}
+            >
+              <div
+                className="cafeOrdersPayGuestModal"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-labelledby="cafe-pay-guest-modal-title"
+              >
+                <div className="cafeOrdersPayGuestModal__header">
+                  <h4 id="cafe-pay-guest-modal-title">Новый гость</h4>
+                  <button
+                    type="button"
+                    className="cafeOrdersModal__close"
+                    onClick={() => setPayAddClientOpen(false)}
+                    disabled={payAddClientSaving}
+                    aria-label="Закрыть"
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+                <form
+                  className="cafeOrdersPayGuestModal__form"
+                  onSubmit={handleCreatePayClient}
+                >
+                  <label className="cafeOrdersPay__label">
+                    Имя *
+                    <input
+                      className="cafeOrdersPay__input"
+                      placeholder="Иван Иванов"
+                      value={payNewClientName}
+                      onChange={(e) => setPayNewClientName(e.target.value)}
+                      disabled={payAddClientSaving}
+                      autoFocus
+                    />
+                  </label>
+                  <label className="cafeOrdersPay__label">
+                    Телефон
+                    <input
+                      className="cafeOrdersPay__input"
+                      placeholder="+996 …"
+                      value={payNewClientPhone}
+                      onChange={(e) => setPayNewClientPhone(e.target.value)}
+                      disabled={payAddClientSaving}
+                    />
+                  </label>
+                  <div className="cafeOrdersPayGuestModal__actions">
+                    <button
+                      type="button"
+                      className="cafeOrders__btn cafeOrders__btn--secondary"
+                      onClick={() => setPayAddClientOpen(false)}
+                      disabled={payAddClientSaving}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="cafeOrders__btn cafeOrders__btn--primary"
+                      disabled={payAddClientSaving || !payNewClientName.trim()}
+                    >
+                      {payAddClientSaving ? "Сохранение…" : "Сохранить"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>

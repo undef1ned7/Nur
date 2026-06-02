@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FaCheck, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../../api";
+import { isProtectedCashflowCategory } from "../../../../../../tools/cafeCashflowCategory";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
 /* helpers */
@@ -520,6 +521,10 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
   const rowId = (r) => String(r.id ?? r.uuid ?? "");
 
   const handleRename = async (r) => {
+    if (isProtectedCashflowCategory(r)) {
+      setError("Системную категорию «Закупки» нельзя изменить");
+      return;
+    }
     const id = rowId(r);
     const title = String(r._editTitle ?? r.title ?? r.name ?? "").trim();
     if (!id || !title) return;
@@ -538,6 +543,10 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
   };
 
   const handleDelete = async (r) => {
+    if (isProtectedCashflowCategory(r)) {
+      setError("Системную категорию «Закупки» нельзя удалить");
+      return;
+    }
     const id = rowId(r);
     if (!id) return;
     if (!window.confirm("Удалить категорию? Движения останутся без категории.")) return;
@@ -593,6 +602,7 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
             ) : filtered.length ? (
               filtered.map((r, idx) => {
                 const id = rowId(r);
+                const locked = isProtectedCashflowCategory(r);
                 const editVal =
                   r._editTitle !== undefined ? r._editTitle : String(r.title ?? r.name ?? "");
                 return (
@@ -609,28 +619,37 @@ export const CashflowCategoriesManageModal = ({ open, onClose, onChanged }) => {
                           )
                         );
                       }}
-                      disabled={savingId === id}
+                      disabled={savingId === id || locked}
+                      readOnly={locked}
                     />
-                    <button
-                      type="button"
-                      className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
-                      onClick={() => handleRename({ ...r, _editTitle: editVal })}
-                      disabled={savingId === id}
-                      title="Сохранить"
-                      aria-label="Сохранить"
-                    >
-                      <FaCheck />
-                    </button>
-                    <button
-                      type="button"
-                      className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
-                      onClick={() => handleDelete(r)}
-                      disabled={savingId === id}
-                      title="Удалить"
-                      aria-label="Удалить"
-                    >
-                      <FaTrash />
-                    </button>
+                    {locked ? (
+                      <span className="cafeKassa__muted" title="Системная категория">
+                        Закупки
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
+                          onClick={() => handleRename({ ...r, _editTitle: editVal })}
+                          disabled={savingId === id}
+                          title="Сохранить"
+                          aria-label="Сохранить"
+                        >
+                          <FaCheck />
+                        </button>
+                        <button
+                          type="button"
+                          className="cafeKassa__iconBtn cafeKassa__iconBtn--compact"
+                          onClick={() => handleDelete(r)}
+                          disabled={savingId === id}
+                          title="Удалить"
+                          aria-label="Удалить"
+                        >
+                          <FaTrash />
+                        </button>
+                      </>
+                    )}
                   </div>
                 );
               })
