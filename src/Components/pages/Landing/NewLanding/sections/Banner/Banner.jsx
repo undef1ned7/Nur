@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import LandingImg from "../../components/LandingImg";
-import banner from "../../assets/banner/banner.jpg";
+import banner from "../../assets/banner/banner.png";
 import smartphone from "../../assets/icons/smartphone.svg";
 import shop from "../../assets/icons/shop.svg";
 import mess from "../../assets/icons/mess.svg";
@@ -25,8 +25,18 @@ const Banner = () => {
   return (
     <section className="banner">
       <div className="banner__container new-container">
-        <LandingImg className="banner__blur1" src={blur1} alt="" aria-hidden="true" />
-        <LandingImg className="banner__blur2" src={blur2} alt="" aria-hidden="true" />
+        <LandingImg
+          className="banner__blur1"
+          src={blur1}
+          alt=""
+          aria-hidden="true"
+        />
+        <LandingImg
+          className="banner__blur2"
+          src={blur2}
+          alt=""
+          aria-hidden="true"
+        />
         <h2 className="banner__title">
           Управляйте бизнесом <br />
           <span>в одной</span> системе
