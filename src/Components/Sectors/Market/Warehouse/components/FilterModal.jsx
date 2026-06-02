@@ -1,6 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import {
+  MARKET_WAREHOUSE_PRESETS,
+  buildMarketWarehouseListParams,
+  modalStateFromAppliedFilters,
+} from "../../../../../tools/marketWarehouseFilters";
 import "../Warehouse.scss";
 
 const FilterModal = ({
@@ -13,39 +18,10 @@ const FilterModal = ({
   suppliers = [],
   suppliersLoading = false,
 }) => {
-  const [filters, setFilters] = useState(() => ({
-    itemTypes: {
-      product: true,
-      service: true,
-      kit: true,
-    },
-    preset: currentFilters.preset || "",
-    category: currentFilters.category || "",
-    brand: currentFilters.brand || "",
-    supplier: currentFilters.supplier || "",
-    price: {
-      type: currentFilters.price_type || "базовая",
-      condition: currentFilters.price_condition || "больше",
-      value: currentFilters.price_value || "0",
-    },
-    stock: {
-      type: currentFilters.stock_type || "общие",
-      condition: currentFilters.stock_condition || "больше",
-      value: currentFilters.stock_value || "0",
-    },
-    shelfLife: {
-      condition: currentFilters.shelf_life_condition || "истекает в течение",
-      value: currentFilters.shelf_life_value || "0",
-    },
-    productChanges: {
-      condition: currentFilters.changes_condition || "изменялся в течение",
-      value: currentFilters.changes_value || "0",
-    },
-    sellability: {
-      condition: currentFilters.sellability_condition || "продавался в течение",
-      value: currentFilters.sellability_value || "0",
-    },
-  }));
+  const [filters, setFilters] = useState(() =>
+    modalStateFromAppliedFilters(currentFilters),
+  );
+  const [applyError, setApplyError] = useState("");
 
   const supplierOptions = useMemo(
     () =>
@@ -87,90 +63,19 @@ const FilterModal = ({
   };
 
   const handleApply = () => {
-    const cleanedFilters = {};
-
-    // Item types (kind)
-    const selectedTypes = [];
-    if (filters.itemTypes.product) selectedTypes.push("product");
-    if (filters.itemTypes.service) selectedTypes.push("service");
-    if (filters.itemTypes.kit) selectedTypes.push("bundle");
-
-    // Если выбраны не все типы, отправляем фильтр
-    if (selectedTypes.length < 3) {
-      cleanedFilters.kind = selectedTypes.join(",");
+    const { params, error } = buildMarketWarehouseListParams(filters);
+    if (error) {
+      setApplyError(error);
+      return;
     }
-
-    // Other filters
-    if (filters.preset) cleanedFilters.preset = filters.preset;
-    if (filters.category) cleanedFilters.category = filters.category;
-    if (filters.brand) cleanedFilters.brand = filters.brand;
-    if (filters.supplier) cleanedFilters.supplier = filters.supplier;
-
-    if (filters.price.value && filters.price.value !== "0") {
-      cleanedFilters.price_type = filters.price.type;
-      cleanedFilters.price_condition = filters.price.condition;
-      cleanedFilters.price_value = filters.price.value;
-    }
-
-    if (filters.stock.value && filters.stock.value !== "0") {
-      cleanedFilters.stock_type = filters.stock.type;
-      cleanedFilters.stock_condition = filters.stock.condition;
-      cleanedFilters.stock_value = filters.stock.value;
-    }
-
-    if (filters.shelfLife.value && filters.shelfLife.value !== "0") {
-      cleanedFilters.shelf_life_condition = filters.shelfLife.condition;
-      cleanedFilters.shelf_life_value = filters.shelfLife.value;
-    }
-
-    if (filters.productChanges.value && filters.productChanges.value !== "0") {
-      cleanedFilters.changes_condition = filters.productChanges.condition;
-      cleanedFilters.changes_value = filters.productChanges.value;
-    }
-
-    if (filters.sellability.value && filters.sellability.value !== "0") {
-      cleanedFilters.sellability_condition = filters.sellability.condition;
-      cleanedFilters.sellability_value = filters.sellability.value;
-    }
-
-    onApplyFilters(cleanedFilters);
+    setApplyError("");
+    onApplyFilters(params);
     onClose();
   };
 
   const handleReset = () => {
-    setFilters({
-      itemTypes: {
-        product: true,
-        service: true,
-        kit: true,
-      },
-      preset: "",
-      category: "",
-      brand: "",
-      supplier: "",
-      price: {
-        type: "базовая",
-        condition: "больше",
-        value: "0",
-      },
-      stock: {
-        type: "общие",
-        condition: "больше",
-        value: "0",
-      },
-      shelfLife: {
-        condition: "истекает в течение",
-        value: "0",
-      },
-      productChanges: {
-        condition: "изменялся в течение",
-        value: "0",
-      },
-      sellability: {
-        condition: "продавался в течение",
-        value: "0",
-      },
-    });
+    setFilters(modalStateFromAppliedFilters({}));
+    setApplyError("");
     onResetFilters();
     onClose();
   };
@@ -205,26 +110,19 @@ const FilterModal = ({
               }
             >
               <option value="">Выберите</option>
-              <option value="товары_со_скидкой">Товары со скидкой</option>
-              <option value="срок_годности_истекает_7_дней">
-                Срок годности истекает в течение 7 дней
-              </option>
-              <option value="нулевая_себестоимость">
-                Нулевая себестоимость
-              </option>
-              <option value="истек_срок_годности">Истёк срок годности</option>
-              <option value="нет_в_наличии">Нет в наличии</option>
-              <option value="не_продаются_3_месяца">
-                Не продаются 3 месяца
-              </option>
-              <option value="отрицательный_остаток">
-                Отрицательный остаток
-              </option>
-              <option value="общий_остаток_меньше_минимального">
-                Общий остаток меньше минимального
-              </option>
+              {MARKET_WAREHOUSE_PRESETS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
+
+          {applyError ? (
+            <p className="warehouse-filter-modal__error" role="alert">
+              {applyError}
+            </p>
+          ) : null}
 
           {/* Типы товаров */}
           <div className="warehouse-filter-modal__section">
@@ -481,18 +379,28 @@ const FilterModal = ({
 
         <div className="warehouse-filter-modal__footer">
           <button
-            className="warehouse-filter-modal__apply-btn"
-            onClick={handleApply}
+            type="button"
+            className="warehouse-filter-modal__reset-btn"
+            onClick={handleReset}
           >
-            Применить
+            Сбросить
           </button>
           <button
+            type="button"
             className="warehouse-filter-modal__cancel-btn"
             onClick={onClose}
           >
             Отменить
           </button>
           <button
+            type="button"
+            className="warehouse-filter-modal__apply-btn"
+            onClick={handleApply}
+          >
+            Применить
+          </button>
+          <button
+            type="button"
             className="warehouse-filter-modal__save-preset-btn"
             onClick={() => {}}
           >

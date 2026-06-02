@@ -17,6 +17,7 @@ import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import InventoryItemsPickerModal from "./InventoryItemsPickerModal";
 import "./CafeInventory.scss";
+import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
@@ -1024,16 +1025,23 @@ const CafeInventory = () => {
 
       {/* Модалка оборудования */}
       {modalOpen && (
+        <ReactPortal wrapperId="cafe-inventory-equipment-modal">
         <div
           className="cafeInventory__modalOverlay"
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="cafeInventory__modal"
+            className="cafeInventory__modal cafeInventory__modal--form cafeInventory__modal--equipment"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cafe-equipment-modal-title"
           >
             <div className="cafeInventory__modalHeader">
-              <h3 className="cafeInventory__modalTitle">
+              <h3
+                id="cafe-equipment-modal-title"
+                className="cafeInventory__modalTitle"
+              >
                 {editingId == null
                   ? "Новое оборудование"
                   : "Изменить оборудование"}
@@ -1182,6 +1190,7 @@ const CafeInventory = () => {
             </form>
           </div>
         </div>
+        </ReactPortal>
       )}
 
       {/* Модалка создания акта */}

@@ -786,8 +786,9 @@ const CafeAnalyticsModalContent = ({
   }
 
   if (modalKey === "expenses") {
-    const block = expensesBlock || { total: 0, count: 0, categories: [] };
+    const block = expensesBlock || { total: 0, count: 0, categories: [], items: [] };
     const cats = Array.isArray(block.categories) ? block.categories : [];
+    const expenseItems = Array.isArray(block.items) ? block.items : [];
 
     return (
       <div className="cafeAnalytics__modalContent">
@@ -798,9 +799,45 @@ const CafeAnalyticsModalContent = ({
           </div>
           <div className="cafeAnalytics__modalKpi">
             <div className="cafeAnalytics__modalKLabel">Записей</div>
-            <div className="cafeAnalytics__modalKVal">{fmtInt(block.count)}</div>
+            <div className="cafeAnalytics__modalKVal">
+              {fmtInt(block.count || expenseItems.length)}
+            </div>
           </div>
         </div>
+
+        {expenseItems.length > 0 && (
+          <div className="cafeAnalytics__modalBlock">
+            <div className="cafeAnalytics__modalBlockTitle">Что куплено</div>
+            <div className="cafeAnalytics__modalTableWrap cafeAnalytics__modalTableWrap--limited">
+              <table className="cafeAnalytics__modalTable">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Комментарий</th>
+                    <th>Категория</th>
+                    <th>Сумма</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenseItems.map((x) => (
+                    <tr key={String(x._id)}>
+                      <td className="cafeAnalytics__modalTdTitle" title={x.title}>
+                        {x.title}
+                      </td>
+                      <td className="cafeAnalytics__modalTdNote" title={x.note}>
+                        {x.note}
+                      </td>
+                      <td>{x.category}</td>
+                      <td>{fmtMoney(toNum(x.amount))}</td>
+                      <td>{fmtDateTime(x.date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {cats.length > 0 && (
           <div className="cafeAnalytics__modalBlock">
@@ -830,10 +867,9 @@ const CafeAnalyticsModalContent = ({
           </div>
         )}
 
-        {!cats.length && (
+        {!cats.length && !expenseItems.length && (
           <div className="cafeAnalytics__modalNote">
-            Детализация по категориям недоступна — показаны только итоги периода (если API их
-            возвращает).
+            Нет расходов за выбранный период или API не вернул детализацию.
           </div>
         )}
       </div>

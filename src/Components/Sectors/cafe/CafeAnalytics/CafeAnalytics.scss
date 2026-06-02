@@ -760,11 +760,19 @@
   }
 
   &__modalTdTitle {
-    max-width: 520px;
+    max-width: 220px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: 550;
+  }
+
+  &__modalTdNote {
+    max-width: 280px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.35;
+    word-break: break-word;
   }
 
   &__modalUnit {

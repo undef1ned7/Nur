@@ -13,6 +13,10 @@ import {
 import api from "../../../../api";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  pickExpenseIdFromResponse,
+  recordCafePurchaseExpense,
+} from "../../../../../tools/cafePurchaseExpense";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -53,6 +57,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
     sku: "",
     minimum: "0",
     remainder: "0",
+    unit_price: "",
   });
 
   const [moveOpen, setMoveOpen] = useState(false);
@@ -127,6 +132,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       sku: "",
       minimum: "0",
       remainder: "0",
+      unit_price: "",
     });
     setItemModalOpen(true);
   };
@@ -159,10 +165,45 @@ const HouseholdInventoryTab = ({ query = "" }) => {
     try {
       if (editingItemId == null) {
         const remainder = Math.max(0, toNum(itemForm.remainder));
-        await api.post("/cafe/household-items/", {
+        const unitPrice = Math.max(0, toNum(itemForm.unit_price));
+
+        if (remainder > 0 && unitPrice < 0.01) {
+          alert(
+            "Укажите цену за единицу — по ней будет записан расход «Закупки».",
+            true,
+          );
+          return;
+        }
+
+        const { data: created } = await api.post("/cafe/household-items/", {
           ...payload,
           remainder: numStr(remainder),
+          ...(unitPrice > 0 ? { unit_price: numStr(unitPrice) } : {}),
         });
+
+        let expenseId = pickExpenseIdFromResponse(created);
+        if (!expenseId && remainder > 0 && unitPrice >= 0.01) {
+          try {
+            expenseId = await recordCafePurchaseExpense({
+              title: `Закупка: ${title}`,
+              amount: remainder * unitPrice,
+              note: `Посуда: создание, ${numStr(remainder)} ${unit}`,
+              source: "household_create",
+              sourceId: created?.id,
+            });
+          } catch (expErr) {
+            alert(
+              `Позиция создана, но расход «Закупки» не записан: ${validateResErrors(expErr)}`,
+              true,
+            );
+          }
+        }
+
+        if (expenseId) {
+          alert(
+            `Позиция создана. Расход «Закупки»: ${(remainder * unitPrice).toFixed(2)} сом.`,
+          );
+        }
       } else {
         await api.patch(`/cafe/household-items/${editingItemId}/`, payload);
       }
@@ -209,12 +250,51 @@ const HouseholdInventoryTab = ({ query = "" }) => {
         : `/cafe/household-items/${moveTarget.id}/write-off/`;
 
     const body = { quantity: numStr(qty), note: moveNote.trim() };
+
     if (moveType === "receive") {
-      body.unit_price = numStr(Math.max(0, toNum(movePrice)));
+      const unitPrice = Math.max(0, toNum(movePrice));
+      if (unitPrice < 0.01) {
+        alert(
+          "Укажите цену за единицу — по ней будет записан расход «Закупки».",
+          true,
+        );
+        return;
+      }
+      body.unit_price = numStr(unitPrice);
     }
 
     try {
-      await api.post(url, body);
+      const { data: moveRes } = await api.post(url, body);
+
+      if (moveType === "receive") {
+        const unitPrice = toNum(body.unit_price);
+        let expenseId = pickExpenseIdFromResponse(moveRes);
+        if (!expenseId && unitPrice >= 0.01) {
+          try {
+            expenseId = await recordCafePurchaseExpense({
+              title: `Закупка: ${moveTarget.title}`,
+              amount: qty * unitPrice,
+              note:
+                moveNote.trim() ||
+                `Посуда: приход ${numStr(qty)} ${moveTarget.unit || "шт"}`,
+              source: "household_receipt",
+              sourceId:
+                moveRes?.movement?.id || moveRes?.item?.id || moveTarget.id,
+            });
+          } catch (expErr) {
+            alert(
+              `Оприходование выполнено, но расход «Закупки» не записан: ${validateResErrors(expErr)}`,
+              true,
+            );
+          }
+        }
+        if (expenseId) {
+          alert(
+            `Оприходовано. Расход «Закупки»: ${(qty * unitPrice).toFixed(2)} сом.`,
+          );
+        }
+      }
+
       setMoveOpen(false);
       await loadAll();
     } catch (err) {
@@ -500,15 +580,41 @@ const HouseholdInventoryTab = ({ query = "" }) => {
                 />
               </label>
               {!editingItemId && (
-                <label>
-                  Начальный остаток
-                  <input
-                    value={itemForm.remainder}
-                    onChange={(e) =>
-                      setItemForm((f) => ({ ...f, remainder: e.target.value }))
-                    }
-                  />
-                </label>
+                <>
+                  <label>
+                    Начальный остаток
+                    <input
+                      value={itemForm.remainder}
+                      onChange={(e) =>
+                        setItemForm((f) => ({
+                          ...f,
+                          remainder: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  {toNum(itemForm.remainder) > 0 && (
+                    <>
+                      <label>
+                        Цена за ед. (сом) *
+                        <input
+                          value={itemForm.unit_price}
+                          onChange={(e) =>
+                            setItemForm((f) => ({
+                              ...f,
+                              unit_price: e.target.value.replace(",", "."),
+                            }))
+                          }
+                          placeholder="Для расхода «Закупки»"
+                        />
+                      </label>
+                      <p className="cafeInventory__hint">
+                        Сумма (остаток × цена) запишется в расходы «Закупки» (
+                        аналитика → Расходы / Финансы).
+                      </p>
+                    </>
+                  )}
+                </>
               )}
               <div className="cafeInventory__formActions">
                 <button type="button" onClick={() => setItemModalOpen(false)}>
@@ -544,13 +650,23 @@ const HouseholdInventoryTab = ({ query = "" }) => {
                 />
               </label>
               {moveType === "receive" && (
-                <label>
-                  Цена за ед. (сом)
-                  <input
-                    value={movePrice}
-                    onChange={(e) => setMovePrice(e.target.value.replace(",", "."))}
-                  />
-                </label>
+                <>
+                  <label>
+                    Цена за ед. (сом) *
+                    <input
+                      value={movePrice}
+                      onChange={(e) =>
+                        setMovePrice(e.target.value.replace(",", "."))
+                      }
+                      required
+                      placeholder="Для расхода «Закупки»"
+                    />
+                  </label>
+                  <p className="cafeInventory__hint">
+                    Сумма прихода (кол-во × цена) будет записана как расход
+                    «Закупки» в аналитике.
+                  </p>
+                </>
               )}
               <label>
                 Комментарий

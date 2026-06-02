@@ -377,8 +377,71 @@ const normalizeRejectionRows = (data) => {
   }));
 };
 
-const normalizeExpensesBlock = (data) => {
-  if (!data)
+const normalizeExpenseLineItem = (x, idx = 0) => {
+  const title = String(x?.title ?? x?.name ?? "").trim() || "—";
+  const noteRaw = String(x?.note ?? x?.comment ?? "").trim();
+  const category = String(
+    x?.category_name ?? x?.category ?? x?.category_title ?? "",
+  ).trim() || "—";
+
+  return {
+    _id: x?.id ?? x?.uuid ?? `exp-${idx}-${title}`,
+    title,
+    note: noteRaw || "—",
+    category,
+    amount: toNum(x?.amount ?? x?.sum ?? x?.total),
+    date: x?.expense_date ?? x?.created_at ?? x?.date ?? null,
+  };
+};
+
+const collectExpenseLineItems = (data) => {
+  if (!data) return [];
+  if (Array.isArray(data)) {
+    return data.map((x, idx) => normalizeExpenseLineItem(x, idx));
+  }
+  if (typeof data !== "object") return [];
+
+  const buckets = [
+    data.items,
+    data.expenses,
+    data.records,
+    data.lines,
+    data.details,
+    data.other_expenses_section?.items,
+  ];
+
+  const out = [];
+  const seen = new Set();
+
+  for (const bucket of buckets) {
+    for (const raw of apiListPayload(bucket)) {
+      const row = normalizeExpenseLineItem(raw, out.length);
+      const key = String(raw?.id ?? raw?.uuid ?? `${row.title}|${row.note}|${row.amount}|${row.date}`);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(row);
+    }
+  }
+
+  return out;
+};
+
+const mergeExpenseLineItems = (...lists) => {
+  const out = [];
+  const seen = new Set();
+  for (const list of lists) {
+    for (const row of list || []) {
+      const key = String(row._id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(row);
+    }
+  }
+  return out;
+};
+
+const normalizeExpensesBlock = (data, extraItems = []) => {
+  if (!data && !extraItems.length)
     return {
       total: 0,
       count: 0,
@@ -388,6 +451,7 @@ const normalizeExpensesBlock = (data) => {
       other_expenses_section: { items: [], expenses_by_day: [] },
     };
   if (Array.isArray(data)) {
+    const lineItems = collectExpenseLineItems(data);
     const categories = data.map((x, idx) => ({
       _id: x.category ?? x.id ?? idx,
       name:
@@ -399,11 +463,26 @@ const normalizeExpensesBlock = (data) => {
       amount: toNum(x.amount ?? x.sum ?? x.total),
       count: toNum(x.count ?? x.expenses_count ?? 1),
     }));
+    const items = mergeExpenseLineItems(lineItems, extraItems);
     return {
-      total: sumBy(categories, "amount"),
-      count: categories.reduce((a, c) => a + toNum(c.count), 0) || categories.length,
+      total: sumBy(categories, "amount") || sumBy(items, "amount"),
+      count:
+        categories.reduce((a, c) => a + toNum(c.count), 0) ||
+        items.length ||
+        categories.length,
       categories,
-      items: [],
+      items,
+      expenses_by_day: [],
+      other_expenses_section: { items: [], expenses_by_day: [] },
+    };
+  }
+  if (!data) {
+    const items = mergeExpenseLineItems([], extraItems);
+    return {
+      total: sumBy(items, "amount"),
+      count: items.length,
+      categories: [],
+      items,
       expenses_by_day: [],
       other_expenses_section: { items: [], expenses_by_day: [] },
     };
@@ -414,7 +493,7 @@ const normalizeExpensesBlock = (data) => {
   const count = toNum(
     data.count ?? data.expenses_count ?? data.items_count ?? data.cafe_expenses_count
   );
-  const rawCat = data.by_category ?? data.categories ?? data.breakdown ?? data.items;
+  const rawCat = data.by_category ?? data.categories ?? data.breakdown;
   const catList = apiListPayload(rawCat);
   const categories = catList.map((x, idx) => ({
     _id: x.category_id ?? x.category ?? x.id ?? idx,
@@ -428,7 +507,7 @@ const normalizeExpensesBlock = (data) => {
     count: toNum(x.count ?? x.expenses_count ?? 1),
   }));
   const catSum = sumBy(categories, "amount");
-  const items = apiListPayload(data.items);
+  const items = mergeExpenseLineItems(collectExpenseLineItems(data), extraItems);
   const expensesByDay = apiListPayload(data.expenses_by_day);
   const otherSection =
     data.other_expenses_section && typeof data.other_expenses_section === "object"
@@ -440,8 +519,8 @@ const normalizeExpensesBlock = (data) => {
       : { items: [], expenses_by_day: [] };
 
   return {
-    total: total || catSum,
-    count: count || categories.reduce((a, c) => a + toNum(c.count), 0),
+    total: total || catSum || sumBy(items, "amount"),
+    count: count || items.length || categories.reduce((a, c) => a + toNum(c.count), 0),
     categories,
     items,
     expenses_by_day: expensesByDay,
@@ -778,6 +857,7 @@ const CafeAnalytics = () => {
         rInflow,
         rRejections,
         rExpenses,
+        rExpensesList,
         rDebts,
         rSalary,
         rFinance,
@@ -795,6 +875,9 @@ const CafeAnalytics = () => {
             params: { ...params, limit: 500 },
           })
           .catch(() => ({ data: null })),
+        api
+          .get("/cafe/expenses/", { params: { ...params, page_size: 500 } })
+          .catch(() => ({ data: [] })),
         api.get("/cafe/analytics/debts/", { params }).catch(() => ({ data: null })),
         salaryReq,
         financeReq,
@@ -818,7 +901,10 @@ const CafeAnalytics = () => {
           : normalizeRevenueInflowRows(rInflow?.data),
       );
       setRejectionRows(normalizeRejectionRows(rRejections?.data));
-      setExpensesBlock(normalizeExpensesBlock(rExpenses?.data));
+      const expenseListRows = listFrom(rExpensesList).map((x, idx) =>
+        normalizeExpenseLineItem(x, idx),
+      );
+      setExpensesBlock(normalizeExpensesBlock(rExpenses?.data, expenseListRows));
       setDebtRows(normalizeDebtRows(rDebts?.data));
       setWaiterSalaryRows(
         hideKitchenStaffKpi ? [] : normalizeWaiterSalaryRows(rSalary?.data)
