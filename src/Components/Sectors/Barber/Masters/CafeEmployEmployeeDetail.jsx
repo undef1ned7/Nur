@@ -9,6 +9,7 @@ import { convertEmployeeAccessesToLabels } from "./employeeAccessLabels";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import CafeWaiterPayProfileModal from "./modals/CafeWaiterPayProfileModal";
 import MarketSaleEmployeePayProfileModal from "./modals/MarketSaleEmployeePayProfileModal";
+import { employPayrollDetailPath } from "./saleEmployeePayroll";
 import { resolveEmployeeRoleLabel } from "./resolveEmployeeRoleLabel";
 import "./Masters.scss";
 
@@ -54,6 +55,7 @@ const CafeEmployEmployeeDetail = () => {
   const sectorName = String(company?.sector?.name || "").trim();
   const isCafe = sectorName === "Кафе";
   const isMarket = sectorName === "Маркет" || sectorName === "Магазин";
+  const isProduction = sectorName === "Производство";
 
   const roleById = useMemo(() => {
     const m = new Map();
@@ -125,12 +127,17 @@ const CafeEmployEmployeeDetail = () => {
     }
   };
 
-  if (!isCafe && !isMarket) {
+  if (!isCafe && !isMarket && !isProduction) {
     return <Navigate to="/crm/employ" replace />;
   }
 
   if (isMarket && employeeId) {
     return <Navigate to={`/crm/employ/market/${employeeId}`} replace />;
+  }
+
+  if (isProduction && employeeId) {
+    const path = employPayrollDetailPath(sectorName, employeeId);
+    if (path) return <Navigate to={path} replace />;
   }
 
   if (!employeeId) {

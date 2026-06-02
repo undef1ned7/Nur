@@ -416,6 +416,10 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("zakaz", Zakaz),
   createProtectedRoute("employ/:employeeId", CafeEmployEmployeeDetail),
   createProtectedRoute("employ/market/:employeeId", MarketEmployEmployeeDetail),
+  createProtectedRoute(
+    "employ/production/:employeeId",
+    MarketEmployEmployeeDetail,
+  ),
   createProtectedRoute("employ", Masters),
   createProtectedRoute("sklad", MarketWarehouse),
   createProtectedRoute("sklad/:id", MarketProductDetail),

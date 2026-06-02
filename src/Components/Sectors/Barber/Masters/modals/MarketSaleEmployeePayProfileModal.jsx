@@ -224,7 +224,7 @@ const MarketSaleEmployeePayProfileModal = ({
       >
         <header className="barbermasters__modalHeader">
           <h3 id="market-employee-pay-title" className="barbermasters__modalTitle">
-            Зарплата сотрудника (маркет)
+            Зарплата по продажам
           </h3>
           <button
             type="button"

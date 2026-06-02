@@ -359,6 +359,17 @@ $due-red: #dc2626;
     flex-shrink: 0;
     font-size: 11px;
     color: #64748b;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  &__group-product-warehouse {
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #475569;
   }
 
   &__group-product-price {
@@ -1293,6 +1304,15 @@ $due-red: #dc2626;
     padding: 48px 24px;
     color: #94a3b8;
     font-weight: 500;
+  }
+
+  &__cell-warehouse {
+    max-width: 120px;
+    font-size: 12px;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__cell-sum {

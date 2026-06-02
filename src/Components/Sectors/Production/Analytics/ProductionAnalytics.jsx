@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Users,
@@ -84,6 +84,8 @@ const ProductionAnalytics = () => {
     rows: [],
     meta: { ...INITIAL_CARD_DETAILS_META },
   });
+  const [salaryRows, setSalaryRows] = useState([]);
+  const [salaryLoading, setSalaryLoading] = useState(false);
 
   // Локальные состояния для фильтров (синхронизируются с Redux)
   const [period, setPeriod] = useState(filters.period || "month");
@@ -264,6 +266,43 @@ const ProductionAnalytics = () => {
   const cardDetailsColumnLabel = (column) =>
     CARD_DETAILS_COLUMN_LABELS[cardDetailsModal.cardKey]?.[column] ?? column;
 
+  const resolveSalaryPeriodParams = useCallback(() => {
+    if (period === "day") {
+      const d = date || new Date().toISOString().slice(0, 10);
+      return { period_start: d, period_end: d };
+    }
+    if (dateFrom && dateTo) {
+      return { period_start: dateFrom, period_end: dateTo };
+    }
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      period_start: from.toISOString().slice(0, 10),
+      period_end: to.toISOString().slice(0, 10),
+    };
+  }, [period, date, dateFrom, dateTo]);
+
+  const fetchSalaryReport = useCallback(async () => {
+    setSalaryLoading(true);
+    try {
+      const params = {
+        tab: "salary",
+        ...resolveSalaryPeriodParams(),
+      };
+      const branchUuid =
+        profile?.active_branch ?? profile?.branch ?? profile?.branch_id;
+      if (branchUuid) params.branch = String(branchUuid);
+      const { data } = await api.get("/main/analytics/market/", { params });
+      setSalaryRows(Array.isArray(data?.rows) ? data.rows : []);
+    } catch (err) {
+      console.error("Ошибка загрузки зарплатной аналитики:", err);
+      setSalaryRows([]);
+    } finally {
+      setSalaryLoading(false);
+    }
+  }, [profile, resolveSalaryPeriodParams]);
+
   // Загрузка данных через Redux (параметры по Owner Analytics API)
   const fetchData = () => {
     const params = {
@@ -289,6 +328,7 @@ const ProductionAnalytics = () => {
     );
 
     dispatch(fetchProductionAnalytics(params));
+    void fetchSalaryReport();
   };
 
   useEffect(() => {
@@ -1877,6 +1917,67 @@ const ProductionAnalytics = () => {
                   <tr>
                     <td colSpan={3} style={{ textAlign: "center" }}>
                       Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Зарплата сотрудников по оплаченным продажам (main.Sale) */}
+      <div className="agent-analytics__section">
+        <div className="agent-analytics__table-card">
+          <h3 className="agent-analytics__table-title">
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <Wallet size={20} />
+              Зарплата сотрудников
+              {salaryLoading ? " (загрузка…)" : ""}
+            </span>
+          </h3>
+          <div className="agent-analytics__table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Схема</th>
+                  <th>Оклад/мес</th>
+                  <th>%</th>
+                  <th>Дней</th>
+                  <th>Оклад за период</th>
+                  <th>Продажи</th>
+                  <th>Бонус %</th>
+                  <th>Итого</th>
+                </tr>
+              </thead>
+              <tbody>
+                {salaryRows.length > 0 ? (
+                  salaryRows.map((row, idx) => (
+                    <tr key={`${row.user_id || "user"}-${idx}`}>
+                      <td>{row.employee_label || "—"}</td>
+                      <td>{row.pay_scheme_label || row.pay_scheme || "—"}</td>
+                      <td>{formatMoney(row.monthly_base_salary || 0)} сом</td>
+                      <td>{formatMoney(row.sales_percent || 0)}</td>
+                      <td>{formatNumber(row.period_days || 0)}</td>
+                      <td>{formatMoney(row.base_prorated || 0)} сом</td>
+                      <td>{formatMoney(row.employee_sales_period || 0)} сом</td>
+                      <td>{formatMoney(row.percent_bonus || 0)} сом</td>
+                      <td>{formatMoney(row.total || 0)} сом</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: "center" }}>
+                      {salaryLoading
+                        ? "Загрузка…"
+                        : "Нет данных за период (настройте профили в карточке сотрудника)"}
                     </td>
                   </tr>
                 )}

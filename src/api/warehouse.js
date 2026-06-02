@@ -992,6 +992,24 @@ export const listWarehouseProducts = async (warehouseUuid, params = {}) => {
 };
 
 /**
+ * Список товаров по всем складам компании (поиск для multi-warehouse продажи)
+ * GET /api/warehouse/products/
+ * @param {Object} params - search, page, page_size
+ */
+export const listCompanyProducts = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/products/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Company Products Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
  * 3.1 Создать товар на складе
  * POST /api/warehouse/{warehouse_uuid}/products/
  */
@@ -3081,6 +3099,7 @@ export default {
   deleteCategory,
   // Товары: основной API (3.1)
   listWarehouseProducts,
+  listCompanyProducts,
   createProductInWarehouse,
   getProductByUuid,
   updateProductByUuid,
