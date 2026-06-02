@@ -164,6 +164,7 @@ const pageTitles = {
 
   "/crm/warehouse/warehouses": "Склады",
   "/crm/warehouse/analytics": "Аналитика",
+  "/crm/warehouse/partners/analytics": "Аналитика партнёров",
   "/crm/warehouse/clients": "Клиенты",
   "/crm/warehouse/documents": "Документы",
   "/crm/warehouse/documents/create": "Новый документ",

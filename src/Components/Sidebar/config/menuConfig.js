@@ -702,6 +702,14 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Аналитика партнёров",
+        to: "/crm/warehouse/partners/analytics",
+        icon: menuIcons.chartLine,
+        permission: "can_view_analytics",
+        ownerAdminOnly: true,
+        implemented: true,
+      },
+      {
         label: "Документы",
         to: "/crm/warehouse/documents/all",
         icon: menuIcons.documentScanner,

@@ -132,6 +132,9 @@ import ConsultingReports from "../Components/Sectors/Consulting/Kassa/Reports/Re
 // Warehouse
 import WarehouseAnalytics from "../Components/Sectors/Warehouse/Analytics/Analytics";
 import WarehouseAgentAnalytics from "../Components/Sectors/Warehouse/Analytics/AgentAnalytics";
+import PartnerAnalyticsList from "../Components/Sectors/Warehouse/Analytics/PartnerAnalyticsList";
+import PartnerAnalyticsDetail from "../Components/Sectors/Warehouse/Analytics/PartnerAnalyticsDetail";
+import PartnerAnalyticsOwnerGate from "../Components/Sectors/Warehouse/Analytics/PartnerAnalyticsOwnerGate";
 import WarehouseClients from "../Components/Sectors/Warehouse/Clients/Clients";
 import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Movements";
 import WarehouseProducts from "../Components/Sectors/Warehouse/Products/Products";
@@ -635,6 +638,22 @@ export const crmRoutes = (profile) => [
   createProtectedRoute(
     "warehouse/warehouses",
     profile?.role !== "owner" ? AgentStocks : Warehouses,
+  ),
+  createProtectedRoute(
+    "warehouse/partners/analytics",
+    () => (
+      <PartnerAnalyticsOwnerGate>
+        <PartnerAnalyticsList />
+      </PartnerAnalyticsOwnerGate>
+    ),
+  ),
+  createProtectedRoute(
+    "warehouse/partners/:partnerId/analytics",
+    () => (
+      <PartnerAnalyticsOwnerGate>
+        <PartnerAnalyticsDetail />
+      </PartnerAnalyticsOwnerGate>
+    ),
   ),
   createProtectedRoute("warehouse/partners/:partnerId", PartnerCatalogPage),
   createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
