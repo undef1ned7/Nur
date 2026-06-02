@@ -69,6 +69,36 @@ const VALID_DOC_TYPES = [
   "COMMERCIAL_OFFER",
 ];
 
+const MULTI_WAREHOUSE_DOC_TYPES = ["SALE", "SALE_RETURN", "COMMERCIAL_OFFER"];
+
+const resolveEntityId = (value) => {
+  if (value == null || value === "") return "";
+  if (typeof value === "object") {
+    const id = value?.id ?? value?.uuid;
+    return id != null ? String(id) : "";
+  }
+  return String(value);
+};
+
+const getProductWarehouseId = (product) =>
+  resolveEntityId(product?.warehouse);
+
+const resolveWarehouseName = (warehouseId, warehouses, fallback = "") => {
+  if (fallback) return String(fallback);
+  const found = (Array.isArray(warehouses) ? warehouses : []).find(
+    (w) => String(w.id || w.uuid) === String(warehouseId),
+  );
+  return found?.name || found?.title || "";
+};
+
+const isOwnerMultiWarehouseMode = (docType, agentId, startPlan) => {
+  const applyAgent =
+    (docType === "SALE" || docType === "SALE_RETURN") && !startPlan;
+  return (
+    MULTI_WAREHOUSE_DOC_TYPES.includes(docType) && !(applyAgent && agentId)
+  );
+};
+
 const getProductImages = (product) => {
   if (!product) return [];
   const images = Array.isArray(product.images) ? product.images : [];
@@ -324,6 +354,7 @@ const CreateSaleDocument = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();
   const { company, profile: userProfile, tariff } = useUser();
+  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
   const { employees } = useDepartments();
@@ -355,6 +386,10 @@ const CreateSaleDocument = () => {
   const [clientId, setClientId] = useState("");
   const [agentId, setAgentId] = useState("");
   const [docType, setDocType] = useState(initialDocType);
+  const isMultiWarehouseOwnerDoc = useMemo(
+    () => isOwnerMultiWarehouseMode(docType, agentId, startPlan),
+    [docType, agentId, startPlan],
+  );
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
   const [isDocumentPosted, setIsDocumentPosted] = useState(
@@ -1003,6 +1038,15 @@ const CreateSaleDocument = () => {
                   {product.name}
                 </FullNamePopover>
                 <div className="create-sale-document__group-product-meta">
+                  {isMultiWarehouseOwnerDoc ? (
+                    <span className="create-sale-document__group-product-warehouse">
+                      {resolveWarehouseName(
+                        getProductWarehouseId(product),
+                        warehouses,
+                        product.warehouse_name,
+                      ) || "—"}
+                    </span>
+                  ) : null}
                   <span className="create-sale-document__group-product-price">
                     {formatPrice(getProductPriceForDocument(product))} сом
                   </span>
@@ -1029,9 +1073,16 @@ const CreateSaleDocument = () => {
 
   const loadProductsForGroup = useCallback(
     async (groupKey, groupIdOrNull) => {
-      if (!warehouse) return;
-      const requestWarehouse = warehouse;
       const key = String(groupKey);
+      const isGlobalSearch =
+        isMultiWarehouseOwnerDoc &&
+        key === PRODUCT_SEARCH_KEY &&
+        Boolean(debouncedProductSearch?.trim());
+
+      if (!isGlobalSearch && !warehouse) return;
+
+      const requestWarehouse = warehouse;
+      const searchQuery = debouncedProductSearch?.trim() || "";
 
       setGroupProducts((prev) => ({
         ...(prev || {}),
@@ -1044,45 +1095,58 @@ const CreateSaleDocument = () => {
       }));
 
       try {
-        const params = {
-          warehouse,
-          page_size: 1000,
-        };
-        if (debouncedProductSearch?.trim()) {
-          params.search = debouncedProductSearch.trim();
-        }
-        if (groupIdOrNull) {
-          params.product_group = groupIdOrNull;
-        }
+        let list = [];
 
-        const result = await dispatch(fetchProductsAsync(params));
-        // если склад поменялся пока грузили — ничего не обновляем
-        if (warehouseRef.current !== requestWarehouse) return;
-
-        if (fetchProductsAsync.fulfilled.match(result)) {
-          const list =
-            result.payload?.results ||
-            (Array.isArray(result.payload) ? result.payload : []);
-          setGroupProducts((prev) => ({
-            ...(prev || {}),
-            [key]: {
-              items: list,
-              loading: false,
-              error: null,
-              search: debouncedProductSearch || "",
-            },
-          }));
+        if (isGlobalSearch) {
+          const data = await warehouseAPI.listCompanyProducts({
+            search: searchQuery,
+            page_size: 1000,
+          });
+          list = Array.isArray(data) ? data : data?.results || [];
         } else {
-          setGroupProducts((prev) => ({
-            ...(prev || {}),
-            [key]: {
-              items: [],
-              loading: false,
-              error: result.payload || result.error || true,
-              search: debouncedProductSearch || "",
-            },
-          }));
+          const params = {
+            warehouse,
+            page_size: 1000,
+          };
+          if (searchQuery) {
+            params.search = searchQuery;
+          }
+          if (groupIdOrNull) {
+            params.product_group = groupIdOrNull;
+          }
+
+          const result = await dispatch(fetchProductsAsync(params));
+          if (warehouseRef.current !== requestWarehouse) return;
+
+          if (fetchProductsAsync.fulfilled.match(result)) {
+            list =
+              result.payload?.results ||
+              (Array.isArray(result.payload) ? result.payload : []);
+          } else {
+            setGroupProducts((prev) => ({
+              ...(prev || {}),
+              [key]: {
+                items: [],
+                loading: false,
+                error: result.payload || result.error || true,
+                search: debouncedProductSearch || "",
+              },
+            }));
+            return;
+          }
         }
+
+        if (!isGlobalSearch && warehouseRef.current !== requestWarehouse) return;
+
+        setGroupProducts((prev) => ({
+          ...(prev || {}),
+          [key]: {
+            items: list,
+            loading: false,
+            error: null,
+            search: debouncedProductSearch || "",
+          },
+        }));
       } catch (e) {
         console.error("Ошибка загрузки товаров группы:", e);
         setGroupProducts((prev) => ({
@@ -1096,12 +1160,13 @@ const CreateSaleDocument = () => {
         }));
       }
     },
-    [warehouse, debouncedProductSearch, dispatch],
+    [warehouse, debouncedProductSearch, dispatch, isMultiWarehouseOwnerDoc],
   );
 
-  // Поиск: грузим плоский список товаров по складу (без product_group).
+  // Поиск: по складу или по всем складам компании (multi-warehouse SALE).
   useEffect(() => {
-    if (!warehouse || !isProductSearchActive) return;
+    if (!isProductSearchActive) return;
+    if (!isMultiWarehouseOwnerDoc && !warehouse) return;
     const key = PRODUCT_SEARCH_KEY;
     const entry = groupProducts?.[key];
     const searchQuery = debouncedProductSearch || "";
@@ -1119,7 +1184,13 @@ const CreateSaleDocument = () => {
     setActiveGroupKeyForKeyboard((prev) => prev || key);
     // groupProducts намеренно не в deps: обновление кэша после load иначе зацикливает запросы
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warehouse, isProductSearchActive, debouncedProductSearch, loadProductsForGroup]);
+  }, [
+    warehouse,
+    isProductSearchActive,
+    debouncedProductSearch,
+    loadProductsForGroup,
+    isMultiWarehouseOwnerDoc,
+  ]);
 
   // При изменении строки поиска обновляем уже раскрытые группы автоматически.
   useEffect(() => {
@@ -1541,11 +1612,21 @@ const CreateSaleDocument = () => {
                 it.description ??
                 it.product_description ??
                 "";
+              const warehouseId =
+                resolveEntityId(it.warehouse) ||
+                getProductWarehouseId(productObject);
+              const warehouseName =
+                it.warehouse_name ||
+                (typeof it.warehouse === "object"
+                  ? it.warehouse?.name || it.warehouse?.title || ""
+                  : "");
               return {
                 id: it.id || `item-${Date.now()}-${idx}`,
                 productId: productId,
                 productName,
                 name: productName,
+                warehouseId,
+                warehouseName,
                 price,
                 unit_price: price,
                 quantity: qty,
@@ -1614,14 +1695,99 @@ const CreateSaleDocument = () => {
     );
   }, [docType]);
 
-  // При смене склада удаляем из корзины товары, которых нет на новом складе
-  // При редактировании черновика (editDocumentId) позиции не удаляем — только обновляем остатки
   useEffect(() => {
-    if (!warehouse || !cartItems.length) return;
+    if (!warehouses?.length) return;
+    setCartItems((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (item.warehouseName || !item.warehouseId) return item;
+        const name = resolveWarehouseName(item.warehouseId, warehouses);
+        if (!name) return item;
+        changed = true;
+        return { ...item, warehouseName: name };
+      });
+      return changed ? next : prev;
+    });
+  }, [warehouses]);
+
+  const cartStockSyncKey = useMemo(
+    () =>
+      cartItems
+        .map((item) => `${item.productId}:${item.warehouseId || ""}`)
+        .join("|"),
+    [cartItems],
+  );
+
+  // Обновление остатков в корзине (по одному складу или по складу каждой строки)
+  useEffect(() => {
+    if (!cartItems.length || !isStockLimitRequired) return;
 
     let cancelled = false;
+
+    const applyStockMap = (productById, { filterToWarehouse = false } = {}) => {
+      setCartItems((prev) => {
+        const isEditDraft = !!editDocumentId;
+        const filtered =
+          filterToWarehouse && warehouse && !isEditDraft
+            ? prev.filter((item) =>
+                productById.has(String(item.productId ?? item.product_id)),
+              )
+            : prev;
+        return filtered.map((item) => {
+          const p = productById.get(String(item.productId ?? item.product_id));
+          const stock =
+            p != null ? Number(p?.quantity ?? 0) : Number(item.stock ?? 0);
+          const qty = Number(item.quantity ?? 0);
+          const capByStock =
+            isStockLimitRequired && stock > 0 && qty > stock;
+          return {
+            ...item,
+            stock,
+            quantity: capByStock ? stock : item.quantity,
+          };
+        });
+      });
+    };
+
     (async () => {
       try {
+        if (isMultiWarehouseOwnerDoc) {
+          const warehouseIds = [
+            ...new Set(
+              cartItems
+                .map((item) => item.warehouseId)
+                .filter((id) => id != null && String(id).trim() !== ""),
+            ),
+          ];
+          if (!warehouseIds.length) return;
+
+          const productById = new Map();
+          await Promise.all(
+            warehouseIds.map(async (wid) => {
+              const result = await dispatch(
+                fetchProductsAsync({ warehouse: wid, page_size: 1000 }),
+              );
+              if (cancelled) return;
+              if (fetchProductsAsync.fulfilled.match(result)) {
+                const list =
+                  result.payload?.results ||
+                  (Array.isArray(result.payload) ? result.payload : []);
+                list.forEach((p) => {
+                  productById.set(String(p.id), {
+                    id: p.id,
+                    quantity: p.quantity,
+                  });
+                });
+              }
+            }),
+          );
+          if (cancelled) return;
+          applyStockMap(productById);
+          return;
+        }
+
+        if (!warehouse) return;
+
         const result = await dispatch(
           fetchProductsAsync({ warehouse, page_size: 1000 }),
         );
@@ -1633,38 +1799,24 @@ const CreateSaleDocument = () => {
           const productById = new Map(
             list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }]),
           );
-          setCartItems((prev) => {
-            const isEditDraft = !!editDocumentId;
-            const filtered = isEditDraft
-              ? prev
-              : prev.filter((item) =>
-                  productById.has(String(item.productId ?? item.product_id)),
-                );
-            return filtered.map((item) => {
-              const p = productById.get(
-                String(item.productId ?? item.product_id),
-              );
-              const stock =
-                p != null ? Number(p?.quantity ?? 0) : Number(item.stock ?? 0);
-              const qty = Number(item.quantity ?? 0);
-              const capByStock =
-                isStockLimitRequired && stock > 0 && qty > stock;
-              return {
-                ...item,
-                stock,
-                quantity: capByStock ? stock : item.quantity,
-              };
-            });
-          });
+          applyStockMap(productById, { filterToWarehouse: true });
         }
-      } catch (e) {
+      } catch {
         // игнорируем ошибку загрузки
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [warehouse, isStockLimitRequired, editDocumentId]);
+  }, [
+    warehouse,
+    isStockLimitRequired,
+    editDocumentId,
+    cartStockSyncKey,
+    isMultiWarehouseOwnerDoc,
+    dispatch,
+  ]);
 
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
@@ -1705,8 +1857,25 @@ const CreateSaleDocument = () => {
   }, [counterparties, docType]);
 
   const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
-  const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
   const applyAgentFilter = isAgentFilterRelevant && !startPlan;
+
+  const prevAgentIdRef = useRef(agentId);
+  useEffect(() => {
+    const prev = prevAgentIdRef.current;
+    prevAgentIdRef.current = agentId;
+    if (!agentId || prev === agentId) return;
+    if (!isAgentFilterRelevant || startPlan) return;
+    if (!cartItems.length) return;
+
+    const wh = warehouse || cartItems[0]?.warehouseId || "";
+    if (wh && String(warehouse) !== String(wh)) {
+      setWarehouse(String(wh));
+    }
+    setCartItems((prev) =>
+      prev.filter((item) => !wh || String(item.warehouseId) === String(wh)),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId, isAgentFilterRelevant, startPlan]);
   const isOwnerOrAdmin =
     userProfile?.role === "owner" || userProfile?.role === "admin";
   const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
@@ -1888,7 +2057,9 @@ const CreateSaleDocument = () => {
     const search = documentSearch.toLowerCase();
     const filtered = cartItems.filter((item) => {
       const name = item.productName || item.name || "";
-      return name.toLowerCase().includes(search);
+      const wh = item.warehouseName || "";
+      const haystack = `${name} ${wh}`.toLowerCase();
+      return haystack.includes(search);
     });
     return [...filtered].sort((a, b) => {
       const dateA = a.addedAt || a.created_at || 0;
@@ -2046,11 +2217,19 @@ const CreateSaleDocument = () => {
           return false;
         }
         const priceForDoc = getProductPriceForDocument(product);
+        const warehouseId = getProductWarehouseId(product);
+        const warehouseName = resolveWarehouseName(
+          warehouseId,
+          warehouses,
+          product.warehouse_name,
+        );
         const newItem = {
           id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           productId: product.id,
           productName: product.name,
           name: product.name,
+          warehouseId,
+          warehouseName,
           price: priceForDoc,
           unit_price: priceForDoc,
           quantity: qtyToAdd,
@@ -2201,6 +2380,21 @@ const CreateSaleDocument = () => {
     );
   };
 
+  const buildDocumentWarehouseFields = useCallback(() => {
+    if (isWarehouseToRequired) {
+      return { warehouse_from: warehouse, warehouse_to: warehouseTo };
+    }
+    if (isMultiWarehouseOwnerDoc) {
+      return warehouse ? { warehouse_from: warehouse } : {};
+    }
+    return { warehouse_from: warehouse };
+  }, [
+    isWarehouseToRequired,
+    isMultiWarehouseOwnerDoc,
+    warehouse,
+    warehouseTo,
+  ]);
+
   // Валидация данных документа перед отправкой
   const validateDocumentData = () => {
     // Проверка товаров
@@ -2238,15 +2432,16 @@ const CreateSaleDocument = () => {
         };
       }
 
-      // Проверка: количество не больше остатка на складе (только для операций отгрузки)
+      // Проверка: количество не больше остатка на складе строки
       if (isStockLimitRequired) {
         const stock = Number(item.stock ?? 0);
         if (stock > 0 && qty > stock) {
+          const whLabel = item.warehouseName || "складе";
           return {
             valid: false,
             error: `Количество товара "${
               item.productName || item.name
-            }" не может превышать остаток на складе (${stock})`,
+            }" не может превышать остаток на складе «${whLabel}» (${stock})`,
           };
         }
       }
@@ -2281,8 +2476,11 @@ const CreateSaleDocument = () => {
       };
     }
 
-    // Проверка склада
-    if (!warehouse) {
+    // Проверка склада (для multi-warehouse SALE warehouse_from в шапке необязателен)
+    if (isWarehouseToRequired && !warehouse) {
+      return { valid: false, error: "Выберите склад отправитель" };
+    }
+    if (!isWarehouseToRequired && !isMultiWarehouseOwnerDoc && !warehouse) {
       return { valid: false, error: "Выберите склад" };
     }
 
@@ -2414,8 +2612,7 @@ const CreateSaleDocument = () => {
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
-        warehouse_from: warehouse,
-        ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
+        ...buildDocumentWarehouseFields(),
         ...(docType === "COMMERCIAL_OFFER"
           ? { counterparty: clientId || null }
           : clientId
@@ -2610,8 +2807,7 @@ const CreateSaleDocument = () => {
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
-        warehouse_from: warehouse,
-        ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
+        ...buildDocumentWarehouseFields(),
         ...(docType === "COMMERCIAL_OFFER"
           ? { counterparty: clientId || null }
           : clientId
@@ -3167,7 +3363,9 @@ const CreateSaleDocument = () => {
             {isProductSearchActive ? (
               <div className="create-sale-document__search-results">
                 <p className="create-sale-document__search-results-hint">
-                  Поиск по всем товарам склада
+                  {isMultiWarehouseOwnerDoc
+                    ? "Поиск по всем складам компании"
+                    : "Поиск по всем товарам склада"}
                 </p>
                 <div className="create-sale-document__group-products">
                   {renderGroupProductsList(
@@ -3324,7 +3522,9 @@ const CreateSaleDocument = () => {
                 <p className="create-sale-document__doc-subtitle">
                   {docType === "COMMERCIAL_OFFER"
                     ? "Без проведения: склад, остатки и касса не затрагиваются"
-                    : "Создание документа продажи"}
+                    : isMultiWarehouseOwnerDoc
+                      ? "Можно добавить товары с разных складов в один документ"
+                      : "Создание документа продажи"}
                 </p>
               </div>
               <div className="create-sale-document__header-meta">
@@ -3512,7 +3712,12 @@ const CreateSaleDocument = () => {
                 />
                 <div className="create-sale-document__field-inner">
                   <label>
-                    Склад {isWarehouseToRequired ? "отправитель" : ""} *
+                    {isMultiWarehouseOwnerDoc && !isWarehouseToRequired
+                      ? "Склад каталога"
+                      : `Склад ${isWarehouseToRequired ? "отправитель" : ""}`}
+                    {!isMultiWarehouseOwnerDoc || isWarehouseToRequired
+                      ? " *"
+                      : ""}
                   </label>
                   <SearchSelect
                     value={warehouse}
@@ -3524,7 +3729,11 @@ const CreateSaleDocument = () => {
                           )
                         : warehouseOptions
                     }
-                    placeholder="Выберите склад"
+                    placeholder={
+                      isMultiWarehouseOwnerDoc && !isWarehouseToRequired
+                        ? "Для каталога (необязательно)"
+                        : "Выберите склад"
+                    }
                   />
                 </div>
               </div>
@@ -3636,6 +3845,7 @@ const CreateSaleDocument = () => {
                   <tr>
                     <th>#</th>
                     <th>НАИМЕНОВАНИЕ</th>
+                    {isMultiWarehouseOwnerDoc ? <th>СКЛАД</th> : null}
                     <th>ЕД. ИЗМ.</th>
                     <th>
                       {docType === "INVENTORY" ? "ФАКТ. ОСТАТОК" : "КОЛ-ВО"}
@@ -3650,7 +3860,7 @@ const CreateSaleDocument = () => {
                   {filteredDocumentItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={isMultiWarehouseOwnerDoc ? 9 : 8}
                         className="create-sale-document__empty-table"
                       >
                         Нет товаров в документе
@@ -3686,6 +3896,14 @@ const CreateSaleDocument = () => {
                         <tr key={item.id || index}>
                           <td>{index + 1}</td>
                           <td title={itemName}>{itemName}</td>
+                          {isMultiWarehouseOwnerDoc ? (
+                            <td
+                              className="create-sale-document__cell-warehouse"
+                              title={item.warehouseName || ""}
+                            >
+                              {item.warehouseName || "—"}
+                            </td>
+                          ) : null}
                           <td>{(item.unit || "шт").toUpperCase()}</td>
                           <td>
                             <input
@@ -3700,7 +3918,11 @@ const CreateSaleDocument = () => {
                                 isStockLimitRequired &&
                                 item.stock != null &&
                                 item.stock > 0
-                                  ? `Остаток на складе: ${item.stock}`
+                                  ? `Остаток${
+                                      item.warehouseName
+                                        ? ` (${item.warehouseName})`
+                                        : ""
+                                    }: ${item.stock}`
                                   : undefined
                               }
                               placeholder={

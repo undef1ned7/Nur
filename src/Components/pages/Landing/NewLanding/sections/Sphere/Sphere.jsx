@@ -1,5 +1,17 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Factory,
+  LayoutGrid,
+  Scissors,
+  Stethoscope,
+  Store,
+  UtensilsCrossed,
+  Warehouse,
+  Wrench,
+} from "lucide-react";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import { useLandingIndustries } from "../../hooks/useLandingIndustries";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -17,16 +29,44 @@ const LANDING_SPHERE_NAMES = [
   "Производство",
   "Услуги",
   "Стоматология",
-  // "Старт Производство",
-  // "Подрядчики (Производство)",
 ];
 
-const getIndustryDescription = (industry) => {
-  if (industry.sectors?.length) {
-    return industry.sectors.map((sector) => sector.name).join(", ");
-  }
-  return "Индивидуальная настройка NurCRM под процессы вашего бизнеса.";
+/** Описания по фактическим модулям сфер в NurCRM (menuConfig + sector routes) */
+const SPHERE_DESCRIPTIONS = {
+  "Строительная сфера":
+    "Объекты и проекты, договоры, закупки, склад, продажи и зарплата — весь цикл стройки от сметы до сдачи в одной системе",
+  "Парикмахерские":
+    "Онлайн-запись, услуги, мастера и клиентская база — салон без очередей, потерянных номеров и хаоса в блокноте",
+  Кафе:
+    "Меню, заказы, кухня, столы, бронь и склад — зал, бар и кухня работают согласованно, без накладок по столам и блюдам",
+  Магазины:
+    "Товары, касса, смены, поставщики и аналитика — розница с точными остатками, документами и прозрачной выручкой",
+  Склад:
+    "Приход, отгрузки, документы, контрагенты и заявки агентов — оптовый учёт без Excel и потерянных накладных",
+  Производство:
+    "Каталог, склад, продажи, заявки и передача агентам — видите заказы и остатки, пока продукция ещё на линии",
+  Услуги:
+    "Записи, услуги, клиенты и сотрудники — для сервисных компаний, где каждый визит и заявка на счету",
+  Стоматология:
+    "Пациенты, приёмы, услуги и история лечения — клиника без потерянных записей и бумажных карточек",
 };
+
+const SPHERE_ICONS = {
+  "Строительная сфера": Building2,
+  "Парикмахерские": Scissors,
+  Кафе: UtensilsCrossed,
+  Магазины: Store,
+  Склад: Warehouse,
+  Производство: Factory,
+  Услуги: Wrench,
+  Стоматология: Stethoscope,
+};
+
+const getSphereDescription = (industryName) =>
+  SPHERE_DESCRIPTIONS[industryName] ??
+  "Индивидуальная настройка NurCRM под процессы вашего бизнеса.";
+
+const getSphereIcon = (industryName) => SPHERE_ICONS[industryName] ?? LayoutGrid;
 
 const Sphere = () => {
   const scrollToDemo = useScrollToDemo();
@@ -47,7 +87,8 @@ const Sphere = () => {
       .map((industry) => ({
         id: industry.id,
         title: industry.name,
-        text: getIndustryDescription(industry),
+        text: getSphereDescription(industry.name),
+        Icon: getSphereIcon(industry.name),
       }));
   }, [industries]);
 
@@ -79,8 +120,8 @@ const Sphere = () => {
             <span className="spheres__title-yellow">разных сфер</span> бизнеса
           </h2>
           <p className="spheres__subtitle">
-            NurCRM помогает управлять продажами, складом, кассой и аналитикой в
-            разных направлениях бизнеса.
+            Выбираете сферу — получаете готовый набор инструментов: клиенты, продажи,
+            склад, касса и отчёты уже настроены под ваш тип бизнеса.
           </p>
         </div>
 
@@ -130,12 +171,14 @@ const Sphere = () => {
               onResize={updateSwiperState}
               onBreakpoint={updateSwiperState}
             >
-              {sphereCards.map((card) => (
-                <SwiperSlide key={card.id} className="spheres__slide">
+              {sphereCards.map(({ id, title, text, Icon }) => (
+                <SwiperSlide key={id} className="spheres__slide">
                   <div className="spheres__card">
-                    <div className="spheres__card-icon" />
-                    <h3 className="spheres__card-title">{card.title}</h3>
-                    <p className="spheres__card-text">{card.text}</p>
+                    <div className="spheres__card-icon" aria-hidden="true">
+                      <Icon size={40} strokeWidth={1.75} />
+                    </div>
+                    <h3 className="spheres__card-title">{title}</h3>
+                    <p className="spheres__card-text">{text}</p>
                   </div>
                 </SwiperSlide>
               ))}
@@ -184,7 +227,7 @@ const Sphere = () => {
           <div className="spheres__footer-info">
             <h4 className="spheres__footer-title">Не нашли свою сферу?</h4>
             <p className="spheres__footer-text">
-              NurCrm можно адаптировать под ваш бизнес.
+              Подключим нужные модули и поможем настроить систему под ваши процессы.
             </p>
           </div>
           <button type="button" className="spheres__btn" onClick={scrollToDemo}>

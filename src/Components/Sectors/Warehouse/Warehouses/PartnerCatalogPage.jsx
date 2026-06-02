@@ -11,6 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import WarehouseHeader from "./components/WarehouseHeader";
+import PartnerCatalogSelectionBar from "./components/PartnerCatalogSelectionBar";
 import StockPartnershipTransferModal from "./components/StockPartnershipTransferModal";
 import Pagination from "./components/Pagination";
 import { usePagination } from "./hooks/usePagination";
@@ -71,10 +72,12 @@ const PartnerCatalogPage = () => {
   const [ownProductsLoading, setOwnProductsLoading] = useState(false);
   const prevDebouncedSearchRef = useRef(debouncedSearchTerm);
 
+  const [selectedProducts, setSelectedProducts] = useState(() => new Map());
   const [transferState, setTransferState] = useState({
     open: false,
     mode: DIRECTION.RECEIVE,
     product: null,
+    products: null,
     warehouseFromId: null,
   });
 
@@ -148,9 +151,14 @@ const PartnerCatalogPage = () => {
     loadCatalog();
   }, [dispatch, loadCatalog]);
 
+  const clearSelection = useCallback(() => {
+    setSelectedProducts(new Map());
+  }, []);
+
   useEffect(() => {
     setProductSearch("");
     setSelectedWarehouseId("");
+    clearSelection();
     setOwnProducts({
       list: [],
       count: 0,
@@ -165,7 +173,11 @@ const PartnerCatalogPage = () => {
       },
       { replace: true },
     );
-  }, [direction, partnerId, setProductSearch, setSearchParams]);
+  }, [direction, partnerId, setProductSearch, setSearchParams, clearSelection]);
+
+  useEffect(() => {
+    clearSelection();
+  }, [selectedWarehouseId, clearSelection]);
 
   useEffect(() => {
     if (!selectedWarehouseId && activeWarehouses.length > 0) {
@@ -291,7 +303,25 @@ const PartnerCatalogPage = () => {
   };
 
   const openTransfer = (mode, product, warehouseFromId) => {
-    setTransferState({ open: true, mode, product, warehouseFromId });
+    setTransferState({
+      open: true,
+      mode,
+      product,
+      products: null,
+      warehouseFromId,
+    });
+  };
+
+  const openBulkTransfer = () => {
+    const items = Array.from(selectedProducts.values());
+    if (items.length === 0) return;
+    setTransferState({
+      open: true,
+      mode: isReceive ? DIRECTION.RECEIVE : DIRECTION.SEND,
+      product: null,
+      products: items,
+      warehouseFromId: selectedWarehouseId,
+    });
   };
 
   const closeTransfer = () => {
@@ -299,11 +329,13 @@ const PartnerCatalogPage = () => {
       open: false,
       mode: DIRECTION.RECEIVE,
       product: null,
+      products: null,
       warehouseFromId: null,
     });
   };
 
   const handleTransferred = async (mode, warehouseFromId) => {
+    clearSelection();
     await loadCatalog();
     if (mode === DIRECTION.SEND && warehouseFromId) {
       await loadOwnWarehouseProducts(
@@ -312,6 +344,56 @@ const PartnerCatalogPage = () => {
         debouncedSearchTerm,
       );
     }
+  };
+
+  const toggleProductSelection = (product) => {
+    const key = String(product.id);
+    setSelectedProducts((prev) => {
+      const next = new Map(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.set(key, product);
+      }
+      return next;
+    });
+  };
+
+  const transferableOnPage = useMemo(
+    () => displayProducts.filter((p) => getProductQty(p) > 0),
+    [displayProducts],
+  );
+
+  const selectedCount = selectedProducts.size;
+
+  const allPageSelected = useMemo(() => {
+    if (transferableOnPage.length === 0) return false;
+    return transferableOnPage.every((p) =>
+      selectedProducts.has(String(p.id)),
+    );
+  }, [transferableOnPage, selectedProducts]);
+
+  const somePageSelected = useMemo(
+    () =>
+      transferableOnPage.some((p) => selectedProducts.has(String(p.id))) &&
+      !allPageSelected,
+    [transferableOnPage, selectedProducts, allPageSelected],
+  );
+
+  const handleSelectAllOnPage = () => {
+    if (allPageSelected) {
+      setSelectedProducts((prev) => {
+        const next = new Map(prev);
+        transferableOnPage.forEach((p) => next.delete(String(p.id)));
+        return next;
+      });
+      return;
+    }
+    setSelectedProducts((prev) => {
+      const next = new Map(prev);
+      transferableOnPage.forEach((p) => next.set(String(p.id), p));
+      return next;
+    });
   };
 
   const handleBack = () => {
@@ -398,11 +480,39 @@ const PartnerCatalogPage = () => {
 
     return (
       <>
+        <div className="partner-catalog-howto">
+          <strong>Как переместить несколько товаров:</strong> отметьте галочками нужные
+          позиции (можно на разных страницах списка), затем нажмите кнопку внизу экрана.
+          Для одного товара можно сразу нажать кнопку в строке.
+        </div>
+
+        {selectedCount > 0 && (
+          <p className="partner-catalog-selection-note">
+            В корзине обмена: {selectedCount}{" "}
+            {selectedCount === 1 ? "товар" : selectedCount < 5 ? "товара" : "товаров"}
+            {totalPages > 1 ? " (выбор сохраняется при перелистывании)" : ""}
+          </p>
+        )}
+
         <div className="warehouse-table-container w-full partner-catalog-products">
           <div className="warehouse-table-scroll warehouse-table-scroll--catalog">
             <table className="warehouse-table warehouse-partnership-products">
               <thead>
                 <tr>
+                  <th className="partner-catalog-table__check-col">
+                    <input
+                      type="checkbox"
+                      className="partner-catalog-table__checkbox"
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected;
+                      }}
+                      onChange={handleSelectAllOnPage}
+                      disabled={transferableOnPage.length === 0}
+                      aria-label="Выбрать все товары на странице"
+                      title="Выбрать все на этой странице"
+                    />
+                  </th>
                   <th>Товар</th>
                   <th>Артикул</th>
                   <th>Остаток</th>
@@ -413,8 +523,27 @@ const PartnerCatalogPage = () => {
                 {displayProducts.map((p) => {
                   const qty = getProductQty(p);
                   const canTransfer = qty > 0;
+                  const isSelected = selectedProducts.has(String(p.id));
                   return (
-                    <tr key={p.id}>
+                    <tr
+                      key={p.id}
+                      className={isSelected ? "partner-catalog-table__row--selected" : ""}
+                    >
+                      <td className="partner-catalog-table__check-col">
+                        <input
+                          type="checkbox"
+                          className="partner-catalog-table__checkbox"
+                          checked={isSelected}
+                          disabled={!canTransfer}
+                          onChange={() => toggleProductSelection(p)}
+                          aria-label={`Выбрать ${p.name || "товар"}`}
+                          title={
+                            canTransfer
+                              ? "Добавить в корзину обмена"
+                              : "Нет остатка для перемещения"
+                          }
+                        />
+                      </td>
                       <td className="warehouse-table__name">{p.name}</td>
                       <td>{p.article || "—"}</td>
                       <td>
@@ -434,7 +563,7 @@ const PartnerCatalogPage = () => {
                               )
                             }
                           >
-                            Забрать к себе
+                            Забрать
                           </button>
                         ) : (
                           <button
@@ -449,7 +578,7 @@ const PartnerCatalogPage = () => {
                               )
                             }
                           >
-                            Отправить партнёру
+                            Отправить
                           </button>
                         )}
                       </td>
@@ -475,7 +604,9 @@ const PartnerCatalogPage = () => {
   };
 
   return (
-    <div className="warehouse-page partner-catalog-page">
+    <div
+      className={`warehouse-page partner-catalog-page${selectedCount > 0 ? " partner-catalog-page--has-selection" : ""}`}
+    >
       <WarehouseHeader
         onBack={handleBack}
         title={`Обмен с «${partnerName}»`}
@@ -499,7 +630,7 @@ const PartnerCatalogPage = () => {
             Забрать у партнёра
           </span>
           <span className="partner-catalog-direction-card__desc">
-            Выберите товар со склада партнёра — он поступит на ваш склад
+            Отметьте один или несколько товаров со склада партнёра — они поступят на ваш склад
           </span>
           <span className="partner-catalog-direction-card__flow">
             <span className="partner-catalog-direction-card__flow-badge">
@@ -524,7 +655,7 @@ const PartnerCatalogPage = () => {
             Отдать партнёру
           </span>
           <span className="partner-catalog-direction-card__desc">
-            Выберите товар со своего склада — он поступит на склад партнёра
+            Отметьте один или несколько товаров со своего склада — они поступят партнёру
           </span>
           <span className="partner-catalog-direction-card__flow">
             <span className="partner-catalog-direction-card__flow-badge">
@@ -545,10 +676,10 @@ const PartnerCatalogPage = () => {
               <strong>1.</strong> Выберите склад партнёра
             </span>
             <span>
-              <strong>2.</strong> Найдите нужный товар
+              <strong>2.</strong> Отметьте товары галочками или нажмите «Забрать» в строке
             </span>
             <span>
-              <strong>3.</strong> Нажмите «Забрать к себе» и укажите свой склад
+              <strong>3.</strong> Укажите свой склад-получатель и количество
             </span>
           </>
         ) : (
@@ -557,11 +688,10 @@ const PartnerCatalogPage = () => {
               <strong>1.</strong> Выберите свой склад
             </span>
             <span>
-              <strong>2.</strong> Найдите товар для отправки
+              <strong>2.</strong> Отметьте товары галочками или нажмите «Отправить» в строке
             </span>
             <span>
-              <strong>3.</strong> Нажмите «Отправить партнёру» и выберите склад
-              получателя
+              <strong>3.</strong> Выберите склад партнёра и количество по каждой позиции
             </span>
           </>
         )}
@@ -644,11 +774,23 @@ const PartnerCatalogPage = () => {
 
       {renderProductsTable()}
 
+      {selectedCount > 0 && (
+        <div className="partner-catalog-selection-spacer" aria-hidden="true" />
+      )}
+
+      <PartnerCatalogSelectionBar
+        selectedCount={selectedCount}
+        isReceive={isReceive}
+        onContinue={openBulkTransfer}
+        onClear={clearSelection}
+      />
+
       <StockPartnershipTransferModal
         mode={transferState.mode}
         open={transferState.open}
         onClose={closeTransfer}
         product={transferState.product}
+        products={transferState.products}
         warehouseFromId={transferState.warehouseFromId}
         partnerCompanyName={partnerName}
         targetWarehouses={

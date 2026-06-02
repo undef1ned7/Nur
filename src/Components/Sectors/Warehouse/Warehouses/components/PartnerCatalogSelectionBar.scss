@@ -1,0 +1,122 @@
+$sidebar-width: 250px;
+
+.partner-catalog-selection-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+  pointer-events: none;
+
+  /* Не заходить на сайдбар (как у .App { padding-left: 250px }) */
+  @media (min-width: 769px) {
+    .App:not(.sidebar-collapsed) & {
+      left: $sidebar-width;
+    }
+  }
+
+  &__inner {
+    pointer-events: auto;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+  }
+
+  &__info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #2563eb;
+    font-size: 14px;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__continue {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+
+    &--receive {
+      background: #2563eb;
+
+      &:hover {
+        background: #1d4ed8;
+      }
+    }
+
+    &--send {
+      background: #059669;
+
+      &:hover {
+        background: #047857;
+      }
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .partner-catalog-selection-bar__inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .partner-catalog-selection-bar__continue {
+    justify-content: center;
+  }
+}

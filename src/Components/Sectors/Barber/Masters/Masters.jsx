@@ -17,6 +17,10 @@ import DeleteRoleModal from "./modals/DeleteRoleModal";
 import DeleteEmployeeModal from "./modals/DeleteEmployeeModal";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import { convertEmployeeAccessesToLabels } from "./employeeAccessLabels";
+import {
+  employPayrollDetailPath,
+  isSaleEmployeePayrollSector,
+} from "./saleEmployeePayroll";
 import "./Masters.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
@@ -299,7 +303,7 @@ const Masters = () => {
 
   const sectorName = String(company?.sector?.name || "").trim();
   const isCafeSector = sectorName === "Кафе";
-  const isMarketSector = sectorName === "Маркет" || sectorName === "Магазин";
+  const isSalePayrollSector = isSaleEmployeePayrollSector(sectorName);
 
   const copyToClipboard = async (text, key) => {
     if (!text) return;
@@ -1123,9 +1127,9 @@ const Masters = () => {
               const roleLabel = resolveEmployeeRoleLabel(u, roleById);
               const cafeOpenDetail =
                 isCafeSector && u.role !== "owner";
-              const marketOpenDetail =
-                isMarketSector && u.role !== "owner";
-              const openDetail = cafeOpenDetail || marketOpenDetail;
+              const salePayrollOpenDetail =
+                isSalePayrollSector && u.role !== "owner";
+              const openDetail = cafeOpenDetail || salePayrollOpenDetail;
               return (
                 <article key={u.id} className="barbermasters__card">
                   <div
@@ -1143,9 +1147,10 @@ const Masters = () => {
                       openDetail
                         ? () =>
                             navigate(
-                              marketOpenDetail
-                                ? `/crm/employ/market/${u.id}`
-                                : `/crm/employ/${u.id}`,
+                              cafeOpenDetail
+                                ? `/crm/employ/${u.id}`
+                                : employPayrollDetailPath(sectorName, u.id) ||
+                                    "/crm/employ",
                             )
                         : undefined
                     }
@@ -1155,9 +1160,10 @@ const Masters = () => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
                               navigate(
-                                marketOpenDetail
-                                  ? `/crm/employ/market/${u.id}`
-                                  : `/crm/employ/${u.id}`,
+                                cafeOpenDetail
+                                  ? `/crm/employ/${u.id}`
+                                  : employPayrollDetailPath(sectorName, u.id) ||
+                                      "/crm/employ",
                               );
                             }
                           }

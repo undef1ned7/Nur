@@ -135,11 +135,18 @@
     &-icon {
       width: 90px;
       height: 90px;
-      background: #fff;
+      background: rgba(242, 183, 5, 0.12);
       border-radius: 50%;
       margin: 0 auto 35px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f2b705;
+
+      svg {
+        flex-shrink: 0;
+      }
     }
 
     &-title {
