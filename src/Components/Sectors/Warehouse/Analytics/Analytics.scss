@@ -793,3 +793,48 @@
     margin-bottom: 0;
   }
 }
+
+/* Partner analytics */
+.warehouse-analytics__subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--wa-muted);
+}
+
+.partner-analytics__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--wa-muted);
+  text-decoration: none;
+}
+
+.partner-analytics__back:hover {
+  color: var(--wa-text);
+}
+
+.partner-analytics__row--clickable {
+  cursor: pointer;
+}
+
+.partner-analytics__row--clickable:hover {
+  background: #f9fafb;
+}
+
+.partner-analytics__row--clickable:focus-visible {
+  outline: 2px solid var(--wa-primary);
+  outline-offset: -2px;
+}
+
+.partner-analytics__arrow {
+  width: 40px;
+  text-align: center;
+  color: var(--wa-muted);
+}
+
+.partner-analytics__table th,
+.partner-analytics__table td {
+  white-space: nowrap;
+}

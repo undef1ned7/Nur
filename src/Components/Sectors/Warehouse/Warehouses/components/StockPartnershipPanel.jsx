@@ -313,6 +313,15 @@ const StockPartnershipPanel = () => {
           <button type="button" className={`warehouse-partnership-tab ${subTab === "partners" ? "active" : ""}`} onClick={() => setSubTab("partners")}>Партнёры</button>
         </div>
         <div className="warehouse-partnership__actions">
+          {isOwnerOrAdmin && subTab === "partners" && (
+            <button
+              type="button"
+              className="warehouse-table__action-btn"
+              onClick={() => navigate("/crm/warehouse/partners/analytics")}
+            >
+              Аналитика партнёров
+            </button>
+          )}
           <button type="button" className="warehouse-header__create-btn" onClick={() => setShowInvite(true)}><Plus size={16} /> Пригласить</button>
           <button type="button" className="warehouse-partnership-refresh" onClick={loadAll} disabled={loading}><RefreshCw size={18} /></button>
         </div>
@@ -332,9 +341,29 @@ const StockPartnershipPanel = () => {
                   <td>{idx + 1}</td>
                   <td className="warehouse-table__name">{p.name || "—"}</td>
                   <td>
-                    <button type="button" className="warehouse-table__action-btn" onClick={() => openPartnerCatalog(p)}>
-                      Обмен товарами
-                    </button>
+                    <div className="warehouse-partnership-row-actions">
+                      <button
+                        type="button"
+                        className="warehouse-table__action-btn"
+                        onClick={() => openPartnerCatalog(p)}
+                      >
+                        Обмен товарами
+                      </button>
+                      {isOwnerOrAdmin && (
+                        <button
+                          type="button"
+                          className="warehouse-table__action-btn"
+                          onClick={() =>
+                            navigate(
+                              `/crm/warehouse/partners/${p.id}/analytics`,
+                              { state: { partnerName: p.name } },
+                            )
+                          }
+                        >
+                          Аналитика
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

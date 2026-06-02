@@ -3035,6 +3035,45 @@ export const getOwnerAgentAnalytics = async (agentId, params = {}) => {
   }
 };
 
+/**
+ * Сводная аналитика по всем компаниям-партнёрам (склад).
+ * GET /api/warehouse/owner/partners/analytics/
+ */
+export const getOwnerPartnersAnalytics = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/owner/partners/analytics/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Owner Partners Analytics Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Детальная аналитика одного партнёра (формат как owner/analytics/).
+ * GET /api/warehouse/owner/partners/{partnerCompanyId}/analytics/
+ */
+export const getOwnerPartnerAnalytics = async (partnerCompanyId, params = {}) => {
+  try {
+    const response = await api.get(
+      `warehouse/owner/partners/${partnerCompanyId}/analytics/`,
+      { params },
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Owner Partner Analytics Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 export default {
   // Документы
   listDocuments,
@@ -3160,6 +3199,8 @@ export default {
   getOwnerAnalytics,
   getAgentMeAnalytics,
   getOwnerAgentAnalytics,
+  getOwnerPartnersAnalytics,
+  getOwnerPartnerAnalytics,
   // Контрагенты (2.4)
   listCounterparties,
   getCounterpartyById,

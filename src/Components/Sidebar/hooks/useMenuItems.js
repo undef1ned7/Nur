@@ -131,10 +131,20 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     }
 
     const filteredItems = sectorConfig.filter((item) => {
-      if ('production' === configKey && item.permission === 'can_view_catalog' && profile?.role === 'owner') return true
-      return hasPermission(item.permission)
-    }
-    );
+      if (item.ownerAdminOnly) {
+        const isOwnerOrAdmin =
+          profile?.role === "owner" || profile?.role === "admin";
+        if (!isOwnerOrAdmin) return false;
+      }
+      if (
+        "production" === configKey &&
+        item.permission === "can_view_catalog" &&
+        profile?.role === "owner"
+      ) {
+        return true;
+      }
+      return hasPermission(item.permission);
+    });
 
     return filteredItems;
   }, [sector, company, hasPermission, profile, tariff]);
