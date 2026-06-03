@@ -14,6 +14,10 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import {
+  formatLineQtyDisplay,
+  formatMenuPriceHint,
+} from "../../cafeMenuWeight";
 import api from "../../../../../api";
 
 const PAGE_SIZE = 100;
@@ -410,12 +414,13 @@ export const RightMenuPanel = ({
         {paginatedItems.map((m) => {
           const img = menuImageUrl?.(m.id);
           const cartItem = isCart(m.id);
+          const isWeight = !!m?.is_sold_by_weight;
           const rawQty = cartItem?.quantity;
           const cartQty =
             rawQty === ""
               ? "—"
               : cartItem
-                ? Math.max(0, Math.floor(Number(rawQty)) || 0)
+                ? formatLineQtyDisplay(rawQty, m?.sale_unit, isWeight)
                 : 0;
           return (
             <button
@@ -435,7 +440,7 @@ export const RightMenuPanel = ({
               <span className="cafeOrdersRpanel__meta">
                 <span className="cafeOrdersRpanel__name">{m.title}</span>
                 <span className="cafeOrdersRpanel__price">
-                  {fmtMoney?.(m.price)} сом
+                  {formatMenuPriceHint(m.price, m)}
                 </span>
               </span>
 

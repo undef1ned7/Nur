@@ -27,6 +27,10 @@ import { useOutletContext } from "react-router-dom";
 import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  formatKitchenTaskQty,
+  kitchenTaskQtyNum,
+} from "../cafeMenuWeight";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -122,13 +126,7 @@ const extractMenuTitleFromTask = (t) =>
     )
   ).trim();
 
-const extractPortionsFromTask = (t) =>
-  Math.max(
-    1,
-    Number(
-      firstDefined(t?.quantity, t?.qty, t?.count, t?.portions, t?.amount, 1)
-    ) || 1
-  );
+const extractPortionsFromTask = (t) => kitchenTaskQtyNum(t) || 1;
 
 const tryFetchTaskDetail = async (taskId) => {
   const id = String(taskId || "");
@@ -1017,6 +1015,7 @@ const Cook = () => {
                     formatReceiptDate={formatReceiptDate}
                     getStatusLabel={getStatusLabel}
                     extractPortionsFromTask={extractPortionsFromTask}
+                    formatKitchenTaskQty={formatKitchenTaskQty}
                     toNum={toNum}
                     isUpdating={(id) => isUpdating(id)}
                     onClaimOne={handleClaimOne}

@@ -11,6 +11,10 @@ import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCom
 import KitchenCreateModal from "../Cook/components/KitchenCreateModal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  menuPriceFieldLabel,
+  normalizeMenuWeightFields,
+} from "../cafeMenuWeight";
 import "./Menu.scss";
 
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
@@ -63,13 +67,18 @@ const normalizeIngredientRows = (rows) =>
     };
   });
 
-const buildFormFromDetail = (detail, fallbackCategory = "") => ({
-  title: detail?.title || "",
-  category: detail?.category || String(fallbackCategory || ""),
-  kitchen: detail?.kitchen ? String(detail.kitchen) : "",
-  price: String(detail?.price ?? "0").replace(",", "."),
-  is_active: !!detail?.is_active,
-});
+const buildFormFromDetail = (detail, fallbackCategory = "") => {
+  const weight = normalizeMenuWeightFields(detail);
+  return {
+    title: detail?.title || "",
+    category: detail?.category || String(fallbackCategory || ""),
+    kitchen: detail?.kitchen ? String(detail.kitchen) : "",
+    price: String(detail?.price ?? "0").replace(",", "."),
+    is_active: !!detail?.is_active,
+    is_sold_by_weight: weight.is_sold_by_weight,
+    sale_unit: weight.sale_unit,
+  };
+};
 
 const EMPTY_FORM = {
   title: "",
@@ -77,6 +86,8 @@ const EMPTY_FORM = {
   kitchen: "",
   price: "0",
   is_active: true,
+  is_sold_by_weight: false,
+  sale_unit: "kg",
 };
 
 export default function CafeMenuItemPage() {
@@ -596,6 +607,12 @@ export default function CafeMenuItemPage() {
         ),
       ),
       is_active: !!form.is_active,
+      is_sold_by_weight: !!form.is_sold_by_weight,
+      sale_unit: form.is_sold_by_weight
+        ? form.sale_unit === "g"
+          ? "g"
+          : "kg"
+        : "kg",
     };
 
     if (!payload.title || !payload.category) return null;
@@ -628,6 +645,11 @@ export default function CafeMenuItemPage() {
         if (payload.kitchen) formData2.append("kitchen", payload.kitchen);
         formData2.append("price", payload.price);
         formData2.append("is_active", payload.is_active ? "true" : "false");
+        formData2.append(
+          "is_sold_by_weight",
+          payload.is_sold_by_weight ? "true" : "false",
+        );
+        formData2.append("sale_unit", payload.sale_unit);
         formData2.append("image", imageFile);
 
         await api.put(
@@ -837,7 +859,9 @@ export default function CafeMenuItemPage() {
                     </div>
 
                     <div className="cafeMenu__field">
-                      <label className="cafeMenu__label">Цена, сом</label>
+                      <label className="cafeMenu__label">
+                        {menuPriceFieldLabel(form)}
+                      </label>
                       <input
                         className="cafeMenu__input"
                         value={priceValue}
@@ -846,12 +870,48 @@ export default function CafeMenuItemPage() {
                             price: formatDecimalInput(e.target.value),
                           })
                         }
-                        placeholder="Например: 250"
+                        placeholder={
+                          form?.is_sold_by_weight ? "Например: 1200" : "Например: 250"
+                        }
                         type="text"
                         inputMode="decimal"
                         autoComplete="off"
                         required
                       />
+                    </div>
+
+                    <div className="cafeMenu__field">
+                      <label className="cafeMenu__check">
+                        <input
+                          type="checkbox"
+                          checked={!!form?.is_sold_by_weight}
+                          onChange={(e) =>
+                            updateField({
+                              is_sold_by_weight: e.target.checked,
+                              sale_unit: form.sale_unit === "g" ? "g" : "kg",
+                            })
+                          }
+                        />
+                        <span>Продаётся на вес</span>
+                      </label>
+                      {form?.is_sold_by_weight ? (
+                        <select
+                          className="cafeMenu__input cafeMenuItemPage__saleUnit"
+                          value={form.sale_unit === "g" ? "g" : "kg"}
+                          onChange={(e) =>
+                            updateField({ sale_unit: e.target.value })
+                          }
+                        >
+                          <option value="kg">килограммы (кг)</option>
+                          <option value="g">граммы (г)</option>
+                        </select>
+                      ) : null}
+                      {form?.is_sold_by_weight ? (
+                        <div className="cafeMenu__hint">
+                          В заказе официант укажет вес (например 1.5 кг). Сумма =
+                          вес × цена за единицу.
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="cafeMenu__field">
