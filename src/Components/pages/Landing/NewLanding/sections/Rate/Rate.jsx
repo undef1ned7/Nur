@@ -1,4 +1,5 @@
 import LandingImg from "../../components/LandingImg";
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import "./Rate.scss";
 import iconbutton from "./img/iconbutton.svg";
 import blur from "./img/blur.svg";
@@ -6,9 +7,9 @@ import blur from "./img/blur.svg";
 const PLANS = [
   {
     id: "start",
-    title: "Стандарт",
+    title: "Старт",
     subtitle: "Для старта и небольших команд",
-    price: "499c",
+    price: "от 1200",
     note: "Лучший выбор для старта",
     features: [
       "CRM система",
@@ -19,25 +20,25 @@ const PLANS = [
     variant: "default",
   },
   {
-    id: "growth",
+    id: "standard",
     title: "Стандарт",
     subtitle: "Для растущего бизнеса",
-    price: "2990с",
-    note: "Бльше возможностей для роста",
+    price: "от 3500",
+    note: "Больше возможностей для роста",
     features: [
       "Автоматизация процессов",
-      "Все из тарифа “Старт”",
+      "Все из тарифа «Старт»",
       "Расширенная аналитика",
-      "И еще что то",
+      "Приоритетная поддержка",
     ],
     variant: "hit",
   },
   {
-    id: "enterprise",
-    title: "Стандарт",
+    id: "business",
+    title: "Бизнес",
     subtitle: "Для крупных компаний",
-    price: "9990с",
-    note: "Бльше возможностей для роста",
+    price: "от 8000",
+    note: "Максимум возможностей",
     features: [
       "Расширенные права доступа",
       "Обучение и внедрение",
@@ -56,6 +57,8 @@ const FeatureItem = ({ text }) => (
 );
 
 const Rate = () => {
+  const scrollToDemo = useScrollToDemo();
+
   return (
     <section id="tariff" className="rate">
       <div className="rate__container new-container">
@@ -90,7 +93,7 @@ const Rate = () => {
                 <p className="rate__cart__description">{plan.subtitle}</p>
                 <p className="rate__cart__price">
                   <span className="rate__cart__price-num">{plan.price}</span>
-                  <span className="rate__cart__price-month">/мес.</span>
+                  <span className="rate__cart__price-month"> сом/мес.</span>
                 </p>
                 <p className="rate__cart__description">{plan.note}</p>
                 <div className="rate__cart__features">
@@ -105,6 +108,7 @@ const Rate = () => {
                       ? "rate__cart__button rate__cart__button1"
                       : "rate__cart__button"
                   }
+                  onClick={scrollToDemo}
                 >
                   Попробовать бесплатно
                 </button>

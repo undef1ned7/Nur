@@ -70,11 +70,11 @@ const NewLanding = () => {
             <Included />
           </Suspense>
         </LazySection>
-        <LazySection sectionId="team" minHeight={480}>
+        {/* <LazySection sectionId="team" minHeight={480}>
           <Suspense fallback={null}>
             <Team />
           </Suspense>
-        </LazySection>
+        </LazySection> */}
         <LazySection minHeight={420}>
           <Suspense fallback={null}>
             <Base />

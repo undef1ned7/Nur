@@ -1,4 +1,5 @@
 import LandingImg from "../../components/LandingImg";
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import "./Base.scss";
 import img from "./img/img.svg";
 import btn from "./img/btn.svg";
@@ -7,6 +8,8 @@ import line2 from "./img/line2.svg";
 import blur from "./img/blur.svg";
 
 const Base = () => {
+  const scrollToDemo = useScrollToDemo();
+
   return (
     <section className="base">
       <div className="base__container new-container">
@@ -23,7 +26,11 @@ const Base = () => {
               Подробные видеоуроки и инструкции помогут быстро осваоить и
               использовать ее на максимум
             </p>
-            <button type="button" className="base__content__left__btn">
+            <button
+              type="button"
+              className="base__content__left__btn"
+              onClick={scrollToDemo}
+            >
               Перейти к базе знаний ⭢
             </button>
           </div>

@@ -47,6 +47,17 @@ export const weightQtyStep = (unit) => (unit === "g" ? 50 : 0.1);
 
 export const defaultWeightQty = (unit) => (unit === "g" ? "100" : "1");
 
+/** Промежуточный ввод веса (0 → 0.7), пока значение ещё ниже минимума. */
+export const isWeightQtyTypingInProgress = (cleaned, saleUnit = "kg") => {
+  if (cleaned === "" || isIncompleteDecimalInput(cleaned)) return true;
+  if (cleaned === "0") return true;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return false;
+  const min = minWeightQty(saleUnit);
+  if (n < min && String(cleaned).includes(".")) return true;
+  return false;
+};
+
 export const parseWeightQtyInput = (
   raw,
   max = Number.MAX_SAFE_INTEGER,
@@ -57,7 +68,7 @@ export const parseWeightQtyInput = (
     .trim();
   if (cleaned === "") return "";
   if (!DECIMAL_INPUT_PATTERN.test(cleaned)) return null;
-  if (isIncompleteDecimalInput(cleaned)) return cleaned;
+  if (isWeightQtyTypingInProgress(cleaned, saleUnit)) return cleaned;
   const n = roundWeightQty(Number(cleaned));
   const min = minWeightQty(saleUnit);
   if (!Number.isFinite(n) || n < min) return "";
@@ -152,7 +163,7 @@ export const parseReturnQtyInput = (raw, maxRefund, isWeight, saleUnit = "kg") =
       .trim();
     if (cleaned === "") return "";
     if (!DECIMAL_INPUT_PATTERN.test(cleaned)) return null;
-    if (isIncompleteDecimalInput(cleaned)) return cleaned;
+    if (isWeightQtyTypingInProgress(cleaned, saleUnit)) return cleaned;
     const n = roundWeightQty(Number(cleaned));
     const min = minWeightQty(saleUnit);
     if (!Number.isFinite(n) || n < min) return "";
