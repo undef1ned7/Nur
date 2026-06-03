@@ -25,6 +25,28 @@ import RecordaServicesPicker from "./RecordaServicesPicker";
 import RecordaMiniClientModal from "./RecordaMiniClientModal";
 import RecordaTimeSlots from "./RecordaTimeSlots";
 
+const serviceBarberIds = (service) => {
+  if (!service) return [];
+  if (Array.isArray(service.barbers) && service.barbers.length) {
+    return service.barbers.map(String);
+  }
+  return [];
+};
+
+const barberCanDoService = (barberId, service) => {
+  const ids = serviceBarberIds(service);
+  if (!ids.length) return true;
+  return ids.includes(String(barberId));
+};
+
+const barberCanDoAllServices = (barberId, serviceList, serviceIds) => {
+  if (!serviceIds.length) return true;
+  return serviceIds.every((sid) => {
+    const svc = serviceList.find((s) => String(s.id) === String(sid));
+    return barberCanDoService(barberId, svc);
+  });
+};
+
 /* ===== основной модальный компонент ===== */
 const RecordaModal = ({
   isOpen,
@@ -45,7 +67,6 @@ const RecordaModal = ({
   // форма - НОВЫЙ ПОРЯДОК: Сотрудник → Услуги → Дата/Время → Клиент
   const [selBarber, setSelBarber] = useState("");
   const [selServices, setSelServices] = useState([]);
-  console.log('48', selServices);
   
   const [startDate, setStartDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState("");
@@ -143,7 +164,7 @@ const RecordaModal = ({
     [clients]
   );
 
-  const serviceItems = useMemo(
+  const allServiceItems = useMemo(
     () =>
       services
         .filter((s) => s.active)
@@ -156,9 +177,46 @@ const RecordaModal = ({
           price: Number.isFinite(Number(s.price)) ? Number(s.price) : null,
           minutes: Number(s.minutes ?? s.time ?? 0),
           categoryName: s.category_name || "",
+          barbers: serviceBarberIds(s),
         })),
     [services]
   );
+
+  const serviceItems = useMemo(() => {
+    if (!selBarber) return allServiceItems;
+    return allServiceItems.filter((it) => {
+      if (!it.barbers.length) return true;
+      return it.barbers.includes(String(selBarber));
+    });
+  }, [allServiceItems, selBarber]);
+
+  const filteredBarbers = useMemo(() => {
+    if (!selServices.length) return barbers;
+    return barbers.filter((b) =>
+      barberCanDoAllServices(b.id, services, selServices)
+    );
+  }, [barbers, selServices, services]);
+
+  const handleBarberChange = (id) => {
+    const nextId = id ? String(id) : "";
+    setSelBarber(nextId);
+    if (!nextId) return;
+    setSelServices((prev) =>
+      prev.filter((sid) => {
+        const svc = services.find((s) => String(s.id) === String(sid));
+        return barberCanDoService(nextId, svc);
+      })
+    );
+  };
+
+  const handleServicesChange = (ids) => {
+    const next = Array.isArray(ids) ? ids.map(String) : [];
+    setSelServices(next);
+    if (!selBarber || !next.length) return;
+    if (!barberCanDoAllServices(selBarber, services, next)) {
+      setSelBarber("");
+    }
+  };
 
   const statusItems = useMemo(
     () =>
@@ -174,7 +232,7 @@ const RecordaModal = ({
     let totalMinutes = 0;
     let totalPrice = 0;
     selServices.forEach((id) => {
-      const it = serviceItems.find((s) => String(s.id) === String(id));
+      const it = allServiceItems.find((s) => String(s.id) === String(id));
       if (it) {
         totalMinutes += it.minutes || 0;
         if (Number.isFinite(it.price)) totalPrice += it.price;
@@ -185,7 +243,7 @@ const RecordaModal = ({
       totalPrice,
       count: selServices.length,
     };
-  }, [selServices, serviceItems]);
+  }, [selServices, allServiceItems]);
 
   const basePrice = servicesSummary.totalPrice || 0;
 
@@ -257,7 +315,7 @@ const RecordaModal = ({
 
   const barberItems = useMemo(() => {
     const busy = busyBarbersOnInterval;
-    const arr = barbers.map((b) => {
+    const arr = filteredBarbers.map((b) => {
       const isBusy = busy.has(String(b.id));
       return {
         id: String(b.id),
@@ -275,16 +333,16 @@ const RecordaModal = ({
         a.label.localeCompare(b.label, "ru")
     );
     return arr;
-  }, [barbers, busyBarbersOnInterval]);
+  }, [filteredBarbers, busyBarbersOnInterval]);
 
   // Простые barberItems без статуса занятости (для начального выбора)
   const simpleBarberItems = useMemo(() => {
-    return barbers.map((b) => ({
+    return filteredBarbers.map((b) => ({
       id: String(b.id),
       label: b.name,
       search: b.name,
     })).sort((a, b) => a.label.localeCompare(b.label, "ru"));
-  }, [barbers]);
+  }, [filteredBarbers]);
 
   /* strict setters */
   const setStartStrict = (v) => {
@@ -603,7 +661,7 @@ const RecordaModal = ({
                     mode="single"
                     items={selServices.length && startTime ? barberItems : simpleBarberItems}
                     selectedId={selBarber}
-                    onChange={(id) => setSelBarber(String(id))}
+                    onChange={handleBarberChange}
                     placeholder="Поиск мастера..."
                     placeholderSelected="Выберите мастера"
                     renderMeta={false}
@@ -623,7 +681,7 @@ const RecordaModal = ({
                   <RecordaServicesPicker
                     items={serviceItems}
                     selectedIds={selServices}
-                    onChange={setSelServices}
+                    onChange={handleServicesChange}
                     summary={servicesSummary}
                   />
                 </div>
