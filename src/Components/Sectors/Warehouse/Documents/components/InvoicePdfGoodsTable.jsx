@@ -1,7 +1,12 @@
 import React from "react";
 import { Text, View } from "@react-pdf/renderer";
 import { invoicePdfStyles as s } from "./invoicePdfDocumentStyles";
-import { fmtQty, goodsRowKey, n2 } from "./invoicePdfDocumentUtils";
+import {
+  fmtDiscountPct,
+  fmtQty,
+  goodsRowKey,
+  n2,
+} from "./invoicePdfDocumentUtils";
 
 function HeaderCell({ style, children, align, isLast }) {
   return (
@@ -23,20 +28,62 @@ function DataCell({ style, children, align, isLast }) {
 
 function buildPriceColumns() {
   return {
-    keys: ["no", "art", "name", "qty", "unit", "price", "sum"],
-    headers: ["п/п", "Артикул", "Название", "Кол-во", "Ед.", "Цена", "Сумма"],
-    styles: [s.colNo, s.colArt, s.colName, s.colQty, s.colUnit, s.colPrice, s.colSum],
-    aligns: ["center", "left", "left", "right", "center", "right", "right"],
+    keys: [
+      "no",
+      "art",
+      "name",
+      "qty",
+      "unit",
+      "priceNoDisc",
+      "discount",
+      "price",
+      "sum",
+    ],
+    headers: [
+      "п/п",
+      "Артикул",
+      "Название",
+      "Кол-во",
+      "Ед.",
+      "Цена без скидки",
+      "Скидка",
+      "Цена",
+      "Сумма",
+    ],
+    styles: [
+      s.colNo,
+      s.colArt,
+      s.colName,
+      s.colQty,
+      s.colUnit,
+      s.colPriceNoDisc,
+      s.colDiscount,
+      s.colPrice,
+      s.colSum,
+    ],
+    aligns: [
+      "center",
+      "left",
+      "left",
+      "right",
+      "center",
+      "right",
+      "right",
+      "right",
+      "right",
+    ],
     render: (it, idx) => [
       String(idx + 1),
       it.article || "",
       it.name || "",
       fmtQty(it.qty),
       (it.unit || "шт").toLowerCase(),
+      n2(it.price_no_discount),
+      fmtDiscountPct(it.discount),
       n2(it.unit_price),
       n2(it.total),
     ],
-    footerSpan: 5,
+    footerSpan: 7,
   };
 }
 

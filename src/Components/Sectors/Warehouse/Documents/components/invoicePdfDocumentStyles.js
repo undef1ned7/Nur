@@ -85,13 +85,15 @@ export const invoicePdfStyles = StyleSheet.create({
   cellRight: { textAlign: "right" },
   cellLeft: { textAlign: "left" },
 
-  colNo: { width: "5%" },
-  colArt: { width: "11%" },
-  colName: { width: "38%" },
-  colQty: { width: "9%" },
-  colUnit: { width: "7%" },
-  colPrice: { width: "14%" },
-  colSum: { width: "16%" },
+  colNo: { width: "4%" },
+  colArt: { width: "9%" },
+  colName: { width: "24%" },
+  colQty: { width: "8%" },
+  colUnit: { width: "6%" },
+  colPriceNoDisc: { width: "11%" },
+  colDiscount: { width: "7%" },
+  colPrice: { width: "11%" },
+  colSum: { width: "12%" },
 
   colNoWide: { width: "6%" },
   colNameWide: { width: "54%" },
@@ -128,6 +130,34 @@ export const invoicePdfStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
     marginTop: 2,
+  },
+
+  totalsRightSection: {
+    marginTop: 6,
+    alignSelf: "flex-end",
+    minWidth: 240,
+    gap: 2,
+  },
+  totalsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+    fontSize: 9,
+  },
+  totalsRowBold: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  totalsLabel: {
+    flex: 1,
+    textAlign: "right",
+  },
+  totalsValue: {
+    minWidth: 80,
+    textAlign: "right",
   },
 
   signatures: {

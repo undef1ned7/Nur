@@ -79,7 +79,18 @@ export function needsPriceColumns(docType) {
 }
 
 export function needsDiscountColumns(docType) {
-  return false;
+  return needsPriceColumns(docType);
+}
+
+export function fmtDiscountPct(v) {
+  const num = Number(v || 0);
+  if (!num) return "—";
+  return (
+    num.toLocaleString("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }) + "%"
+  );
 }
 
 export function usesPartyBlocks(docType) {
@@ -153,19 +164,8 @@ export function resolveDocumentDiscount(doc, data, subtotal, rawItems) {
     }
   }
 
-  const docPctRaw = Number(doc.discount_percent);
-  const hasLinesWithDocDiscount =
-    docPctRaw > 0 &&
-    Array.isArray(rawItems) &&
-    rawItems.some((item) => {
-      const dp = item.discount_percent;
-      return dp == 0 || !dp;
-    });
-
-  const baseShow =
-    documentDiscountAmount > 0 || documentDiscountPercent > 0;
   const showDocumentDiscountLine =
-    baseShow && (docPctRaw <= 0 || hasLinesWithDocDiscount);
+    documentDiscountAmount > 0 || documentDiscountPercent > 0;
 
   return {
     documentDiscountPercent,
