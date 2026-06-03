@@ -132,6 +132,12 @@ const Recorda = () => {
         time: s.time || "",
         minutes: parseDurationMin(s.time || ""),
         active: s.is_active !== false,
+        category_name: s.category_name || "",
+        barbers: Array.isArray(s.barbers)
+          ? s.barbers.map(String)
+          : Array.isArray(s.barbers_detail)
+          ? s.barbers_detail.map((b) => String(b.id))
+          : [],
       }));
 
       setClients(cls);

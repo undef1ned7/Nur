@@ -52,6 +52,21 @@ import {
   toId,
 } from "./cafeOrderItemPayload";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import {
+  defaultWeightQty,
+  formatLineQtyDisplay,
+  isValidOrderQuantity,
+  lineQtyInputValue,
+  lineQtyNum,
+  normalizeMenuWeightFields,
+  parsePieceQtyInput,
+  parseWeightQtyInput,
+  resolveLineWeightMeta,
+  roundWeightQty,
+  saleUnitLabel,
+  weightQtyStep,
+  weightQtyValidationHint,
+} from "../cafeMenuWeight";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -835,14 +850,17 @@ const Orders = () => {
     // Извлекаем массив из объекта пагинации или используем как массив
     const itemsArray =
       menuItems?.results || (Array.isArray(menuItems) ? menuItems : []);
-    itemsArray.forEach((mi) =>
+    itemsArray.forEach((mi) => {
+      const weight = normalizeMenuWeightFields(mi);
       m.set(String(mi.id), {
         title: mi.title,
         price: toNum(mi.price),
         image_url: mi.image_url || "",
         kitchen: mi.kitchen ?? null,
-      }),
-    );
+        is_sold_by_weight: weight.is_sold_by_weight,
+        sale_unit: weight.sale_unit,
+      });
+    });
     return m;
   }, [menuItems]);
 
@@ -946,15 +964,26 @@ const Orders = () => {
         paid_cash: 0,
         paid_card: 0,
         change: 0,
-        items: items.map((it) => ({
-          name: orderItemTitle(it),
-          qty: Math.max(1, Number(it.quantity) || 1),
-          price: linePrice(it),
-          comment: String(it.comment || "").trim(),
-        })),
+        items: items.map((it) => {
+          const meta = resolveLineWeightMeta(it, menuMap);
+          const qtyNum = lineQtyNum(
+            it.quantity,
+            meta.is_sold_by_weight,
+            meta.sale_unit,
+          );
+          return {
+            name: orderItemTitle(it),
+            qty: qtyNum,
+            qty_display: meta.is_sold_by_weight
+              ? `${formatLineQtyDisplay(qtyNum, meta.sale_unit, true)} × ${fmtMoney(linePrice(it))} сом/${saleUnitLabel(meta.sale_unit)}`
+              : null,
+            price: linePrice(it),
+            comment: String(it.comment || "").trim(),
+          };
+        }),
       };
     },
-    [tablesMap, userData, waiterIdLabelMap],
+    [tablesMap, userData, waiterIdLabelMap, menuMap],
   );
 
   const printOrder = useCallback(
@@ -1032,15 +1061,25 @@ const Orders = () => {
         paid_card: 0,
         change: 0,
         kitchen_id: kitchenId,
-        items: (items || []).map((it) => ({
-          name: orderItemTitle(it),
-          qty: Math.max(1, Number(it.quantity) || 1),
-          comment: String(it.comment || "").trim(),
-          // price: linePrice(it),
-        })),
+        items: (items || []).map((it) => {
+          const meta = resolveLineWeightMeta(it, menuMap);
+          const qtyNum = lineQtyNum(
+            it.quantity,
+            meta.is_sold_by_weight,
+            meta.sale_unit,
+          );
+          return {
+            name: orderItemTitle(it),
+            qty: qtyNum,
+            qty_display: meta.is_sold_by_weight
+              ? formatLineQtyDisplay(qtyNum, meta.sale_unit, true)
+              : null,
+            comment: String(it.comment || "").trim(),
+          };
+        }),
       };
     },
-    [tablesMap, userData, waiterIdLabelMap],
+    [tablesMap, userData, waiterIdLabelMap, menuMap],
   );
 
   const getKitchenPrinterKey = useCallback(
@@ -1299,6 +1338,10 @@ const Orders = () => {
             };
           }
           const mid = String(it.menu_item || it.menu_item_id || "");
+          const weight = resolveLineWeightMeta(it, menuMap);
+          const qtyRaw =
+            it.quantity ??
+            (weight.is_sold_by_weight ? defaultWeightQty(weight.sale_unit) : 1);
           return {
             _key: it.id ? `i:${it.id}` : `m:${mid}`,
             id: it.id,
@@ -1306,7 +1349,9 @@ const Orders = () => {
             menu_item: mid,
             title: it.menu_item_title || it.title,
             price: linePrice(it),
-            quantity: Number(it.quantity) || 1,
+            quantity: qtyRaw,
+            is_sold_by_weight: weight.is_sold_by_weight,
+            sale_unit: weight.sale_unit,
             comment: it.comment || "",
             is_rejected: !!it.is_rejected,
             rejection_reason: it.rejection_reason || "",
@@ -1332,6 +1377,7 @@ const Orders = () => {
     if (!menu?.id) return;
     const idStr = String(menu.id);
     const mkey = `m:${idStr}`;
+    const weight = normalizeMenuWeightFields(menu);
 
     setForm((prev) => {
       const ex = prev.items.find(
@@ -1340,6 +1386,9 @@ const Orders = () => {
           String(i.menu_item) === idStr,
       );
       if (ex) {
+        if (weight.is_sold_by_weight) {
+          return prev;
+        }
         return {
           ...prev,
           items: prev.items.map((i) =>
@@ -1363,7 +1412,11 @@ const Orders = () => {
             menu_item: idStr,
             title: menu.title,
             price: toNum(menu.price),
-            quantity: 1,
+            quantity: weight.is_sold_by_weight
+              ? defaultWeightQty(weight.sale_unit)
+              : 1,
+            is_sold_by_weight: weight.is_sold_by_weight,
+            sale_unit: weight.sale_unit,
             comment: "",
             is_rejected: false,
             rejection_reason: "",
@@ -1373,31 +1426,23 @@ const Orders = () => {
     });
   };
 
-  const lineQtyInputValue = (q) => (q === "" ? "" : String(q));
-
-  const parseLineQtyDigits = (raw) => {
-    const s = String(raw ?? "").replace(/\D/g, "");
-    if (s === "") return "";
-    let n = parseInt(s, 10);
-    if (!Number.isFinite(n) || n < 0) return "";
-    if (n > MAX_QTY) n = MAX_QTY;
-    return n;
-  };
-
-  const lineQtyNum = (q) => {
-    if (q === "" || q === null || q === undefined) return 0;
-    const n = Math.floor(Number(q));
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
-
   const changeItemQty = (lineKey, raw) => {
-    const next = parseLineQtyDigits(raw);
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.map((i) =>
-        i._key === lineKey ? { ...i, quantity: next } : i,
-      ),
-    }));
+    setForm((prev) => {
+      const row = prev.items.find((i) => i._key === lineKey);
+      if (!row) return prev;
+      const isWeight = !!row.is_sold_by_weight;
+      const saleUnit = row.sale_unit === "g" ? "g" : "kg";
+      const parsed = isWeight
+        ? parseWeightQtyInput(raw, MAX_QTY, saleUnit)
+        : parsePieceQtyInput(raw, MAX_QTY);
+      if (parsed === null) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((i) =>
+          i._key === lineKey ? { ...i, quantity: parsed } : i,
+        ),
+      };
+    });
   };
 
   const changeItemComment = (lineKey, raw) => {
@@ -1414,14 +1459,15 @@ const Orders = () => {
   const incItem = (lineKey) => {
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) =>
-        i._key === lineKey
-          ? {
-              ...i,
-              quantity: (i.quantity === "" ? 0 : Number(i.quantity) || 0) + 1,
-            }
-          : i,
-      ),
+      items: prev.items.map((i) => {
+        if (i._key !== lineKey) return i;
+        const cur = i.quantity === "" ? 0 : Number(i.quantity) || 0;
+        if (i.is_sold_by_weight) {
+          const step = weightQtyStep(i.sale_unit);
+          return { ...i, quantity: roundWeightQty(cur + step) };
+        }
+        return { ...i, quantity: Math.floor(cur) + 1 };
+      }),
     }));
   };
 
@@ -1429,18 +1475,23 @@ const Orders = () => {
     setForm((prev) => ({
       ...prev,
       items: prev.items
-        .map((i) =>
-          i._key === lineKey
-            ? {
-                ...i,
-                quantity: Math.max(
-                  0,
-                  (i.quantity === "" ? 0 : Number(i.quantity) || 0) - 1,
-                ),
-              }
-            : i,
-        )
-        .filter((el) => Number(el.quantity) > 0),
+        .map((i) => {
+          if (i._key !== lineKey) return i;
+          const cur = i.quantity === "" ? 0 : Number(i.quantity) || 0;
+          if (i.is_sold_by_weight) {
+            const step = weightQtyStep(i.sale_unit);
+            const next = roundWeightQty(Math.max(0, cur - step));
+            return { ...i, quantity: next };
+          }
+          return { ...i, quantity: Math.max(0, Math.floor(cur) - 1) };
+        })
+        .filter((el) =>
+          isValidOrderQuantity(
+            el.quantity,
+            !!el.is_sold_by_weight,
+            el.sale_unit === "g" ? "g" : "kg",
+          ),
+        ),
     }));
   };
 
@@ -1475,9 +1526,21 @@ const Orders = () => {
     e.preventDefault();
     if (!form.items.length) return;
 
-    const invalidQty = form.items.some((i) => lineQtyNum(i.quantity) < 1);
+    const invalidQty = form.items.some(
+      (i) =>
+        !isValidOrderQuantity(
+          i.quantity,
+          !!i.is_sold_by_weight,
+          i.sale_unit === "g" ? "g" : "kg",
+        ),
+    );
     if (invalidQty) {
-      alert("Укажите количество не меньше 1 для каждой позиции.", true);
+      alert(
+        `Укажите количество: для порций — не меньше 1; ${weightQtyValidationHint(
+          form.items.find((x) => x.is_sold_by_weight)?.sale_unit || "kg",
+        )}.`,
+        true,
+      );
       return;
     }
 
@@ -1672,30 +1735,33 @@ const Orders = () => {
     setPayNewClientPhone("");
   };
 
-  const applyPayMethodChange = useCallback((nextMethod, prevForm, order) => {
-    const d = checkoutDue(order, prevForm.discountAmount);
-    const next = {
-      ...prevForm,
-      paymentMethod: nextMethod,
-      payNow: numStr(d),
-    };
-    if (nextMethod !== "debt") {
-      next.usePrepaid = false;
-      next.prepaidAmount = "";
-      next.prepaidPaymentMethod = "cash";
-    }
-    if (nextMethod !== "split") {
-      next.splitOnlineAmount = "";
-      next.splitCashAmount = "";
-    } else {
-      next.splitCashAmount = numStr(d);
-      next.splitOnlineAmount = "0";
-    }
-    if (nextMethod === "debt" && !String(next.clientId || "").trim()) {
-      next.clientId = getOrderClientId(order) || "";
-    }
-    return next;
-  }, [checkoutDue]);
+  const applyPayMethodChange = useCallback(
+    (nextMethod, prevForm, order) => {
+      const d = checkoutDue(order, prevForm.discountAmount);
+      const next = {
+        ...prevForm,
+        paymentMethod: nextMethod,
+        payNow: numStr(d),
+      };
+      if (nextMethod !== "debt") {
+        next.usePrepaid = false;
+        next.prepaidAmount = "";
+        next.prepaidPaymentMethod = "cash";
+      }
+      if (nextMethod !== "split") {
+        next.splitOnlineAmount = "";
+        next.splitCashAmount = "";
+      } else {
+        next.splitCashAmount = numStr(d);
+        next.splitOnlineAmount = "0";
+      }
+      if (nextMethod === "debt" && !String(next.clientId || "").trim()) {
+        next.clientId = getOrderClientId(order) || "";
+      }
+      return next;
+    },
+    [checkoutDue],
+  );
 
   const handleCreatePayClient = async (e) => {
     e?.preventDefault?.();
@@ -2029,8 +2095,16 @@ const Orders = () => {
                   {sliceItems.map((it, i) => {
                     const itemPrice = linePrice(it);
                     const itemTitle = orderItemTitle(it);
-                    const itemQty = Number(it.quantity) || 0;
+                    const meta = resolveLineWeightMeta(it, menuMap);
+                    const itemQty = lineQtyNum(
+                      it.quantity,
+                      meta.is_sold_by_weight,
+                      meta.sale_unit,
+                    );
                     const sum = itemPrice * itemQty;
+                    const qtyLabel = meta.is_sold_by_weight
+                      ? formatLineQtyDisplay(itemQty, meta.sale_unit, true)
+                      : `×${itemQty}`;
 
                     return (
                       <div
@@ -2044,7 +2118,7 @@ const Orders = () => {
                           {itemTitle}
                         </span>
                         <span className="cafeOrders__receiptItemQty">
-                          x{itemQty}
+                          {qtyLabel}
                         </span>
                         <span className="cafeOrders__receiptItemPrice">
                           {fmtShort(sum)}
@@ -2346,12 +2420,20 @@ const Orders = () => {
                           String(it.line_kind || "menu").toLowerCase() ===
                           "service";
                         const img = isService ? "" : menuImageUrl(it.menu_item);
-                        const qtyNum = lineQtyNum(it.quantity);
+                        const isWeight = !isService && !!it.is_sold_by_weight;
+                        const qtyNum = lineQtyNum(
+                          it.quantity,
+                          isWeight,
+                          it.sale_unit,
+                        );
                         const price = toNum(it.price);
                         const sum = price * qtyNum;
                         const lineTitle = isService
                           ? it.service_title || "Услуга"
                           : it.title;
+                        const unitSuffix = isWeight
+                          ? saleUnitLabel(it.sale_unit)
+                          : "";
 
                         return (
                           <div key={it._key} className="cafeOrders__itemRow">
@@ -2378,6 +2460,11 @@ const Orders = () => {
                                       {" "}
                                       · услуга
                                     </span>
+                                  ) : isWeight ? (
+                                    <span className="cafeOrders__itemKind">
+                                      {" "}
+                                      · на вес ({unitSuffix})
+                                    </span>
                                   ) : null}
                                 </div>
                                 <textarea
@@ -2391,7 +2478,10 @@ const Orders = () => {
                                   rows={2}
                                 />
                                 <div className="cafeOrders__itemMeta">
-                                  <span>{fmtMoney(price)} сом</span>
+                                  <span>
+                                    {fmtMoney(price)} сом
+                                    {isWeight ? `/${unitSuffix}` : ""}
+                                  </span>
                                   <span className="cafeOrders__dot">•</span>
                                   <span>{fmtMoney(sum)} сом</span>
                                 </div>
@@ -2413,14 +2503,29 @@ const Orders = () => {
                                 <input
                                   className="cafeOrders__qtyInput"
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode={isWeight ? "decimal" : "numeric"}
                                   autoComplete="off"
                                   value={lineQtyInputValue(it.quantity)}
                                   onChange={(e) =>
                                     changeItemQty(it._key, e.target.value)
                                   }
                                   disabled={saving}
+                                  aria-label={
+                                    isWeight
+                                      ? `Вес, ${unitSuffix}`
+                                      : "Количество"
+                                  }
+                                  title={
+                                    isWeight
+                                      ? `Вес, ${unitSuffix}`
+                                      : "Количество"
+                                  }
                                 />
+                                {isWeight ? (
+                                  <span className="cafeOrders__qtyUnit">
+                                    {unitSuffix}
+                                  </span>
+                                ) : null}
 
                                 <button
                                   type="button"
@@ -2511,7 +2616,14 @@ const Orders = () => {
                     disabled={
                       saving ||
                       !form.items.length ||
-                      form.items.some((i) => lineQtyNum(i.quantity) < 1)
+                      form.items.some(
+                        (i) =>
+                          !isValidOrderQuantity(
+                            i.quantity,
+                            !!i.is_sold_by_weight,
+                            i.sale_unit === "g" ? "g" : "kg",
+                          ),
+                      )
                     }
                   >
                     {saving

@@ -825,9 +825,19 @@ const Documents = () => {
     const docDiscountAmount = Number(doc.discount_amount || 0);
     const items = Array.isArray(doc.items)
       ? doc.items.map((item) => {
-          const price = Number(item.price || 0);
+          const basePrice = Number(item.price ?? item.unit_price ?? 0);
           const qty = Number(item.qty || 0);
-          const lineTotal = price * qty;
+          const lineDiscPct = Number(item.discount_percent ?? item.discount ?? 0);
+          const effectiveDisc =
+            item.effective_discount_percent != null &&
+            item.effective_discount_percent !== ""
+              ? Number(item.effective_discount_percent)
+              : lineDiscPct > 0
+                ? lineDiscPct
+                : docDiscountPercent;
+          const lineTotal =
+            Number(item.line_total ?? item.total) ||
+            basePrice * qty * (1 - effectiveDisc / 100);
           return {
             id: item.id,
             name:
@@ -837,7 +847,8 @@ const Documents = () => {
               item.product?.title ??
               "Товар",
             qty: String(qty),
-            unit_price: String(price.toFixed(2)),
+            price: String(basePrice.toFixed(2)),
+            unit_price: String(basePrice.toFixed(2)),
             total: String(lineTotal.toFixed(2)),
             unit: item.product?.unit ?? item.unit ?? "ШТ",
             article:
@@ -847,9 +858,11 @@ const Documents = () => {
                   item.product_article ??
                   "",
               ).trim() || "",
-            discount_percent: Number(item.discount_percent || 0),
+            discount_percent: lineDiscPct,
             discount_amount: Number(item.discount_amount || 0),
-            price_before_discount: String(price.toFixed(2)),
+            price_before_discount: String(basePrice.toFixed(2)),
+            original_price: String(basePrice.toFixed(2)),
+            effective_discount_percent: effectiveDisc,
             images: item.product_image_url
               ? [item.product_image_url]
               : Array.isArray(item.images)

@@ -7,13 +7,14 @@ import {
   needsPriceColumns,
   n2,
   fmtQty,
+  fmtDiscountPct,
   resolveDocumentDiscount,
   resolvePartiesForDocType,
   safe,
   usesPartyBlocks,
 } from "./invoicePdfDocumentUtils";
 
-const COLS_PRICE = 7;
+const COLS_PRICE = 9;
 const COLS_SIMPLE = 5;
 
 function padRow(cells, colCount) {
@@ -74,7 +75,7 @@ export function exportInvoiceToExcel(data) {
   const showPriceColumns = needsPriceColumns(docType);
   const colCount = showPriceColumns ? COLS_PRICE : COLS_SIMPLE;
   const colLast = colCount - 1;
-  const footerLabelCol = showPriceColumns ? 5 : colCount - 2;
+  const footerLabelCol = showPriceColumns ? 7 : colCount - 2;
 
   const items = buildInvoiceItemsFromData(data);
   const totals = data?.totals || {};
@@ -144,7 +145,17 @@ export function exportInvoiceToExcel(data) {
   if (showPriceColumns) {
     aoa.push(
       padRow(
-        ["п/п", "Артикул", "Название", "Кол-во", "Ед.", "Цена", "Сумма"],
+        [
+          "п/п",
+          "Артикул",
+          "Название",
+          "Кол-во",
+          "Ед.",
+          "Цена без скидки",
+          "Скидка",
+          "Цена",
+          "Сумма",
+        ],
         colCount,
       ),
     );
@@ -157,6 +168,8 @@ export function exportInvoiceToExcel(data) {
             it.name || "",
             fmtQty(it.qty),
             String(it.unit || "шт").toLowerCase(),
+            n2(it.price_no_discount),
+            fmtDiscountPct(it.discount),
             n2(it.unit_price),
             n2(it.total),
           ],
@@ -190,22 +203,37 @@ export function exportInvoiceToExcel(data) {
   aoa.push(padRow([], colCount));
 
   if (showPriceColumns) {
-    if (
+    const pct = Number(doc.discount_percent || 0);
+    const showDisc =
       showDocumentDiscountLine &&
-      (documentDiscountAmount > 0 || Number(doc.discount_percent || 0) > 0)
-    ) {
+      (documentDiscountAmount > 0 || pct > 0);
+
+    if (showDisc) {
+      // Правый блок: Скидка документа
+      const discValueText =
+        n2(documentDiscountAmount) + (pct > 0 ? ` (${n2(pct)}%)` : "");
       const discRow = aoa.length;
-      const pct = Number(doc.discount_percent || 0);
-      const discText = `Скидка по документу: ${n2(documentDiscountAmount)}${pct > 0 ? ` (${n2(pct)}%)` : ""}`;
-      aoa.push(padRow([discText], colCount));
-      mergeRow(merges, discRow, 0, colLast);
+      // cols: 0..footerLabelCol-1 пусты, footerLabelCol = метка, colLast = значение
+      const discArr = Array(footerLabelCol).fill("");
+      discArr.push("Скидка документа:", discValueText);
+      aoa.push(padRow(discArr, colCount));
+      mergeRow(merges, discRow, footerLabelCol - 2, footerLabelCol);
     }
+
+    // Правый блок: ИТОГО
+    const totalRow = aoa.length;
+    const totalArr = Array(footerLabelCol).fill("");
+    totalArr.push("ИТОГО:", n2(grandTotal));
+    aoa.push(padRow(totalArr, colCount));
+    mergeRow(merges, totalRow, footerLabelCol - 2, footerLabelCol);
+
+    aoa.push(padRow([], colCount));
 
     const summaryRow = aoa.length;
     aoa.push(
       padRow(
         [
-          `Всего наименований ${items.length}, на сумму ${n2(grandTotal)} сом`,
+          `Всего наименований ${items.length}, на сумму ${n2(grandTotal)} KGS`,
         ],
         colCount,
       ),
@@ -244,9 +272,11 @@ export function exportInvoiceToExcel(data) {
     ws["!cols"] = [
       { wch: 5 },
       { wch: 14 },
-      { wch: 42 },
+      { wch: 36 },
       { wch: 10 },
       { wch: 6 },
+      { wch: 16 },
+      { wch: 10 },
       { wch: 14 },
       { wch: 14 },
     ];

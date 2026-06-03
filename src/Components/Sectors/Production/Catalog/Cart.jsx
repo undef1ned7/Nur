@@ -33,6 +33,28 @@ import {
   addProductToAgentCart,
 } from "../../../../store/creators/agentCartCreators";
 import { createDeal } from "../../../../store/creators/saleThunk";
+
+const normalizeCartStatus = (status) =>
+  String(status ?? "draft").trim().toLowerCase() || "draft";
+
+/** Редактируемая корзина: всё, кроме уже отправленной/одобренной/отклонённой. */
+const getCartStatusFlags = (status) => {
+  const normalized = normalizeCartStatus(status);
+  const isSubmitted = normalized === "submitted";
+  const isApproved = normalized === "approved";
+  const isRejected = normalized === "rejected";
+  const isEditable = !isSubmitted && !isApproved && !isRejected;
+  const isDraft = normalized === "draft" || normalized === "active" || !status;
+
+  return {
+    normalized,
+    isEditable,
+    isDraft,
+    isSubmitted,
+    isApproved,
+    isRejected,
+  };
+};
 import { useUser } from "../../../../store/slices/userSlice";
 import {
   openShiftAsync,
@@ -677,12 +699,13 @@ const OrderSummary = ({
       agentCart?.order_discount_total ?? agentCart?.discount_total ?? 0,
     );
     const discount = lineDiscount + orderDiscount;
-    // Корзина редактируема, если статус "draft" или "active"
-    const isEditable = status === "draft" || status === "active";
-    const isDraft = status === "draft";
-    const isSubmitted = status === "submitted";
-    const isApproved = status === "approved";
-    const isRejected = status === "rejected";
+    const {
+      isEditable,
+      isDraft,
+      isSubmitted,
+      isApproved,
+      isRejected,
+    } = getCartStatusFlags(status);
 
     return {
       discount,
@@ -747,8 +770,17 @@ const OrderSummary = ({
         <span>К оплате: {money(total)} KGS</span>
       </div>
 
-      {/* Выбор типа оплаты */}
-      {isEditable && selectedClient && (
+      {selectedClient && !isEditable && (
+        <p
+          className="cart-checkout-hint"
+          style={{ marginTop: "12px", fontSize: "13px", color: "#856404" }}
+        >
+          Оформление недоступно: корзина уже отправлена или закрыта.
+        </p>
+      )}
+
+      {/* Выбор типа оплаты — показываем после выбора клиента */}
+      {selectedClient && isEditable && (
         <div className="payment-type-section" style={{ marginTop: "16px" }}>
           <label
             style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}
@@ -756,7 +788,7 @@ const OrderSummary = ({
             Тип оплаты:
           </label>
           <select
-            value={paymentType || ""}
+            value={paymentType || "cash"}
             onChange={(e) => onPaymentTypeChange(e.target.value)}
             style={{
               width: "100%",
@@ -766,7 +798,6 @@ const OrderSummary = ({
               fontSize: "14px",
             }}
           >
-            <option value="">Выберите тип оплаты</option>
             <option value="cash">Наличные</option>
             <option value="transfer">Перевод</option>
             <option value="Долги">Долг</option>
@@ -870,11 +901,18 @@ const OrderSummary = ({
         disabled={
           submitting ||
           !selectedClient ||
-          !paymentType ||
+          !(paymentType || "cash") ||
           // (!usingServer && (cartItems || []).length === 0) ||
           !isEditable
         }
         style={{ marginTop: "16px" }}
+        title={
+          !selectedClient
+            ? "Выберите клиента"
+            : !isEditable
+              ? "Корзина недоступна для продажи"
+              : ""
+        }
       >
         <ShoppingCart size={20} />
         {isSubmitted
@@ -923,7 +961,7 @@ const Cart = ({
   const [submitting, setSubmitting] = useState(false);
 
   // Состояние для долга
-  const [paymentType, setPaymentType] = useState(""); // "" | "cash" | "transfer" | "Долги" | "Предоплата"
+  const [paymentType, setPaymentType] = useState("cash"); // "cash" | "transfer" | "Долги" | "Предоплата"
   const [debtMonths, setDebtMonths] = useState("");
   const [firstDueDate, setFirstDueDate] = useState("");
   const [prepaymentAmount, setPrepaymentAmount] = useState("");
@@ -958,6 +996,27 @@ const Cart = ({
     if (!isCartActive) return;
     dispatch(fetchClientsAsync());
   }, [dispatch, isCartActive]);
+
+  // Клиент с бэкенда (корзина) → Redux, чтобы совпадал с UI
+  useEffect(() => {
+    if (!isCartActive || !agentCart?.client) return;
+    const raw = agentCart.client;
+    const cartClient =
+      typeof raw === "object" && raw !== null
+        ? raw
+        : (Array.isArray(clients?.results) ? clients.results : clients || []).find(
+            (c) => String(c?.id) === String(raw),
+          );
+    if (cartClient && cartClient.id && cartClient.id !== selectedClient?.id) {
+      dispatch(selectClient(cartClient));
+    }
+  }, [agentCart?.client, clients, dispatch, isCartActive, selectedClient?.id]);
+
+  useEffect(() => {
+    if (!selectedClient) {
+      setPaymentType("cash");
+    }
+  }, [selectedClient]);
 
   // Проверяем, мобильное ли это устройство
   useEffect(() => {
@@ -1911,10 +1970,7 @@ const Cart = ({
             ? agentItems
             : cartItemsLocal || []
           ).map((item) => {
-            // Корзина редактируема, если статус "draft" или "active" (не отправлена/одобрена/отклонена)
-            const cartStatus = agentCart?.status;
-            const isEditable =
-              !agentCart || cartStatus === "draft" || cartStatus === "active";
+            const { isEditable } = getCartStatusFlags(agentCart?.status);
 
             const maxStockTotal =
               productsList?.find((el) => el.id === item.product)?.quantity || 0;
@@ -1969,7 +2025,7 @@ const Cart = ({
         selectedClient={selectedClient}
         items={agentItems}
         agentCart={agentCart}
-        status={agentCart?.status || "draft"}
+        status={agentCart?.status ?? "draft"}
         onSubmit={handleSubmit}
         submitting={submitting}
         paymentType={paymentType}

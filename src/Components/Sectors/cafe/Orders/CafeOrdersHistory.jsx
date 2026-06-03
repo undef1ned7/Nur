@@ -2,12 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "../../../../store/slices/userSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
-import {
-  FaSearch,
-  FaTimes,
-  FaClipboardList,
-  FaEdit,
-} from "react-icons/fa";
+import { FaSearch, FaTimes, FaClipboardList, FaEdit } from "react-icons/fa";
 import api from "../../../../api";
 import "./Orders.scss";
 
@@ -32,6 +27,16 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import {
+  formatLineQtyDisplay,
+  lineQtyNum,
+  normalizeMenuWeightFields,
+  parseReturnQtyInput,
+  resolveLineWeightMeta,
+  returnQtyNum,
+  roundWeightQty,
+  saleUnitLabel,
+} from "../cafeMenuWeight";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -53,45 +58,32 @@ const orderItemTitle = (it) => {
   return String(it.menu_item_title || it.title || "Позиция");
 };
 
+const returnQtyInputValue = (q) => (q === "" ? "" : String(q));
+
 /** Сколько единиц по строке уже возвращено (частичный refund API). */
-const itemRefundedQty = (it) => {
-  const qty = Math.max(0, Math.floor(Number(it.quantity) || 0));
-  const r = Math.max(0, Math.floor(Number(it.refunded_quantity) || 0));
+const itemRefundedQty = (it, menuMap) => {
+  const meta = resolveLineWeightMeta(it, menuMap);
+  const qty = lineQtyNum(it.quantity, meta.is_sold_by_weight, meta.sale_unit);
+  const r = lineQtyNum(
+    it.refunded_quantity,
+    meta.is_sold_by_weight,
+    meta.sale_unit,
+  );
   return Math.min(r, qty);
 };
 
 /** Остаток к оплате по строке (без учёта полностью отклонённых позиций). */
-const itemNetQty = (it) => {
+const itemNetQty = (it, menuMap) => {
   if (it.is_rejected) return 0;
-  const qty = Math.max(0, Math.floor(Number(it.quantity) || 0));
-  return Math.max(0, qty - itemRefundedQty(it));
-};
-
-const returnQtyInputValue = (q) => (q === "" ? "" : String(q));
-
-/** Разрешить стереть поле и набрать новое число; ограничение — доступный возврат. */
-const parseReturnQtyDigits = (raw, maxRefund) => {
-  const s = String(raw ?? "").replace(/\D/g, "");
-  if (s === "") return "";
-  let n = parseInt(s, 10);
-  if (!Number.isFinite(n) || n < 0) return "";
-  if (n === 0) return "";
-  const max = Math.max(1, Math.floor(Number(maxRefund) || 1));
-  if (n > max) n = max;
-  return n;
-};
-
-const returnQtyNum = (q) => {
-  if (q === "" || q === null || q === undefined) return 0;
-  const n = Math.floor(Number(q));
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const meta = resolveLineWeightMeta(it, menuMap);
+  const qty = lineQtyNum(it.quantity, meta.is_sold_by_weight, meta.sale_unit);
+  return Math.max(0, roundWeightQty(qty - itemRefundedQty(it, menuMap)));
 };
 
 const fullName = (u) =>
   [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
   u?.email ||
   "Без имени";
-
 
 const safeUserData = () => {
   try {
@@ -104,27 +96,30 @@ const safeUserData = () => {
 
 /** Как в Masters / CafeEmployEmployeeDetail: роль с бэка может быть en или ru. */
 const normalizeCafeMgmtRole = (raw) => {
-  const l = String(raw || "").trim().toLowerCase();
+  const l = String(raw || "")
+    .trim()
+    .toLowerCase();
   if (["owner", "владелец"].includes(l)) return "owner";
-  if (["admin", "administrator", "админ", "администратор"].includes(l)) return "admin";
+  if (["admin", "administrator", "админ", "администратор"].includes(l))
+    return "admin";
   return l;
 };
 
 const newIdempotencyKey = () => {
   try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID();
   } catch {
     /* ignore */
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 };
 
-const statusFilterOptions =
-  [
-    { value: "", label: "Все статусы" },
-    { value: "closed", label: "Закрыт" },
-    { value: "cancelled", label: "Отменен" },
-  ]
+const statusFilterOptions = [
+  { value: "", label: "Все статусы" },
+  { value: "closed", label: "Закрыт" },
+  { value: "cancelled", label: "Отменен" },
+];
 
 /* =========================================================
    Orders
@@ -140,11 +135,10 @@ const CafeOrderHistory = () => {
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
-  const { socketOrders } = useOutletContext()
+  const { socketOrders } = useOutletContext();
   const [waiterOptions, setWaiterOptions] = useState([
-    { value: null, label: 'Все сотрудники' }
-  ])
-
+    { value: null, label: "Все сотрудники" },
+  ]);
 
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
@@ -155,8 +149,8 @@ const CafeOrderHistory = () => {
     totalPages: 0,
     currentPage: 1,
     limit: 100,
-    totalCount: 0
-  })
+    totalCount: 0,
+  });
 
   const userData = profile || safeUserData();
   const userRole = String(userData?.role || "");
@@ -189,7 +183,8 @@ const CafeOrderHistory = () => {
   const [itemsEditOrder, setItemsEditOrder] = useState(null);
   const [itemsEditRows, setItemsEditRows] = useState([]);
   const [itemsEditSaving, setItemsEditSaving] = useState(false);
-  const [itemsRefundPaymentMethod, setItemsRefundPaymentMethod] = useState("cash");
+  const [itemsRefundPaymentMethod, setItemsRefundPaymentMethod] =
+    useState("cash");
 
   const openView = useCallback(async (order) => {
     if (!order) {
@@ -226,19 +221,24 @@ const CafeOrderHistory = () => {
   }, []);
 
   /* ===== API ===== */
-  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
+  const fetchTables = async () =>
+    setTables(listFrom(await api.get("/cafe/tables/")));
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
-    setWaiterOptions(prevOptions => {
-      const staticOption = prevOptions[0] || ({ value: null, label: 'Все официанты' });
-      const options = arr.map(el => ({ value: el.id, label: el.first_name + ' ' + el.last_name }))
-      options.unshift(staticOption)
-      return options
-    })
+    setWaiterOptions((prevOptions) => {
+      const staticOption = prevOptions[0] || {
+        value: null,
+        label: "Все официанты",
+      };
+      const options = arr.map((el) => ({
+        value: el.id,
+        label: el.first_name + " " + el.last_name,
+      }));
+      options.unshift(staticOption);
+      return options;
+    });
   };
-
-
 
   const fetchMenu = async () => {
     const arr = listFrom(await api.get("/cafe/menu-items/")) || [];
@@ -252,8 +252,6 @@ const CafeOrderHistory = () => {
     }
   };
 
-
-
   const hydrateOrdersDetails = async (list) => {
     const ids = list
       .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
@@ -266,8 +264,8 @@ const CafeOrderHistory = () => {
         api
           .get(`/cafe/orders/${id}/`)
           .then((r) => ({ id, data: r.data }))
-          .catch(() => null)
-      )
+          .catch(() => null),
+      ),
     );
 
     return list.map((o) => {
@@ -278,16 +276,16 @@ const CafeOrderHistory = () => {
 
   const fetchOrders = useCallback(async (params = {}) => {
     const response = await api.get("/cafe/orders/", {
-      params
-    })
+      params,
+    });
     const base = listFrom(response) || [];
     const full = await hydrateOrdersDetails(base);
     const { data } = response;
-    setOrderPagination(prev => ({
+    setOrderPagination((prev) => ({
       ...prev,
       totalPages: Math.ceil(data.count / prev.limit),
-      totalCount: data.count
-    }))
+      totalCount: data.count,
+    }));
     setOrders(full);
   }, []);
 
@@ -302,9 +300,9 @@ const CafeOrderHistory = () => {
     (async () => {
       try {
         await Promise.all([fetchTables(), fetchEmployees(), fetchMenu()]);
-        } catch (e) {
-          const errorMessage = validateResErrors(e, "Ошибка загрузки");
-          alert(errorMessage, true);
+      } catch (e) {
+        const errorMessage = validateResErrors(e, "Ошибка загрузки");
+        alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
@@ -321,43 +319,59 @@ const CafeOrderHistory = () => {
       try {
         const params = {
           search: debouncedOrderSearchQuery,
-          status__in: ['closed', 'cancelled'].toString(),
-          page: ordersPagination.currentPage
+          status__in: ["closed", "cancelled"].toString(),
+          page: ordersPagination.currentPage,
         };
         if (!startPlan) {
           params.waiter = waiterFilter;
         }
         if (statusFilter) {
-          params['status'] = statusFilter;
-          delete params['status__in'];
+          params["status"] = statusFilter;
+          delete params["status__in"];
         }
         await fetchOrders(params);
       } catch (e) {
-        const errorMessage = validateResErrors(e, "Ошибка загрузки истории заказов");
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка загрузки истории заказов",
+        );
         alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders, ordersPagination?.currentPage, startPlan])
+  }, [
+    debouncedOrderSearchQuery,
+    statusFilter,
+    waiterFilter,
+    socketOrders?.orders,
+    ordersPagination?.currentPage,
+    startPlan,
+  ]);
   useEffect(() => {
     const handler = () => fetchOrders();
     window.addEventListener("orders:refresh", handler);
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
 
-  const tablesMap = useMemo(() => new Map(tables.map((t) => [String(t.id), t])), [tables]);
+  const tablesMap = useMemo(
+    () => new Map(tables.map((t) => [String(t.id), t])),
+    [tables],
+  );
 
   const menuMap = useMemo(() => {
     const m = new Map();
-    menuItems.forEach((mi) =>
+    menuItems.forEach((mi) => {
+      const weight = normalizeMenuWeightFields(mi);
       m.set(String(mi.id), {
         title: mi.title,
         price: toNum(mi.price),
         image_url: mi.image_url || "",
         kitchen: mi.kitchen ?? null,
-      })
-    );
+        is_sold_by_weight: weight.is_sold_by_weight,
+        sale_unit: weight.sale_unit,
+      });
+    });
     return m;
   }, [menuItems]);
 
@@ -393,8 +407,8 @@ const CafeOrderHistory = () => {
       if (it.is_rejected) {
         rejectedSum += price * qty;
       } else {
-        total += price * itemNetQty(it);
-        rejectedSum += price * itemRefundedQty(it);
+        total += price * itemNetQty(it, menuMap);
+        rejectedSum += price * itemRefundedQty(it, menuMap);
       }
     }
     return { count, total, rejectedSum };
@@ -411,37 +425,41 @@ const CafeOrderHistory = () => {
     setItemsEditOrder(viewOrder);
     setItemsRefundPaymentMethod("cash");
     setItemsEditRows(
-      items.map((it, i) => ({
-        _key: orderItemRowKey(it, i),
-        id: it.id,
-        line_kind: String(it.line_kind || "menu").toLowerCase(),
-        menu_item: it.menu_item,
-        service_title: String(it.service_title || it.title || "").trim(),
-        title: orderItemTitle(it),
-        price: linePrice(it),
-        quantity: Math.max(1, Math.floor(Number(it.quantity) || 1)),
-        is_rejected: Boolean(it.is_rejected),
-        refunded_quantity: Math.max(0, Math.floor(Number(it.refunded_quantity) || 0)),
-        refundable_quantity: Math.max(
-          0,
-          Math.floor(
-            Number(
-              it.refundable_quantity ??
-              ((Number(it.quantity) || 0) - (Number(it.refunded_quantity) || 0))
-            ) || 0
-          )
-        ),
-        return_quantity: Math.max(
-          0,
-          Math.floor(
-            Number(
-              it.refundable_quantity ??
-              ((Number(it.quantity) || 0) - (Number(it.refunded_quantity) || 0))
-            ) || 0
-          )
-        ),
-        rejection_reason: String(it.rejection_reason || "").trim(),
-      }))
+      items.map((it, i) => {
+        const weight = resolveLineWeightMeta(it, menuMap);
+        const qtyNum = lineQtyNum(
+          it.quantity,
+          weight.is_sold_by_weight,
+          weight.sale_unit,
+        );
+        const refunded = lineQtyNum(
+          it.refunded_quantity,
+          weight.is_sold_by_weight,
+          weight.sale_unit,
+        );
+        const refundable = lineQtyNum(
+          it.refundable_quantity ?? qtyNum - refunded,
+          weight.is_sold_by_weight,
+          weight.sale_unit,
+        );
+        return {
+          _key: orderItemRowKey(it, i),
+          id: it.id,
+          line_kind: String(it.line_kind || "menu").toLowerCase(),
+          menu_item: it.menu_item,
+          service_title: String(it.service_title || it.title || "").trim(),
+          title: orderItemTitle(it),
+          price: linePrice(it),
+          quantity: qtyNum,
+          is_sold_by_weight: weight.is_sold_by_weight,
+          sale_unit: weight.sale_unit,
+          is_rejected: Boolean(it.is_rejected),
+          refunded_quantity: refunded,
+          refundable_quantity: refundable,
+          return_quantity: refundable > 0 ? refundable : 0,
+          rejection_reason: String(it.rejection_reason || "").trim(),
+        };
+      }),
     );
     setItemsEditOpen(true);
   };
@@ -452,12 +470,12 @@ const CafeOrderHistory = () => {
     if (missingId) {
       alert(
         "У части позиций нет идентификатора — сохранение невозможно. Обновите страницу.",
-        true
+        true,
       );
       return;
     }
     const badReason = itemsEditRows.some(
-      (r) => r.is_rejected && !String(r.rejection_reason || "").trim()
+      (r) => r.is_rejected && !String(r.rejection_reason || "").trim(),
     );
     if (badReason) {
       alert("Укажите причину возврата для каждой отмеченной позиции.", true);
@@ -465,12 +483,20 @@ const CafeOrderHistory = () => {
     }
     const badReturnQty = itemsEditRows.some((r) => {
       if (!r.is_rejected) return false;
-      const returnQty = returnQtyNum(r.return_quantity);
-      const refundableQty = Math.max(0, Math.floor(Number(r.refundable_quantity) || 0));
+      const unit = r.sale_unit === "g" ? "g" : "kg";
+      const returnQty = returnQtyNum(r.return_quantity, !!r.is_sold_by_weight, unit);
+      const refundableQty = lineQtyNum(
+        r.refundable_quantity,
+        !!r.is_sold_by_weight,
+        unit,
+      );
       return returnQty <= 0 || returnQty > refundableQty;
     });
     if (badReturnQty) {
-      alert("Проверьте количество возврата: оно должно быть > 0 и не больше доступного.", true);
+      alert(
+        "Проверьте количество возврата: оно должно быть > 0 и не больше доступного.",
+        true,
+      );
       return;
     }
 
@@ -488,8 +514,17 @@ const CafeOrderHistory = () => {
     setItemsEditSaving(true);
     try {
       for (const r of selectedRows) {
-        const returnQty = returnQtyNum(r.return_quantity);
-        const refundableQty = Math.max(0, Math.floor(Number(r.refundable_quantity) || 0));
+        const unit = r.sale_unit === "g" ? "g" : "kg";
+        const returnQty = returnQtyNum(
+          r.return_quantity,
+          !!r.is_sold_by_weight,
+          unit,
+        );
+        const refundableQty = lineQtyNum(
+          r.refundable_quantity,
+          !!r.is_sold_by_weight,
+          unit,
+        );
         if (!(returnQty > 0) || returnQty > refundableQty) continue;
         await api.post(`/cafe/orders/${itemsEditOrder.id}/refund-item/`, {
           order_item_id: r.id,
@@ -502,7 +537,8 @@ const CafeOrderHistory = () => {
       const detail = await api.get(`/cafe/orders/${itemsEditOrder.id}/`);
       const updated = detail?.data || {};
       const mergeOrder = (prevOrder) => {
-        if (!prevOrder || String(prevOrder.id) !== String(updated.id)) return prevOrder;
+        if (!prevOrder || String(prevOrder.id) !== String(updated.id))
+          return prevOrder;
         return {
           ...prevOrder,
           ...updated,
@@ -547,7 +583,9 @@ const CafeOrderHistory = () => {
     (order) => {
       const tableLabel = resolveTableLabel(order, tablesMap);
 
-      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const dt = formatReceiptDate(
+        order?.created_at || order?.date || order?.created,
+      );
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
@@ -563,16 +601,30 @@ const CafeOrderHistory = () => {
         paid_cash: 0,
         paid_card: 0,
         change: 0,
-        items: items.map((it) => ({
-          name: orderItemTitle(it),
-          qty: it.is_rejected
-            ? Math.max(1, Number(it.quantity) || 1)
-            : Math.max(0, itemNetQty(it)),
-          price: linePrice(it),
-        })),
+        items: items.map((it) => {
+          const meta = resolveLineWeightMeta(it, menuMap);
+          const qtyNum = it.is_rejected
+            ? lineQtyNum(it.quantity, meta.is_sold_by_weight, meta.sale_unit)
+            : itemNetQty(it, menuMap);
+          return {
+            name: orderItemTitle(it),
+            qty: qtyNum,
+            qty_display: meta.is_sold_by_weight
+              ? formatLineQtyDisplay(qtyNum, meta.sale_unit, true)
+              : null,
+            price: linePrice(it),
+          };
+        }),
       };
     },
-    [formatReceiptDate, linePrice, tablesMap, userData, waiterIdLabelMap]
+    [
+      formatReceiptDate,
+      linePrice,
+      tablesMap,
+      userData,
+      waiterIdLabelMap,
+      menuMap,
+    ],
   );
 
   const printOrder = useCallback(
@@ -588,8 +640,10 @@ const CafeOrderHistory = () => {
           if (w) payload = { ...payload, waiter_name: w };
         }
 
-        const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
-        if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+        const receiptBinding =
+          localStorage.getItem("cafe_receipt_printer") || "";
+        if (!receiptBinding)
+          throw new Error("Не настроен принтер кассы (чековый аппарат)");
         const parsed = parsePrinterBinding(receiptBinding);
         if (parsed.kind === "ip") {
           await printViaWiFiSimple(payload, parsed.ip, parsed.port);
@@ -601,7 +655,7 @@ const CafeOrderHistory = () => {
         }
         try {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
-        } catch { }
+        } catch {}
       } catch (e) {
         const errorMessage = validateResErrors(e, "Ошибка печати чека");
         alert(errorMessage, true);
@@ -609,7 +663,7 @@ const CafeOrderHistory = () => {
         setPrintingId(null);
       }
     },
-    [buildPrintPayload, printingId]
+    [buildPrintPayload, printingId],
   );
 
   const toggleExpandedOrder = (id) => {
@@ -664,19 +718,31 @@ const CafeOrderHistory = () => {
           {!loading &&
             visibleOrders.map((o) => {
               const totals = calcTotals(o);
-              const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
+              const orderDate = formatReceiptDate(
+                o.created_at || o.date || o.created,
+              );
               const tableLabel = resolveTableLabel(o, tablesMap);
 
               const items = Array.isArray(o.items) ? o.items : [];
               const isFullyRefunded =
                 items.length > 0 &&
                 items.every((it) => {
-                  const qty = Math.max(0, Math.floor(Number(it?.quantity) || 0));
-                  return qty > 0 && itemNetQty(it) <= 0;
+                  const meta = resolveLineWeightMeta(it, menuMap);
+                  const qty = lineQtyNum(
+                    it?.quantity,
+                    meta.is_sold_by_weight,
+                    meta.sale_unit,
+                  );
+                  return qty > 0 && itemNetQty(it, menuMap) <= 0;
                 });
               const expanded = expandedOrders.has(String(o.id));
-              const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
-              const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
+              const sliceItems = expanded
+                ? items
+                : items.slice(0, CARD_ITEMS_LIMIT);
+              const rest = Math.max(
+                0,
+                items.length - Math.min(items.length, CARD_ITEMS_LIMIT),
+              );
               return (
                 <article
                   key={o.id}
@@ -688,15 +754,28 @@ const CafeOrderHistory = () => {
                     if (e.key === "Enter" || e.key === " ") openView(o);
                   }}
                 >
-                  <SimpleStamp date={o.status === 'closed' ? o.paid_at : ''} className="bottom-10 left-20" type={o.status} size={'md'} />
+                  <SimpleStamp
+                    date={o.status === "closed" ? o.paid_at : ""}
+                    className="bottom-10 left-20"
+                    type={o.status}
+                    size={"md"}
+                  />
                   <div className="cafeOrders__receiptHeader">
                     <div className="cafeOrders__receiptTable">
-                      {tableLabel === "С собой" ? "С собой" : `СТОЛ ${tableLabel}`}
+                      {tableLabel === "С собой"
+                        ? "С собой"
+                        : `СТОЛ ${tableLabel}`}
                     </div>
                     <div className="cafeOrders__receiptHeadMeta">
-                      {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
+                      {orderDate && (
+                        <div className="cafeOrders__receiptDate">
+                          {orderDate}
+                        </div>
+                      )}
                       {isFullyRefunded ? (
-                        <div className="cafeOrders__receiptRefundBadge">Возврат</div>
+                        <div className="cafeOrders__receiptRefundBadge">
+                          Возврат
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -707,19 +786,22 @@ const CafeOrderHistory = () => {
                     {sliceItems.map((it, i) => {
                       const itemPrice = linePrice(it);
                       const itemTitle = orderItemTitle(it);
-                      const itemQty = Number(it.quantity) || 0;
-                      const rej = Boolean(it.is_rejected);
-                      const refunded = itemRefundedQty(it);
-                      const refundable = Math.max(
-                        0,
-                        Math.floor(
-                          Number(
-                            it.refundable_quantity ??
-                              itemQty - refunded
-                          ) || 0
-                        )
+                      const meta = resolveLineWeightMeta(it, menuMap);
+                      const itemQty = lineQtyNum(
+                        it.quantity,
+                        meta.is_sold_by_weight,
+                        meta.sale_unit,
                       );
-                      const sum = rej ? itemPrice * itemQty : itemPrice * itemNetQty(it);
+                      const rej = Boolean(it.is_rejected);
+                      const refunded = itemRefundedQty(it, menuMap);
+                      const refundable = lineQtyNum(
+                        it.refundable_quantity ?? itemQty - refunded,
+                        meta.is_sold_by_weight,
+                        meta.sale_unit,
+                      );
+                      const sum = rej
+                        ? itemPrice * itemQty
+                        : itemPrice * itemNetQty(it, menuMap);
                       const reason = String(it.rejection_reason || "").trim();
                       const refundTitle =
                         !rej && refunded > 0
@@ -727,7 +809,10 @@ const CafeOrderHistory = () => {
                           : undefined;
                       return (
                         <div
-                          key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`}
+                          key={
+                            it.id ||
+                            `${it.line_kind || "menu"}-${it.menu_item || it.service_title || i}`
+                          }
                           className={`cafeOrders__receiptItem${rej ? " cafeOrders__receiptItem--rejected" : ""}`}
                         >
                           <div className="cafeOrders__receiptItemNameCol">
@@ -745,12 +830,24 @@ const CafeOrderHistory = () => {
                             {!rej && refunded > 0 ? (
                               <span className="cafeOrders__receiptItemMeta">
                                 Возвращено: {refunded}
-                                {refundable > 0 ? ` · к возврату: ${refundable}` : ""}
+                                {refundable > 0
+                                  ? ` · к возврату: ${refundable}`
+                                  : ""}
                               </span>
                             ) : null}
                           </div>
-                          <span className="cafeOrders__receiptItemQty">×{itemQty}</span>
-                          <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
+                          <span className="cafeOrders__receiptItemQty">
+                            {meta.is_sold_by_weight
+                              ? formatLineQtyDisplay(
+                                  itemQty,
+                                  meta.sale_unit,
+                                  true,
+                                )
+                              : `×${itemQty}`}
+                          </span>
+                          <span className="cafeOrders__receiptItemPrice">
+                            {fmtShort(sum)}
+                          </span>
                         </div>
                       );
                     })}
@@ -784,12 +881,17 @@ const CafeOrderHistory = () => {
                     <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
 
                     <div className="cafeOrders__receiptTotal">
-                      <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
-                      <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
+                      <span className="cafeOrders__receiptTotalLabel">
+                        ИТОГО
+                      </span>
+                      <span className="cafeOrders__receiptTotalAmount">
+                        {fmtShort(totals.total)}
+                      </span>
                     </div>
                     {totals.rejectedSum > 0 ? (
                       <div className="cafeOrders__receiptRejectedNote">
-                        Возвраты не входят в сумму: {fmtShort(totals.rejectedSum)}
+                        Возвраты не входят в сумму:{" "}
+                        {fmtShort(totals.rejectedSum)}
                       </div>
                     ) : null}
                   </div>
@@ -797,11 +899,11 @@ const CafeOrderHistory = () => {
               );
             })}
 
-
           {!loading && !roleFiltered.length && (
-            <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
+            <div className="cafeOrders__alert cafeOrders__alert--muted">
+              Ничего не найдено по «{query}».
+            </div>
           )}
-
         </div>
       </DataContainer>
 
@@ -813,17 +915,20 @@ const CafeOrderHistory = () => {
         hasPrevPage={ordersPagination.currentPage > 1}
         loading={loading}
         onPageChange={(page) => {
-          setOrderPagination(prev => ({
+          setOrderPagination((prev) => ({
             ...prev,
-            currentPage: page
-          }))
+            currentPage: page,
+          }));
         }}
       />
 
       {/* View modal (like pay modal, but without pay button) */}
       {viewOpen && viewOrder && (
         <div className="cafeOrdersModal__overlay z-100!" onClick={closeView}>
-          <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="cafeOrdersModal__shell"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
                 <h3 className="cafeOrdersModal__title">Чек</h3>
@@ -840,8 +945,14 @@ const CafeOrderHistory = () => {
               <div className="cafeOrdersPay">
                 {(() => {
                   const tableLabel = resolveTableLabel(viewOrder, tablesMap);
-                  const dt = formatReceiptDate(viewOrder?.created_at || viewOrder?.date || viewOrder?.created);
-                  const items = Array.isArray(viewOrder?.items) ? viewOrder.items : [];
+                  const dt = formatReceiptDate(
+                    viewOrder?.created_at ||
+                      viewOrder?.date ||
+                      viewOrder?.created,
+                  );
+                  const items = Array.isArray(viewOrder?.items)
+                    ? viewOrder.items
+                    : [];
                   const totals = calcTotals(viewOrder);
                   const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
@@ -860,21 +971,26 @@ const CafeOrderHistory = () => {
                         {items.length ? (
                           items.map((it, idx) => {
                             const title = orderItemTitle(it);
-                            const qty = Number(it.quantity) || 0;
+                            const meta = resolveLineWeightMeta(it, menuMap);
+                            const qty = lineQtyNum(
+                              it.quantity,
+                              meta.is_sold_by_weight,
+                              meta.sale_unit,
+                            );
                             const price = linePrice(it);
                             const rej = Boolean(it.is_rejected);
-                            const refunded = itemRefundedQty(it);
-                            const refundable = Math.max(
-                              0,
-                              Math.floor(
-                                Number(
-                                  it.refundable_quantity ??
-                                    qty - refunded
-                                ) || 0
-                              )
+                            const refunded = itemRefundedQty(it, menuMap);
+                            const refundable = lineQtyNum(
+                              it.refundable_quantity ?? qty - refunded,
+                              meta.is_sold_by_weight,
+                              meta.sale_unit,
                             );
-                            const sum = rej ? price * qty : price * itemNetQty(it);
-                            const reason = String(it.rejection_reason || "").trim();
+                            const sum = rej
+                              ? price * qty
+                              : price * itemNetQty(it, menuMap);
+                            const reason = String(
+                              it.rejection_reason || "",
+                            ).trim();
                             const refundTitle =
                               !rej && refunded > 0
                                 ? `Возвращено: ${refunded}${refundable > 0 ? ` · ещё к возврату: ${refundable}` : ""}`
@@ -882,7 +998,10 @@ const CafeOrderHistory = () => {
 
                             return (
                               <div
-                                key={it.id || `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`}
+                                key={
+                                  it.id ||
+                                  `${it.line_kind || "menu"}-${it.menu_item || it.service_title || idx}`
+                                }
                                 className={`cafeOrdersPay__row${rej ? " cafeOrdersPay__row--rejected" : ""}`}
                               >
                                 <div className="cafeOrdersPay__nameCol">
@@ -900,17 +1019,28 @@ const CafeOrderHistory = () => {
                                   {!rej && refunded > 0 ? (
                                     <span className="cafeOrdersPay__meta">
                                       Возвращено: {refunded}
-                                    
                                     </span>
                                   ) : null}
                                 </div>
-                                <span className="cafeOrdersPay__qty">×{qty}</span>
-                                <span className="cafeOrdersPay__sum">{fmtShort(sum)}</span>
+                                <span className="cafeOrdersPay__qty">
+                                  {meta.is_sold_by_weight
+                                    ? formatLineQtyDisplay(
+                                        qty,
+                                        meta.sale_unit,
+                                        true,
+                                      )
+                                    : `×${qty}`}
+                                </span>
+                                <span className="cafeOrdersPay__sum">
+                                  {fmtShort(sum)}
+                                </span>
                               </div>
                             );
                           })
                         ) : (
-                          <div className="cafeOrdersPay__empty">Позиции заказа не найдены.</div>
+                          <div className="cafeOrdersPay__empty">
+                            Позиции заказа не найдены.
+                          </div>
                         )}
                       </div>
 
@@ -977,7 +1107,8 @@ const CafeOrderHistory = () => {
                     disabled={printingId === viewOrder.id}
                     title="Распечатать чек"
                   >
-                    <FaClipboardList /> {printingId === viewOrder.id ? "Печать…" : "Чек"}
+                    <FaClipboardList />{" "}
+                    {printingId === viewOrder.id ? "Печать…" : "Чек"}
                   </button>
                 </div>
               </div>
@@ -1025,10 +1156,13 @@ const CafeOrderHistory = () => {
               <div className="cafeOrdersHistoryItemsEdit__body">
                 <p className="cafeOrdersHistoryItemsEdit__hint">
                   Для возврата отметьте позиции, укажите количество и причину.
-                  Возврат проводится через новый endpoint по каждой строке заказа.
+                  Возврат проводится через новый endpoint по каждой строке
+                  заказа.
                 </p>
                 <div className="cafeOrdersPay__field">
-                  <label className="cafeOrdersPay__label">Способ возврата</label>
+                  <label className="cafeOrdersPay__label">
+                    Способ возврата
+                  </label>
                   <SearchableCombobox
                     value={itemsRefundPaymentMethod}
                     onChange={(v) => setItemsRefundPaymentMethod(v || "cash")}
@@ -1046,7 +1180,10 @@ const CafeOrderHistory = () => {
 
                 <div className="cafeOrdersHistoryItemsEdit__list">
                   {itemsEditRows.map((row) => (
-                    <div key={row._key} className="cafeOrdersHistoryItemsEdit__row">
+                    <div
+                      key={row._key}
+                      className="cafeOrdersHistoryItemsEdit__row"
+                    >
                       <div className="cafeOrdersHistoryItemsEdit__rowHead">
                         <span
                           className="cafeOrdersHistoryItemsEdit__title"
@@ -1058,15 +1195,24 @@ const CafeOrderHistory = () => {
                           <span className="cafeOrdersHistoryItemsEdit__price">
                             {fmtShort(row.price)} сом
                           </span>
-                          <span className="cafeOrdersHistoryItemsEdit__times" aria-hidden>
+                          <span
+                            className="cafeOrdersHistoryItemsEdit__times"
+                            aria-hidden
+                          >
                             ×
                           </span>
                           <div className="cafeOrdersHistoryItemsEdit__qtyField">
                             <span className="cafeOrdersHistoryItemsEdit__qtyCaption">
-                              Кол-во
+                              {row.is_sold_by_weight
+                                ? `Вес, ${saleUnitLabel(row.sale_unit)}`
+                                : "Кол-во"}
                             </span>
                             <div className="cafeOrdersHistoryItemsEdit__qtyStatic">
-                              {Math.max(1, Number(row.quantity) || 1)}
+                              {formatLineQtyDisplay(
+                                row.quantity,
+                                row.sale_unit,
+                                !!row.is_sold_by_weight,
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1077,9 +1223,13 @@ const CafeOrderHistory = () => {
                             <span>Уже возвращено: {row.refunded_quantity}</span>
                           ) : null}
                           <span>
-                            {Number(row.refunded_quantity) > 0 ? " · " : ""}
-                            К возврату:{" "}
-                            {Math.max(0, Math.floor(Number(row.refundable_quantity) || 0))}
+                            {Number(row.refunded_quantity) > 0 ? " · " : ""}К
+                            возврату:{" "}
+                            {formatLineQtyDisplay(
+                              row.refundable_quantity,
+                              row.sale_unit,
+                              !!row.is_sold_by_weight,
+                            )}
                           </span>
                         </div>
                       ) : null}
@@ -1089,7 +1239,13 @@ const CafeOrderHistory = () => {
                           checked={row.is_rejected}
                           onChange={(e) => {
                             const on = e.target.checked;
-                            const maxRefund = Math.max(0, Number(row.refundable_quantity) || 0);
+                            const rowUnit =
+                              row.sale_unit === "g" ? "g" : "kg";
+                            const maxRefund = lineQtyNum(
+                              row.refundable_quantity,
+                              !!row.is_sold_by_weight,
+                              rowUnit,
+                            );
                             setItemsEditRows((prev) =>
                               prev.map((x) =>
                                 x._key === row._key
@@ -1098,24 +1254,51 @@ const CafeOrderHistory = () => {
                                       is_rejected: on,
                                       return_quantity: on
                                         ? (() => {
-                                            const maxR = Math.max(1, maxRefund || 1);
-                                            const n = returnQtyNum(x.return_quantity);
-                                            if (x.return_quantity !== "" && n > 0 && n <= maxR) {
+                                            const maxR =
+                                              maxRefund || x.return_quantity;
+                                            const n = returnQtyNum(
+                                              x.return_quantity,
+                                              !!x.is_sold_by_weight,
+                                              rowUnit,
+                                            );
+                                            if (
+                                              x.return_quantity !== "" &&
+                                              n > 0 &&
+                                              n <= maxRefund
+                                            ) {
                                               return x.return_quantity;
                                             }
-                                            return Math.min(maxR, Math.max(1, n || maxR));
+                                            return maxRefund > 0
+                                              ? maxRefund
+                                              : x.return_quantity;
                                           })()
                                         : x.return_quantity,
-                                      rejection_reason: on ? x.rejection_reason : "",
+                                      rejection_reason: on
+                                        ? x.rejection_reason
+                                        : "",
                                     }
-                                  : x
-                              )
+                                  : x,
+                              ),
                             );
                           }}
-                          disabled={itemsEditSaving || Math.max(0, Number(row.refundable_quantity) || 0) <= 0}
+                          disabled={
+                            itemsEditSaving ||
+                            lineQtyNum(
+                              row.refundable_quantity,
+                              !!row.is_sold_by_weight,
+                              row.sale_unit === "g" ? "g" : "kg",
+                            ) <= 0
+                          }
                         />
                         <span>
-                          Возврат {Math.max(0, Number(row.refundable_quantity) || 0) <= 0 ? "(недоступен)" : ""}
+                          Возврат{" "}
+                          {lineQtyNum(
+                            row.refundable_quantity,
+                            !!row.is_sold_by_weight,
+                            row.sale_unit === "g" ? "g" : "kg",
+                          ) <= 0
+                            ? "(недоступен)"
+                            : ""}
                         </span>
                       </label>
                       {row.is_rejected ? (
@@ -1129,19 +1312,33 @@ const CafeOrderHistory = () => {
                             </span>
                             <input
                               type="text"
-                              inputMode="numeric"
+                              inputMode={
+                                row.is_sold_by_weight ? "decimal" : "numeric"
+                              }
                               autoComplete="off"
                               className="cafeOrders__input cafeOrdersHistoryItemsEdit__qty"
                               value={returnQtyInputValue(row.return_quantity)}
                               onChange={(e) => {
-                                const max = Math.max(1, Number(row.refundable_quantity) || 1);
-                                const next = parseReturnQtyDigits(e.target.value, max);
+                                const rowUnit =
+                                  row.sale_unit === "g" ? "g" : "kg";
+                                const max = lineQtyNum(
+                                  row.refundable_quantity,
+                                  !!row.is_sold_by_weight,
+                                  rowUnit,
+                                );
+                                const next = parseReturnQtyInput(
+                                  e.target.value,
+                                  max,
+                                  !!row.is_sold_by_weight,
+                                  rowUnit,
+                                );
+                                if (next === null) return;
                                 setItemsEditRows((prev) =>
                                   prev.map((x) =>
                                     x._key === row._key
                                       ? { ...x, return_quantity: next }
-                                      : x
-                                  )
+                                      : x,
+                                  ),
                                 );
                               }}
                               disabled={itemsEditSaving}
@@ -1160,8 +1357,8 @@ const CafeOrderHistory = () => {
                                 prev.map((x) =>
                                   x._key === row._key
                                     ? { ...x, rejection_reason: e.target.value }
-                                    : x
-                                )
+                                    : x,
+                                ),
                               )
                             }
                             disabled={itemsEditSaving}

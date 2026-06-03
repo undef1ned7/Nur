@@ -639,22 +639,16 @@ export const crmRoutes = (profile) => [
     "warehouse/warehouses",
     profile?.role !== "owner" ? AgentStocks : Warehouses,
   ),
-  createProtectedRoute(
-    "warehouse/partners/analytics",
-    () => (
-      <PartnerAnalyticsOwnerGate>
-        <PartnerAnalyticsList />
-      </PartnerAnalyticsOwnerGate>
-    ),
-  ),
-  createProtectedRoute(
-    "warehouse/partners/:partnerId/analytics",
-    () => (
-      <PartnerAnalyticsOwnerGate>
-        <PartnerAnalyticsDetail />
-      </PartnerAnalyticsOwnerGate>
-    ),
-  ),
+  createProtectedRoute("warehouse/partners/analytics", () => (
+    <PartnerAnalyticsOwnerGate>
+      <PartnerAnalyticsList />
+    </PartnerAnalyticsOwnerGate>
+  )),
+  createProtectedRoute("warehouse/partners/:partnerId/analytics", () => (
+    <PartnerAnalyticsOwnerGate>
+      <PartnerAnalyticsDetail />
+    </PartnerAnalyticsOwnerGate>
+  )),
   createProtectedRoute("warehouse/partners/:partnerId", PartnerCatalogPage),
   createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),

@@ -1,5 +1,10 @@
 /** Сериализация позиций заказа под OpenAPI OrderItemInline (создание / PATCH). */
 
+import {
+  isValidOrderQuantity,
+  serializeOrderQuantity,
+} from "../cafeMenuWeight";
+
 export const MAX_QTY = 2147483647;
 
 export const numStr = (n) => String(Number(n) || 0).replace(",", ".");
@@ -30,16 +35,19 @@ export const decimalStringOrNull = (v) => {
   return numStr(n);
 };
 
+const lineIsWeight = (i) => Boolean(i?.is_sold_by_weight);
+
+const lineSaleUnit = (i) => (i?.sale_unit === "g" ? "g" : "kg");
+
 /**
  * Одна строка заказа под OpenAPI OrderItemInline:
  * order, line_kind, menu_item | service_title, unit_price, quantity, is_rejected, rejection_reason.
  * `order`: null при создании заказа, uuid при PATCH.
  */
 export const serializeOrderItemInline = (i, orderRef) => {
-  const qty = Math.max(
-    1,
-    Math.min(MAX_QTY, Math.floor(Number(i.quantity) || 1))
-  );
+  const isWeight = lineIsWeight(i);
+  const saleUnit = lineSaleUnit(i);
+  const qty = serializeOrderQuantity(i.quantity, isWeight, saleUnit, MAX_QTY);
   const rejected = Boolean(i.is_rejected);
   const reasonRaw = String(i.rejection_reason || "").trim();
   const rejection_reason = rejected ? (reasonRaw || "—").slice(0, 500) : "";
@@ -84,11 +92,18 @@ export const normalizeOrderPayload = (f, isNew = false, editingOrderId = null) =
 
   const items = (f.items || [])
     .filter((i) => {
-      const qRaw = i.quantity === "" ? 0 : Number(i.quantity);
-      if (!i || !Number.isFinite(qRaw) || qRaw < 1) return false;
+      if (!i) return false;
       const lk = String(i.line_kind || "menu").toLowerCase();
-      if (lk === "service") return String(i.service_title || "").trim().length > 0;
-      return !!toId(i.menu_item);
+      if (lk === "service") {
+        return (
+          String(i.service_title || "").trim().length > 0 &&
+          isValidOrderQuantity(i.quantity, false, "kg")
+        );
+      }
+      return (
+        !!toId(i.menu_item) &&
+        isValidOrderQuantity(i.quantity, lineIsWeight(i), lineSaleUnit(i))
+      );
     })
     .map((i) => serializeOrderItemInline(i, orderRef));
 

@@ -456,16 +456,19 @@ function buildPrettyReceiptFromJSON(payload) {
 
   for (const it of items) {
     const name = String(it.name ?? "").trim() || "Позиция";
-    const qty = Math.max(1, Number(it.qty || 0));
+    const qty = Number(it.qty || 0);
     const price = Number(it.price || 0);
-    const sum = qty * price;
+    const sum = (Number.isFinite(qty) && qty > 0 ? qty : 1) * price;
     const comment = String(it.comment ?? "").trim();
+    const qtyLine =
+      String(it.qty_display ?? "").trim() ||
+      `${Number.isFinite(qty) && qty > 0 ? qty : 1} x ${money(price)}`;
 
     chunks.push(enc(name + "\n"));
     if (comment) {
       chunks.push(enc(`Комментарий: ${comment}\n`));
     }
-    chunks.push(enc(`${qty} x ${money(price)} = ${money(sum)}\n`));
+    chunks.push(enc(`${qtyLine} = ${money(sum)}\n`));
     chunks.push(enc("\n"));
   }
 

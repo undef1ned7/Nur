@@ -1710,6 +1710,11 @@
 
 /* ===== Блок CAFE-MENU-ITEM-PAGE ===== */
 .cafeMenuItemPage {
+  &__saleUnit {
+    margin-top: 8px;
+    max-width: 280px;
+  }
+
   &__header {
     display: flex;
     justify-content: space-between;

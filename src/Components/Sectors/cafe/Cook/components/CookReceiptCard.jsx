@@ -8,6 +8,7 @@ const CookReceiptCard = ({
   formatReceiptDate,
   getStatusLabel,
   extractPortionsFromTask,
+  formatKitchenTaskQty,
   toNum,
   isUpdating,
   onClaimOne,
@@ -27,6 +28,9 @@ const CookReceiptCard = ({
     isUpdating(group.id) ||
     (Array.isArray(group?.tasks_ids) && group.tasks_ids.some((id) => isUpdating(id)));
   const portions = extractPortionsFromTask(group);
+  const portionsLabel = formatKitchenTaskQty
+    ? formatKitchenTaskQty(group)
+    : String(portions);
 
   return (
     <article className="cafeCook__receipt">
@@ -51,7 +55,7 @@ const CookReceiptCard = ({
           <div className="cafeCook__rowTitle" title={group?.menu_item_title || ""}>
             {group?.menu_item_title || "Блюдо"}
           </div>
-          <div className="cafeCook__rowSub">Кол-во: {portions}</div>
+          <div className="cafeCook__rowSub">Кол-во: {portionsLabel}</div>
         </div>
 
         <div className="cafeCook__rowRight">

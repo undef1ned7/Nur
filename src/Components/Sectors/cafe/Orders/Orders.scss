@@ -552,6 +552,14 @@
     background: #fff;
   }
 
+  &__qtyUnit {
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted, #6b7280);
+    white-space: nowrap;
+  }
+
   &__itemRemove {
     padding: 10px 12px;
     min-height: 48px;
