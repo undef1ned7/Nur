@@ -20,6 +20,10 @@ import "./CafeInventory.scss";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  pickExpenseIdFromResponse,
+  recordCafePurchaseExpense,
+} from "../../../../../tools/cafePurchaseExpense";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -228,16 +232,55 @@ const CafeInventory = () => {
     setModalOpen(true);
   };
 
+  const recordEquipmentPurchaseExpense = async ({
+    title,
+    amount,
+    equipmentId,
+    purchaseDate,
+    notes,
+    source,
+  }) => {
+    const amt = toNum(amount);
+    if (amt < 0.01) return null;
+
+    let expenseId = null;
+    try {
+      expenseId = await recordCafePurchaseExpense({
+        title: `Закупка оборудования: ${title}`,
+        amount: amt,
+        note:
+          String(notes || "").trim() ||
+          `Инвентаризация: оборудование «${title}»`,
+        source,
+        sourceId: equipmentId,
+        expenseDate: purchaseDate || null,
+      });
+    } catch (expErr) {
+      alert(
+        `Оборудование сохранено, но расход «Закупки» не записан: ${validateResErrors(expErr)}`,
+        true,
+      );
+      return null;
+    }
+
+    if (expenseId) {
+      alert(`Расход «Закупки»: ${fmtMoney(amt)} сом.`);
+    }
+    return expenseId;
+  };
+
   const saveEquipment = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
 
+    const title = form.title.trim();
+    const priceNum = Math.max(0, toNum(form.price));
     const payload = {
-      title: form.title.trim(),
+      title,
       serial_number: form.serial_number.trim() || null,
       category: form.category.trim() || null,
       purchase_date: form.purchase_date || null,
-      price: form.price ? numStr(form.price) : null,
+      price: priceNum > 0 ? numStr(priceNum) : null,
       condition: form.condition,
       is_active: form.is_active,
       notes: form.notes.trim() || "",
@@ -247,11 +290,38 @@ const CafeInventory = () => {
       if (editingId == null) {
         const res = await api.post("/cafe/equipment/", payload);
         setEquipment((prev) => [...prev, res.data]);
+
+        let expenseId = pickExpenseIdFromResponse(res.data);
+        if (!expenseId && priceNum >= 0.01) {
+          expenseId = await recordEquipmentPurchaseExpense({
+            title,
+            amount: priceNum,
+            equipmentId: res.data?.id,
+            purchaseDate: form.purchase_date,
+            notes: form.notes,
+            source: "equipment_create",
+          });
+        }
       } else {
+        const prevRow = equipment.find((eq) => eq.id === editingId);
+        const prevPrice = toNum(prevRow?.price);
+
         const res = await api.patch(`/cafe/equipment/${editingId}/`, payload);
         setEquipment((prev) =>
-          prev.map((e) => (e.id === editingId ? res.data : e))
+          prev.map((eq) => (eq.id === editingId ? res.data : eq)),
         );
+
+        let expenseId = pickExpenseIdFromResponse(res.data);
+        if (!expenseId && priceNum >= 0.01 && prevPrice < 0.01) {
+          expenseId = await recordEquipmentPurchaseExpense({
+            title,
+            amount: priceNum,
+            equipmentId: editingId,
+            purchaseDate: form.purchase_date,
+            notes: form.notes,
+            source: "equipment_price_set",
+          });
+        }
       }
       setModalOpen(false);
     } catch (err) {
@@ -1109,7 +1179,7 @@ const CafeInventory = () => {
                 </div>
 
                 <div className="cafeInventory__field">
-                  <label className="cafeInventory__label">Цена (сом)</label>
+                  <label className="cafeInventory__label">Цена закупки (сом)</label>
                   <input
                     type="number"
                     min={0}
@@ -1120,6 +1190,10 @@ const CafeInventory = () => {
                       setForm((f) => ({ ...f, price: e.target.value }))
                     }
                   />
+                  <span className="cafeInventory__hint">
+                    При указании цены создаётся операционный расход «Закупки» (как
+                    на складе кафе).
+                  </span>
                 </div>
 
                 <div className="cafeInventory__field">

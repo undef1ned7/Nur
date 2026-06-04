@@ -52,6 +52,7 @@ import {
   toId,
 } from "./cafeOrderItemPayload";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { canCafeOrderPay } from "../../../../tools/cafeEmployeePermissions";
 import {
   defaultWeightQty,
   formatLineQtyDisplay,
@@ -414,6 +415,9 @@ const Orders = () => {
       isStaff,
     };
   }, [profile]);
+
+  const canPayOrders = useMemo(() => canCafeOrderPay(profile), [profile]);
+
   const [printingId, setPrintingId] = useState(null);
 
   // Cash/receipt printer binding is configured in Settings (Настройки → Печать).
@@ -1834,6 +1838,10 @@ const Orders = () => {
 
   const submitCheckoutPay = async () => {
     if (!payOrder?.id) return;
+    if (!canPayOrders) {
+      alert("Нет доступа на проведение оплаты заказов.", true);
+      return;
+    }
 
     const order = payOrder;
     const discount_amount = numStr(toNum(payForm.discountAmount));
@@ -2060,6 +2068,7 @@ const Orders = () => {
             const isTakeaway = tableLabel === TAKEAWAY_LABEL;
             const debtDue = toNum(o.balance_due);
             const showPayActions =
+              canPayOrders &&
               String(o.status || "").toLowerCase() === "open" &&
               (!o.is_paid || debtDue > 0);
 
@@ -3067,14 +3076,16 @@ const Orders = () => {
                     {printingId === payOrder.id ? "Печать…" : "Чек"}
                   </button>
 
-                  <button
-                    type="button"
-                    className="cafeOrders__btn cafeOrders__btn--primary"
-                    onClick={submitCheckoutPay}
-                    disabled={paying || printingId === payOrder.id}
-                  >
-                    {paying ? "Оплата…" : "Провести оплату"}
-                  </button>
+                  {canPayOrders ? (
+                    <button
+                      type="button"
+                      className="cafeOrders__btn cafeOrders__btn--primary"
+                      onClick={submitCheckoutPay}
+                      disabled={paying || printingId === payOrder.id}
+                    >
+                      {paying ? "Оплата…" : "Провести оплату"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

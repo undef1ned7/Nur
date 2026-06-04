@@ -172,10 +172,31 @@ export const fetchProductHistoryApi = async (params = {}) => {
   }
 };
 
-// Получение товара по штрих-коду
+/** Склад маркета: поиск товара по штрихкоду без POS (см. docs/new_mark.md). */
+export const lookupWarehouseProductByBarcodeApi = async (barcode, params = {}) => {
+  const encoded = encodeURIComponent(String(barcode || "").trim());
+  if (!encoded) {
+    return Promise.reject(new Error("Пустой штрихкод"));
+  }
+  try {
+    const response = await api.get(
+      `main/products/warehouse-barcode/${encoded}/`,
+      { params },
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      return Promise.reject(error.response);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// Получение товара по штрих-коду (глобальный каталог / касса)
 export const getProductByBarcodeApi = async (barcode) => {
   try {
-    const response = await api.get(`main/products/global-barcode/${barcode}/`);
+    const encoded = encodeURIComponent(String(barcode || "").trim());
+    const response = await api.get(`main/products/global-barcode/${encoded}/`);
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -184,8 +205,9 @@ export const getProductByBarcodeApi = async (barcode) => {
         "Get Product By Barcode Error Status:",
         error.response.status
       );
-      return Promise.reject(error.response.data);
+      return Promise.reject(error.response);
     }
+    return Promise.reject(error);
   }
 };
 
