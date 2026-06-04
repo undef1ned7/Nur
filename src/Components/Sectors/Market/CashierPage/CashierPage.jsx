@@ -30,6 +30,7 @@ import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
+import { isMarketWarehouseServiceProduct } from "../../../../tools/marketWarehouseFilters";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { resetPosSale, useSale } from "../../../../store/slices/saleSlice";
@@ -2287,8 +2288,9 @@ const CashierPage = () => {
       );
       const availableQuantity = parseFloat(product.quantity || 0);
 
-      // Проверяем наличие
+      // Проверяем наличие (услуги — без ограничения по остатку)
       if (
+        !isMarketWarehouseServiceProduct(product) &&
         !item.salePackage &&
         availableQuantity > 0 &&
         qtyNum > availableQuantity
@@ -2299,7 +2301,7 @@ const CashierPage = () => {
           `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
         );
         return;
-      } else if (item.salePackage) {
+      } else if (item.salePackage && !isMarketWarehouseServiceProduct(product)) {
         if (!(availableQuantity > 0)) {
           showAlert(
             "warning",
@@ -2711,7 +2713,10 @@ const CashierPage = () => {
           isFavorite: getProductFavorite(el),
         };
       })
-      .filter((el) => !!el.quantity || el.isCart)
+      .filter(
+        (el) =>
+          isMarketWarehouseServiceProduct(el) || !!el.quantity || el.isCart,
+      )
       .map((el, index) => ({ ...el, __orderIndex: index }))
       .sort((a, b) => {
         const favDelta = Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
@@ -2772,7 +2777,12 @@ const CashierPage = () => {
           __orderIndex: index,
         };
       })
-      .filter((product) => !!product.quantity || product.isCart)
+      .filter(
+        (product) =>
+          isMarketWarehouseServiceProduct(product) ||
+          !!product.quantity ||
+          product.isCart,
+      )
       .sort((a, b) => {
         const favDelta =
           Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
@@ -3605,7 +3615,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
-                              if (product) {
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                                 const availableQuantity = parseFloat(
                                   product.quantity || 0,
                                 );
@@ -3635,6 +3648,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                               const items =
                                 currentSale?.items || currentSale?.cart?.items || [];
                               const currentItem = items.find(
@@ -3648,7 +3665,7 @@ const CashierPage = () => {
                                   (p) => p.id === item.salePackage,
                                 )?.quantity_in_package,
                               );
-                              if (product && qip > 0) {
+                              if (qip > 0) {
                                 const totalConsume = calcTotalConsumeForProduct(
                                   items,
                                   item.productId,
@@ -3669,6 +3686,7 @@ const CashierPage = () => {
                                   pendingQtyLineInputRef.current.delete(lineKey);
                                   return;
                                 }
+                              }
                               }
                             }
                             if (numValue < 0) {
@@ -3747,7 +3765,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
-                              if (product) {
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                                 const availableQuantity = parseFloat(
                                   product.quantity || 0,
                                 );

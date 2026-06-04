@@ -213,6 +213,16 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         label: "Инвентаризация",
         backendKey: "can_view_cafe_inventory",
       },
+      {
+        value: "Проведение оплаты заказов",
+        label: "Проведение оплаты заказов",
+        backendKey: "can_view_cafe_order_pay",
+      },
+      {
+        value: "Возврат по заказам",
+        label: "Возврат по заказам",
+        backendKey: "can_view_cafe_order_return",
+      },
     ],
     "Строительная компания": [
       {
