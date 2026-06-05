@@ -37,8 +37,16 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
   useEffect(() => {
     const checkTokenValidity = async () => {
-      const token = localStorage.getItem("accessToken");
       const currentPath = window.location.pathname;
+
+      if (currentPath === "/crm/logout") {
+        clearTokens();
+        localStorage.removeItem("userId");
+        setIsCheckingToken(false);
+        return;
+      }
+
+      const token = localStorage.getItem("accessToken");
 
       // Если токена нет и мы не на публичной странице
       if (!token) {

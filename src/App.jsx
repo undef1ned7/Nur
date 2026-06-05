@@ -5,6 +5,7 @@ import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard.jsx";
 import Layout from "./Components/Layout/Layout.jsx";
 import { ScrollToTop } from "./hooks/ScrollToTop.jsx";
 import { publicRoutes } from "./config/routes.jsx";
+import Logout from "./Components/Auth/Logout/Logout.jsx";
 import RouteFallback from "./Components/common/RouteFallback/RouteFallback.jsx";
 import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
@@ -38,6 +39,7 @@ function AppRoutes({ profile }) {
       <Routes>
         {publicRoutes}
         <Route key="/crm" path="/crm" element={<Layout />}>
+          <Route path="logout" element={<Logout />} />
           {crmRoutesElements ?? (
             <Route key="crm-fallback" path="*" element={<RouteFallback />} />
           )}
