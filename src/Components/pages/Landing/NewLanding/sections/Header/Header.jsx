@@ -1,46 +1,41 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import LandingImg from "../../components/LandingImg";
 import phoneIcon from "../../assets/icons/phone.svg";
 import headerLogo from "../../assets/icons/headerLogo.svg";
+import {
+  LANDING_LANGUAGES,
+  LANDING_SECTION_LINKS,
+} from "../../constants/landingNav";
 import { DEMO_SECTION_ID, scrollToDemoSection } from "../../utils/scrollToDemo";
+import { scrollToLandingSection } from "../../utils/scrollToLandingSection";
 import "./header.scss";
 
-const SECTION_LINKS = [
-  { id: "features", label: "Возможности" },
-  { id: "for-whom", label: "Для кого" },
-  { id: "interface", label: "Интерфейс" },
-  { id: "tariff", label: "Тариф" },
-  { id: "team", label: "Команда" },
-];
-
-const scrollToSection = (id) => {
-  const el = document.getElementById(id);
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.history.replaceState(null, "", `/#${id}`);
-  }
-};
-
 const Header = () => {
+  const { t, i18n } = useTranslation("newLanding");
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const isLanding = location.pathname === "/";
   const currentHash = location.hash.replace("#", "");
+  const currentLang = (i18n.resolvedLanguage || i18n.language || "ru").startsWith(
+    "ky",
+  )
+    ? "ky"
+    : "ru";
 
   const closeMenu = () => setMenuOpen(false);
 
   const handleSectionClick = (e, sectionId) => {
     e.preventDefault();
     closeMenu();
+    scrollToLandingSection(navigate, location.pathname, sectionId);
+  };
 
-    if (isLanding) {
-      scrollToSection(sectionId);
-      return;
-    }
-
-    navigate({ pathname: "/", hash: sectionId });
+  const handleLanguageChange = (code) => {
+    i18n.changeLanguage(code);
+    closeMenu();
   };
 
   return (
@@ -48,11 +43,11 @@ const Header = () => {
       <div className="newHeader__container new-container">
         <div className="newHeader__left">
           <Link to="/" className="newHeader__logo" onClick={closeMenu}>
-            <LandingImg src={headerLogo} alt="NurCRM" priority />
+            <LandingImg src={headerLogo} alt={t("header.logoAlt")} priority />
           </Link>
-          <nav className="newHeader__nav" aria-label="Основная навигация">
+          <nav className="newHeader__nav" aria-label={t("nav.ariaLabel")}>
             <ul className="newHeader__menu">
-              {SECTION_LINKS.map(({ id, label }) => (
+              {LANDING_SECTION_LINKS.map(({ id, labelKey }) => (
                 <li key={id} className="newHeader__menu-item">
                   <a
                     href={`/#${id}`}
@@ -61,7 +56,7 @@ const Header = () => {
                     }
                     onClick={(e) => handleSectionClick(e, id)}
                   >
-                    {label}
+                    {t(labelKey)}
                   </a>
                 </li>
               ))}
@@ -73,7 +68,7 @@ const Header = () => {
                   }
                   onClick={closeMenu}
                 >
-                  База знаний
+                  {t("nav.knowledgeBase")}
                 </NavLink>
               </li>
               <li className="newHeader__menu-item">
@@ -90,7 +85,7 @@ const Header = () => {
                     scrollToDemoSection(navigate, location.pathname);
                   }}
                 >
-                  FAQ
+                  {t("nav.faq")}
                 </a>
               </li>
             </ul>
@@ -98,21 +93,30 @@ const Header = () => {
         </div>
         <div className="newHeader__right">
           <NavLink to="/login" className="newHeader__login" onClick={closeMenu}>
-            Логин
+            {t("header.login")}
           </NavLink>
           <div className="newHeader__lang">
-            <button type="button">RU</button>
-            <span>/</span>
-            <button type="button">KG</button>
+            {LANDING_LANGUAGES.map(({ code, label }, index) => (
+              <Fragment key={code}>
+                {index > 0 && <span>/</span>}
+                <button
+                  type="button"
+                  className={currentLang === code ? "active" : undefined}
+                  onClick={() => handleLanguageChange(code)}
+                >
+                  {label}
+                </button>
+              </Fragment>
+            ))}
           </div>
           <div className="newHeader__contacts">
             <LandingImg src={phoneIcon} alt="" aria-hidden="true" />
-            <a href="tel:+996556900556">+996 (556) 900 556</a>
+            <a href="tel:+996556900556">{t("header.phone")}</a>
           </div>
           <button
             type="button"
             className="newHeader__burger"
-            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-label={menuOpen ? t("header.menuClose") : t("header.menuOpen")}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >

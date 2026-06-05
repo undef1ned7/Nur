@@ -1,5 +1,7 @@
+import { useTranslation } from "react-i18next";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import LandingImg from "../../components/LandingImg";
+import { getTranslationArray } from "../../utils/getTranslationArray";
 import "./BusinessProblems.scss";
 import cart1 from "./img/cart1.svg";
 import cart2 from "./img/cart2.svg";
@@ -12,7 +14,9 @@ import logobanner4 from "./img/logobanner4.svg";
 import logobanner5 from "./img/logobanner5.svg";
 
 const BusinessProblems = () => {
+  const { t } = useTranslation("newLanding");
   const scrollToDemo = useScrollToDemo();
+  const cards = getTranslationArray(t, "businessProblems.cards");
 
   return (
     <section id="interface" className="business pt-[100px]">
@@ -21,19 +25,22 @@ const BusinessProblems = () => {
           <div className="col-6">
             <div className="business__tems">
               <div className="business__tems-dot"></div>
-              <p className="business__tems-text">ПРОБЛЕМЫ БИЗНЕСА</p>
+              <p className="business__tems-text">
+                {t("businessProblems.eyebrow")}
+              </p>
             </div>
             <h2 className="business__title">
-              Бизнес теряет деньги из-за{" "}
-              <span className="business__title-span">хаоса</span>
+              {t("businessProblems.title")}{" "}
+              <span className="business__title-span">
+                {t("businessProblems.titleHighlight")}
+              </span>
             </h2>
             <p className="business__description">
-              Таблицы, звонки, сотрудники и продажи - когда все разных местах,
-              бизнес теряет контроль.
+              {t("businessProblems.description")}
             </p>
             <div className="business__line"></div>
             <button type="button" className="business__btn" onClick={scrollToDemo}>
-              Попробовать NurCRM ⭢
+              {t("businessProblems.cta")}
             </button>
             <div className="business__banner">
               <LandingImg
@@ -72,48 +79,46 @@ const BusinessProblems = () => {
           <div className="col-6 ">
             <div className="business__carts">
               <div className="cols business__carts-col">
-                <div className="business__cart">
-                  <div className="business__cart__up">
-                    <LandingImg className="business__cart__img" src={cart1} alt="" aria-hidden="true" />
-                    <p className="business__cart__num">01 </p>
+                {cards.slice(0, 2).map((card, index) => (
+                  <div key={card.title} className="business__cart">
+                    <div className="business__cart__up">
+                      <LandingImg
+                        className="business__cart__img"
+                        src={[cart1, cart2][index]}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                      <p className="business__cart__num">
+                        {String(index + 1).padStart(2, "0")}{" "}
+                      </p>
+                    </div>
+                    <h3 className="business__cart__title">{card.title}</h3>
+                    <p className="business__cart__description">
+                      {card.description}
+                    </p>
                   </div>
-                  <h3 className="business__cart__title">Потеря клиентов</h3>
-                  <p className="business__cart__description">
-                    Заявки забываются, а сделки не доходят до оплаты.
-                  </p>
-                </div>
-                <div className="business__cart">
-                  <div className="business__cart__up">
-                    <LandingImg className="business__cart__img" src={cart2} alt="" aria-hidden="true" />
-                    <p className="business__cart__num">02 </p>
-                  </div>
-                  <h3 className="business__cart__title">Нет контроля</h3>
-                  <p className="business__cart__description">
-                    Сложно отслеживать работу сотрудников и продажи.
-                  </p>
-                </div>
+                ))}
               </div>
               <div className="cols business__carts-col">
-                <div className="business__cart">
-                  <div className="business__cart__up">
-                    <LandingImg className="business__cart__img" src={cart3} alt="" aria-hidden="true" />
-                    <p className="business__cart__num">03 </p>
+                {cards.slice(2, 4).map((card, index) => (
+                  <div key={card.title} className="business__cart">
+                    <div className="business__cart__up">
+                      <LandingImg
+                        className="business__cart__img"
+                        src={[cart3, cart4][index]}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                      <p className="business__cart__num">
+                        {String(index + 3).padStart(2, "0")}{" "}
+                      </p>
+                    </div>
+                    <h3 className="business__cart__title">{card.title}</h3>
+                    <p className="business__cart__description">
+                      {card.description}
+                    </p>
                   </div>
-                  <h3 className="business__cart__title">Хаос в данных</h3>
-                  <p className="business__cart__description">
-                    Информация хранится в чатах, Excel и разных сервисах.
-                  </p>
-                </div>
-                <div className="business__cart">
-                  <div className="business__cart__up">
-                    <LandingImg className="business__cart__img" src={cart4} alt="" aria-hidden="true" />
-                    <p className="business__cart__num">04 </p>
-                  </div>
-                  <h3 className="business__cart__title">Нет аналитики</h3>
-                  <p className="business__cart__description">
-                    Непонятно, что приносит прибыль, а что тянет бизнес вниз.
-                  </p>
-                </div>
+                ))}
               </div>
             </div>
           </div>

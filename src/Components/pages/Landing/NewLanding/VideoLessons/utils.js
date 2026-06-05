@@ -16,7 +16,7 @@ export function flattenLessons(courses) {
   );
 }
 
-export function formatLessonDate(dateString) {
+export function formatLessonDate(dateString, localeCode = "ru") {
   if (!dateString) return "";
   try {
     return formatDistanceToNow(new Date(dateString), {

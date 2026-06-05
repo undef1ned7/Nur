@@ -1,51 +1,15 @@
+import { useTranslation } from "react-i18next";
 import LandingImg from "../../components/LandingImg";
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
+import { getTranslationArray } from "../../utils/getTranslationArray";
 import "./Rate.scss";
 import iconbutton from "./img/iconbutton.svg";
 import blur from "./img/blur.svg";
 
-const PLANS = [
-  {
-    id: "start",
-    title: "Стандарт",
-    subtitle: "Для старта и небольших команд",
-    price: "499c",
-    note: "Лучший выбор для старта",
-    features: [
-      "CRM система",
-      "Клиенты и контакты",
-      "Базовая аналитика",
-      "Поддержка",
-    ],
-    variant: "default",
-  },
-  {
-    id: "growth",
-    title: "Стандарт",
-    subtitle: "Для растущего бизнеса",
-    price: "2990с",
-    note: "Бльше возможностей для роста",
-    features: [
-      "Автоматизация процессов",
-      "Все из тарифа “Старт”",
-      "Расширенная аналитика",
-      "И еще что то",
-    ],
-    variant: "hit",
-  },
-  {
-    id: "enterprise",
-    title: "Стандарт",
-    subtitle: "Для крупных компаний",
-    price: "9990с",
-    note: "Бльше возможностей для роста",
-    features: [
-      "Расширенные права доступа",
-      "Обучение и внедрение",
-      "Полная аналитика",
-      "Персональный менеджер",
-    ],
-    variant: "default",
-  },
+const PLAN_CONFIG = [
+  { id: "start", variant: "default" },
+  { id: "standard", variant: "hit" },
+  { id: "business", variant: "default" },
 ];
 
 const FeatureItem = ({ text }) => (
@@ -56,12 +20,15 @@ const FeatureItem = ({ text }) => (
 );
 
 const Rate = () => {
+  const { t } = useTranslation("newLanding");
+  const scrollToDemo = useScrollToDemo();
+
   return (
     <section id="tariff" className="rate">
       <div className="rate__container new-container">
         <h1 className="rate__title">
-          Выберите тариф, который{" "}
-          <span className="rate__title-span">подходит именно вам</span>
+          {t("rate.title")}{" "}
+          <span className="rate__title-span">{t("rate.titleHighlight")}</span>
         </h1>
         <button type="button" className="rate__button">
           <LandingImg
@@ -70,48 +37,64 @@ const Rate = () => {
             alt=""
             aria-hidden="true"
           />
-          Экономьте до 20% при оплате за год
+          {t("rate.annualDiscount")}
         </button>
 
         <div className="rate__carts">
-          {PLANS.map((plan) => (
-            <div key={plan.id} className="col-4">
-              <div
-                className={
-                  plan.variant === "hit" ? "rate__cart1" : "rate__cart"
-                }
-              >
-                {plan.variant === "hit" && (
-                  <div className="rate__cart1__hit">
-                    <p className="rate__cart1__hit-text">ХИТ</p>
-                  </div>
-                )}
-                <h2 className="rate__cart__title">{plan.title}</h2>
-                <p className="rate__cart__description">{plan.subtitle}</p>
-                <p className="rate__cart__price">
-                  <span className="rate__cart__price-num">{plan.price}</span>
-                  <span className="rate__cart__price-month">/мес.</span>
-                </p>
-                <p className="rate__cart__description">{plan.note}</p>
-                <div className="rate__cart__features">
-                  {plan.features.map((feature) => (
-                    <FeatureItem key={feature} text={feature} />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className={
-                    plan.variant === "hit"
-                      ? "rate__cart__button rate__cart__button1"
-                      : "rate__cart__button"
-                  }
+          {PLAN_CONFIG.map(({ id, variant }) => {
+            const features = getTranslationArray(t, `rate.plans.${id}.features`);
+
+            return (
+              <div key={id} className="col-4">
+                <div
+                  className={variant === "hit" ? "rate__cart1" : "rate__cart"}
                 >
-                  Попробовать бесплатно
-                </button>
+                  {variant === "hit" && (
+                    <div className="rate__cart1__hit">
+                      <p className="rate__cart1__hit-text">
+                        {t("rate.hitBadge")}
+                      </p>
+                    </div>
+                  )}
+                  <h2 className="rate__cart__title">
+                    {t(`rate.plans.${id}.title`)}
+                  </h2>
+                  <p className="rate__cart__description">
+                    {t(`rate.plans.${id}.subtitle`)}
+                  </p>
+                  <p className="rate__cart__price">
+                    <span className="rate__cart__price-num">
+                      {t(`rate.plans.${id}.price`)}
+                    </span>
+                    <span className="rate__cart__price-month">
+                      {" "}
+                      {t("rate.priceUnit")}
+                    </span>
+                  </p>
+                  <p className="rate__cart__description">
+                    {t(`rate.plans.${id}.note`)}
+                  </p>
+                  <div className="rate__cart__features">
+                    {features.map((feature) => (
+                      <FeatureItem key={feature} text={feature} />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={
+                      variant === "hit"
+                        ? "rate__cart__button rate__cart__button1"
+                        : "rate__cart__button"
+                    }
+                    onClick={scrollToDemo}
+                  >
+                    {t("rate.cta")}
+                  </button>
+                </div>
+                <p className="rate__descriptionend">{t("rate.trialNote")}</p>
               </div>
-              <p className="rate__descriptionend">10 дней бесплатно</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <LandingImg className="rate__blur" src={blur} alt="" aria-hidden="true" />
       </div>

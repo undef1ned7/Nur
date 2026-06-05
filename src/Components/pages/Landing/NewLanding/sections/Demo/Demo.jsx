@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLandingIndustries } from "../../hooks/useLandingIndustries";
 import { useSubmitApplicationForm } from "../../../../SubmitApplication/useSubmitApplicationForm";
 import LandingImg from "../../components/LandingImg";
@@ -7,6 +8,7 @@ import blur1 from "./img/blur1.svg";
 import line from "./img/line.svg";
 
 const Demo = () => {
+  const { t } = useTranslation("newLanding");
   const { industries, loading: loadingIndustries } = useLandingIndustries();
   const [industryId, setIndustryId] = useState("");
 
@@ -19,7 +21,7 @@ const Demo = () => {
     e.preventDefault();
 
     if (!industryId) {
-      setError("Выберите сферу");
+      setError(t("demo.industryRequired"));
       return;
     }
 
@@ -30,9 +32,14 @@ const Demo = () => {
     await submit({
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
-      text: industry ? `Сфера: ${industry.name}` : "",
+      text: industry
+        ? t("demo.industryPrefix", { name: industry.name })
+        : "",
     });
   };
+
+  const displayError =
+    error === "Ошибка при оставлении запроса" ? t("demo.submitError") : error;
 
   return (
     <section id="demo" className="demo">
@@ -42,32 +49,30 @@ const Demo = () => {
         <div className="demo__left">
           <LandingImg className="demo__line" src={line} alt="" aria-hidden="true" />
           <h1 className="demo__left__title">
-            Получите демо <span className="demo-span">NurCRM</span> под ваш
-            бизнес
+            {t("demo.title")}{" "}
+            <span className="demo-span">{t("demo.titleHighlight")}</span>{" "}
+            {t("demo.titleSuffix")}
           </h1>
-          <p className="demo__left__description">
-            Оставьте заявку — мы свяжемся с вами, покажем систему и подберем
-            решение под вашу сферу.
-          </p>
+          <p className="demo__left__description">{t("demo.description")}</p>
         </div>
         <form className="demo__form" onSubmit={onFormSubmit} noValidate>
-          <h2 className="demo__form__title">Оставьте заявку</h2>
+          <h2 className="demo__form__title">{t("demo.formTitle")}</h2>
 
           {ok && (
             <div
               className="demo__form__message demo__form__message--success"
               role="status"
             >
-              Заявка успешно отправлена
+              {t("demo.success")}
             </div>
           )}
 
-          {!!error && (
+          {!!displayError && (
             <div
               className="demo__form__message demo__form__message--error"
               role="alert"
             >
-              {error}
+              {displayError}
             </div>
           )}
 
@@ -75,7 +80,7 @@ const Demo = () => {
             className="demo__form__inp"
             type="text"
             name="full_name"
-            placeholder="Введите ваше имя"
+            placeholder={t("demo.namePlaceholder")}
             value={form.full_name}
             onChange={onChange}
             required
@@ -84,7 +89,7 @@ const Demo = () => {
             className="demo__form__inp"
             type="tel"
             name="phone"
-            placeholder="Номер телефона"
+            placeholder={t("demo.phonePlaceholder")}
             value={form.phone}
             onChange={onChange}
             inputMode="tel"
@@ -99,7 +104,9 @@ const Demo = () => {
             required
           >
             <option value="" disabled>
-              {loadingIndustries ? "Загрузка сфер…" : "Выберите сферу"}
+              {loadingIndustries
+                ? t("demo.industryLoading")
+                : t("demo.industryPlaceholder")}
             </option>
             {industries.map((industry) => (
               <option key={industry.id} value={industry.id}>
@@ -112,7 +119,7 @@ const Demo = () => {
             className="demo__form__btn"
             disabled={sending}
           >
-            {sending ? "Отправка..." : "Оставить заявку"}
+            {sending ? t("demo.submitting") : t("demo.submit")}
           </button>
         </form>
       </div>

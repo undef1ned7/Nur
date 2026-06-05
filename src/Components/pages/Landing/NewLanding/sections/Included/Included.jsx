@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { getTranslationArray } from "../../utils/getTranslationArray";
 import "./Included.scss";
 
-const STATS = [
-  { value: 25, suffix: "%", label: "Рост прибыли" },
-  { value: -60, suffix: "%", label: "Меньше ошибок" },
-  { value: 3, suffix: "x", label: "Быстрее ответы" },
-  { static: "24/7", label: "Контроль бизнеса" },
+const STATS_CONFIG = [
+  { key: "profit", value: 25, suffix: "%" },
+  { key: "errors", value: -60, suffix: "%" },
+  { key: "responses", value: 3, suffix: "x" },
+  { key: "control", static: "24/7" },
 ];
 
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -67,8 +69,10 @@ const AnimatedStatValue = ({ stat, isVisible, delay = 0 }) => {
 };
 
 const Included = () => {
+  const { t } = useTranslation("newLanding");
   const statsRef = useRef(null);
   const [statsVisible, setStatsVisible] = useState(false);
+  const gridItems = getTranslationArray(t, "included.grid");
 
   useEffect(() => {
     const node = statsRef.current;
@@ -94,51 +98,22 @@ const Included = () => {
         <div className="included__main">
           <div className="included__info">
             <h1 className="included__title">
-              Что входит <span className="included-yellow">в каждый</span> тариф
+              {t("included.title")}{" "}
+              <span className="included-yellow">{t("included.titleHighlight")}</span>{" "}
+              {t("included.titleSuffix")}
             </h1>
-            <p className="included__description">
-              Мы обеспечиваем не только систему, но и полноценную поддержку на
-              каждом этапе
-            </p>
+            <p className="included__description">{t("included.description")}</p>
           </div>
 
           <div className="included__grid">
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Подключение <br />
-                <span className="included-yellow">за 1 день</span>
-              </h2>
-            </div>
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Обучение <br />
-                <span className="included-yellow">сотрудников</span>
-              </h2>
-            </div>
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Техподдержка <br />
-                <span className="included-yellow">24/7</span>
-              </h2>
-            </div>
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Помощь <br />
-                <span className="included-yellow">в настройке</span>
-              </h2>
-            </div>
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Гибкая <br />
-                <span className="included-yellow">настройка</span>
-              </h2>
-            </div>
-            <div className="included__grid-item">
-              <h2 className="included__subtitle">
-                Регулярные <br />
-                <span className="included-yellow">обновления</span>
-              </h2>
-            </div>
+            {gridItems.map((item) => (
+                <div key={item.title} className="included__grid-item">
+                  <h2 className="included__subtitle">
+                    {item.title} <br />
+                    <span className="included-yellow">{item.highlight}</span>
+                  </h2>
+                </div>
+              ))}
           </div>
         </div>
 
@@ -146,9 +121,9 @@ const Included = () => {
           ref={statsRef}
           className={`included__stats${statsVisible ? " included__stats--visible" : ""}`}
         >
-          {STATS.map((stat, index) => (
+          {STATS_CONFIG.map((stat, index) => (
             <div
-              key={stat.label}
+              key={stat.key}
               className="included__stat-box"
               style={{ "--stat-delay": `${index * 120}ms` }}
             >
@@ -157,7 +132,9 @@ const Included = () => {
                 isVisible={statsVisible}
                 delay={index * 120}
               />
-              <div className="included__stat-label">{stat.label}</div>
+              <div className="included__stat-label">
+                {t(`included.stats.${stat.key}`)}
+              </div>
             </div>
           ))}
         </div>

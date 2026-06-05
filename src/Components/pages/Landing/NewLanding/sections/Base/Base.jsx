@@ -1,4 +1,6 @@
+import { useTranslation } from "react-i18next";
 import LandingImg from "../../components/LandingImg";
+import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import "./Base.scss";
 import img from "./img/img.svg";
 import btn from "./img/btn.svg";
@@ -7,6 +9,9 @@ import line2 from "./img/line2.svg";
 import blur from "./img/blur.svg";
 
 const Base = () => {
+  const { t } = useTranslation("newLanding");
+  const scrollToDemo = useScrollToDemo();
+
   return (
     <section className="base">
       <div className="base__container new-container">
@@ -15,16 +20,19 @@ const Base = () => {
           <LandingImg className="base__line2" src={line2} alt="" aria-hidden="true" />
           <div className="base__content__left">
             <h2 className="base__content__left__subtitle">
-              <span className="base__content__left__dot"></span> ПОДДЕРЖКА И
-              ОБУЧНЕНИЕ
+              <span className="base__content__left__dot"></span>{" "}
+              {t("base.eyebrow")}
             </h2>
-            <h1 className="base__content__left__title">База знаний NurCRM</h1>
+            <h1 className="base__content__left__title">{t("base.title")}</h1>
             <p className="base__content__left__description">
-              Подробные видеоуроки и инструкции помогут быстро осваоить и
-              использовать ее на максимум
+              {t("base.description")}
             </p>
-            <button type="button" className="base__content__left__btn">
-              Перейти к базе знаний ⭢
+            <button
+              type="button"
+              className="base__content__left__btn"
+              onClick={scrollToDemo}
+            >
+              {t("base.cta")}
             </button>
           </div>
 
