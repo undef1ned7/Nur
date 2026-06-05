@@ -9,7 +9,7 @@ import blur from "./img/blur.svg";
 const PLAN_CONFIG = [
   { id: "start", variant: "default" },
   { id: "standard", variant: "hit" },
-  { id: "business", variant: "default" },
+  { id: "individual", variant: "default" },
 ];
 
 const FeatureItem = ({ text }) => (

@@ -1,5 +1,6 @@
 // Разрешенные пути без токена (публичные страницы)
 export const ALLOWED_PATHS_WITHOUT_TOKEN = [
+  "/crm/logout",
   "/login",
   "/register",
   "/register-access/settings",
