@@ -37,9 +37,9 @@ function AppRoutes({ profile }) {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         {publicRoutes}
-        <Route path="/crm" element={<Layout />}>
+        <Route key="/crm" path="/crm" element={<Layout />}>
           {crmRoutesElements ?? (
-            <Route path="*" element={<RouteFallback />} />
+            <Route key="crm-fallback" path="*" element={<RouteFallback />} />
           )}
         </Route>
       </Routes>

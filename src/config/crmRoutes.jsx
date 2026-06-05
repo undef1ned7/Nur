@@ -534,7 +534,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
-  <Route element={<BuildingLayout />} path="building">
+  <Route key="building" element={<BuildingLayout />} path="building">
     {[
       createProtectedRoute("analytics", BuildingAnalytics),
       createProtectedRoute("cash-register", BuildingCashRegister),
