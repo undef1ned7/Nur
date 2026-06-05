@@ -27,6 +27,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { canCafeOrderReturn } from "../../../../tools/cafeEmployeePermissions";
 import {
   formatLineQtyDisplay,
   lineQtyNum,
@@ -94,17 +95,6 @@ const safeUserData = () => {
   }
 };
 
-/** Как в Masters / CafeEmployEmployeeDetail: роль с бэка может быть en или ru. */
-const normalizeCafeMgmtRole = (raw) => {
-  const l = String(raw || "")
-    .trim()
-    .toLowerCase();
-  if (["owner", "владелец"].includes(l)) return "owner";
-  if (["admin", "administrator", "админ", "администратор"].includes(l))
-    return "admin";
-  return l;
-};
-
 const newIdempotencyKey = () => {
   try {
     if (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -156,10 +146,10 @@ const CafeOrderHistory = () => {
   const userRole = String(userData?.role || "");
   const userId = localStorage.getItem("userId");
 
-  const canManageReturns = useMemo(() => {
-    const m = normalizeCafeMgmtRole(profile?.role || userRole);
-    return m === "owner" || m === "admin";
-  }, [profile?.role, userRole]);
+  const canManageReturns = useMemo(
+    () => canCafeOrderReturn(profile || userData),
+    [profile, userData],
+  );
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;

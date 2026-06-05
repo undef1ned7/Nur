@@ -179,6 +179,16 @@ const SECTOR_ACCESS_TYPES = {
       label: "Инвентаризация",
       backendKey: "can_view_cafe_inventory",
     },
+    {
+      value: "Проведение оплаты заказов",
+      label: "Проведение оплаты заказов",
+      backendKey: "can_view_cafe_order_pay",
+    },
+    {
+      value: "Возврат по заказам",
+      label: "Возврат по заказам",
+      backendKey: "can_view_cafe_order_return",
+    },
   ],
   Магазин: MARKET_ACCESS_TYPES,
   Маркет: MARKET_ACCESS_TYPES,
@@ -392,6 +402,11 @@ const MARKET_CASHIER_SPECIAL_KEYS = new Set([
   "can_view_market_employee_return",
 ]);
 
+const CAFE_WAITER_ORDER_SPECIAL_KEYS = new Set([
+  "can_view_cafe_order_pay",
+  "can_view_cafe_order_return",
+]);
+
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
 
 const AccessList = ({
@@ -544,6 +559,9 @@ const AccessList = ({
         allMenuPermissions.add("can_view_market_employee_return");
         allMenuPermissions.add("can_view_market_procurement");
         allMenuPermissions.add("can_view_market_supplier");
+      } else if (String(sectorName || "").trim() === "Кафе") {
+        allMenuPermissions.add("can_view_cafe_order_pay");
+        allMenuPermissions.add("can_view_cafe_order_return");
       }
     }
 
@@ -744,13 +762,20 @@ const AccessList = ({
           (basic) => basic.backendKey === type.backendKey,
         ) &&
         !additionalServicesMapping[type.backendKey] &&
-        !MARKET_CASHIER_SPECIAL_KEYS.has(type.backendKey),
+        !MARKET_CASHIER_SPECIAL_KEYS.has(type.backendKey) &&
+        !CAFE_WAITER_ORDER_SPECIAL_KEYS.has(type.backendKey),
     );
   }, [availableAccessTypes]);
 
   const marketCashierSpecialTypes = useMemo(() => {
     return availableAccessTypes.filter((type) =>
       MARKET_CASHIER_SPECIAL_KEYS.has(type.backendKey),
+    );
+  }, [availableAccessTypes]);
+
+  const cafeWaiterOrderSpecialTypes = useMemo(() => {
+    return availableAccessTypes.filter((type) =>
+      CAFE_WAITER_ORDER_SPECIAL_KEYS.has(type.backendKey),
     );
   }, [availableAccessTypes]);
 
@@ -818,6 +843,14 @@ const AccessList = ({
       type.label.toLowerCase().includes(query),
     );
   }, [marketCashierSpecialTypes, searchQuery]);
+
+  const filteredCafeWaiterOrderSpecial = useMemo(() => {
+    if (!searchQuery.trim()) return cafeWaiterOrderSpecialTypes;
+    const query = searchQuery.toLowerCase();
+    return cafeWaiterOrderSpecialTypes.filter((type) =>
+      type.label.toLowerCase().includes(query),
+    );
+  }, [cafeWaiterOrderSpecialTypes, searchQuery]);
 
   const handleSave = () => {
     const payloadForBackend = {};
@@ -1095,6 +1128,128 @@ const AccessList = ({
                       : "white",
                     border: `1px solid ${
                       selectedAccess[accessType.backendKey] ? "#2196f3" : "#ddd"
+                    }`,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "white";
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!selectedAccess[accessType.backendKey]}
+                    onChange={() => toggleAccess(accessType.backendKey)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#333",
+                      userSelect: "none",
+                    }}
+                  >
+                    {accessType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Заказы кафе: оплата и возврат для официантов */}
+        {filteredCafeWaiterOrderSpecial.length > 0 && (
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                paddingBottom: "8px",
+                borderBottom: "2px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Заказы кафе — официанты
+              </h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() =>
+                    handleSelectAll(filteredCafeWaiterOrderSpecial, true)
+                  }
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Выбрать все
+                </button>
+                <button
+                  onClick={() =>
+                    handleSelectAll(filteredCafeWaiterOrderSpecial, false)
+                  }
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "8px",
+                maxHeight: "300px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "#e8f4fd",
+                borderRadius: "6px",
+              }}
+            >
+              {filteredCafeWaiterOrderSpecial.map((accessType) => (
+                <label
+                  key={accessType.backendKey}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    background: selectedAccess[accessType.backendKey]
+                      ? "#bbdefb"
+                      : "white",
+                    border: `1px solid ${
+                      selectedAccess[accessType.backendKey] ? "#1976d2" : "#ddd"
                     }`,
                     transition: "all 0.2s",
                   }}

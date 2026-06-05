@@ -30,6 +30,7 @@ import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
+import { isMarketWarehouseServiceProduct } from "../../../../tools/marketWarehouseFilters";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { resetPosSale, useSale } from "../../../../store/slices/saleSlice";
@@ -58,6 +59,13 @@ import {
   useMarketCashierMultiCart,
 } from "../../../../hooks/useMarketCashierMultiCart";
 import CashierCartsBar from "./components/CashierCartsBar";
+import PieceSaleModal from "./components/PieceSaleModal";
+import {
+  cartItemUnitLabel,
+  getDefaultPackage,
+  maxPiecesAvailable,
+  supportsPieceFromPack,
+} from "../../../../../tools/marketPackPieceSale";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
@@ -305,11 +313,6 @@ const CashierPage = () => {
     if (num % 1 === 0) return String(num);
     // Иначе убираем лишние нули в конце
     return String(num).replace(/\.?0+$/, "");
-  };
-
-  const getDefaultPiecePackage = (product) => {
-    const packages = Array.isArray(product?.packages) ? product.packages : [];
-    return packages.find((pkg) => Number(pkg?.quantity_in_package) > 0) || null;
   };
 
   /**
@@ -781,6 +784,7 @@ const CashierPage = () => {
     message: "",
   });
 
+  const [pieceSaleModal, setPieceSaleModal] = useState(null);
   const [mobileProductsList, setMobileProductsList] = useState(false);
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
   const [favoriteLoadingMap, setFavoriteLoadingMap] = useState({});
@@ -918,6 +922,37 @@ const CashierPage = () => {
     };
   }, [desktopProductsWidth]);
 
+  const resolveProductWithPackages = useCallback(
+    async (productId, fallbackProduct = null) => {
+      const local =
+        products.find((item) => item.id === productId) || fallbackProduct;
+      if (local && supportsPieceFromPack(local)) return local;
+      if (local && Array.isArray(local.packages)) return local;
+      try {
+        const { data } = await api.get(`/main/products/${productId}/`);
+        return data || local;
+      } catch {
+        return local;
+      }
+    },
+    [products],
+  );
+
+  const openPieceSaleChoice = useCallback((product, source = "click", extra = {}) => {
+    if (!supportsPieceFromPack(product)) return false;
+    setPieceSaleModal({
+      product,
+      step: "choice",
+      source,
+      ...extra,
+    });
+    return true;
+  }, []);
+
+  const closePieceSaleModal = useCallback(() => {
+    setPieceSaleModal(null);
+  }, []);
+
   const handleProductCardClick = async (product, event) => {
     const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
 
@@ -934,6 +969,7 @@ const CashierPage = () => {
       return;
     }
 
+    if (openPieceSaleChoice(product, "click")) return;
     await addToCart(product);
   };
 
@@ -1251,12 +1287,37 @@ const CashierPage = () => {
             const it = scanItems[i];
             const pid = it.product ?? it.product_id;
             const p = products.find((x) => x.id === pid);
-            if (p && productMatchesBarcode(p, barcode)) {
+            const matchesScan =
+              (p && productMatchesBarcode(p, barcode)) ||
+              (!p && pid && !it.sale_package);
+            if (matchesScan) {
               requestCartQuantityFocus({
                 itemId: it.id,
                 productId: pid,
                 salePackage: it.sale_package ?? null,
               });
+              if (!it.sale_package) {
+                const resolved = await resolveProductWithPackages(pid, p);
+                if (supportsPieceFromPack(resolved)) {
+                  const totalConsume = calcTotalConsumeForProduct(
+                    scanItems,
+                    pid,
+                    products,
+                  );
+                  const pkg = getDefaultPackage(resolved);
+                  const otherConsume = Math.max(0, totalConsume - 1);
+                  openPieceSaleChoice(resolved, "scan", {
+                    scanCartItemId: it.id,
+                    maxQuantity: pkg
+                      ? maxPiecesAvailable(
+                          resolved.quantity,
+                          otherConsume,
+                          pkg,
+                        )
+                      : null,
+                  });
+                }
+              }
               break;
             }
           }
@@ -2087,12 +2148,23 @@ const CashierPage = () => {
     );
   }, [dispatch, getSelectedSaleId, openShiftId, preferredWholesaleMode]);
 
-  const addToCartWithPackage = async (product, salePackageId = null) => {
+  const addToCartWithPackage = async (
+    product,
+    salePackageId = null,
+    quantityOverride = null,
+  ) => {
     // Для весовых товаров при остатке < 1 добавляем весь остаток.
     // Если остаток 0/минус/некорректный — подставляем 1.
     const availableQuantity = normalizeQuantity(product?.quantity);
-    const qtyFromStock =
-      availableQuantity > 0 && availableQuantity < 1 ? availableQuantity : 1;
+    const defaultQty =
+      salePackageId != null
+        ? 1
+        : availableQuantity > 0 && availableQuantity < 1
+          ? availableQuantity
+          : 1;
+    const qtyToAdd = normalizeQuantity(
+      quantityOverride != null ? quantityOverride : defaultQty,
+    );
 
     try {
       // Проверяем наличие открытой смены перед добавлением товара
@@ -2144,7 +2216,7 @@ const CashierPage = () => {
 
       if (existingItem) {
         const currentQty = normalizeQuantity(existingItem.quantity);
-        const newQuantity = normalizeQuantity(currentQty + qtyFromStock);
+        const newQuantity = normalizeQuantity(currentQty + qtyToAdd);
         // Обновляем количество
         await dispatch(
           updateManualFilling({
@@ -2166,7 +2238,7 @@ const CashierPage = () => {
           manualFilling({
             id: saleId,
             productId: product.id,
-            quantity: normalizeQuantity(qtyFromStock),
+            quantity: qtyToAdd,
             ...(salePackageId ? { salePackageId } : {}),
           }),
         );
@@ -2191,6 +2263,76 @@ const CashierPage = () => {
 
   const addToCart = async (product) => {
     return addToCartWithPackage(product, null);
+  };
+
+  const revertScanPackLine = async (cartItemId) => {
+    if (!cartItemId) return;
+    const saleId = getSelectedSaleId();
+    if (!saleId) return;
+    const items =
+      store.getState().sale?.start?.items ||
+      store.getState().sale?.start?.cart?.items ||
+      currentSale?.items ||
+      currentSale?.cart?.items ||
+      [];
+    const line = items.find((item) => item.id === cartItemId);
+    if (!line || line.sale_package) return;
+
+    const currentQty = normalizeQuantity(line.quantity);
+    if (currentQty <= 1) {
+      await dispatch(
+        deleteProductInCart({
+          id: saleId,
+          productId: cartItemId,
+        }),
+      );
+      return;
+    }
+    await dispatch(
+      updateManualFilling({
+        id: saleId,
+        productId: cartItemId,
+        quantity: normalizeQuantity(currentQty - 1),
+      }),
+    );
+  };
+
+  const handlePieceSaleChoosePack = async (product, source) => {
+    closePieceSaleModal();
+    if (source === "scan") return;
+    await addToCart(product);
+  };
+
+  const handlePieceSaleConfirmPieces = async (product, salePackageId, qty) => {
+    const pkg = getDefaultPackage(product);
+    if (!pkg || !salePackageId) return;
+
+    const items = currentSale?.items || currentSale?.cart?.items || [];
+    const otherConsume = calcTotalConsumeForProduct(items, product.id, products);
+    const maxQty = maxPiecesAvailable(
+      product.quantity,
+      otherConsume,
+      pkg,
+    );
+
+    if (maxQty > 0 && qty > maxQty) {
+      showAlert(
+        "warning",
+        "Недостаточно товара",
+        `Доступно не более ${maxQty} ${pkg.unit || "шт."}`,
+      );
+      return;
+    }
+
+    const modalSource = pieceSaleModal?.source;
+    const scanCartItemId = pieceSaleModal?.scanCartItemId;
+    closePieceSaleModal();
+
+    if (modalSource === "scan" && scanCartItemId) {
+      await revertScanPackLine(scanCartItemId);
+    }
+
+    await addToCartWithPackage(product, salePackageId, qty);
   };
 
   const updateQuantity = async (item, delta) => {
@@ -2287,8 +2429,9 @@ const CashierPage = () => {
       );
       const availableQuantity = parseFloat(product.quantity || 0);
 
-      // Проверяем наличие
+      // Проверяем наличие (услуги — без ограничения по остатку)
       if (
+        !isMarketWarehouseServiceProduct(product) &&
         !item.salePackage &&
         availableQuantity > 0 &&
         qtyNum > availableQuantity
@@ -2299,7 +2442,7 @@ const CashierPage = () => {
           `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
         );
         return;
-      } else if (item.salePackage) {
+      } else if (item.salePackage && !isMarketWarehouseServiceProduct(product)) {
         if (!(availableQuantity > 0)) {
           showAlert(
             "warning",
@@ -2711,7 +2854,10 @@ const CashierPage = () => {
           isFavorite: getProductFavorite(el),
         };
       })
-      .filter((el) => !!el.quantity || el.isCart)
+      .filter(
+        (el) =>
+          isMarketWarehouseServiceProduct(el) || !!el.quantity || el.isCart,
+      )
       .map((el, index) => ({ ...el, __orderIndex: index }))
       .sort((a, b) => {
         const favDelta = Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
@@ -2772,7 +2918,12 @@ const CashierPage = () => {
           __orderIndex: index,
         };
       })
-      .filter((product) => !!product.quantity || product.isCart)
+      .filter(
+        (product) =>
+          isMarketWarehouseServiceProduct(product) ||
+          !!product.quantity ||
+          product.isCart,
+      )
       .sort((a, b) => {
         const favDelta =
           Number(Boolean(b.isFavorite)) - Number(Boolean(a.isFavorite));
@@ -3056,7 +3207,10 @@ const CashierPage = () => {
 
                   // Если есть найденные товары, добавляем первый в корзину
                   if (filteredProducts.length > 0) {
-                    addToCart(filteredProducts[0]);
+                    const firstProduct = filteredProducts[0];
+                    if (!openPieceSaleChoice(firstProduct, "click")) {
+                      addToCart(firstProduct);
+                    }
                     // Очищаем поле поиска после добавления товара
                     setSearchTerm("");
                     // Сбрасываем флаг очистки после сканирования, так как это ручное добавление
@@ -3079,7 +3233,7 @@ const CashierPage = () => {
               </div>
             ) : (
               filteredProducts.map((product) => {
-                const piecePackage = getDefaultPiecePackage(product);
+                const piecePackage = getDefaultPackage(product);
                 const cartItem = cart.find(
                   (item) => !item.isCustom && item.productId === product.id,
                 );
@@ -3254,14 +3408,19 @@ const CashierPage = () => {
             {cart.length === 0 ? (
               <div className="cashier-page__cart-empty">Корзина пуста</div>
             ) : (
-              cart.map((item) => (
+              cart.map((item) => {
+                const cartProduct = item.productId
+                  ? products.find((p) => p.id === item.productId)
+                  : null;
+                const cartUnitLabel = cartItemUnitLabel(item, cartProduct);
+                return (
                 <div key={item.id} className="cashier-page__cart-item">
                   <div className="cashier-page__cart-item-main">
                     <div className="cashier-page__cart-item-head">
                       <div className="cashier-page__cart-item-name-wrap">
                         <span className="cashier-page__cart-item-name">
                           {item.name}
-                          {item.salePackage ? " (поштучно)" : ""}
+                          {item.salePackage ? ` (${cartUnitLabel})` : ""}
                         </span>
                         {Array.isArray(item.promotionRules) &&
                           item.promotionRules.length > 0 && (
@@ -3424,7 +3583,7 @@ const CashierPage = () => {
                     <div className="cashier-page__cart-item-row">
                       <label className="cashier-page__cart-item-field">
                         <span className="cashier-page__cart-item-field-label">
-                          Цена
+                          Цена{item.salePackage ? ` / ${cartUnitLabel}` : ""}
                         </span>
                         {canMarketEditPrice ? (
                           <input
@@ -3605,7 +3764,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
-                              if (product) {
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                                 const availableQuantity = parseFloat(
                                   product.quantity || 0,
                                 );
@@ -3635,6 +3797,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                               const items =
                                 currentSale?.items || currentSale?.cart?.items || [];
                               const currentItem = items.find(
@@ -3648,7 +3814,7 @@ const CashierPage = () => {
                                   (p) => p.id === item.salePackage,
                                 )?.quantity_in_package,
                               );
-                              if (product && qip > 0) {
+                              if (qip > 0) {
                                 const totalConsume = calcTotalConsumeForProduct(
                                   items,
                                   item.productId,
@@ -3669,6 +3835,7 @@ const CashierPage = () => {
                                   pendingQtyLineInputRef.current.delete(lineKey);
                                   return;
                                 }
+                              }
                               }
                             }
                             if (numValue < 0) {
@@ -3747,7 +3914,10 @@ const CashierPage = () => {
                               const product = products.find(
                                 (p) => p.id === item.productId,
                               );
-                              if (product) {
+                              if (
+                                product &&
+                                !isMarketWarehouseServiceProduct(product)
+                              ) {
                                 const availableQuantity = parseFloat(
                                   product.quantity || 0,
                                 );
@@ -3826,7 +3996,8 @@ const CashierPage = () => {
                     </div>
                   </div>
                 </div>
-              ))
+              );
+              })
             )}
           </div>
 
@@ -3884,6 +4055,18 @@ const CashierPage = () => {
         <ReceiptsModal onClose={() => setShowReceiptsModal(false)} />
       )}
 
+      {pieceSaleModal?.product && (
+        <PieceSaleModal
+          product={pieceSaleModal.product}
+          step={pieceSaleModal.step || "choice"}
+          source={pieceSaleModal.source || "click"}
+          maxQuantity={pieceSaleModal.maxQuantity ?? null}
+          onClose={closePieceSaleModal}
+          onChoosePack={handlePieceSaleChoosePack}
+          onConfirmPieces={handlePieceSaleConfirmPieces}
+        />
+      )}
+
       {showHotkeyProductsModal && (
         <HotkeyProductsModal
           hotkeyGroup={hotkeyProductsGroup}
@@ -3892,7 +4075,11 @@ const CashierPage = () => {
           error={hotkeyProductsError}
           onClose={() => setShowHotkeyProductsModal(false)}
           onSelectGroup={openHotkeyProductsModal}
-          onAddProduct={addToCart}
+          onAddProduct={(product) => {
+            if (!openPieceSaleChoice(product, "click")) {
+              void addToCart(product);
+            }
+          }}
           onAddProductPiece={addToCartWithPackage}
         />
       )}

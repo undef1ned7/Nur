@@ -9,6 +9,31 @@ export const MARKET_WAREHOUSE_KIND = {
   bundle: "bundle",
 };
 
+/** Товар-услуга склада маркета (без учёта остатка на кассе). */
+export const isMarketWarehouseServiceProduct = (item) =>
+  String(item?.kind ?? "")
+    .trim()
+    .toLowerCase() === MARKET_WAREHOUSE_KIND.service;
+
+const normalizeKind = (item) =>
+  String(item?.kind ?? MARKET_WAREHOUSE_KIND.product)
+    .trim()
+    .toLowerCase();
+
+/** Обычный товар (не услуга и не комплект). */
+export const isMarketWarehouseProductKind = (item) =>
+  normalizeKind(item) === MARKET_WAREHOUSE_KIND.product;
+
+/** Есть положительный остаток на складе. */
+export const hasMarketWarehouseStock = (item) => {
+  const qty = parseFloat(item?.quantity);
+  return Number.isFinite(qty) && qty > 0;
+};
+
+/** Кандидат в состав комплекта: только товар с остатком. */
+export const isKitCompositionCandidate = (item) =>
+  isMarketWarehouseProductKind(item) && hasMarketWarehouseStock(item);
+
 export const MARKET_WAREHOUSE_PRESETS = [
   { value: "discounted", label: "Товары со скидкой" },
   { value: "shelf_life_expires_7d", label: "Срок годности истекает в течение 7 дней" },

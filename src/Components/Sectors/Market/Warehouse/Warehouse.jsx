@@ -25,6 +25,7 @@ import {
 } from "./hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
+import { lookupMarketWarehouseProductByBarcode } from "../../../../../tools/marketWarehouseBarcodeScan";
 
 const WAREHOUSE_SELECTED_IDS_KEY = "marketWarehouseSelectedProductIds";
 const WAREHOUSE_SELECTED_SNAPSHOTS_KEY = "marketWarehouseSelectedProductSnapshots";
@@ -350,33 +351,9 @@ const Warehouse = () => {
       lastScannedBarcodeRef.current = scanned;
       lastScanTimeRef.current = now;
       setScanLookupLoading(true);
-      let tempSaleId = null;
       try {
-        const startRes = await api.post("/main/pos/sales/start/", {
-          order_discount_total: 0,
-        });
-        tempSaleId = startRes?.data?.id;
-        if (!tempSaleId) {
-          alert("Не удалось подготовить поиск по штрихкоду.", true);
-          return;
-        }
-
-        const scanRes = await api.post(`/main/pos/sales/${tempSaleId}/scan/`, {
-          barcode: scanned,
-        });
-
-        const scanData = scanRes?.data || {};
-        const scanItems = Array.isArray(scanData?.items)
-          ? scanData.items
-          : Array.isArray(scanData?.cart?.items)
-            ? scanData.cart.items
-            : [];
-
-        const productId =
-          scanItems.length > 0
-            ? scanItems[scanItems.length - 1]?.product ||
-              scanItems[scanItems.length - 1]?.product_id
-            : null;
+        const result = await lookupMarketWarehouseProductByBarcode(scanned);
+        const productId = result?.product?.id;
 
         if (productId) {
           navigate(`/crm/sklad/${productId}`);
@@ -391,13 +368,6 @@ const Warehouse = () => {
         );
         alert(errorMessage, true);
       } finally {
-        if (tempSaleId) {
-          try {
-            await api.delete(`/main/pos/sales/${tempSaleId}/`);
-          } catch {
-            // ignore temporary sale cleanup errors
-          }
-        }
         barcodeProcessingRef.current = false;
         setScanLookupLoading(false);
         setTimeout(() => {

@@ -1,4 +1,4 @@
-# Кафе — требования к API (документация для бэкенда)
+# Кафе — требования к API (единая документация для бэкенда)
 
 Документ по задачам с фронта CRM (`/crm/cafe/...`).  
 **Базовый префикс:** `/api/cafe/` (прод: `https://app.nurcrm.kg/api/cafe/...`).
@@ -13,13 +13,15 @@
 - Фильтрация: `CompanyBranchQuerysetMixin`, `?branch=<uuid>`.
 - Даты: `YYYY-MM-DD`, интервал включительно (timezone компании, `Asia/Bishkek`).
 - Деньги: decimal/string с 2 знаками.
+- Расходы «Закупки»: `tools/cafePurchaseExpense.js` → `POST /api/cafe/expenses/`, категория `zakupki`.
 
 | Раздел | Маршрут CRM | Компонент (фронт) |
 |--------|-------------|-------------------|
 | Аналитика | `/crm/cafe/analytics` | `CafeAnalytics.jsx`, `Reports.jsx` |
 | Склад | `/crm/cafe/stock` | `Stock.jsx` |
 | Инвентаризация | `/crm/cafe/inventory` | `CafeInventory.jsx`, `HouseholdInventoryTab.jsx` |
-| Заказы | `/crm/cafe/orders` | `Orders.jsx` |
+| Заказы | `/crm/cafe/orders` | `Orders.jsx`, `CafeOrdersHistory.jsx` |
+| Сотрудники | `/crm/employ` | `Masters.jsx`, `AccessList.jsx` |
 
 ---
 
@@ -31,40 +33,32 @@
 GET /api/cafe/analytics/sales/dynamics/?date_from=...&date_to=...&period=day|week|month&branch=...
 ```
 
-**Бэкенд (по отчёту команды):** `apps/cafe/analytics.py` → `SalesDynamicsView`, URL в `apps/cafe/urls.py`.
+**Бэкенд:** `apps/cafe/analytics.py` → `SalesDynamicsView`.
 
 ### Ответ
 
-`date_from`, `date_to`, `period`, `basis: "paid_at"`, `totals` (`orders_count`, `items_qty`, `revenue`), `series[]` (`label`, `date_from`, `date_to`, …).
+`date_from`, `date_to`, `period`, `basis: "paid_at"`, `totals` (`orders_count`, `items_qty`, `revenue`), `series[]`.
 
 ### Правила
 
 - `is_paid=true`, дата `paid_at`, строки `is_rejected=false`.
-- Авто `period`: ≤62 дней → `day`, иначе `week` (фронт дублирует в `resolveCafeSalesDynamicsPeriod`; при >366 дней шлёт `month`).
-- `period=day` и диапазон >366 дней → **400** (бэкенд).
-- Кэш ~30–60 с (бэкенд).
+- Авто `period`: ≤62 дней → `day`, иначе `week`; при >366 дней фронт шлёт `month`.
+- `period=day` и диапазон >366 дней → **400**.
+- Кэш ~30–60 с.
 
 ### Фронт
 
 | Файл | Что делает |
 |------|------------|
-| `tools/cafeAnalyticsDynamics.js` | `GET /cafe/analytics/sales/dynamics/`; при **404/501** — fallback N× `sales/summary/` |
-| `CafeAnalytics.jsx`, `Reports.jsx` | График «Динамика продаж» — один запрос; KPI — по-прежнему один `sales/summary/` в `fetchAll` |
+| `tools/cafeAnalyticsDynamics.js` | `GET dynamics/`; при **404/501** — fallback N× `sales/summary/` |
+| `CafeAnalytics.jsx`, `Reports.jsx` | График — один запрос |
 
-### Чеклист бэкенда
+### Чеклист
 
-- [x] `GET analytics/sales/dynamics/`
-- [x] `date_from`, `date_to`, `period`
-- [x] `totals` + `series`
-- [x] Та же база, что `sales/summary/`
-
-### Чеклист фронта
-
-- [x] Один запрос на график
-- [x] Fallback при отсутствии эндпоинта
-- [x] KPI не дублируют N× `summary`
-
-**Статус:** при деплое бэка с `dynamics/` на проде fallback не нужен; 429 на графике должны исчезнуть.
+| | Бэкенд | Фронт |
+|---|--------|-------|
+| `GET analytics/sales/dynamics/` | [x] | [x] |
+| Fallback при 404 | — | [x] |
 
 ---
 
@@ -100,41 +94,35 @@ PATCH/DELETE системной → **403**.
 POST /api/cafe/warehouse/{id}/receive/
 ```
 
-Ответ: товар + `expense_id`, `expense_amount`, `movement_id` (ожидается бэкендом).
+Ответ: товар + `expense_id`, `expense_amount`, `movement_id`.
 
 ### Фронт
 
 | Действие | Реализация |
 |----------|------------|
 | Создание товара | `POST /cafe/warehouse/` — **без** `construction/cashflows` |
-| Оприходование | `POST .../receive/`; при **404** — fallback `PUT` (старый бэк) |
-| Касса | `tools/cafeCashflowCategory.js` + `KassaModals.jsx` — категория «Закупки» / `zakupki` **не редактируется и не удаляется** в UI |
+| Оприходование | `POST .../receive/`; при **404** — fallback `PUT` |
+| Касса | `tools/cafeCashflowCategory.js` — «Закупки» не редактируется в UI |
 
-**Вариант A (согласовано):** операционный расход только `CafeExpense` на бэке; фронт **не дублирует** cashflow при складе.
+**Вариант A:** расход только `CafeExpense` на бэке; фронт **не дублирует** cashflow.
 
-### Чеклист бэкенда
+### Чеклист
 
-- [x] Системная категория «Закупки»
-- [x] Запрет PATCH/DELETE категории
-- [x] Авто-расход на создание и приход
-- [x] `source`, `source_id`
-- [x] `POST .../receive/` + `expense_id` в ответе
-- [ ] Cashflow на бэке (вариант A: только `CafeExpense`; дубль cashflow не требуется)
-
-### Чеклист фронта
-
-- [x] Убраны ручные `POST /construction/cashflows/` на складе
-- [x] `POST .../receive/` (+ fallback `PUT`)
-- [x] Защита категории «Закупки» в кассе
-- [ ] Явный вызов `GET /expense-categories/` на странице склада (не нужен — расход создаёт бэк)
-
-**Статус:** интеграция готова; на проде проверить, что `receive/` отвечает не 404 и в аналитике расходов видны «Закупки».
+| | Бэкенд | Фронт |
+|---|--------|-------|
+| Авто-расход, `receive/`, `expense_id` | [x] | [x] |
+| Cashflow на бэке (вариант A) | [ ] | — |
 
 ---
 
-## 3. Посуда и расходники (household)
+## 3. Инвентаризация `/crm/cafe/inventory`
 
-### Префиксы
+Страница объединяет вкладки: **оборудование**, **акты по оборудованию**, **посуда и расходники**, **сверка склада**.  
+Все закупки → **`CafeExpense`**, категория **«Закупки»** (`zakupki`).
+
+---
+
+### 3.1. Посуда и расходники (household)
 
 | Ресурс | Путь |
 |--------|------|
@@ -142,51 +130,114 @@ POST /api/cafe/warehouse/{id}/receive/
 | Движения | `.../receive/`, `.../write-off/` |
 | Инвентаризация | `/api/cafe/household-inventory/sessions/` + `.../confirm/` |
 
-**Бэкенд:** `apps/cafe/household_views.py`, модели в `apps/cafe/models.py`.
+**Бэкенд:** `apps/cafe/household_views.py`.
 
-### POST сессии инвентаризации
+#### POST сессии
 
 ```json
 {
   "comment": "...",
-  "items": [
-    { "item": "uuid", "qty_counted": "118" }
-  ]
+  "items": [{ "item": "uuid", "qty_counted": "118" }]
 }
 ```
 
-Альтернатива на бэке: ключ `lines` с тем же форматом. Фронт шлёт **`items`**.
+Фронт шлёт **`items`** (бэк может принимать и `lines`).
 
-### Фронт
+#### Авто `CafeExpense`
 
-Вкладка **«Посуда и расходники»** в `CafeInventory.jsx` → `HouseholdInventoryTab.jsx`:
+| Триггер | `source` |
+|---------|----------|
+| `POST` с `remainder > 0` + `unit_price` | `household_create` |
+| `POST .../receive/` | `household_receipt` |
 
-- CRUD `household-items/`
-- `POST .../receive/`, `POST .../write-off/`
-- `POST household-inventory/sessions/` (тело с `items`)
-- `GET sessions/{id}/`, `POST .../confirm/`
-- **Нет** `PATCH` черновика акта в UI (только создание + просмотр + проведение)
+Бэкенд создаёт расход на `receive/`; фронт дублирует `POST /cafe/expenses/`, если нет `expense_id` в ответе.
 
-### Чеклист бэкенда
+#### Фронт (`HouseholdInventoryTab.jsx`)
 
-- [x] Модели `Household*`
-- [x] CRUD номенклатуры
-- [x] `receive` / `write-off`
-- [x] Сессии + `confirm` + summary
-- [x] `CafeExpense` «Закупки» на приход с `unit_price`
-- [x] PATCH черновика: `comment` + пересоздание строк (`items` / `lines`)
-- [x] Сериализатор: `items` в `Meta.fields` (POST без AssertionError)
+- CRUD, оприходование / списание, акты инвентаризации
+- Цена обязательна при приходе и при начальном остатке
 
-### Чеклист фронта
+#### Чеклист
 
-- [x] Вкладка и номенклатура
-- [x] Оприходование / списание
-- [x] Создание и проведение актов
-- [x] Расход «Закупки» при создании (начальный остаток + цена) и оприходовании — `tools/cafePurchaseExpense.js` → `POST /cafe/expenses/` (если бэк не вернул `expense_id`)
-- [ ] Редактирование черновика акта (`PATCH`) — при необходимости отдельная задача
-- [ ] Поддержка ключа `lines` в POST (сейчас только `items`; бэк принимает оба)
+| | Бэкенд | Фронт |
+|---|--------|-------|
+| CRUD, receive, write-off, сессии | [x] | [x] |
+| Расход «Закупки» | [x] | [x] |
+| PATCH черновика акта в UI | [x] бэк | [ ] фронт |
 
-**Статус:** основной сценарий закрыт; PATCH черновика — только на бэке.
+---
+
+### 3.2. Оборудование (`/api/cafe/equipment/`)
+
+#### Поля
+
+| Поле | Комментарий |
+|------|-------------|
+| `title` | Обязательно |
+| `price` | Сумма закупки **одной** единицы |
+| `purchase_date` | → `expense_date` |
+| `condition` | `good` / `repair` / `broken` |
+
+#### Авто `CafeExpense` (целевое на бэке)
+
+| Триггер | `source` | Сумма |
+|---------|----------|--------|
+| `POST` с `price >= 0.01` | `equipment_create` | `price` |
+| `PATCH` — цена задана впервые | `equipment_price_set` | `price` |
+| `PATCH` — рост цены (опц.) | `equipment_receipt` | дельта |
+
+Ответ (как на складе):
+
+```json
+{
+  "id": "uuid",
+  "title": "Холодильник",
+  "price": "45000.00",
+  "expense_id": "uuid",
+  "expense_amount": "45000.00"
+}
+```
+
+Фронт: `pickExpenseIdFromResponse` — также `expense.id`, `movement.expense_id`.
+
+#### Опционально: приход
+
+```http
+POST /api/cafe/equipment/{id}/receive/
+```
+
+```json
+{ "quantity": "1", "unit_price": "12000.00", "note": "Докупка" }
+```
+
+`source`: `equipment_receipt`. При **404** фронт использует только `POST/PATCH` с `price`.
+
+#### Фронт (`CafeInventory.jsx`)
+
+- [x] `recordCafePurchaseExpense` при создании и при первом указании цены
+- [x] Подсказка у поля «Цена закупки»
+
+#### Чеклист бэкенда
+
+- [ ] `POST/PATCH` + `price` → `CafeExpense`, `expense_id` в ответе
+- [ ] Идемпотентность `(company, source, source_id)`
+
+---
+
+### 3.3. Сверка продуктов склада
+
+`POST /api/cafe/inventory/sessions/` + `.../confirm/` по товарам `/cafe/warehouse/`.
+
+При `confirm/`, если факт > учётного:
+
+- оприходование на складе;
+- `CafeExpense` с `source`: `warehouse_receipt` или `inventory_confirm`.
+
+Фронт **не** шлёт расход при confirm — только бэкенд.
+
+#### Чеклист
+
+- [ ] Confirm → оприходование + расход при излишке (бэкенд)
 
 ---
 
@@ -205,57 +256,224 @@ POST /api/cafe/orders/{id}/pay/
 
 ### Фронт (`Orders.jsx`)
 
-- Карточки способов оплаты, смешанная оплата (`validateSplitAmounts` из `tools/marketCashierSplitPayment.js`)
+- Смешанная оплата (`validateSplitAmounts`)
 - Предоплата только при `debt`
-- Быстрое создание гостя в модалке оплаты
+- Кнопки оплаты — по доступу `can_view_cafe_order_pay` (§7)
 
-### Чеклист бэкенда
+### Чеклист
 
-- [x] `split` + `payments[]`
-- [x] `debt` + предоплата
-- [x] `pay_now` + `client_id`
-- [x] Идемпотентность `idempotency_key`
-
-### Чеклист фронта
-
-- [x] Все сценарии из таблицы
-- [x] UI смешанной оплаты и долга
-
-**Статус:** готово с обеих сторон.
+| | Бэкенд | Фронт |
+|---|--------|-------|
+| split, debt, idempotency | [x] | [x] |
+| 403 без права на pay | [ ] | [x] UI |
 
 ---
 
-## 5. Аналитика: финансы (дополнение, вне исходного ТЗ)
+## 5. Аналитика: наличные и безналичные (смешанная оплата)
 
-Фронт уже использует `GET /cafe/analytics/finance/` (`income_breakdown`, `income_items`) в `CafeAnalytics.jsx` для модалки «Финансы» и разбивки оплат в «Выручка». Отдельный чеклист бэка — по `docs/cafe_ops_analytics_ru.md`, если нужна детализация split/debt в `income_breakdown`.
+**Проблема:** при `payment_method: split` нельзя отдавать одну строку «Смешанная» на всю сумму — нужна разбивка по `payments[]`.
+
+### 5.1. Каналы
+
+| Канал | `method` | UI |
+|-------|----------|-----|
+| Наличные | `cash` | «Наличные» |
+| Безналичные | `card`, `transfer` | «Безналичные» |
+
+```
+наличные + безналичные = оплаченная выручка за период
+```
+
+### 5.2. Тела `pay/` (фронт уже шлёт)
+
+**Split:**
+
+```json
+{
+  "payment_method": "split",
+  "payments": [
+    { "method": "cash", "amount": "500.00" },
+    { "method": "card", "amount": "300.00" }
+  ],
+  "close_order": true,
+  "idempotency_key": "..."
+}
+```
+
+**Долг с предоплатой:**
+
+```json
+{
+  "payment_method": "debt",
+  "prepaid_amount": "200.00",
+  "prepaid_payment_method": "cash",
+  "client_id": "uuid"
+}
+```
+
+Предоплата → аналитика по `prepaid_payment_method`; остаток — долг, не выручка.
+
+### 5.3. Агрегация
+
+1. Приоритет: таблица **фактических платежей** (`payments[]`, prepaid).
+2. Legacy: `order.payment_method` + `paid_amount`.
+3. База: `paid_at`, `is_paid=true`.
+
+При split 500 cash + 300 card → наличные 500, безналичные 300. **Не** `mixed: 800`.
+
+### 5.4. Эндпоинты
+
+**`GET /api/cafe/analytics/revenue-inflow/`** — рекомендуемый ответ:
+
+```json
+{
+  "by_channel": {
+    "cash": { "total": "125000.00", "orders_count": 42 },
+    "non_cash": { "total": "98000.50", "orders_count": 38 }
+  },
+  "by_method": [
+    { "payment_method": "cash", "amount": "125000.00", "orders_count": 42 },
+    { "payment_method": "card", "amount": "75000.00", "orders_count": 30 }
+  ]
+}
+```
+
+Без строки `split`/`mixed`, если есть дочерние платежи.
+
+**`GET /api/cafe/analytics/finance/`** — `income_breakdown[]`:
+
+```json
+{
+  "method": "cash",
+  "payment_channel": "cash",
+  "total": "125000.00",
+  "count": 42
+}
+```
+
+```json
+{
+  "method": "card",
+  "payment_channel": "non_cash",
+  "total": "75000.00",
+  "count": 30
+}
+```
+
+### 5.5. Модель (рекомендация)
+
+**`CafeOrderPayment`:** `order`, `method` (`cash`|`card`|`transfer`), `amount`, `paid_at`, `kind` (`checkout`|`prepaid`|`debt_repayment`).
+
+При `split` — N записей по `payments[]`; `order.payment_method = split` только для UI списка.
+
+### 5.6. Фронт
+
+| Файл | Поведение |
+|------|-----------|
+| `Orders.jsx` | `payments[]` при split |
+| `CafeAnalytics.jsx` | `normalizeIncomeBreakdownToInflowRows` |
+| `CafeAnalyticsModals.jsx` | Таблицы по способам |
+
+### 5.7. Чеклист бэкенда
+
+- [ ] Сохранять каждую строку `payments[]` при split
+- [ ] Агрегация по платежам, не по `split` целиком
+- [ ] `cash` / `card`+`transfer` → каналы
+- [ ] Предоплата по `prepaid_payment_method`
+- [ ] (Желательно) `by_channel` в ответе
+
+### 5.8. Smoke-тест
+
+1. Заказ 1000: split 600 cash + 400 card.  
+2. `GET finance/` — ≈600 нал, ≈400 карта, нет строки 1000 «Смешанная».  
+3. Только `transfer` 500 — всё в безналичных.
+
+---
+
+## 6. Доступы официанта: оплата и возврат
+
+Фронт: `/crm/cafe/orders`, история заказов, сотрудники.  
+UI: группа **«Заказы кафе — официанты»** в «Управление доступами».
+
+### 6.1. Поля сотрудника
+
+По умолчанию `false`:
+
+| Поле | UI | Назначение |
+|------|-----|------------|
+| `can_view_cafe_order_pay` | Проведение оплаты заказов | «Оплатить» / «Провести оплату» |
+| `can_view_cafe_order_return` | Возврат по заказам | «Позиции и возвраты» в чеке истории |
+
+**Всегда с правами:** `owner`, `admin` (и рус. синонимы) — без флагов.
+
+**Официант:** только если включён чекбокс (`PATCH /users/employees/{id}/`).
+
+Флаги в `GET /users/employees/{id}/` и профиле текущего пользователя.
+
+### 6.2. Проверки API
+
+| Действие | Метод | Право |
+|----------|--------|-------|
+| Оплата | `POST /api/cafe/orders/{id}/pay/` | `can_view_cafe_order_pay` или owner/admin |
+| Возврат позиции | `POST /api/cafe/orders/{id}/refund-item/` | `can_view_cafe_order_return` или owner/admin |
+
+Без права → **403** с текстом.
+
+### 6.3. Миграция
+
+- Существующие сотрудники: оба флага `false`.
+- Владелец/админ: не зависят от флагов.
+
+### 6.4. Фронт
+
+| Файл | Роль |
+|------|------|
+| `src/tools/cafeEmployeePermissions.js` | `canCafeOrderPay`, `canCafeOrderReturn` |
+| `AccessList.jsx`, `employeeAccessLabels.js` | Группа доступов |
+| `Orders.jsx` | Кнопки оплаты |
+| `CafeOrdersHistory.jsx` | Возвраты |
+
+### 6.5. Чеклист
+
+| | Бэкенд | Фронт |
+|---|--------|-------|
+| Поля в Employee | [ ] | [x] UI |
+| 403 на pay / refund-item | [ ] | [x] UI |
 
 ---
 
 ## Сводный статус
 
-| № | Задача | Бэкенд | Фронт | Примечание |
-|---|--------|--------|-------|------------|
-| 1 | `sales/dynamics/` | [x] | [x] | На проде убедиться, что нет 404 → fallback |
-| 2 | Авто «Закупки» | [x]* | [x] | *Cashflow на бэке [ ] — по варианту A не блокер |
-| 3 | Household | [x] | [x]† | †PATCH черновика акта на фронте [ ] |
-| 4 | Оплата `pay/` | [x] | [x] | — |
+| № | Задача | Бэкенд | Фронт |
+|---|--------|--------|-------|
+| 1 | `sales/dynamics/` | [x] | [x] |
+| 2 | Склад «Закупки» | [x]* | [x] |
+| 3 | Household | [x] | [x] |
+| 3.2 | Оборудование + расход | [ ] | [x] |
+| 3.3 | Сверка склада confirm | [ ] | — |
+| 4 | Оплата `pay/` | [x] | [x] |
+| 5 | Аналитика cash / non_cash | [ ] | [x] |
+| 6 | Доступы официанта | [ ] | [x] |
+
+\* Cashflow на бэке по варианту A — не блокер.
 
 ### После деплоя на прод
 
-1. Перезапуск воркеров / применение миграций `cafe` (если не применены).
-2. Smoke-тесты:
-   - аналитика: график без 429, один запрос `dynamics/`;
-   - склад: оприходование → расход «Закупки» в `CafeExpense`, без дубля cashflow;
-   - inventory → household: приход, акт, confirm;
-   - заказ: split + debt с предоплатой.
+1. Миграции `cafe`, перезапуск воркеров.
+2. Smoke:
+   - аналитика: `dynamics/` без 429;
+   - склад / inventory: расход «Закупки»;
+   - заказ: split + debt;
+   - split → аналитика нал/безнал;
+   - официант: оплата/возврат только с флагами.
 
-### Расхождения / долги
+### Расхождения
 
 | Тема | Деталь |
 |------|--------|
-| Cashflow | Бэкенд [ ] — фронт уже не шлёт дубль при складе |
-| Household PATCH | Бэкенд [x], фронт не вызывает — редактирование черновика только через новый акт |
-| `receive/` 404 | Старый бэк: фронт откатится на `PUT` без `expense_id` в ответе |
+| Cashflow | Бэкенд [ ] — фронт не дублирует на складе |
+| `receive/` 404 | Фронт fallback `PUT` без `expense_id` |
+| Equipment | Фронт шлёт расход, пока бэк не отдаёт `expense_id` |
 
 ---
 
@@ -264,8 +482,20 @@ POST /api/cafe/orders/{id}/pay/
 | Файл |
 |------|
 | `tools/cafeAnalyticsDynamics.js` |
-| `src/Components/Sectors/cafe/Stock/Stock.jsx` |
+| `tools/cafePurchaseExpense.js` |
 | `tools/cafeCashflowCategory.js` |
-| `src/Components/Sectors/cafe/kassaCafe/components/KassaModals.jsx` |
+| `tools/marketCashierSplitPayment.js` |
+| `src/tools/cafeEmployeePermissions.js` |
+| `src/Components/Sectors/cafe/Stock/Stock.jsx` |
+| `src/Components/Sectors/cafe/Inventory/CafeInventory.jsx` |
 | `src/Components/Sectors/cafe/Inventory/HouseholdInventoryTab.jsx` |
 | `src/Components/Sectors/cafe/Orders/Orders.jsx` |
+| `src/Components/Sectors/cafe/Orders/CafeOrdersHistory.jsx` |
+| `src/Components/Sectors/cafe/CafeAnalytics/CafeAnalytics.jsx` |
+| `src/Components/DepartmentDetails/AccessList.jsx` |
+
+### Прочие документы кафе (не входят в этот файл)
+
+- `docs/cafe_ops_analytics_ru.md` — обзор аналитики
+- `docs/cafe_menu_weight_backend_api.md`, `docs/cafe_weighted_menu_frontend.md`
+- `docs/CAFE_WEBSOCKETS.md`, `docs/CAFE_RECEIPT_PRINTER_SETTINGS_API.md`

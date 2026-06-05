@@ -48,7 +48,13 @@ import {
   ProductBasicInfo,
   ProductImagesSection,
   PromotionRulesEditor,
+  KitProductsPickerModal,
 } from "./AddProductPage/components";
+import {
+  filterKitCompositionCandidates,
+  filterKitPickerList,
+} from "./AddProductPage/utils/kitPickerUtils";
+import { MARKET_WAREHOUSE_KIND } from "../../../tools/marketWarehouseFilters";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 
@@ -151,11 +157,6 @@ const AddProductPage = ({
   const {
     kitProducts: kitProductsFromHook,
     setKitProducts: setKitProductsFromHook,
-    kitSearchTerm: kitSearchTermFromHook,
-    showKitSearch: showKitSearchFromHook,
-    setShowKitSearch: setShowKitSearchFromHook,
-    kitSearchResults: kitSearchResultsFromHook,
-    handleKitSearch: handleKitSearchFromHook,
     addProductToKit: addProductToKitFromHook,
     removeProductFromKit: removeProductFromKitFromHook,
     updateKitProductQuantity: updateKitProductQuantityFromHook,
@@ -195,13 +196,6 @@ const AddProductPage = ({
       handleMarketDataChange("kitProducts", kitProductsFromHook);
     }
   }, [kitProductsFromHook, marketData.kitProducts, handleMarketDataChange]);
-
-  // Синхронизируем kitSearchTerm
-  useEffect(() => {
-    if (marketData.kitSearchTerm !== kitSearchTermFromHook) {
-      handleMarketDataChange("kitSearchTerm", kitSearchTermFromHook);
-    }
-  }, [kitSearchTermFromHook, marketData.kitSearchTerm, handleMarketDataChange]);
 
   const [showKitRecalculateTooltip, setShowKitRecalculateTooltip] =
     useState(false);
@@ -1026,15 +1020,11 @@ const AddProductPage = ({
     setNewItemData((prev) => ({ ...prev, barcode }));
   };
 
-  // Используем функции и переменные из хука useKitProducts
-  const handleKitSearch = handleKitSearchFromHook;
+  // Используем функции из хука useKitProducts
   const addProductToKit = addProductToKitFromHook;
   const removeProductFromKit = removeProductFromKitFromHook;
   const handleUpdateKitProductQuantity = updateKitProductQuantityFromHook;
   const recalculateKitPrice = recalculateKitPriceFromHook;
-  const kitSearchResults = kitSearchResultsFromHook;
-  const showKitSearch = showKitSearchFromHook;
-  const setShowKitSearch = setShowKitSearchFromHook;
 
   return (
     <>
@@ -1140,6 +1130,7 @@ const AddProductPage = ({
           ) : !loadingProduct ? (
             // Форма для маркета с выбором типа товара/услуги/комплекта
             <MarketProductForm
+              editingProductId={productId}
               itemType={itemType}
               setItemType={setItemType}
               forceProductOnly={forceProductOnly}
@@ -1158,10 +1149,6 @@ const AddProductPage = ({
               navigate={navigate}
               handleReturn={handleReturn}
               generateBarcode={generateBarcode}
-              handleKitSearch={handleKitSearch}
-              kitSearchResults={kitSearchResults}
-              showKitSearch={showKitSearch}
-              setShowKitSearch={setShowKitSearch}
               addProductToKit={addProductToKit}
               removeProductFromKit={removeProductFromKit}
               recalculateKitPrice={recalculateKitPrice}
@@ -1814,6 +1801,7 @@ const AddProductPage = ({
 
 // Компонент формы для маркета
 const MarketProductForm = ({
+  editingProductId = "",
   itemType,
   setItemType,
   forceProductOnly = false,
@@ -1832,10 +1820,6 @@ const MarketProductForm = ({
   navigate,
   handleReturn,
   generateBarcode,
-  handleKitSearch,
-  kitSearchResults,
-  showKitSearch,
-  setShowKitSearch,
   addProductToKit,
   removeProductFromKit,
   recalculateKitPrice,
@@ -1879,10 +1863,100 @@ const MarketProductForm = ({
   pickSupplier,
   company,
 }) => {
+  const dispatch = useDispatch();
   const [showPluTooltip, setShowPluTooltip] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
+
+  const [kitPickerOpen, setKitPickerOpen] = useState(false);
+  const [kitPickerSearch, setKitPickerSearch] = useState("");
+  const [kitPickerCategory, setKitPickerCategory] = useState("");
+  const [kitPickerSelected, setKitPickerSelected] = useState(() => new Set());
+  const [kitPickerLoading, setKitPickerLoading] = useState(false);
+
+  const kitAlreadyInKitIds = useMemo(
+    () => (marketData.kitProducts || []).map((p) => p.id),
+    [marketData.kitProducts],
+  );
+
+  const kitPickerCandidates = useMemo(
+    () =>
+      filterKitCompositionCandidates(products, {
+        excludeProductId: editingProductId,
+        alreadyInKitIds: kitAlreadyInKitIds,
+      }),
+    [products, editingProductId, kitAlreadyInKitIds],
+  );
+
+  const kitPickerList = useMemo(
+    () =>
+      filterKitPickerList(kitPickerCandidates, {
+        search: kitPickerSearch,
+        categoryId: kitPickerCategory,
+        categories,
+      }),
+    [kitPickerCandidates, kitPickerSearch, kitPickerCategory, categories],
+  );
+
+  const isAllKitPickerSelected =
+    kitPickerList.length > 0 &&
+    kitPickerList.every((item) => kitPickerSelected.has(item.id));
+
+  const openKitPicker = useCallback(async () => {
+    setKitPickerOpen(true);
+    setKitPickerSearch("");
+    setKitPickerCategory("");
+    setKitPickerSelected(new Set());
+    try {
+      setKitPickerLoading(true);
+      await dispatch(
+        fetchProductsAsync({
+          page_size: 500,
+          kind: MARKET_WAREHOUSE_KIND.product,
+        }),
+      ).unwrap();
+    } catch (error) {
+      console.error("Ошибка загрузки товаров для комплекта:", error);
+    } finally {
+      setKitPickerLoading(false);
+    }
+  }, [dispatch]);
+
+  const toggleKitPickerItem = (id) => {
+    setKitPickerSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleKitPickerSelectAll = () => {
+    const ids = kitPickerList.map((item) => item.id);
+    if (isAllKitPickerSelected) {
+      setKitPickerSelected((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      return;
+    }
+    setKitPickerSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const applyKitPickerSelection = () => {
+    if (kitPickerSelected.size === 0) return;
+    kitPickerList
+      .filter((item) => kitPickerSelected.has(item.id))
+      .forEach((item) => addProductToKit(item.product));
+    setKitPickerOpen(false);
+    setKitPickerSelected(new Set());
+  };
 
   const sanitizePriceTo3DecimalsLocal = (val) => {
     const s = String(val ?? "").replace(",", ".");
@@ -3031,34 +3105,6 @@ const MarketProductForm = ({
             <h3 className="market-product-form__section-title">
               Состав комплекта
             </h3>
-            <div className="market-product-form__form-group">
-              <div className="market-product-form__search-wrapper">
-                <Search
-                  className="market-product-form__search-icon"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  className="market-product-form__input"
-                  placeholder="поиск..."
-                  value={marketData.kitSearchTerm}
-                  onChange={(e) => handleKitSearch(e.target.value)}
-                />
-              </div>
-              {showKitSearch && kitSearchResults.length > 0 && (
-                <div className="market-product-form__search-results">
-                  {kitSearchResults.map((product) => (
-                    <div
-                      key={product.id}
-                      className="market-product-form__search-result-item"
-                      onClick={() => addProductToKit(product)}
-                    >
-                      {product.name}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Список товаров в комплекте */}
             {marketData.kitProducts.length > 0 && (
@@ -3098,11 +3144,46 @@ const MarketProductForm = ({
               </div>
             )}
 
-            {/* Область для выбранных товаров */}
-            <div className="market-product-form__kit-selection-area">
+            {/* Область для выбора товаров карточками */}
+            <button
+              type="button"
+              className="market-product-form__kit-selection-area"
+              onClick={() => void openKitPicker()}
+            >
               <p>← Выберите товары</p>
-            </div>
+              <span className="market-product-form__kit-selection-hint">
+                Откроется список товаров в наличии с поиском и фильтром по
+                категории
+              </span>
+            </button>
           </div>
+
+          <KitProductsPickerModal
+            open={kitPickerOpen}
+            onClose={() => setKitPickerOpen(false)}
+            searchValue={kitPickerSearch}
+            onSearchChange={setKitPickerSearch}
+            categoryId={kitPickerCategory}
+            onCategoryChange={setKitPickerCategory}
+            categories={categories}
+            items={kitPickerList}
+            selectedIds={kitPickerSelected}
+            onToggle={toggleKitPickerItem}
+            onToggleSelectAll={toggleKitPickerSelectAll}
+            isAllFilteredSelected={isAllKitPickerSelected}
+            onConfirm={applyKitPickerSelection}
+            loading={kitPickerLoading}
+            confirmLabel={
+              kitPickerSelected.size > 0
+                ? `Добавить (${kitPickerSelected.size})`
+                : "Добавить выбранные"
+            }
+            emptyText={
+              kitPickerCandidates.length === 0
+                ? "Нет товаров в наличии для добавления в комплект"
+                : "Товары не найдены. Измените поиск или категорию."
+            }
+          />
 
           {/* Цены для комплекта */}
           <div className="market-product-form__section">

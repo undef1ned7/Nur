@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { productSearchHaystackLower } from "../../../../../../tools/productBarcode";
+import { getDefaultPackage } from "../../../../../../tools/marketPackPieceSale";
 import "./HotkeyProductsModal.scss";
 
 const HOTKEY_GROUPS = Array.from({ length: 12 }, (_, index) => `F${index + 1}`);
@@ -17,11 +18,6 @@ const formatQuantity = (qty) => {
   if (Number.isNaN(num)) return "0";
   if (num % 1 === 0) return String(num);
   return String(num).replace(/\.?0+$/, "");
-};
-
-const getDefaultPiecePackage = (product) => {
-  const packages = Array.isArray(product?.packages) ? product.packages : [];
-  return packages.find((pkg) => Number(pkg?.quantity_in_package) > 0) || null;
 };
 
 const HotkeyProductsModal = ({
@@ -140,7 +136,7 @@ const HotkeyProductsModal = ({
           ) : (
             <div className="hotkey-products-modal__grid">
               {filteredProducts.map((product) => {
-                const piecePackage = getDefaultPiecePackage(product);
+                const piecePackage = getDefaultPackage(product);
 
                 return (
                   <div
