@@ -149,13 +149,15 @@ const BarberClientDocuments = () => {
 
   const submitUpload = async (e) => {
     e.preventDefault();
-    if (!selected?.id || !uploadFile) return;
+    if (!selected?.id) return;
+    const comment = uploadComment.trim();
+    if (!uploadFile && !comment) return;
     setUploadBusy(true);
     setDetailErr("");
     try {
       const fd = new FormData();
-      fd.append("file", uploadFile);
-      if (uploadComment.trim()) fd.append("file_comment", uploadComment.trim());
+      if (uploadFile) fd.append("file", uploadFile);
+      if (comment) fd.append("file_comment", comment);
       await api.post(`/barbershop/clients/${selected.id}/documents/`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -163,7 +165,7 @@ const BarberClientDocuments = () => {
       setUploadComment("");
       refreshDocuments();
     } catch (e) {
-      setDetailErr(parseApiError(e, "Не удалось загрузить файл."));
+      setDetailErr(parseApiError(e, "Не удалось добавить запись."));
     } finally {
       setUploadBusy(false);
     }
@@ -181,25 +183,16 @@ const BarberClientDocuments = () => {
     setEditBusy(true);
     setDetailErr("");
     try {
-      if (editFile) {
-        const fd = new FormData();
-        fd.append("file", editFile);
-        if (editComment.trim()) fd.append("file_comment", editComment.trim());
-        await api.patch(
-          `/barbershop/clients/${selected.id}/documents/${editDoc.id}/`,
-          fd,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          },
-        );
-      } else {
-        await api.patch(
-          `/barbershop/clients/${selected.id}/documents/${editDoc.id}/`,
-          {
-            file_comment: editComment.trim() || null,
-          },
-        );
-      }
+      const fd = new FormData();
+      if (editFile) fd.append("file", editFile);
+      fd.append("file_comment", editComment.trim());
+      await api.patch(
+        `/barbershop/clients/${selected.id}/documents/${editDoc.id}/`,
+        fd,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
       setEditDoc(null);
       refreshDocuments();
     } catch (e) {
@@ -340,7 +333,9 @@ const BarberClientDocuments = () => {
                 onSubmit={submitUpload}
               >
                 <div className="barber-client-docs__field">
-                  <span className="barber-client-docs__label">Файл</span>
+                  <span className="barber-client-docs__label">
+                    Файл (необязательно)
+                  </span>
                   <div className="barber-client-docs__fileWrap">
                     <input
                       id={uploadFileInputId}
@@ -380,9 +375,7 @@ const BarberClientDocuments = () => {
                   </span>
                 </div>
                 <div className="barber-client-docs__field">
-                  <span className="barber-client-docs__label">
-                    Комментарий (необязательно)
-                  </span>
+                  <span className="barber-client-docs__label">Комментарий</span>
                   <input
                     className="barber-client-docs__input"
                     value={uploadComment}
@@ -394,9 +387,13 @@ const BarberClientDocuments = () => {
                 <button
                   type="submit"
                   className="barber-client-docs__btn barber-client-docs__btn--primary"
-                  disabled={!uploadFile || uploadBusy || detailLoading}
+                  disabled={
+                    (!uploadFile && !uploadComment.trim()) ||
+                    uploadBusy ||
+                    detailLoading
+                  }
                 >
-                  <FaUpload /> Загрузить
+                  <FaUpload /> Добавить
                 </button>
               </form>
 
@@ -426,16 +423,18 @@ const BarberClientDocuments = () => {
                         documents.map((d) => (
                           <tr key={d.id}>
                             <td>
-                              <a
-                                className="barber-client-docs__fileLink"
-                                href={resolveBarberMediaUrl(d.file)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {String(d.file || "")
-                                  .split("/")
-                                  .pop() || "файл"}
-                              </a>
+                              {d.file ? (
+                                <a
+                                  className="barber-client-docs__fileLink"
+                                  href={resolveBarberMediaUrl(d.file)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {String(d.file).split("/").pop() || "файл"}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
                             </td>
                             <td>{d.file_comment || "—"}</td>
                             <td>{fmtDt(d.file_create_date)}</td>
@@ -571,10 +570,10 @@ const BarberClientDocuments = () => {
         isOpen={!!deleteDoc}
         message={
           deleteDoc
-            ? `Удалить документ «${
-                String(deleteDoc.file || "")
-                  .split("/")
-                  .pop() || "файл"
+            ? `Удалить запись «${
+                deleteDoc.file_comment ||
+                String(deleteDoc.file || "").split("/").pop() ||
+                "документ"
               }»?`
             : ""
         }

@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import LandingImg from "../../components/LandingImg";
 import banner from "../../assets/banner/banner.png";
@@ -10,6 +11,7 @@ import blur2 from "./img/blur2.svg";
 import "./Banner.scss";
 
 const Banner = () => {
+  const { t } = useTranslation("newLanding");
   const scrollToDemo = useScrollToDemo();
 
   useEffect(() => {
@@ -38,34 +40,31 @@ const Banner = () => {
           aria-hidden="true"
         />
         <h2 className="banner__title">
-          Управляйте бизнесом <br />
-          <span>в одной</span> системе
+          {t("banner.titleLine1")} <br />
+          <span>{t("banner.titleHighlight")}</span> {t("banner.titleLine2")}
         </h2>
-        <p className="banner__text">
-          CRM, склад, касса, аналитика, продажи и сотрудники — всё под контролем
-          в NurCRM
-        </p>
+        <p className="banner__text">{t("banner.description")}</p>
         <div className="banner__buttons">
           <button
             type="button"
             className="banner__buttons-btn banner__buttons-btn--primary"
             onClick={scrollToDemo}
           >
-            Оставить заявку
+            {t("banner.ctaApply")}
           </button>
           <button
             type="button"
             className="banner__buttons-btn banner__buttons-btn--secondary"
             onClick={scrollToDemo}
           >
-            Бесплатная консультация
+            {t("banner.ctaConsultation")}
           </button>
         </div>
         <div className="banner__content">
           <LandingImg
             className="banner__image"
             src={banner}
-            alt="Интерфейс NurCRM"
+            alt={t("banner.imageAlt")}
             width={766}
             height={428}
             priority
@@ -77,7 +76,9 @@ const Banner = () => {
               alt=""
               aria-hidden="true"
             />
-            <p className="banner__content__description">Поддержка 24/7</p>
+            <p className="banner__content__description">
+              {t("banner.badgeSupport")}
+            </p>
           </div>
           <div className="banner__content__cart banner__content__cart-2">
             <LandingImg
@@ -86,7 +87,9 @@ const Banner = () => {
               alt=""
               aria-hidden="true"
             />
-            <p className="banner__content__description">Для магазинов</p>
+            <p className="banner__content__description">
+              {t("banner.badgeStores")}
+            </p>
           </div>
           <div className="banner__content__cart banner__content__cart-3">
             <LandingImg
@@ -95,7 +98,9 @@ const Banner = () => {
               alt=""
               aria-hidden="true"
             />
-            <p className="banner__content__description">Мобильное приложение</p>
+            <p className="banner__content__description">
+              {t("banner.badgeMobile")}
+            </p>
           </div>
         </div>
       </div>

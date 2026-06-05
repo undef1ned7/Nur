@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Maximize,
   Pause,
@@ -10,6 +11,7 @@ import {
 import { getVideoSource } from "../utils";
 
 const VideoPlayer = ({ url, title }) => {
+  const { t } = useTranslation("newLanding");
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const source = getVideoSource(url);
@@ -28,7 +30,7 @@ const VideoPlayer = ({ url, title }) => {
   if (source.type === "none") {
     return (
       <div className="vl-player vl-player--empty">
-        <span>Видео недоступно</span>
+        <span>{t("videoLessons.playerUnavailable")}</span>
       </div>
     );
   }
@@ -116,7 +118,9 @@ const VideoPlayer = ({ url, title }) => {
             type="button"
             className="vl-player__btn"
             onClick={togglePlay}
-            aria-label={playing ? "Пауза" : "Воспроизведение"}
+            aria-label={
+              playing ? t("videoLessons.playerPause") : t("videoLessons.playerPlay")
+            }
           >
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
@@ -124,7 +128,9 @@ const VideoPlayer = ({ url, title }) => {
             type="button"
             className="vl-player__btn"
             onClick={toggleMute}
-            aria-label={muted ? "Включить звук" : "Выключить звук"}
+            aria-label={
+              muted ? t("videoLessons.playerUnmute") : t("videoLessons.playerMute")
+            }
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
@@ -154,14 +160,14 @@ const VideoPlayer = ({ url, title }) => {
             type="button"
             className="vl-player__btn"
             onClick={toggleFullscreen}
-            aria-label="На весь экран"
+            aria-label={t("videoLessons.playerFullscreen")}
           >
             <Maximize size={18} />
           </button>
           <button
             type="button"
             className="vl-player__btn vl-player__btn--disabled"
-            aria-label="Настройки"
+            aria-label={t("videoLessons.playerSettings")}
             disabled
           >
             <Settings size={18} />

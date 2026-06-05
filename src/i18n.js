@@ -10,9 +10,12 @@ i18n
   .init({
     fallbackLng: "ru",
     supportedLngs: ["ru", "ky"],
+    ns: ["translation", "newLanding"],
+    defaultNS: "translation",
+    preload: ["translation", "newLanding"],
 
     backend: {
-      loadPath: "/locales/{{lng}}/translation.json",
+      loadPath: "/locales/{{lng}}/{{ns}}.json",
     },
 
     interpolation: {

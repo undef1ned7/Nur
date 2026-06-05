@@ -468,6 +468,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("barber/client-documents", BarberClientDocuments),
   createProtectedRoute("barber/cash-reports", BarberAnalitika),
   createProtectedRoute("barber/requests", BarberRequests),
+
   createProtectedRoute("services/services", BarberServices),
   createProtectedRoute("services/warehouse", Sklad),
   createProtectedRoute("services/masters", MastersTabs),
@@ -478,6 +479,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("services/client-documents", BarberClientDocuments),
   createProtectedRoute("services/cash-reports", BarberAnalitika),
   createProtectedRoute("services/requests", BarberRequests),
+
   createProtectedRoute("dentistry/services", BarberServices),
   createProtectedRoute("dentistry/warehouse", Sklad),
   createProtectedRoute("dentistry/masters", MastersTabs),

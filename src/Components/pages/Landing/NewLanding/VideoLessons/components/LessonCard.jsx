@@ -1,8 +1,13 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { formatLessonDate } from "../utils";
 
 const LessonCard = ({ lesson, compact = false, isCurrent = false }) => {
-  const dateLabel = formatLessonDate(lesson.created_at);
+  const { i18n } = useTranslation("newLanding");
+  const locale = (i18n.resolvedLanguage || i18n.language || "ru").startsWith("ky")
+    ? "ky"
+    : "ru";
+  const dateLabel = formatLessonDate(lesson.created_at, locale);
 
   return (
     <Link

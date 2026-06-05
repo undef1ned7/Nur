@@ -15,7 +15,7 @@ const LandingImg = ({
     height={height}
     loading={priority ? "eager" : "lazy"}
     decoding={priority ? "sync" : "async"}
-    fetchPriority={priority ? "high" : "auto"}
+    {...(priority ? { fetchpriority: "high" } : {})}
     {...rest}
   />
 );

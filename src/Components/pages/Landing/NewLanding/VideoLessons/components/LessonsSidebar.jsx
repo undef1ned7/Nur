@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 const LessonsSidebar = ({
@@ -10,6 +11,7 @@ const LessonsSidebar = ({
   onToggleExpand,
   activeLessonId,
 }) => {
+  const { t } = useTranslation("newLanding");
   const location = useLocation();
 
   return (
@@ -19,15 +21,15 @@ const LessonsSidebar = ({
         className={`vl-sidebar__all${!selectedCourseId ? " vl-sidebar__all--active" : ""}`}
         onClick={onSelectAll}
       >
-        Все уроки
+        {t("videoLessons.sidebarAll")}
       </button>
 
-      <nav className="vl-sidebar__nav" aria-label="Категории уроков">
+      <nav className="vl-sidebar__nav" aria-label={t("videoLessons.sidebarAriaLabel")}>
         {(Array.isArray(courses) ? courses : []).map((course) => {
           const isExpanded = expandedIds.has(course.id);
           const isCourseActive = selectedCourseId === course.id;
           const sortedLessons = [...(course.lessons || [])].sort(
-            (a, b) => a.order - b.order
+            (a, b) => a.order - b.order,
           );
 
           return (

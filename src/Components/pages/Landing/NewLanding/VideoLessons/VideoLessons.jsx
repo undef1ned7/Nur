@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Header from "../sections/Header/Header";
 import LessonsSidebar from "./components/LessonsSidebar";
 import LessonSearch from "./components/LessonSearch";
@@ -9,6 +9,7 @@ import { filterLessons, flattenLessons } from "./utils";
 import "./VideoLessons.scss";
 
 const VideoLessons = () => {
+  const { t } = useTranslation("newLanding");
   const { courses, loading, error, reload } = useKnowledgeBase();
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
@@ -22,8 +23,9 @@ const VideoLessons = () => {
   );
 
   const pageTitle = selectedCourseId
-    ? (courses.find((c) => c.id === selectedCourseId)?.title ?? "Видеоуроки")
-    : "Все видеоуроки";
+    ? (courses.find((c) => c.id === selectedCourseId)?.title ??
+      t("videoLessons.titleCourse"))
+    : t("videoLessons.titleAll");
 
   const handleToggleExpand = (courseId) => {
     setExpandedIds((prev) => {
@@ -60,25 +62,24 @@ const VideoLessons = () => {
                 <h1 className="vl-main__title">{pageTitle}</h1>
                 <div className="vl-main__head-actions">
                   <LessonSearch value={search} onChange={setSearch} />
-                  {/* <Link to="/video-lessons/admin" className="vl-main__admin-link">
-                    Управление
-                  </Link> */}
                 </div>
               </div>
 
-              {loading && <p className="vl-main__status">Загрузка уроков…</p>}
+              {loading && (
+                <p className="vl-main__status">{t("videoLessons.loading")}</p>
+              )}
 
               {error && !loading && (
                 <div className="vl-main__status vl-main__status--error">
                   <p>{error}</p>
                   <button type="button" onClick={reload}>
-                    Повторить
+                    {t("videoLessons.retry")}
                   </button>
                 </div>
               )}
 
               {!loading && !error && visibleLessons.length === 0 && (
-                <p className="vl-main__status">Уроки не найдены</p>
+                <p className="vl-main__status">{t("videoLessons.notFound")}</p>
               )}
 
               {!loading && !error && visibleLessons.length > 0 && (

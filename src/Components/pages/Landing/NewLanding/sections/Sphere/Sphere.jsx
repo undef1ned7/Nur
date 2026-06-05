@@ -12,6 +12,7 @@ import {
   Warehouse,
   Wrench,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useScrollToDemo } from "../../hooks/useScrollToDemo";
 import { useLandingIndustries } from "../../hooks/useLandingIndustries";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -20,55 +21,19 @@ import "./Sphere.scss";
 
 const DESKTOP_SLIDES = 4;
 
-const LANDING_SPHERE_NAMES = [
-  "Строительная сфера",
-  "Парикмахерские",
-  "Кафе",
-  "Магазины",
-  "Склад",
-  "Производство",
-  "Услуги",
-  "Стоматология",
+const LANDING_SPHERES = [
+  { key: "construction", apiName: "Строительная сфера", Icon: Building2 },
+  { key: "barbershop", apiName: "Парикмахерские", Icon: Scissors },
+  { key: "cafe", apiName: "Кафе", Icon: UtensilsCrossed },
+  { key: "stores", apiName: "Магазины", Icon: Store },
+  { key: "warehouse", apiName: "Склад", Icon: Warehouse },
+  { key: "production", apiName: "Производство", Icon: Factory },
+  { key: "services", apiName: "Услуги", Icon: Wrench },
+  { key: "dentistry", apiName: "Стоматология", Icon: Stethoscope },
 ];
 
-/** Описания по фактическим модулям сфер в NurCRM (menuConfig + sector routes) */
-const SPHERE_DESCRIPTIONS = {
-  "Строительная сфера":
-    "Объекты и проекты, договоры, закупки, склад, продажи и зарплата — весь цикл стройки от сметы до сдачи в одной системе",
-  "Парикмахерские":
-    "Онлайн-запись, услуги, мастера и клиентская база — салон без очередей, потерянных номеров и хаоса в блокноте",
-  Кафе:
-    "Меню, заказы, кухня, столы, бронь и склад — зал, бар и кухня работают согласованно, без накладок по столам и блюдам",
-  Магазины:
-    "Товары, касса, смены, поставщики и аналитика — розница с точными остатками, документами и прозрачной выручкой",
-  Склад:
-    "Приход, отгрузки, документы, контрагенты и заявки агентов — оптовый учёт без Excel и потерянных накладных",
-  Производство:
-    "Каталог, склад, продажи, заявки и передача агентам — видите заказы и остатки, пока продукция ещё на линии",
-  Услуги:
-    "Записи, услуги, клиенты и сотрудники — для сервисных компаний, где каждый визит и заявка на счету",
-  Стоматология:
-    "Пациенты, приёмы, услуги и история лечения — клиника без потерянных записей и бумажных карточек",
-};
-
-const SPHERE_ICONS = {
-  "Строительная сфера": Building2,
-  "Парикмахерские": Scissors,
-  Кафе: UtensilsCrossed,
-  Магазины: Store,
-  Склад: Warehouse,
-  Производство: Factory,
-  Услуги: Wrench,
-  Стоматология: Stethoscope,
-};
-
-const getSphereDescription = (industryName) =>
-  SPHERE_DESCRIPTIONS[industryName] ??
-  "Индивидуальная настройка NurCRM под процессы вашего бизнеса.";
-
-const getSphereIcon = (industryName) => SPHERE_ICONS[industryName] ?? LayoutGrid;
-
 const Sphere = () => {
+  const { t } = useTranslation("newLanding");
   const scrollToDemo = useScrollToDemo();
   const swiperRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -82,15 +47,18 @@ const Sphere = () => {
       industries.map((industry) => [industry.name, industry]),
     );
 
-    return LANDING_SPHERE_NAMES.map((name) => byName.get(name))
-      .filter(Boolean)
-      .map((industry) => ({
+    return LANDING_SPHERES.map(({ key, apiName, Icon }) => {
+      const industry = byName.get(apiName);
+      if (!industry) return null;
+
+      return {
         id: industry.id,
-        title: industry.name,
-        text: getSphereDescription(industry.name),
-        Icon: getSphereIcon(industry.name),
-      }));
-  }, [industries]);
+        title: t(`sphere.industries.${key}.title`),
+        text: t(`sphere.industries.${key}.description`),
+        Icon,
+      };
+    }).filter(Boolean);
+  }, [industries, t]);
 
   const updateSwiperState = useCallback((swiper) => {
     setActiveIndex(swiper.snapIndex ?? swiper.activeIndex);
@@ -116,19 +84,19 @@ const Sphere = () => {
       <div className="spheres__container new-container">
         <div className="spheres__header">
           <h2 className="spheres__title">
-            Решения для{" "}
-            <span className="spheres__title-yellow">разных сфер</span> бизнеса
+            {t("sphere.title")}{" "}
+            <span className="spheres__title-yellow">
+              {t("sphere.titleHighlight")}
+            </span>{" "}
+            {t("sphere.titleSuffix")}
           </h2>
-          <p className="spheres__subtitle">
-            Выбираете сферу — получаете готовый набор инструментов: клиенты, продажи,
-            склад, касса и отчёты уже настроены под ваш тип бизнеса.
-          </p>
+          <p className="spheres__subtitle">{t("sphere.subtitle")}</p>
         </div>
 
-        {loading && <p className="spheres__status">Загрузка сфер…</p>}
+        {loading && <p className="spheres__status">{t("sphere.loading")}</p>}
 
         {!loading && sphereCards.length === 0 && (
-          <p className="spheres__status">Сферы временно недоступны</p>
+          <p className="spheres__status">{t("sphere.unavailable")}</p>
         )}
 
         {!loading && sphereCards.length > 0 && (
@@ -136,7 +104,7 @@ const Sphere = () => {
             <button
               type="button"
               className="spheres__nav spheres__nav--prev"
-              aria-label="Предыдущие сферы"
+              aria-label={t("sphere.navPrev")}
               onClick={handlePrev}
               disabled={isBeginning}
             >
@@ -187,7 +155,7 @@ const Sphere = () => {
             <button
               type="button"
               className="spheres__nav spheres__nav--next"
-              aria-label="Следующие сферы"
+              aria-label={t("sphere.navNext")}
               onClick={handleNext}
               disabled={isEnd}
             >
@@ -201,7 +169,7 @@ const Sphere = () => {
             <div
               className="spheres__dots"
               role="tablist"
-              aria-label="Страницы сфер"
+              aria-label={t("sphere.paginationLabel")}
             >
               {Array.from({ length: pageCount }, (_, index) => (
                 <button
@@ -211,7 +179,10 @@ const Sphere = () => {
                   className={`spheres__dot${
                     index === activeIndex ? " spheres__dot--active" : ""
                   }`}
-                  aria-label={`Страница ${index + 1} из ${pageCount}`}
+                  aria-label={t("sphere.paginationPage", {
+                    current: index + 1,
+                    total: pageCount,
+                  })}
                   aria-selected={index === activeIndex}
                   onClick={() => handleDotClick(index)}
                 />
@@ -225,13 +196,12 @@ const Sphere = () => {
 
         <div className="spheres__footer">
           <div className="spheres__footer-info">
-            <h4 className="spheres__footer-title">Не нашли свою сферу?</h4>
-            <p className="spheres__footer-text">
-              Подключим нужные модули и поможем настроить систему под ваши процессы.
-            </p>
+            <h4 className="spheres__footer-title">{t("sphere.footerTitle")}</h4>
+            <p className="spheres__footer-text">{t("sphere.footerText")}</p>
           </div>
           <button type="button" className="spheres__btn" onClick={scrollToDemo}>
-            Попробовать NurCRM <span className="spheres__btn-arrow">→</span>
+            {t("sphere.cta")}{" "}
+            <span className="spheres__btn-arrow">→</span>
           </button>
         </div>
       </div>
