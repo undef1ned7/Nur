@@ -376,8 +376,8 @@
     }
 
     &--equipment {
-      width: min(920px, calc(100vw - 24px));
-      max-width: 920px;
+      width: min(1040px, calc(100vw - 24px));
+      max-width: 1040px;
 
       .cafeInventory__formBody {
         max-height: min(72dvh, 640px);
@@ -385,7 +385,7 @@
       }
 
       .cafeInventory__formGrid {
-        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
         gap: 18px 20px;
       }
 
@@ -1013,17 +1013,6 @@
       padding: 10px 14px;
       font-size: 13px;
       flex-shrink: 0;
-    }
-  }
-
-  @media (max-width: 960px) {
-    &__modal--equipment {
-      width: calc(100vw - 20px);
-      max-width: none;
-
-      .cafeInventory__formGrid {
-        grid-template-columns: 1fr;
-      }
     }
   }
 
@@ -1742,5 +1731,67 @@
 
   &__iconBtn--danger {
     color: #b91c1c;
+  }
+
+  /* Модалка оборудования — после household-переопределений ниже по файлу */
+  &__modal--equipment {
+    width: min(1040px, calc(100vw - 24px));
+    max-width: 1040px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: min(90dvh, 820px);
+
+    .cafeInventory__form--modal {
+      display: flex;
+      flex-direction: column;
+      flex: none;
+      width: 100%;
+      gap: 0;
+      padding: 0;
+    }
+
+    .cafeInventory__formBody {
+      padding: 20px 28px 24px;
+      max-height: min(72dvh, 640px);
+    }
+
+    .cafeInventory__formGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(300px, 1fr));
+      gap: 18px 24px;
+      align-items: start;
+    }
+
+    .cafeInventory__field {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .cafeInventory__input,
+    .cafeInventory__textarea {
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+    }
+
+    .cafeInventoryCombo {
+      width: 100%;
+      max-width: none;
+    }
+
+    .cafeInventory__form--modal > .cafeInventory__formActions {
+      padding: 14px 28px 22px;
+    }
+
+    @media (max-width: 1100px) {
+      width: calc(100vw - 20px);
+      max-width: none;
+
+      .cafeInventory__formGrid {
+        grid-template-columns: 1fr;
+      }
+    }
   }
 }
