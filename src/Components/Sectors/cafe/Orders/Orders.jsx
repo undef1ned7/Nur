@@ -558,15 +558,18 @@ const Orders = () => {
     }
   };
 
-  const hydrateOrdersDetails = async (list) => {
-    if (!list.length) return list;
+  const orderNeedsDetail = (o) =>
+    !Array.isArray(o?.items) || o.items.length === 0;
 
-    // Список /cafe/orders/ часто отдаёт устаревшие items — всегда подтягиваем detail.
+  const hydrateOrdersDetails = async (list) => {
+    const ids = list.filter(orderNeedsDetail).map((o) => o.id);
+    if (!ids.length) return list;
+
     const details = await Promise.all(
-      list.map((o) =>
+      ids.map((id) =>
         api
-          .get(`/cafe/orders/${o.id}/`)
-          .then((r) => ({ id: o.id, data: r.data }))
+          .get(`/cafe/orders/${id}/`)
+          .then((r) => ({ id, data: r.data }))
           .catch(() => null),
       ),
     );
@@ -637,6 +640,29 @@ const Orders = () => {
       }
     })();
   }, [socketOrders?.orders]);
+
+  const applyOrderDetailToList = (orderSnapshot, detail) => {
+    const oid = String(orderSnapshot?.id || "");
+    if (!oid || !detail) return;
+    setOrders((cur) => {
+      const exists = cur.some((o) => String(o.id) === oid);
+      if (exists) {
+        return cur.map((o) =>
+          String(o.id) === oid ? { ...orderSnapshot, ...detail } : o,
+        );
+      }
+      return [{ ...orderSnapshot, ...detail }, ...cur];
+    });
+  };
+
+  const fetchAndMergeOrderDetail = (orderSnapshot) => {
+    const oid = String(orderSnapshot?.id || "");
+    if (!oid || !orderNeedsDetail(orderSnapshot)) return;
+    api
+      .get(`/cafe/orders/${oid}/`)
+      .then((r) => applyOrderDetailToList(orderSnapshot, r?.data))
+      .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+  };
 
   const refreshOrderDetailInList = (orderId, socketSnapshot) => {
     const oid = String(orderId || "");
@@ -721,31 +747,20 @@ const Orders = () => {
 
         // Add new orders from WS that are not yet in prev
         const prevIds = new Set(prev.map((o) => String(o.id)));
+        const newOrdersFromSocket = [];
         socketOpenOrders.forEach((so) => {
           if (!prevIds.has(String(so.id))) {
-            api
-              .get(`/cafe/orders/${so.id}/`)
-              .then((r) => {
-                const detail = r?.data;
-                if (!detail) return;
-                setOrders((cur) => {
-                  const exists = cur.some(
-                    (o) => String(o.id) === String(so.id),
-                  );
-                  if (exists) {
-                    // Order already in list (added as partial WS object) — update it with full detail
-                    return cur.map((o) =>
-                      String(o.id) === String(so.id) ? { ...so, ...detail } : o,
-                    );
-                  }
-                  return [{ ...so, ...detail }, ...cur];
-                });
-              })
-              .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+            if (orderNeedsDetail(so)) {
+              fetchAndMergeOrderDetail(so);
+            } else {
+              newOrdersFromSocket.push(so);
+            }
           }
         });
 
-        return updated;
+        return newOrdersFromSocket.length
+          ? [...newOrdersFromSocket, ...updated]
+          : updated;
       }
 
       // Full list from WS — full replace with merge
@@ -770,22 +785,7 @@ const Orders = () => {
       return socketOpenOrders.map((so) => {
         const p = prevById.get(String(so.id));
         if (!p) {
-          api
-            .get(`/cafe/orders/${so.id}/`)
-            .then((r) => {
-              const detail = r?.data;
-              if (!detail) return;
-              setOrders((cur) => {
-                const exists = cur.some((o) => String(o.id) === String(so.id));
-                if (exists) {
-                  return cur.map((o) =>
-                    String(o.id) === String(so.id) ? { ...so, ...detail } : o,
-                  );
-                }
-                return [{ ...so, ...detail }, ...cur];
-              });
-            })
-            .catch(() => {});
+          fetchAndMergeOrderDetail(so);
           return so;
         }
         return mergeSocketOrder(p, so);
