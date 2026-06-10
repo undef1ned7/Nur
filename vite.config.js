@@ -78,13 +78,34 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks(id) {
-                    if (!id.includes('node_modules')) return undefined;
-
-                    // Крупные опциональные библиотеки — отдельно; React/Redux не трогаем
-                    if (id.includes('swiper')) return 'vendor-swiper';
-                    if (id.includes('chart.js') || id.includes('recharts')) {
-                        return 'vendor-charts';
+                    if (id.includes('node_modules')) {
+                        if (id.includes('swiper')) return 'vendor-swiper';
+                        if (id.includes('chart.js') || id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        return undefined;
                     }
+
+                    const sectorMatchers = [
+                        ['sector-barber', '/Components/Sectors/Barber/'],
+                        ['sector-cafe', '/Components/Sectors/cafe/'],
+                        ['sector-building-pages', '/Components/pages/Building/'],
+                        ['sector-building', '/Components/Sectors/Building/'],
+                        ['sector-market', '/Components/Sectors/Market/'],
+                        ['sector-warehouse', '/Components/Sectors/Warehouse/'],
+                        ['sector-production', '/Components/Sectors/Production/'],
+                        ['sector-school', '/Components/Sectors/School/'],
+                        ['sector-hostel', '/Components/Sectors/Hostel/'],
+                        ['sector-consulting', '/Components/Sectors/Consulting/'],
+                        ['sector-logistics', '/Components/Sectors/logistics/'],
+                        ['sector-pilorama', '/Components/Sectors/Pilorama/'],
+                    ];
+
+                    for (const [chunkName, fragment] of sectorMatchers) {
+                        if (id.includes(fragment)) return chunkName;
+                    }
+
+                    return undefined;
                 },
             },
         },

@@ -170,49 +170,49 @@ const Warehouses = () => {
         <StockPartnershipPanel />
       ) : (
         <>
-      <SearchSection
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        count={count}
-        foundCount={warehouses.length}
-      />
+          <SearchSection
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            count={count}
+            foundCount={warehouses.length}
+          />
 
-      <div className="warehouse-table-container w-full">
-        <WarehouseTable
-          warehouses={warehouses}
-          loading={loading}
-          onOpenWarehouse={handleOpenWarehouse}
-          onEditWarehouse={handleEditWarehouse}
-          getRowNumber={getRowNumber}
-        />
+          <div className="warehouse-table-container w-full">
+            <WarehouseTable
+              warehouses={warehouses}
+              loading={loading}
+              onOpenWarehouse={handleOpenWarehouse}
+              onEditWarehouse={handleEditWarehouse}
+              getRowNumber={getRowNumber}
+            />
 
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          count={count}
-          loading={loading}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
-          onPageChange={handlePageChange}
-        />
-      </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              count={count}
+              loading={loading}
+              hasNextPage={hasNextPage}
+              hasPrevPage={hasPrevPage}
+              onPageChange={handlePageChange}
+            />
+          </div>
 
-      {showCreateModal && (
-        <CreateWarehouseModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={handleCreateWarehouseSubmit}
-        />
-      )}
+          {showCreateModal && (
+            <CreateWarehouseModal
+              onClose={() => setShowCreateModal(false)}
+              onCreate={handleCreateWarehouseSubmit}
+            />
+          )}
 
-      {showEditModal && editingWarehouse && (
-        <EditWarehouseModal
-          warehouse={editingWarehouse}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingWarehouse(null);
-          }}
-        />
-      )}
+          {showEditModal && editingWarehouse && (
+            <EditWarehouseModal
+              warehouse={editingWarehouse}
+              onClose={() => {
+                setShowEditModal(false);
+                setEditingWarehouse(null);
+              }}
+            />
+          )}
         </>
       )}
     </div>

@@ -33,7 +33,7 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
     if (onProfileLoaded) {
       onProfileLoaded(profile);
     }
-  }, [dispatch, loading])
+  }, [dispatch, loading]);
 
   useEffect(() => {
     const checkTokenValidity = async () => {

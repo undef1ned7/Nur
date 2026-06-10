@@ -179,7 +179,7 @@ export default function CafeLayout() {
     return m;
   }, [tables]);
 
-const fullName = useCallback(
+  const fullName = useCallback(
     (u = {}) =>
       [u?.last_name || "", u?.first_name || ""]
         .filter(Boolean)
@@ -307,7 +307,8 @@ const fullName = useCallback(
     if (!oid) return false;
     if (printedReceiptsRef.current.has(oid)) return true;
     try {
-      if (localStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`)) return true;
+      if (localStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`))
+        return true;
     } catch {}
     try {
       if (sessionStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`))
@@ -328,16 +329,21 @@ const fullName = useCallback(
     } catch {}
   }, []);
 
-  const enqueuePrintJob = useCallback(async (job) => {
-    const run = async () => {
-      await new Promise((resolve) => setTimeout(resolve, PRINT_QUEUE_DELAY_MS));
-      return job();
-    };
-    const next = printQueueRef.current.then(run, run);
-    // Keep the queue chain alive even after failures
-    printQueueRef.current = next.catch(() => {});
-    return next;
-  }, [PRINT_QUEUE_DELAY_MS]);
+  const enqueuePrintJob = useCallback(
+    async (job) => {
+      const run = async () => {
+        await new Promise((resolve) =>
+          setTimeout(resolve, PRINT_QUEUE_DELAY_MS),
+        );
+        return job();
+      };
+      const next = printQueueRef.current.then(run, run);
+      // Keep the queue chain alive even after failures
+      printQueueRef.current = next.catch(() => {});
+      return next;
+    },
+    [PRINT_QUEUE_DELAY_MS],
+  );
 
   const printReceiptForOrder = useCallback(
     async (orderId) => {
@@ -607,7 +613,10 @@ const fullName = useCallback(
         return;
       }
       const _tableId =
-        detail?.table_id ?? detail?.tableId ?? detail?.table?.id ?? detail?.table;
+        detail?.table_id ??
+        detail?.tableId ??
+        detail?.table?.id ??
+        detail?.table;
       if (_tableId && tablesMap.size === 0) {
         await new Promise((res) => setTimeout(res, 1500));
       }
@@ -747,7 +756,9 @@ const fullName = useCallback(
   };
 
   const isCancelledOrderStatus = useCallback((order) => {
-    const s = String(order?.status || "").toLowerCase().trim();
+    const s = String(order?.status || "")
+      .toLowerCase()
+      .trim();
     return ["cancelled", "canceled", "отменен", "отменён"].includes(s);
   }, []);
 
@@ -903,7 +914,9 @@ const fullName = useCallback(
           removedByKitchen.size === 0
         ) {
           const createdRaw =
-            orderDetail?.created_at || orderDetail?.date || orderDetail?.created;
+            orderDetail?.created_at ||
+            orderDetail?.date ||
+            orderDetail?.created;
           const createdMs = createdRaw ? new Date(createdRaw).getTime() : 0;
           if (
             createdMs > 0 &&
@@ -1119,7 +1132,7 @@ const fullName = useCallback(
         setNotificationOptions({ variant: "waiter", sticky: true });
       }
     }
-    
+
     // Auto print to kitchen printers on order created (for the device that has printers configured)
     if (type === "order_created") {
       // Notify cook (only on Kitchen page)

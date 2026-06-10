@@ -4,18 +4,8 @@ import {
   buildPosStartPayload,
   getMainCartSaleId,
 } from "../../../tools/posSaleCarts";
+import { handleThunkError } from "./utils/handleThunkError";
 
-// Делает ошибки сериализуемыми
-const plainAxiosError = (error) => ({
-  message: error?.message,
-  code: error?.code,
-  status: error?.response?.status,
-  data: error?.response?.data,
-  url: error?.config?.url,
-  method: error?.config?.method,
-});
-
-// ===== Helpers для сделок =====
 // ===== Helpers для сделок =====
 const ruStatusToKind = (ru) => {
   const s = String(ru).trim();
@@ -43,7 +33,7 @@ export const startSale = createAsyncThunk(
       const { data } = await api.post("/main/pos/sales/start/", payload);
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
   {
@@ -67,7 +57,7 @@ export const updateSale = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -79,7 +69,7 @@ export const getSale = createAsyncThunk(
       const { data: response } = await api.get(`/main/pos/sales/${id}/`);
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -102,7 +92,7 @@ export const manualFilling = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -117,7 +107,7 @@ export const updateManualFilling = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -131,7 +121,7 @@ export const deleteProductInCart = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -142,7 +132,7 @@ export const deleteSale = createAsyncThunk(
     try {
       await api.delete(`/main/pos/sales/${id}/`);
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -157,7 +147,7 @@ export const updateProductInCart = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -192,7 +182,7 @@ export const sendBarCode = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -206,7 +196,7 @@ export const doSearch = createAsyncThunk(
       });
       return data.results;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -225,7 +215,7 @@ export const historySellProduct = createAsyncThunk(
       });
       return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -243,7 +233,7 @@ export const fetchDocuments = createAsyncThunk(
       });
       return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -258,7 +248,7 @@ export const updateSellProduct = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -277,7 +267,7 @@ export const historySellObjects = createAsyncThunk(
       });
       return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -289,7 +279,7 @@ export const historySellProductDetail = createAsyncThunk(
       const { data } = await api.get(`/main/pos/sales/${id}/`);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -309,7 +299,7 @@ export const returnSale = createAsyncThunk(
       const { data } = await api.post(endpoint, payload);
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -321,7 +311,7 @@ export const historySellObjectDetail = createAsyncThunk(
       const { data } = await api.get(`/main/object-sales/${id}/`);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -346,7 +336,7 @@ export const productCheckout = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -360,7 +350,7 @@ export const getProductCheckout = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -374,7 +364,7 @@ export const getProductInvoice = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -387,7 +377,7 @@ export const getInvoiceJson = createAsyncThunk(
       const { data } = await api.get(`/main/sales/json/${id}/invoice/`);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -400,7 +390,7 @@ export const getReceiptJson = createAsyncThunk(
       const { data } = await api.get(`/main/sales/json/${id}/receipt/`);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -413,7 +403,7 @@ export const getObjects = createAsyncThunk(
       const { data } = await api.get(`/main/object-items/`);
       return data.results;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -425,7 +415,7 @@ export const createObject = createAsyncThunk(
       const { data: response } = await api.post("/main/object-items/", payload);
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -438,7 +428,7 @@ export const startSellObjects = createAsyncThunk(
       const { data } = await api.post("/main/object-sales/", payload);
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -454,7 +444,7 @@ export const objectCartAddItem = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -470,7 +460,7 @@ export const addCustomItem = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );
@@ -551,7 +541,7 @@ export const createDeal = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return rejectWithValue(plainAxiosError(error));
+      return handleThunkError(error, rejectWithValue);
     }
   },
 );

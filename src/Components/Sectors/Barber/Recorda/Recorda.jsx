@@ -69,6 +69,7 @@ const Recorda = () => {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
+  const [modalMode, setModalMode] = useState("booking");
 
   /* Проверка, сегодня ли выбранная дата */
   const isToday = fltDate === todayStr();
@@ -266,11 +267,19 @@ const Recorda = () => {
 
   const handleOpenNew = () => {
     setCurrentRecord(null);
+    setModalMode("booking");
+    setModalOpen(true);
+  };
+
+  const handleOpenWalkIn = () => {
+    setCurrentRecord(null);
+    setModalMode("walkin");
     setModalOpen(true);
   };
 
   const handleOpenExisting = (rec) => {
     setCurrentRecord(rec);
+    setModalMode("booking");
     setModalOpen(true);
   };
 
@@ -328,6 +337,7 @@ const Recorda = () => {
         onToday={handleToday}
         isToday={isToday}
         onAddClick={handleOpenNew}
+        onWalkInClick={handleOpenWalkIn}
       />
 
       {pageError && (
@@ -359,6 +369,7 @@ const Recorda = () => {
           isOpen={modalOpen}
           onClose={handleCloseModal}
           currentRecord={currentRecord}
+          initialMode={modalMode}
           clients={clients}
           barbers={barbers}
           services={services}

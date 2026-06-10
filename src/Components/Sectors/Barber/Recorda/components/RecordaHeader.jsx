@@ -1,6 +1,6 @@
 // RecordaHeader.jsx
 import React, { useRef, useState } from "react";
-import { FaPlus, FaChevronLeft, FaChevronRight, FaCalendarAlt, FaFilter, FaTimes } from "react-icons/fa";
+import { FaPlus, FaChevronLeft, FaChevronRight, FaCalendarAlt, FaFilter, FaTimes, FaWalking } from "react-icons/fa";
 import BarberSelect from "../../common/BarberSelect";
 
 const STATUS_OPTIONS = [
@@ -26,6 +26,7 @@ const RecordaHeader = ({
   onToday,
   isToday,
   onAddClick,
+  onWalkInClick,
 }) => {
   const dateInputRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -137,15 +138,27 @@ const RecordaHeader = ({
           </button>
         </div>
 
-        {/* Кнопка добавления */}
+        {/* Кнопки добавления */}
+        <button
+          type="button"
+          className="barberrecorda__btn barberrecorda__btn--walkin"
+          onClick={onWalkInClick}
+          aria-label="Клиент пришёл без записи"
+          title="Клиент пришёл без записи"
+        >
+          <FaWalking />
+          <span className="barberrecorda__btnText">Клиент пришёл</span>
+        </button>
+
         <button
           type="button"
           className="barberrecorda__btn barberrecorda__btn--primary"
           onClick={onAddClick}
-          aria-label="Добавить запись"
+          aria-label="Запланировать запись"
+          title="Запланировать запись"
         >
           <FaPlus />
-          <span className="barberrecorda__btnText">Добавить</span>
+          <span className="barberrecorda__btnText">Записать</span>
         </button>
       </div>
 

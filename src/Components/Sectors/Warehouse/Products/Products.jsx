@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { FaBox, FaPlus, FaTimes, FaSearch, FaEdit } from "react-icons/fa";
 import "./Products.scss";
+import {
+  compareByAlphabetEnRu,
+  sortByAlphabetEnRu,
+} from "../../../../utils/sortByAlphabetEnRu";
 
 /**
  * sklad-products — справочник товаров + вкладка "Ед. изм."
@@ -167,7 +171,9 @@ const WarehouseProducts = () => {
           brand: "Khan",
           unit: "мл",
         },
-      ].sort((a, b) => a.name.localeCompare(b.name, "ru")),
+      ].sort((a, b) =>
+        compareByAlphabetEnRu(a, b, (item) => item?.name ?? ""),
+      ),
     [],
   );
 
@@ -182,14 +188,16 @@ const WarehouseProducts = () => {
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return items;
-    return items.filter(
-      (p) =>
-        p.name.toLowerCase().includes(s) ||
-        p.category.toLowerCase().includes(s) ||
-        p.brand.toLowerCase().includes(s) ||
-        p.unit.toLowerCase().includes(s),
-    );
+    const base = s
+      ? items.filter(
+          (p) =>
+            p.name.toLowerCase().includes(s) ||
+            p.category.toLowerCase().includes(s) ||
+            p.brand.toLowerCase().includes(s) ||
+            p.unit.toLowerCase().includes(s),
+        )
+      : items;
+    return sortByAlphabetEnRu(base, (item) => item?.name ?? "");
   }, [items, q]);
 
   const [page, setPage] = useState(1);
@@ -283,9 +291,7 @@ const WarehouseProducts = () => {
       return setError("Такой товар уже существует.");
 
     if (editingIndex === -1) {
-      const next = [...items, draft].sort((a, b) =>
-        a.name.localeCompare(b.name, "ru"),
-      );
+      const next = sortByAlphabetEnRu([...items, draft], (item) => item?.name ?? "");
       setItems(next);
       const s = q.trim().toLowerCase();
       const filteredNext = s
@@ -299,9 +305,10 @@ const WarehouseProducts = () => {
         : next;
       setPage(Math.max(1, Math.ceil(filteredNext.length / PAGE_SIZE)));
     } else {
-      const next = items
-        .map((it, i) => (i === editingIndex ? draft : it))
-        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      const next = sortByAlphabetEnRu(
+        items.map((it, i) => (i === editingIndex ? draft : it)),
+        (item) => item?.name ?? "",
+      );
       setItems(next);
     }
 

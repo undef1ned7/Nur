@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "../../api";
 import { useSelector } from "react-redux";
+import { handleThunkError } from "../creators/utils/handleThunkError";
 
 const initialState = {
   list: [],
@@ -16,7 +17,7 @@ export const getCashBoxes = createAsyncThunk(
       const { data: response } = await api.get("/construction/cashboxes/");
       return response.results;
     } catch (e) {
-      return rejectWithValue(e.response?.data || e.message);
+      return handleThunkError(e, rejectWithValue);
     }
   }
 );
@@ -30,7 +31,7 @@ export const getCashFlows = createAsyncThunk(
       });
       return response.results || response || [];
     } catch (e) {
-      return rejectWithValue(e.response?.data || e.message);
+      return handleThunkError(e, rejectWithValue);
     }
   }
 );
@@ -45,7 +46,7 @@ export const addCashFlows = createAsyncThunk(
       );
       return response;
     } catch (e) {
-      return rejectWithValue(e.response?.data || e.message);
+      return handleThunkError(e, rejectWithValue);
     }
   }
 );
@@ -60,7 +61,7 @@ export const updateCashFlows = createAsyncThunk(
         updatedData
       );
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -75,7 +76,7 @@ export const bulkUpdateCashFlowsStatus = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
