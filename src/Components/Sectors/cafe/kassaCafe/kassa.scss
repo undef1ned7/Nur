@@ -3,6 +3,7 @@
 .cafeKassa {
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  --control-h: 40px;
 
   background: var(--surface);
   border-radius: var(--radius);
@@ -107,16 +108,6 @@
     border-radius: 8px;
   }
 
-  &__categoryFilter {
-    min-width: 200px;
-    max-width: 280px;
-    margin-right: 24px;
-  }
-
-  &__categoriesBtn {
-    margin-left: 12px;
-  }
-
   /* header */
   &__header {
     display: flex;
@@ -209,8 +200,10 @@
   &__field {
     min-width: 140px;
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: stretch;
     gap: 4px;
+
     .cafeKassa__input {
       min-width: unset;
       width: 100%;
@@ -221,23 +214,35 @@
     display: block;
     font-size: 12px;
     opacity: 0.8;
-    margin-bottom: 4px;
+    margin-bottom: 0;
+  }
+
+  &__input--date {
+    min-width: 0;
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 10px;
+    box-sizing: border-box;
   }
 
   /* buttons */
   &__btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-
-    padding: 10px 14px;
+    box-sizing: border-box;
+    height: var(--control-h);
+    padding: 0 14px;
     border-radius: 10px;
     border: 1px solid var(--border);
     background: #fff;
-
+    font-size: 14px;
+    line-height: 1;
     font-weight: 500;
     cursor: pointer;
     transition: 0.15s;
+    white-space: nowrap;
 
     &:hover:not(:disabled) {
       background: #f3f4f6;
@@ -313,7 +318,85 @@
     text-align: center;
   }
 
-  /* detail-page chips */
+  /* detail-page filters */
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+  }
+
+  &__filtersTop,
+  &__filtersBottom {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  &__filtersTop {
+    width: 100%;
+  }
+
+  &__filtersBottom {
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  &__filtersField {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+
+    &--category {
+      flex: 1 1 200px;
+      max-width: 280px;
+
+      .cafeKassaCombo__control {
+        height: var(--control-h);
+        border-radius: 10px;
+      }
+    }
+  }
+
+  &__filtersLabel {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    line-height: 1.2;
+  }
+
+  &__filtersStatus {
+    display: inline-flex;
+    align-items: center;
+    height: var(--control-h);
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  &__dateRange {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__dateField {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 130px;
+  }
+
   &__switch {
     display: flex;
     align-items: center;
@@ -322,16 +405,40 @@
     margin: 0;
   }
 
-  &__chip {
-    padding: 8px 12px;
+  &__chipGroup {
+    display: inline-flex;
+    flex-shrink: 0;
+    height: var(--control-h);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 10px;
+    overflow: hidden;
     background: #fff;
+    box-sizing: border-box;
+  }
 
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0;
+    min-width: 84px;
+    height: 100%;
+    padding: 0 12px;
+    border: none;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
     cursor: pointer;
     font-weight: 500;
     font-size: 14px;
+    line-height: 1;
     transition: 0.15s;
+    white-space: nowrap;
+    box-sizing: border-box;
+
+    &:last-child {
+      border-right: none;
+    }
 
     &:hover:not(:disabled) {
       background: #f3f4f6;
@@ -340,7 +447,6 @@
     &--active {
       background: #111;
       color: #fff;
-      border-color: #111;
 
       &:hover:not(:disabled) {
         background: #000;
@@ -355,6 +461,10 @@
 
   &__grow {
     flex: 1;
+
+    &--filtersBottom {
+      min-width: 12px;
+    }
   }
 
   /* ===== MODAL: по центру, не липнет к краям ===== */
@@ -589,11 +699,8 @@
       justify-content: center;
     }
 
-    &__switch {
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    &__filters {
+      align-items: stretch;
     }
 
     &__field {
@@ -633,32 +740,57 @@
       font-size: 18px;
     }
 
-    &__switch {
-      width: 100%;
-      flex-direction: column;
-      align-items: stretch;
+    &__filters {
+      padding: 10px;
       gap: 10px;
-      margin-bottom: 0;
+    }
+
+    &__filtersTop,
+    &__filtersBottom {
+      width: 100%;
+    }
+
+    &__filtersTop .cafeKassa__grow,
+    &__grow--filtersBottom {
+      display: none;
+    }
+
+    &__filtersTop .cafeKassa__btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__filtersField--category {
+      flex: 1 1 100%;
+      max-width: none;
+    }
+
+    &__chipGroup {
+      width: 100%;
     }
 
     &__chip {
-      flex: 1 1 auto;
-      width: 100%;
+      flex: 1 1 0;
       text-align: center;
     }
 
-    &__grow {
-      display: none;
+    &__dateRange {
+      width: 100%;
+    }
+
+    &__dateField {
+      flex: 1 1 120px;
+      min-width: 0;
+    }
+
+    &__filtersBottom .cafeKassa__btn {
+      width: 100%;
+      justify-content: center;
     }
 
     &__field {
       width: 100%;
       min-width: 0;
-    }
-
-    &__btn {
-      width: 100%;
-      justify-content: center;
     }
 
     &__table {
@@ -706,11 +838,6 @@
   }
 
   @media (max-width: 640px) {
-    &__switch {
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
     &__tableWrap {
       border-left: none;
       border-right: none;
@@ -751,33 +878,13 @@
       font-size: 13px;
     }
 
-    &__switch {
-      width: 100%;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 8px;
-      margin-bottom: 0;
-    }
-
-    &__chip {
-      padding: 8px 12px;
-      font-size: 13px;
-      width: 100%;
-      flex: 1 1 auto;
-      min-width: 0;
-      text-align: center;
-    }
-
-    &__grow {
+    &__filtersTop .cafeKassa__grow,
+    &__grow--filtersBottom {
       display: none;
     }
 
-    &__field {
-      width: 100%;
-      min-width: 0;
-    }
-
-    &__btn {
+    &__filtersTop .cafeKassa__btn,
+    &__filtersBottom .cafeKassa__btn {
       width: 100%;
       justify-content: center;
     }
@@ -828,32 +935,14 @@
       font-size: 13px;
     }
 
-    &__switch {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
-      margin-bottom: 0;
-    }
-
     &__chip {
       padding: 8px 10px;
       font-size: 12px;
-      width: 100%;
-      text-align: center;
-    }
-
-    &__grow {
-      display: none;
     }
 
     &__field {
       width: 100%;
       min-width: 0;
-    }
-
-    &__btn {
-      width: 100%;
-      justify-content: center;
     }
 
     &__table {
@@ -957,19 +1046,9 @@
       height: 36px;
     }
 
-    &__switch {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
-      margin-bottom: 0;
-    }
-
     &__chip {
       padding: 8px 10px;
       font-size: 11px;
-      width: 100%;
-      flex: 1 1 auto;
-      text-align: center;
     }
 
     &__tableWrap {
