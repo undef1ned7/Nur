@@ -552,86 +552,109 @@ const CashboxDetail = () => {
         <h2 className="cafeKassa__title">{cashboxTitle}</h2>
       </div>
 
-      <div className="cafeKassa__switch">
-        <button
-          className={`cafeKassa__chip ${tab === "expense" ? "cafeKassa__chip--active" : ""}`}
-          onClick={() => setTab("expense")}
-          type="button"
-        >
-          Расход
-        </button>
-        <button
-          className={`cafeKassa__chip ${tab === "income" ? "cafeKassa__chip--active" : ""}`}
-          onClick={() => setTab("income")}
-          type="button"
-        >
-          Приход
-        </button>
-        <button
-          className={`cafeKassa__chip ${tab === "all" ? "cafeKassa__chip--active" : ""}`}
-          onClick={() => setTab("all")}
-          type="button"
-        >
-          Все
-        </button>
+      <div className="cafeKassa__filters">
+        <div className="cafeKassa__filtersTop">
+          <div className="cafeKassa__chipGroup" role="tablist" aria-label="Тип операции">
+            <button
+              className={`cafeKassa__chip ${tab === "expense" ? "cafeKassa__chip--active" : ""}`}
+              onClick={() => setTab("expense")}
+              type="button"
+              role="tab"
+              aria-selected={tab === "expense"}
+            >
+              Расход
+            </button>
+            <button
+              className={`cafeKassa__chip ${tab === "income" ? "cafeKassa__chip--active" : ""}`}
+              onClick={() => setTab("income")}
+              type="button"
+              role="tab"
+              aria-selected={tab === "income"}
+            >
+              Приход
+            </button>
+            <button
+              className={`cafeKassa__chip ${tab === "all" ? "cafeKassa__chip--active" : ""}`}
+              onClick={() => setTab("all")}
+              type="button"
+              role="tab"
+              aria-selected={tab === "all"}
+            >
+              Все
+            </button>
+          </div>
 
-        <div className="cafeKassa__field cafeKassa__categoryFilter">
-          <span className="cafeKassa__label">Категория</span>
-          <SearchableCombobox
-            value={categoryFilter}
-            onChange={onCategoryFilterChange}
-            options={categoryFilterOptions}
-            placeholder="Все категории"
-            disabled={loading || flowsLoading}
-          />
-        </div>
+          {flowsLoading ? (
+            <span className="cafeKassa__filtersStatus">Обновление…</span>
+          ) : null}
 
-        {flowsLoading ? (
-          <span className="cafeKassa__muted" style={{ alignSelf: "center" }}>
-            Обновление…
-          </span>
-        ) : null}
+          <div className="cafeKassa__grow" />
 
-        <button
-          type="button"
-          className="cafeKassa__btn cafeKassa__btn--secondary cafeKassa__categoriesBtn"
-          onClick={() => setCategoriesModalOpen(true)}
-        >
-          Категории
-        </button>
-
-        <div className="cafeKassa__grow" />
-
-        <div className="cafeKassa__field">
-          <label className="cafeKassa__label">С</label>
-          <input className="cafeKassa__input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-
-        <div className="cafeKassa__field">
-          <label className="cafeKassa__label">По</label>
-          <input className="cafeKassa__input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </div>
-
-        {(dateFrom || dateTo) && (
           <button
-            className="cafeKassa__btn"
-            onClick={() => {
-              setDateFrom("");
-              setDateTo("");
-            }}
+            className="cafeKassa__btn cafeKassa__btn--primary"
+            onClick={() => setAddOpOpen(true)}
             type="button"
           >
-            Сбросить
+            Добавить операцию
           </button>
-        )}
+        </div>
 
-        <button
-          className="cafeKassa__btn cafeKassa__btn--primary"
-          onClick={() => setAddOpOpen(true)}
-          type="button"
-        >
-          Добавить операцию
-        </button>
+        <div className="cafeKassa__filtersBottom">
+          <div className="cafeKassa__filtersField cafeKassa__filtersField--category">
+            <span className="cafeKassa__filtersLabel">Категория</span>
+            <SearchableCombobox
+              value={categoryFilter}
+              onChange={onCategoryFilterChange}
+              options={categoryFilterOptions}
+              placeholder="Все категории"
+              disabled={loading || flowsLoading}
+              classNamePrefix="cafeKassaCombo"
+            />
+          </div>
+
+          <button
+            type="button"
+            className="cafeKassa__btn cafeKassa__btn--secondary"
+            onClick={() => setCategoriesModalOpen(true)}
+          >
+            Категории
+          </button>
+
+          <div className="cafeKassa__grow cafeKassa__grow--filtersBottom" />
+
+          <div className="cafeKassa__dateRange">
+            <label className="cafeKassa__dateField">
+              <span className="cafeKassa__filtersLabel">С</span>
+              <input
+                className="cafeKassa__input cafeKassa__input--date"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="cafeKassa__dateField">
+              <span className="cafeKassa__filtersLabel">По</span>
+              <input
+                className="cafeKassa__input cafeKassa__input--date"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+            {(dateFrom || dateTo) ? (
+              <button
+                className="cafeKassa__btn cafeKassa__btn--secondary"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                type="button"
+              >
+                Сбросить
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <DataContainer>
