@@ -1767,12 +1767,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                   {kpi.change && (
                     <div className="analytics-page__kpi-change analytics-page__kpi-change--positive">
@@ -1949,12 +1949,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                   {kpi.subtitle && (
                     <div className="analytics-page__kpi-subtitle">
@@ -2073,12 +2073,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                   {kpi.subtitle && (
                     <div className="analytics-page__kpi-subtitle">
@@ -2268,12 +2268,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                   {kpi.subtitle && (
                     <div className="analytics-page__kpi-subtitle">
@@ -2430,12 +2430,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                 </div>
               );
@@ -2652,12 +2652,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                   {kpi.subtitle && (
                     <div className="analytics-page__kpi-subtitle">
@@ -2793,12 +2793,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                 </div>
               );
@@ -2870,12 +2870,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                 </div>
               );
@@ -3085,12 +3085,12 @@ const Analytics = () => {
                     <Icon size={24} style={{ color: kpi.color }} />
                   </div>
                   <div className="analytics-page__kpi-value">
+                    {kpi.value}
                     {kpi.currency && (
                       <span className="analytics-page__kpi-currency">
                         {kpi.currency}
                       </span>
                     )}
-                    {kpi.value}
                   </div>
                 </div>
               );

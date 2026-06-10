@@ -1324,7 +1324,7 @@ const CafeAnalytics = () => {
               </div>
             </div>
             <div className="cafeAnalytics__kpiValue">
-              <span className="cafeAnalytics__kpiCur">сом</span> {fmtInt(revenueTotal)}
+              {fmtInt(revenueTotal)} <span className="cafeAnalytics__kpiCur">сом</span>
             </div>
           </button>
 
