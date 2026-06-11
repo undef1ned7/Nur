@@ -31,6 +31,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { registerPdfFonts } from "@/pdf/registerFonts";
 import "./Costing.scss";
 
@@ -980,6 +981,7 @@ export default function CafeCosting() {
       );
       await loadTechCardsMenuList({ page: techCardListPage, search: "" });
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка загрузки данных себестоимости"), true);
     } finally {
       setLoading(false);
@@ -1012,6 +1014,7 @@ export default function CafeCosting() {
         });
       } catch (error) {
         if (controller.signal.aborted) return;
+        if (suppressOfflineError(error)) return;
         alert(validateResErrors(error, "Ошибка загрузки списка техкарт"), true);
       }
     })();
@@ -1040,6 +1043,7 @@ export default function CafeCosting() {
         setPickerMenuItems(results);
       } catch (error) {
         if (controller.signal.aborted) return;
+        if (suppressOfflineError(error)) return;
         setPickerMenuItems([]);
         alert(validateResErrors(error, "Ошибка загрузки списка блюд"), true);
       } finally {
@@ -1072,6 +1076,7 @@ export default function CafeCosting() {
         if (mounted) setDetailPreparation(res?.data || null);
       } catch (error) {
         if (mounted) {
+          if (suppressOfflineError(error)) return;
           setDetailPreparation(null);
           alert(validateResErrors(error, "Ошибка загрузки заготовки"), true);
         }
@@ -1251,6 +1256,7 @@ export default function CafeCosting() {
     try {
       await refreshTechCardById(id);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       setDishCost(null);
       alert(validateResErrors(error, "Ошибка получения себестоимости блюда"), true);
     }
@@ -1274,6 +1280,7 @@ export default function CafeCosting() {
       });
       await refreshTechCardById(id);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка добавления ингредиента"), true);
     }
   };
@@ -1307,6 +1314,7 @@ export default function CafeCosting() {
       cancelEditDishIngredient();
       await refreshTechCardById(dishId);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка изменения ингредиента"), true);
     }
   };
@@ -1340,6 +1348,7 @@ export default function CafeCosting() {
       ).toBlob();
       downloadBlob(blob, `tech_card_${safeFilename(pdfData.title || techCardId)}.pdf`);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка скачивания PDF техкарты"), true);
     } finally {
       setPdfDownloading(false);
@@ -1435,6 +1444,7 @@ export default function CafeCosting() {
       );
       closeTechCardsPicker();
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка скачивания PDF техкарт"), true);
     } finally {
       setPdfAllDownloading(false);
@@ -1449,6 +1459,7 @@ export default function CafeCosting() {
         await api.delete(`/cafe/dish-ingredients/${encodeURIComponent(id)}/`);
         await refreshTechCardById(dishId);
       } catch (error) {
+        if (suppressOfflineError(error)) return;
         alert(validateResErrors(error, "Ошибка удаления ингредиента"), true);
       }
     });
@@ -1564,6 +1575,7 @@ export default function CafeCosting() {
       setPrepModalOpen(false);
       await loadAll();
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка сохранения заготовки"), true);
     } finally {
       setSaving(false);
@@ -1577,6 +1589,7 @@ export default function CafeCosting() {
         await api.delete(`/cafe/preparations/${encodeURIComponent(id)}/`);
         await loadAll();
       } catch (error) {
+        if (suppressOfflineError(error)) return;
         alert(validateResErrors(error, "Ошибка удаления заготовки"), true);
       }
     });
@@ -1639,6 +1652,7 @@ export default function CafeCosting() {
       await loadAll();
       alert("Приход заготовки успешно выполнен");
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка при оприходовании заготовки"), true);
     } finally {
       setSaving(false);
@@ -1702,6 +1716,7 @@ export default function CafeCosting() {
       await saveDetailProcessings(nextRows);
       setDetailProcessingModalOpen(false);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка сохранения обработки заготовки"), true);
     } finally {
       setSaving(false);
@@ -1719,6 +1734,7 @@ export default function CafeCosting() {
       const nextRows = currentRows.filter((_, i) => i !== idx);
       await saveDetailProcessings(nextRows);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка удаления обработки заготовки"), true);
     } finally {
       setSaving(false);
@@ -1764,6 +1780,7 @@ export default function CafeCosting() {
     try {
       await loadTechCardDetail(id);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       alert(validateResErrors(error, "Ошибка загрузки технической карты"), true);
     }
   };
@@ -1788,6 +1805,7 @@ export default function CafeCosting() {
       const { data } = await api.post("/cafe/dishes/calculate-preview/", payload);
       setPreviewResult(data || null);
     } catch (error) {
+      if (suppressOfflineError(error)) return;
       setPreviewResult(null);
       alert(validateResErrors(error, "Ошибка расчета предпросмотра"), true);
     }

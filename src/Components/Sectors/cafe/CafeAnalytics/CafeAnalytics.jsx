@@ -29,6 +29,7 @@ import { pdf, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer
 import api from "../../../../api";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { fetchCafeSalesDynamicsSeries } from "../../../../../tools/cafeAnalyticsDynamics";
 import {
   checkPrinterConnection,
@@ -1105,6 +1106,7 @@ const CafeAnalytics = () => {
         company: orgName || undefined,
       });
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       alert(validateResErrors(e, "Ошибка печати отчёта на кассу"), true);
     }
   }, [alert, company?.name, company?.title, dateFrom, dateTo, financeBlock]);

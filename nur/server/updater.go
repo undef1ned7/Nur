@@ -34,6 +34,7 @@ func getCurrentVersion() string {
 }
 
 func checkUpdate() (*VersionInfo, bool) {
+	return nil, false
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	resp, err := client.Get(versionURL)

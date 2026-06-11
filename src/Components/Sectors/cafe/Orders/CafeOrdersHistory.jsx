@@ -26,6 +26,7 @@ import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 import { canCafeOrderReturn } from "../../../../tools/cafeEmployeePermissions";
 import {
@@ -283,6 +284,7 @@ const CafeOrderHistory = () => {
     try {
       attachUsbListenersOnce();
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка загрузки");
       alert(errorMessage, true);
     }
@@ -291,6 +293,7 @@ const CafeOrderHistory = () => {
       try {
         await Promise.all([fetchTables(), fetchEmployees(), fetchMenu()]);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       } finally {
@@ -321,6 +324,7 @@ const CafeOrderHistory = () => {
         }
         await fetchOrders(params);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(
           e,
           "Ошибка загрузки истории заказов",
@@ -547,6 +551,7 @@ const CafeOrderHistory = () => {
         /* ignore */
       }
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const msg = validateResErrors(e, "Не удалось сохранить позиции");
       alert(msg, true);
     } finally {
@@ -647,6 +652,7 @@ const CafeOrderHistory = () => {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
         } catch {}
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка печати чека");
         alert(errorMessage, true);
       } finally {

@@ -10,6 +10,7 @@ import { useCafeTablesWebSocket } from "../../../../hooks/useCafeWebSocket";
 import { useOutletContext } from "react-router-dom";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -123,6 +124,7 @@ const Tables = () => {
       const full = await hydrateOrdersDetails(active);
       setOrdersActive(full);
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка загрузки данных");
       alert(errorMessage, true);
       // Ошибка загрузки данных - неудачно при сетевых проблемах
@@ -185,6 +187,7 @@ const Tables = () => {
           await api.patch(`/cafe/tables/${t.id}/`, { status: "free" });
           setTables((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "free" } : x)));
         } catch (e) {
+          if (suppressOfflineError(e)) return;
           const errorMessage = validateResErrors(e, "Не удалось обновить статус стола");
           alert(errorMessage, true);
         }
@@ -199,6 +202,7 @@ const Tables = () => {
       setZones((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка создания зоны");
       alert(errorMessage, true);
       return false;
@@ -211,6 +215,7 @@ const Tables = () => {
       setZones((prev) => prev.map((z) => (z.id === id ? res.data : z)));
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка обновления зоны");
       alert(errorMessage, true);
       return false;
@@ -224,6 +229,7 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => ((t.zone?.id || t.zone) === id ? { ...t, zone: "" } : t)));
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка удаления зоны");
       alert(errorMessage, true);
       return false;
@@ -237,6 +243,7 @@ const Tables = () => {
       setTables((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка создания стола");
       alert(errorMessage, true);
       return false;
@@ -249,6 +256,7 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => (t.id === id ? res.data : t)));
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка обновления стола");
       alert(errorMessage, true);
       return false;
@@ -261,6 +269,7 @@ const Tables = () => {
       setTables((prev) => prev.filter((t) => t.id !== id));
       return true;
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка удаления стола");
       alert(errorMessage, true);
       return false;

@@ -43,6 +43,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
@@ -455,7 +456,8 @@ const Orders = () => {
       const r = await api.get("/cafe/kitchens/");
       setKitchens(listFrom(r) || []);
     } catch (e) {
-      const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+      if (suppressOfflineError(e)) return;
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке кухонь");
       alert(errorMessage, true);
       setKitchens([]);
     }
@@ -487,6 +489,7 @@ const Orders = () => {
         });
       }
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка при загрузке меню");
       alert(errorMessage, true);
     } finally {
@@ -534,6 +537,7 @@ const Orders = () => {
 
         setMenuCurrentPage(newPage);
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         const errorMessage = validateResErrors(err, "Ошибка загрузке меню");
         alert(errorMessage, true);
       } finally {
@@ -624,6 +628,7 @@ const Orders = () => {
           fetchCashboxes(),
         ]);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       }
@@ -635,6 +640,7 @@ const Orders = () => {
         await fetchTables();
         setForm((prev) => ({ ...prev, table: "" }));
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       }
@@ -799,6 +805,7 @@ const Orders = () => {
       try {
         await fetchOrders();
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       } finally {
@@ -1031,6 +1038,7 @@ const Orders = () => {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
         } catch {}
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка при печати чека");
         alert(errorMessage, true);
       } finally {
@@ -1268,6 +1276,7 @@ const Orders = () => {
         const data = await getAllClients();
         if (mounted) setClients(Array.isArray(data) ? data : []);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
         alert(errorMessage, true);
         if (mounted) setClientsErr("Не удалось загрузить клиентов");
@@ -1632,6 +1641,7 @@ const Orders = () => {
 
       await fetchOrders();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка сохранения заказа");
       alert(errorMessage, true);
       // Ошибка сохранения заказа
@@ -1669,6 +1679,7 @@ const Orders = () => {
     try {
       await api.patch(`/cafe/tables/${tableId}/`, { status: "free" });
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Не удалось освободить стол");
       alert(errorMessage, true);
     }
@@ -1786,6 +1797,7 @@ const Orders = () => {
       setPayNewClientPhone("");
       setPayAddClientOpen(false);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Не удалось создать гостя"), true);
     } finally {
       setPayAddClientSaving(false);
@@ -1802,6 +1814,7 @@ const Orders = () => {
         const data = await getAllClients();
         if (mounted) setClients(Array.isArray(data) ? data : []);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
         alert(errorMessage, true);
         if (mounted) setClientsErr("Не удалось загрузить клиентов");
@@ -1948,6 +1961,7 @@ const Orders = () => {
       await postPayCashflowDelta(order, paidBefore, data);
       await finishPaySuccess(order, data);
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка оплаты заказа");
       alert(errorMessage, true);
     } finally {
@@ -2603,6 +2617,7 @@ const Orders = () => {
                               setOpenSelectId(null);
                               await fetchOrders();
                             } catch (err) {
+                              if (suppressOfflineError(err)) return;
                               const errorMessage = validateResErrors(
                                 err,
                                 "Ошибка при отмене заказа",

@@ -84,3 +84,34 @@ export async function markSynced(ids) {
     ids.map((id) => db.offline_queue.update(id, { synced: true })),
   );
 }
+
+export async function updateOrderLocally(orderId, updater) {
+  const order = await db.open_orders.get(orderId);
+  if (!order) return null;
+  const updated = updater(order);
+  await db.open_orders.put(updated);
+  return updated;
+}
+
+export async function createOrderLocally(orderData) {
+  const tempId =
+    "offline-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  const order = {
+    id: tempId,
+    table_id: orderData.table_id || null,
+    status: "open",
+    created_at: new Date().toISOString(),
+    items:
+      orderData.items?.map((item, i) => ({
+        id: "offline-item-" + Date.now() + "-" + i,
+        menu_item_id: item.menu_item_id,
+        menu_item_name: item.menu_item_name || "",
+        quantity: item.quantity,
+        price: item.price || "0.00",
+      })) || [],
+    total: "0.00",
+    offline: true,
+  };
+  await db.open_orders.put(order);
+  return order;
+}

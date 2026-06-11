@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
 import { useAlert } from "../../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../../utils/cafeOfflineError";
 
 const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, createPing }) => {
   const [query, setQuery] = useState("");
@@ -69,6 +70,7 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
         if (ok) closeModal();
       }
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка создания/обновления зоны");
       alert(errorMessage, true);
     } finally {

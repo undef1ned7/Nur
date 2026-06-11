@@ -11,6 +11,7 @@ import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCom
 import KitchenCreateModal from "../Cook/components/KitchenCreateModal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import {
   menuPriceFieldLabel,
   normalizeMenuWeightFields,
@@ -314,6 +315,7 @@ export default function CafeMenuItemPage() {
         }
       } catch (err) {
         if (!mounted) return;
+        if (suppressOfflineError(err)) return;
         alert(
           validateResErrors(err, "Ошибка при загрузке данных блюда"),
           true,
@@ -467,6 +469,7 @@ export default function CafeMenuItemPage() {
       setIngredientEditId("");
       await reloadDishIngredients();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка добавления ингредиента"), true);
     } finally {
       setIngredientSaving(false);
@@ -510,6 +513,7 @@ export default function CafeMenuItemPage() {
       setIngredientEditId("");
       await reloadDishIngredients();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка обновления ингредиента"), true);
     } finally {
       setIngredientSaving(false);
@@ -525,6 +529,7 @@ export default function CafeMenuItemPage() {
         await api.delete(`/cafe/dish-ingredients/${encodeURIComponent(String(ingredientId))}/`);
         await reloadDishIngredients();
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         alert(validateResErrors(err, "Ошибка удаления ингредиента"), true);
       } finally {
         setIngredientSaving(false);
@@ -570,6 +575,7 @@ export default function CafeMenuItemPage() {
         );
         await reloadDishIngredients();
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         alert(validateResErrors(err, "Ошибка добавления обработки"), true);
       } finally {
         // Keep lock until UI is fully refreshed to avoid race clicks.
@@ -587,6 +593,7 @@ export default function CafeMenuItemPage() {
         await api.delete(`/cafe/dish-ingredient-processings/${encodeURIComponent(String(processingRowId))}/`);
         await reloadDishIngredients();
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         alert(validateResErrors(err, "Ошибка удаления обработки"), true);
       } finally {
         setTimeout(() => setProcessingMutatingKey(""), 200);
@@ -714,6 +721,7 @@ export default function CafeMenuItemPage() {
 
         alert("Блюдо успешно сохранено");
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         alert(
           validateResErrors(err, "Произошла ошибка при сохранении блюда"),
           true,

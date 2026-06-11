@@ -27,6 +27,7 @@ import { useOutletContext } from "react-router-dom";
 import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import {
   formatKitchenTaskQty,
   kitchenTaskQtyNum,
@@ -438,6 +439,7 @@ const Cook = () => {
     try {
       await refetchTask();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка загрузки истории заказов");
       alert(errorMessage, true);
       setHistoryOrders([]);
@@ -457,6 +459,7 @@ const Cook = () => {
       const res = await api.get("/cafe/kitchens/");
       setKitchensList(listFrom(res));
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка загрузки кухонь");
       alert(errorMessage, true);
       setKitchensList([]);
@@ -523,6 +526,7 @@ const Cook = () => {
       refetchKitchens();
       showNotice("ok", "Кухня сохранена");
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка при сохранении кухни");
       showNotice("error", errorMessage);
     } finally {
@@ -544,6 +548,7 @@ const Cook = () => {
           refetchKitchens();
           showNotice("ok", "Кухня удалена");
         } catch (e) {
+          if (suppressOfflineError(e)) return;
           const errorMessage = validateResErrors(e, "Ошибка при удалении кухни");
           showNotice("error", errorMessage);
         } finally {
@@ -768,6 +773,7 @@ const Cook = () => {
         // await printOrderReceiptJSONViaUSBWithDialog(payload);
       } catch (err) {
         suppressNextRefreshRef.current = false;
+        if (suppressOfflineError(err)) return;
         console.error("Claim error:", err);
         showNotice("error", toUserMessage(err));
       }
@@ -811,12 +817,14 @@ const Cook = () => {
             await applyWarehouseIncreaseSafe(needMap);
           } catch { }
           suppressNextRefreshRef.current = false;
+          if (suppressOfflineError(eReady)) return;
           console.error("Ready error:", eReady);
           showNotice("error", toUserMessage(eReady));
           return;
         }
       } catch (err) {
         suppressNextRefreshRef.current = false;
+        if (suppressOfflineError(err)) return;
         console.error("Ready pipeline error:", err);
         showNotice("error", toUserMessage(err));
       }

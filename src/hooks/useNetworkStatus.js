@@ -18,5 +18,5 @@ export function useNetworkStatus() {
     };
   }, []);
 
-  return { isOnline };
+  return { isOnline, isOffline: !isOnline };
 }
