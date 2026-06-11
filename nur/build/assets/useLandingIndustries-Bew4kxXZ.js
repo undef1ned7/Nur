@@ -1,0 +1,1 @@
+import{r,fW as c}from"./sector-barber-BK8wXLDa.js";let e=null,s=null;const o=()=>e?Promise.resolve(e):(s||(s=c().then(t=>(e=Array.isArray(t)?t:[],e)).catch(()=>(e=[],e))),s),f=()=>{const[t,u]=r.useState(e??[]),[i,l]=r.useState(e===null);return r.useEffect(()=>{let n=!1;return o().then(a=>{n||(u(a),l(!1))}),()=>{n=!0}},[]),{industries:t,loading:i}};export{f as u};

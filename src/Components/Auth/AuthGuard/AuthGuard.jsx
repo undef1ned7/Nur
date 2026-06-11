@@ -69,7 +69,18 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
           return;
         }
       } catch (err) {
-        // Токен невалиден или ошибка при проверке - очищаем и редиректим на логин
+        const isNetworkError =
+          !err.response &&
+          (err.code === "ERR_NETWORK" ||
+            err.code === "ECONNABORTED" ||
+            err.message === "Network Error" ||
+            !navigator.onLine);
+
+        if (isNetworkError) {
+          console.warn("AuthGuard: нет сети, сессия сохранена");
+          return;
+        }
+
         console.error("Ошибка проверки токена:", err);
         clearTokens();
 

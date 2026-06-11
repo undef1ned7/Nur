@@ -66,8 +66,13 @@ export function createAuthResponseInterceptor(api, axiosLib) {
         processQueue(null, newAccessToken);
         return api(originalRequest);
       } catch (refreshErr) {
-        processQueue(refreshErr, null);
+        const isNetworkError = !refreshErr.response || !navigator.onLine;
+        if (isNetworkError) {
+          processQueue(refreshErr, null);
+          return Promise.reject(refreshErr);
+        }
 
+        processQueue(refreshErr, null);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         window.location.href = "/login";

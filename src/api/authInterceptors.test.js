@@ -82,11 +82,30 @@ describe("createAuthResponseInterceptor", () => {
       config: { url: "/users/profile/", headers: {} },
     };
     const refreshError = new Error("refresh failed");
+    refreshError.response = { status: 500 };
     api.post.mockRejectedValueOnce(refreshError);
 
     await expect(interceptor(err)).rejects.toBe(refreshError);
     expect(localStorage.getItem("accessToken")).toBeNull();
     expect(window.location.href).toBe("/login");
+  });
+
+  it("keeps tokens when refresh fails due to network error", async () => {
+    localStorage.setItem("accessToken", "old-access");
+    localStorage.setItem("refreshToken", "refresh-123");
+
+    const err = {
+      response: { status: 401 },
+      config: { url: "/users/profile/", headers: {} },
+    };
+    const refreshError = new Error("Network Error");
+    refreshError.code = "ERR_NETWORK";
+    api.post.mockRejectedValueOnce(refreshError);
+
+    await expect(interceptor(err)).rejects.toBe(refreshError);
+    expect(localStorage.getItem("accessToken")).toBe("old-access");
+    expect(localStorage.getItem("refreshToken")).toBe("refresh-123");
+    expect(window.location.href).toBe("");
   });
 
   it("does not retry refresh endpoint on 401", async () => {

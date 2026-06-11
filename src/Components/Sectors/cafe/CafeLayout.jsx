@@ -21,6 +21,7 @@ import {
 } from "./Orders/OrdersPrintService";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 import * as logger from "../../../utils/logger";
+import OfflineStatusBar from "./common/OfflineStatusBar";
 
 export default function CafeLayout() {
   const { orders, tables } = useCafeWebSocketManager();
@@ -1195,6 +1196,7 @@ export default function CafeLayout() {
 
   return (
     <>
+      <OfflineStatusBar />
       <NotificationCafeSound
         notification={notificationOrder}
         notificationKey={notificationDeps}
