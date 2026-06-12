@@ -123,6 +123,9 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
     net: Number(
       d.net_amount ?? d.money_net_amount ?? d.balance ?? d.saldo ?? 0,
     ),
+    debtReceipt: Number(d.money_debt_receipt_amount ?? 0),
+    debtExpense: Number(d.money_debt_expense_amount ?? 0),
+    debtNet: Number(d.money_debt_net_amount ?? 0),
   }));
 
   const requestsApproved = Number(summary.requests_approved ?? 0);
@@ -139,6 +142,13 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
     moneyNetRaw != null && moneyNetRaw !== ""
       ? Number(moneyNetRaw)
       : moneyReceiptAmount - moneyExpenseAmount;
+  const moneyDebtReceiptAmount = Number(summary.money_debt_receipt_amount ?? 0);
+  const moneyDebtExpenseAmount = Number(summary.money_debt_expense_amount ?? 0);
+  const moneyDebtNetRaw = summary.money_debt_net_amount;
+  const moneyDebtNetAmount =
+    moneyDebtNetRaw != null && moneyDebtNetRaw !== ""
+      ? Number(moneyDebtNetRaw)
+      : moneyDebtReceiptAmount - moneyDebtExpenseAmount;
 
   const areaFillId = `${idPrefix}AreaFill`;
 
@@ -193,7 +203,25 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
         <KpiCard
           label="Сальдо"
           value={`${formatNum(moneyNetAmount)} сом`}
-          description="Приход − расход"
+          description="Приход − расход (без долгов)"
+          icon={Wallet}
+        />
+        <KpiCard
+          label="Погашение долга"
+          value={`${formatNum(moneyDebtReceiptAmount)} сом`}
+          description="Поступления в счёт долга"
+          icon={Wallet}
+        />
+        <KpiCard
+          label="Выплаты по долгу"
+          value={`${formatNum(moneyDebtExpenseAmount)} сом`}
+          description="Отдельная графа долга"
+          icon={Wallet}
+        />
+        <KpiCard
+          label="Нетто по долгам"
+          value={`${formatNum(moneyDebtNetAmount)} сом`}
+          description="Погашение − выплаты"
           icon={Wallet}
         />
         <KpiCard
@@ -344,6 +372,14 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                     strokeWidth={2}
                     dot={false}
                   />
+                  <Line
+                    type="monotone"
+                    dataKey="debtNet"
+                    name="Нетто по долгам"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -460,6 +496,9 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                   "Приход, сом",
                   "Расход, сом",
                   "Сальдо, сом",
+                  "Долг +, сом",
+                  "Долг −, сом",
+                  "Нетто долг, сом",
                   "Документов",
                 ]}
                 rows={cashByRegister.map((r) => {
@@ -469,11 +508,14 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                     formatNum(amounts.receipt),
                     formatNum(amounts.expense),
                     formatNum(amounts.net),
+                    formatNum(amounts.debtReceipt),
+                    formatNum(amounts.debtExpense),
+                    formatNum(amounts.debtNet),
                     formatNum(r.docs_count ?? 0),
                   ];
                 })}
-                colTemplate="1.2fr 110px 110px 110px 100px"
-                numeric={[1, 2, 3, 4]}
+                colTemplate="1.2fr 100px 100px 100px 100px 100px 100px 90px"
+                numeric={[1, 2, 3, 4, 5, 6, 7]}
               />
             ) : (
               <div className="warehouse-analytics-table__empty">

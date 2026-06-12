@@ -5,6 +5,12 @@ import { useUser } from "../../../../../store/slices/userSlice";
 import { fetchEmployeesAsync } from "../../../../../store/creators/employeeCreators";
 import { updateWarehouseCounterparty } from "../../../../../store/creators/warehouseThunk";
 import CounterpartyLegalFields from "./CounterpartyLegalFields";
+import CounterpartyBankAccountsFields from "./CounterpartyBankAccountsFields";
+import {
+  bankAccountsFromCounterparty,
+  buildBankAccountsPayload,
+  validateBankAccounts,
+} from "../counterpartyBankAccounts";
 import "../Counterparties.scss";
 
 const isAgentRole = (profile) =>
@@ -31,10 +37,11 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
     agent: initialAgent || "",
     inn: counterparty?.inn || "",
     okpo: counterparty?.okpo || "",
-    score: counterparty?.score || "",
-    bik: counterparty?.bik || "",
     address: counterparty?.address || "",
   });
+  const [bankAccounts, setBankAccounts] = useState(() =>
+    bankAccountsFromCounterparty(counterparty),
+  );
 
   const [error, setError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -108,12 +115,14 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
     }
 
     const phoneTrim = (formData.phone || "").trim();
-    if (!phoneTrim) {
-      setLocalError("Номер телефона обязателен");
+    if (phoneTrim && !/^\+?\d[\d\s\-()]{5,}$/.test(phoneTrim)) {
+      setLocalError("Неверный формат телефона");
       return false;
     }
-    if (!/^\+?\d[\d\s\-()]{5,}$/.test(phoneTrim)) {
-      setLocalError("Неверный формат телефона");
+
+    const bankErr = validateBankAccounts(bankAccounts);
+    if (bankErr) {
+      setLocalError(bankErr);
       return false;
     }
 
@@ -132,16 +141,24 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
     setLocalError("");
 
     try {
+      const phoneTrim = (formData.phone || "").trim();
+      const accounts = buildBankAccountsPayload(bankAccounts);
       const payload = {
         name: formData.name.trim(),
         type: formData.type,
-        phone: formData.phone.trim(),
+        phone: phoneTrim || null,
         inn: (formData.inn || "").trim(),
         okpo: (formData.okpo || "").trim(),
-        score: (formData.score || "").trim(),
-        bik: (formData.bik || "").trim(),
         address: (formData.address || "").trim(),
+        bank_accounts: accounts,
       };
+      if (accounts[0]) {
+        payload.score = accounts[0].score;
+        payload.bik = accounts[0].bik;
+      } else {
+        payload.score = "";
+        payload.bik = "";
+      }
 
       if (isOwnerOrAdmin && formData.agent) {
         payload.agent = formData.agent;
@@ -215,16 +232,15 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
 
             <div className="warehouse-filter-modal__section">
               <label className="warehouse-filter-modal__label">
-                Номер телефона *
+                Номер телефона
               </label>
               <input
                 type="tel"
                 name="phone"
                 className="warehouse-filter-modal__select"
-                placeholder="Введите номер телефона"
+                placeholder="Введите номер телефона (необязательно)"
                 value={formData.phone}
                 onChange={handleChange}
-                required
                 disabled={updating}
                 autoComplete="tel"
               />
@@ -249,6 +265,12 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
             <CounterpartyLegalFields
               formData={formData}
               onChange={handleChange}
+              disabled={updating}
+            />
+
+            <CounterpartyBankAccountsFields
+              bankAccounts={bankAccounts}
+              onChange={setBankAccounts}
               disabled={updating}
             />
 
