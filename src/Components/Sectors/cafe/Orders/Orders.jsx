@@ -52,6 +52,7 @@ import {
   toId,
 } from "./cafeOrderItemPayload";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { buildCafeReceiptPrintFinancials } from "../utils/cafeOrderFinancials";
 import { canCafeOrderPay } from "../../../../tools/cafeEmployeePermissions";
 import {
   defaultWeightQty,
@@ -957,34 +958,39 @@ const Orders = () => {
       const items = Array.isArray(order?.items) ? order.items : [];
 
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
+      const mappedItems = items.map((it) => {
+        const meta = resolveLineWeightMeta(it, menuMap);
+        const qtyNum = lineQtyNum(
+          it.quantity,
+          meta.is_sold_by_weight,
+          meta.sale_unit,
+        );
+        return {
+          name: orderItemTitle(it),
+          qty: qtyNum,
+          qty_display: meta.is_sold_by_weight
+            ? `${formatLineQtyDisplay(qtyNum, meta.sale_unit, true)} × ${fmtMoney(linePrice(it))} сом/${saleUnitLabel(meta.sale_unit)}`
+            : null,
+          price: linePrice(it),
+          comment: String(it.comment || "").trim(),
+        };
+      });
+      const itemsSubtotal = mappedItems.reduce(
+        (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
+        0,
+      );
+      const financials = buildCafeReceiptPrintFinancials(order, itemsSubtotal);
+
       return {
         company: localStorage.getItem("company_name") || "КАССА",
         doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
         waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
-        discount: 0,
         tax: 0,
-        paid_cash: 0,
-        paid_card: 0,
         change: 0,
-        items: items.map((it) => {
-          const meta = resolveLineWeightMeta(it, menuMap);
-          const qtyNum = lineQtyNum(
-            it.quantity,
-            meta.is_sold_by_weight,
-            meta.sale_unit,
-          );
-          return {
-            name: orderItemTitle(it),
-            qty: qtyNum,
-            qty_display: meta.is_sold_by_weight
-              ? `${formatLineQtyDisplay(qtyNum, meta.sale_unit, true)} × ${fmtMoney(linePrice(it))} сом/${saleUnitLabel(meta.sale_unit)}`
-              : null,
-            price: linePrice(it),
-            comment: String(it.comment || "").trim(),
-          };
-        }),
+        ...financials,
+        items: mappedItems,
       };
     },
     [tablesMap, userData, waiterIdLabelMap, menuMap],

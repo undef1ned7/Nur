@@ -925,6 +925,48 @@
   font-weight: 500;
 }
 
+.cafeOrdersRpanel__headActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cafeOrdersRpanel__viewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f9fafb;
+}
+
+.cafeOrdersRpanel__viewBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.18s;
+
+  &:hover {
+    background: #fff;
+    color: var(--text);
+    border-color: rgba(15, 23, 42, 0.08);
+  }
+
+  &--active {
+    background: rgba(247, 215, 79, 0.35);
+    color: #111;
+    border-color: var(--primary-dark);
+  }
+}
+
 .cafeOrdersRpanel__close {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -971,57 +1013,54 @@
 
 .cafeOrdersRpanel__list {
   padding: 10px;
-  overflow: auto; /* скролл видимый */
+  overflow: auto;
   flex: 1;
-  flex-wrap: wrap;
-  display: flex;
-  overscroll-behavior: contain; /* на мобильных при скролле списка блюд не скроллить задний фон */
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  min-height: 0; /* чтобы flex-ребёнок мог скроллиться */
+  min-height: 0;
+
+  &--cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-content: start;
+  }
+
+  &--list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 
-.cafeOrdersRpanel__item {
-  width: 100%;
+.cafeOrdersRpanel__card {
   display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
+  flex-direction: column;
+  min-height: 188px;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff7e;
+  background: #fff;
   overflow: hidden;
   cursor: pointer;
   text-align: left;
-  flex: 1 0 150px;
-  margin-bottom: 8px;
+  padding: 0;
   position: relative;
 
   &:hover {
-    border-color: rgba(15, 23, 42, 0.14);
+    border-color: rgba(15, 23, 42, 0.16);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
   }
 }
-.cafeOrdersRpanel__image {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
 
-}
-.cafeOrdersRpanel__thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.cafeOrdersRpanel__cardMedia {
+  height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  display: inline-grid;
-  place-items: center;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: #fff;
+  font-size: 22px;
 
   img {
     width: 100%;
@@ -1030,39 +1069,111 @@
   }
 }
 
-.cafeOrdersRpanel__meta {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
+.cafeOrdersRpanel__cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  padding: 10px 10px 12px;
 }
 
-.cafeOrdersRpanel__name {
-  font-weight: 500;
+.cafeOrdersRpanel__cardName {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #111;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+}
 
-  @include ifmobile {
-    font-size: 14px;
+.cafeOrdersRpanel__cardPrice {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111;
+}
+
+.cafeOrdersRpanel__row {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    border-color: rgba(15, 23, 42, 0.16);
+    background: #fafafa;
   }
 }
 
-.cafeOrdersRpanel__price {
+.cafeOrdersRpanel__rowThumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: inline-grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  font-size: 18px;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.cafeOrdersRpanel__rowMeta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.cafeOrdersRpanel__rowName {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #111;
+  word-break: break-word;
+}
+
+.cafeOrdersRpanel__rowPrice {
   font-size: 13px;
-  // color: var(--muted);
-  color: black;
-  font-weight: 500;
+  font-weight: 600;
+  color: #111;
 }
 
 .cafeOrdersRpanel__add {
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(247, 215, 79, 0.35);
   color: #111;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cafeOrdersRpanel__card .cafeOrdersRpanel__add {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
 
 .cafeOrdersRpanel__empty {
@@ -1133,6 +1244,57 @@
   background: #fff;
 }
 
+/* Десктоп — крупная модалка меню по центру */
+@media (min-width: 981px) {
+  .cafeOrdersRpanel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    width: min(860px, 76vw);
+    height: min(88dvh, 900px);
+    max-width: 94vw;
+    border-radius: 18px;
+    z-index: 110;
+    box-shadow:
+      0 24px 64px rgba(15, 23, 42, 0.22),
+      0 8px 24px rgba(15, 23, 42, 0.1);
+    animation: rpanel-in-desktop 0.2s ease-out forwards;
+  }
+
+  .cafeOrdersRpanel__list--cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .cafeOrdersRpanel__card {
+    min-height: 210px;
+  }
+
+  .cafeOrdersRpanel__cardMedia {
+    height: 124px;
+  }
+
+  .cafeOrdersRpanel__cardName {
+    font-size: 14px;
+    -webkit-line-clamp: 4;
+  }
+
+  .cafeOrdersRpanel__rowName {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .cafeOrdersRpanel {
+    width: min(960px, 80vw);
+  }
+
+  .cafeOrdersRpanel__list--cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* Маленькие экраны */
 @media (max-width: 980px) {
   .cafeOrdersRpanel {
@@ -1147,6 +1309,29 @@
     border-radius: 18px;
     animation: rpanel-in-mobile 0.18s ease-out forwards;
     z-index: 80;
+  }
+
+  .cafeOrdersRpanel__list--cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cafeOrdersRpanel__card {
+    min-height: 200px;
+  }
+
+  .cafeOrdersRpanel__cardMedia {
+    height: 116px;
+  }
+
+  .cafeOrdersRpanel__cardName {
+    font-size: 14px;
+    -webkit-line-clamp: 4;
+  }
+}
+
+@media (max-width: 520px) {
+  .cafeOrdersRpanel__list--cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1164,6 +1349,17 @@
   }
   to {
     transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes rpanel-in-desktop {
+  from {
+    transform: translate(-50%, -48%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
     opacity: 1;
   }
 }

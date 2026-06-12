@@ -427,10 +427,19 @@ function buildPrettyReceiptFromJSON(payload) {
   const waiter = String(payload.waiter_name ?? "").trim();
 
   const items = Array.isArray(payload.items) ? payload.items : [];
-  const total = items.reduce(
+  const itemsSubtotal = items.reduce(
     (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
     0
   );
+  const discount = financeToNum(payload.discount);
+  const subtotal =
+    payload.subtotal != null ? financeToNum(payload.subtotal) : itemsSubtotal;
+  const total =
+    payload.total != null
+      ? financeToNum(payload.total)
+      : Math.max(0, subtotal - discount);
+  const paidCash = financeToNum(payload.paid_cash);
+  const paidCard = financeToNum(payload.paid_card);
 
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40));
@@ -474,8 +483,23 @@ function buildPrettyReceiptFromJSON(payload) {
 
   chunks.push(enc(line + "\n"));
   chunks.push(ESC(0x1b, 0x45, 0x01));
+  if (discount > 0) {
+    chunks.push(enc(lrSafe("СУММА:", money(subtotal), width) + "\n"));
+    chunks.push(enc(lrSafe("СКИДКА:", `-${money(discount)}`, width) + "\n"));
+  }
   chunks.push(enc(lrSafe("ИТОГО:", money(total), width) + "\n"));
   chunks.push(ESC(0x1b, 0x45, 0x00));
+
+  if (paidCash > 0) {
+    chunks.push(enc(lrSafe("НАЛИЧНЫЕ:", money(paidCash), width) + "\n"));
+  }
+  if (paidCard > 0) {
+    chunks.push(enc(lrSafe("КАРТА:", money(paidCard), width) + "\n"));
+  }
+  const payMethod = financeShortPayMethod(payload);
+  if (payMethod && payMethod !== "—" && paidCash <= 0 && paidCard <= 0) {
+    chunks.push(enc(lrSafe("ОПЛАТА:", payMethod, width) + "\n"));
+  }
 
   chunks.push(ESC(0x1b, 0x64, 0x06));
   chunks.push(ESC(0x1d, 0x56, 0x00));
