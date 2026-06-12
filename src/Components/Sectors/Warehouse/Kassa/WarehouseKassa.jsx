@@ -36,6 +36,24 @@ const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("ru-RU") : "—");
 const statusLabel = (s) =>
   s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
 
+const paymentMethodLabel = (value) => {
+  const raw = String(value || "").toLowerCase();
+  if (raw === "cashless" || raw.includes("безнал")) return "Безналичные";
+  if (raw === "cash" || raw.includes("нал")) return "Наличные";
+  return value ? String(value) : "—";
+};
+
+const isPartnerCashRegister = (row, companyId) => {
+  if (!row) return false;
+  if (row.is_partner || row.is_partner_register || row.partner_cash_register) {
+    return true;
+  }
+  const rowCompany = row.company ?? row.company_id;
+  return Boolean(
+    companyId && rowCompany && String(rowCompany) !== String(companyId),
+  );
+};
+
 const parseAmount = (value) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   const normalized = String(value ?? "")
@@ -634,6 +652,8 @@ const CashRequestsInbox = () => {
 const CashRegisterList = () => {
   const navigate = useNavigate();
   const alert = useAlert();
+  const { profile, company } = useUser();
+  const isOwner = profile?.role === "owner";
   const [tab, setTab] = useState("registers"); // "registers" | "requests" | "partner_incass"
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
@@ -649,7 +669,9 @@ const CashRegisterList = () => {
     try {
       setErr("");
       setLoading(true);
-      const data = await warehouseAPI.listCashRegisters({ page_size: 200 });
+      const params = { page_size: 200 };
+      if (isOwner) params.include_partners = 1;
+      const data = await warehouseAPI.listCashRegisters(params);
       const list = asArray(data);
       setRows(list);
 
@@ -694,7 +716,7 @@ const CashRegisterList = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOwner]);
 
   useEffect(() => {
     load();
@@ -846,6 +868,10 @@ const CashRegisterList = () => {
                   ) : filtered.length ? (
                     filtered.map((r, i) => {
                       const totals = totalsById[r.id];
+                      const partnerRegister = isPartnerCashRegister(
+                        r,
+                        company?.id,
+                      );
                       return (
                         <tr
                           key={r.id}
@@ -855,6 +881,11 @@ const CashRegisterList = () => {
                           <td>{i + 1}</td>
                           <td>
                             <b>{r.name || "—"}</b>
+                            {partnerRegister ? (
+                              <span className="warehouse-kassa__partner-badge">
+                                Партнёр
+                              </span>
+                            ) : null}
                           </td>
                           <td>{r.location || "—"}</td>
                           <td>{totals ? money(totals.receipts_total) : "—"}</td>
@@ -968,6 +999,7 @@ const CashRegisterDetail = () => {
   const [dateFromFilter, setDateFromFilter] = useState("");
   const [dateToFilter, setDateToFilter] = useState("");
   const [categoryFilterId, setCategoryFilterId] = useState("");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
   const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [docs, setDocs] = useState([]);
   const [docsCount, setDocsCount] = useState(0);
@@ -1068,7 +1100,8 @@ const CashRegisterDetail = () => {
         counterpartyFilterId ||
         dateFromFilter ||
         dateToFilter ||
-        categoryFilterId,
+        categoryFilterId ||
+        paymentMethodFilter,
       ),
     [
       agentFilterId,
@@ -1076,6 +1109,7 @@ const CashRegisterDetail = () => {
       dateFromFilter,
       dateToFilter,
       categoryFilterId,
+      paymentMethodFilter,
     ],
   );
 
@@ -1106,6 +1140,9 @@ const CashRegisterDetail = () => {
     if (categoryFilterId) {
       params.payment_category = categoryFilterId;
     }
+    if (paymentMethodFilter) {
+      params.payment_method = paymentMethodFilter;
+    }
     setDocsLoading(true);
     setDocsError("");
     warehouseAPI
@@ -1133,6 +1170,7 @@ const CashRegisterDetail = () => {
     dateFromFilter,
     dateToFilter,
     categoryFilterId,
+    paymentMethodFilter,
     currentPage,
   ]);
 
@@ -1147,6 +1185,7 @@ const CashRegisterDetail = () => {
     dateFromFilter,
     dateToFilter,
     categoryFilterId,
+    paymentMethodFilter,
   ]);
 
   const fromItem = docsCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -1387,6 +1426,7 @@ const CashRegisterDetail = () => {
                     setDateFromFilter("");
                     setDateToFilter("");
                     setCategoryFilterId("");
+                    setPaymentMethodFilter("");
                   }}
                   title="Сбросить фильтры"
                 >
@@ -1493,6 +1533,22 @@ const CashRegisterDetail = () => {
                   ))}
                 </select>
               </div>
+              <div className="warehouse-kassa__filter-group">
+                <label className="warehouse-kassa__filter-label">
+                  <Tag size={14} />
+                  Форма оплаты
+                </label>
+                <select
+                  className="warehouse-kassa__filter-select"
+                  value={paymentMethodFilter}
+                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                  title="Фильтр по форме оплаты"
+                >
+                  <option value="">Все</option>
+                  <option value="cash">Наличные</option>
+                  <option value="cashless">Безналичные</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -1525,6 +1581,7 @@ const CashRegisterDetail = () => {
                     <th>Дата</th>
                     <th>Контрагент</th>
                     <th>Категория</th>
+                    <th>Оплата</th>
                     <th>Сумма</th>
                     <th>Статус</th>
                     <th className="warehouse-kassa__ko1-col">КО-1</th>
@@ -1540,6 +1597,7 @@ const CashRegisterDetail = () => {
                       <td>{fmtDate(row.date || row.created_at)}</td>
                       <td>{row.counterparty_display_name ?? "—"}</td>
                       <td>{row.payment_category_title ?? "—"}</td>
+                      <td>{paymentMethodLabel(row.payment_method)}</td>
                       <td>{money(row.amount)}</td>
                       <td>{statusLabel(row.status)}</td>
                       <td className="warehouse-kassa__ko1-col">

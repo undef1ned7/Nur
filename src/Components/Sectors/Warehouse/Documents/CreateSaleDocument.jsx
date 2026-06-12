@@ -405,6 +405,7 @@ const CreateSaleDocument = () => {
   const [documentDiscountAmount, setDocumentDiscountAmount] = useState("");
   const [comment, setComment] = useState("");
   const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
+  const [paymentMethod, setPaymentMethod] = useState("cash"); // cash | cashless — наличные / безналичные
   const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
@@ -1554,6 +1555,10 @@ const CreateSaleDocument = () => {
               ? "cash"
               : rawPk,
         );
+        const rawPm = String(doc.payment_method || "cash").toLowerCase();
+        setPaymentMethod(
+          rawPm === "cashless" || rawPm.includes("безнал") ? "cashless" : "cash",
+        );
         setPrepaymentAmount(
           doc.prepayment_amount != null && doc.prepayment_amount !== ""
             ? String(doc.prepayment_amount)
@@ -1677,12 +1682,14 @@ const CreateSaleDocument = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- только при смене editDocumentId; alert/navigate стабильны по смыслу
   }, [editDocumentId]);
 
-  // Цена для подстановки в позицию: при покупке — закупочная, при продаже — цена продажи
+  // Цена для подстановки в позицию: покупка/приход — закупочная, продажа — цена продажи
   const getProductPriceForDocument = (product) => {
     if (!product) return 0;
-    const isPurchase = docType === "PURCHASE" || docType === "PURCHASE_RETURN";
+    const usePurchasePrice = ["PURCHASE", "PURCHASE_RETURN", "RECEIPT"].includes(
+      docType,
+    );
     return Number(
-      isPurchase
+      usePurchasePrice
         ? (product.purchase_price ?? product.price ?? 0)
         : (product.price ?? 0),
     );
@@ -2020,14 +2027,15 @@ const CreateSaleDocument = () => {
     if (docType === "SALE") {
       return paymentKind === "credit";
     }
-    return ["SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
+    return ["SALE_RETURN", "PURCHASE_RETURN"].includes(docType);
   }, [docType, paymentKind]);
 
   // Агент и контрагент в продаже/возврате показываем всегда (раньше скрывались при оплате не в долг)
   const showAgentCounterpartyFields =
     isCounterpartyRequired ||
     isAgentFilterRelevant ||
-    docType === "COMMERCIAL_OFFER";
+    docType === "COMMERCIAL_OFFER" ||
+    docType === "PURCHASE";
 
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
@@ -2609,6 +2617,7 @@ const CreateSaleDocument = () => {
       const documentData = {
         doc_type: docType,
         ...(includePaymentKindInPayload && { payment_kind: paymentKind }),
+        ...(isPaymentKindRelevant && { payment_method: paymentMethod }),
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
@@ -2804,6 +2813,7 @@ const CreateSaleDocument = () => {
       const documentData = {
         doc_type: docType,
         ...(includePaymentKindInPayload && { payment_kind: paymentKind }),
+        ...(isPaymentKindRelevant && { payment_method: paymentMethod }),
         ...(hasPrepayment && {
           prepayment_amount: String(prepaymentNum.toFixed(2)),
         }),
@@ -3619,6 +3629,30 @@ const CreateSaleDocument = () => {
                     )}
                   </div>
                 )}
+                {isPaymentKindRelevant && (
+                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="cash"
+                        checked={paymentMethod === "cash"}
+                        onChange={() => setPaymentMethod("cash")}
+                      />
+                      <span>Наличными</span>
+                    </label>
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="cashless"
+                        checked={paymentMethod === "cashless"}
+                        onChange={() => setPaymentMethod("cashless")}
+                      />
+                      <span>Безналичными</span>
+                    </label>
+                  </div>
+                )}
                 {docType === "RECEIPT" && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
                     <label className="create-sale-document__payment-option">
@@ -3818,8 +3852,12 @@ const CreateSaleDocument = () => {
                         options={counterpartyOptions}
                         placeholder={
                           docType === "SALE" || docType === "SALE_RETURN"
-                            ? "Выберите клиента"
-                            : "Выберите поставщика"
+                            ? isCounterpartyRequired
+                              ? "Выберите клиента"
+                              : "Выберите клиента (необязательно)"
+                            : isCounterpartyRequired
+                              ? "Выберите поставщика"
+                              : "Выберите поставщика (необязательно)"
                         }
                         emptyText="Контрагенты не найдены"
                       />

@@ -230,3 +230,70 @@
     line-height: 1.4;
   }
 }
+
+.counterparty-bank-accounts {
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  &__hint {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--muted, #6b7280);
+    line-height: 1.4;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 140px auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 10px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__field {
+    min-width: 0;
+  }
+
+  &__add-btn,
+  &__remove-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--border, #e5e7eb);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  &__add-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text, #0f172a);
+
+    &:hover:not(:disabled) {
+      background: #f8fafc;
+    }
+  }
+
+  &__remove-btn {
+    width: 40px;
+    height: 40px;
+    color: #b91c1c;
+
+    &:hover:not(:disabled) {
+      background: #fef2f2;
+    }
+  }
+}

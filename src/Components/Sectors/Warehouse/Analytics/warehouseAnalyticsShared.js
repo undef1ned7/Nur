@@ -48,6 +48,9 @@ export const cashRegisterAmounts = (row) => ({
   receipt: row.receipt_amount ?? row.money_receipt_amount ?? 0,
   expense: row.expense_amount ?? row.money_expense_amount ?? 0,
   net: row.net_amount ?? row.money_net_amount ?? 0,
+  debtReceipt: row.money_debt_receipt_amount ?? 0,
+  debtExpense: row.money_debt_expense_amount ?? 0,
+  debtNet: row.money_debt_net_amount ?? 0,
 });
 
 export const moneyCategoryLabel = (row) => {
