@@ -9,8 +9,10 @@ import React, {
 import {
   FaChevronDown,
   FaClipboardList,
+  FaListUl,
   FaPlus,
   FaSearch,
+  FaThLarge,
   FaTimes,
 } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
@@ -21,6 +23,16 @@ import {
 import api from "../../../../../api";
 
 const PAGE_SIZE = 100;
+const MENU_VIEW_STORAGE_KEY = "cafe_orders_menu_view";
+
+const readMenuViewMode = () => {
+  try {
+    const saved = localStorage.getItem(MENU_VIEW_STORAGE_KEY);
+    return saved === "list" ? "list" : "cards";
+  } catch {
+    return "cards";
+  }
+};
 
 /* =========================================================
    SearchSelect — один открытый и закрывается после выбора
@@ -257,6 +269,7 @@ export const RightMenuPanel = ({
   setSelectedCategoryFilter,
 }) => {
   const [q, setQ] = useState("");
+  const [viewMode, setViewMode] = useState(readMenuViewMode);
   const isCart = useCallback(
     (id) =>
       cartItems.find(
@@ -278,6 +291,14 @@ export const RightMenuPanel = ({
       }
     }
   }, [open]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MENU_VIEW_STORAGE_KEY, viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
   const [categories, setCategories] = useState([]);
   const fetchCategories = useCallback(async () => {
     const res = await api.get("/cafe/categories/");
@@ -373,20 +394,116 @@ export const RightMenuPanel = ({
     [totalPages, searchQuery, onPageChange],
   );
 
+  const renderMenuMedia = (img) =>
+    img ? (
+      <img src={img} alt="" />
+    ) : (
+      <FaClipboardList aria-hidden />
+    );
+
+  const renderMenuPickControl = (cartItem, cartQty) => (
+    <span className="cafeOrdersRpanel__add" aria-hidden>
+      {!cartItem ? <FaPlus /> : cartQty}
+    </span>
+  );
+
+  const renderMenuItems = () =>
+    paginatedItems.map((m) => {
+      const img = menuImageUrl?.(m.id);
+      const cartItem = isCart(m.id);
+      const isWeight = !!m?.is_sold_by_weight;
+      const rawQty = cartItem?.quantity;
+      const cartQty =
+        rawQty === ""
+          ? "—"
+          : cartItem
+            ? formatLineQtyDisplay(rawQty, m?.sale_unit, isWeight)
+            : 0;
+      const priceLabel = formatMenuPriceHint(m.price, m);
+
+      if (viewMode === "list") {
+        return (
+          <button
+            key={m.id}
+            type="button"
+            className="cafeOrdersRpanel__row"
+            onClick={() => onPick(m)}
+            title={m.title}
+          >
+            <span className="cafeOrdersRpanel__rowThumb" aria-hidden>
+              {renderMenuMedia(img)}
+            </span>
+            <span className="cafeOrdersRpanel__rowMeta">
+              <span className="cafeOrdersRpanel__rowName">{m.title}</span>
+              <span className="cafeOrdersRpanel__rowPrice">{priceLabel}</span>
+            </span>
+            {renderMenuPickControl(cartItem, cartQty)}
+          </button>
+        );
+      }
+
+      return (
+        <button
+          key={m.id}
+          type="button"
+          className="cafeOrdersRpanel__card"
+          onClick={() => onPick(m)}
+          title={m.title}
+        >
+          <span className="cafeOrdersRpanel__cardMedia" aria-hidden>
+            {renderMenuMedia(img)}
+          </span>
+          <span className="cafeOrdersRpanel__cardBody">
+            <span className="cafeOrdersRpanel__cardName">{m.title}</span>
+            <span className="cafeOrdersRpanel__cardPrice">{priceLabel}</span>
+          </span>
+          {renderMenuPickControl(cartItem, cartQty)}
+        </button>
+      );
+    });
+
   if (!open) return null;
 
   return (
     <aside className="cafeOrdersRpanel" aria-label="Меню">
       <div className="cafeOrdersRpanel__head">
         <div className="cafeOrdersRpanel__title">Меню</div>
-        <button
-          type="button"
-          className="cafeOrdersRpanel__close"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
-          <FaTimes />
-        </button>
+        <div className="cafeOrdersRpanel__headActions">
+          <div
+            className="cafeOrdersRpanel__viewToggle"
+            role="group"
+            aria-label="Вид меню"
+          >
+            <button
+              type="button"
+              className={`cafeOrdersRpanel__viewBtn${viewMode === "cards" ? " cafeOrdersRpanel__viewBtn--active" : ""}`}
+              onClick={() => setViewMode("cards")}
+              aria-label="Карточки"
+              aria-pressed={viewMode === "cards"}
+              title="Карточки"
+            >
+              <FaThLarge />
+            </button>
+            <button
+              type="button"
+              className={`cafeOrdersRpanel__viewBtn${viewMode === "list" ? " cafeOrdersRpanel__viewBtn--active" : ""}`}
+              onClick={() => setViewMode("list")}
+              aria-label="Список"
+              aria-pressed={viewMode === "list"}
+              title="Список"
+            >
+              <FaListUl />
+            </button>
+          </div>
+          <button
+            type="button"
+            className="cafeOrdersRpanel__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            <FaTimes />
+          </button>
+        </div>
       </div>
 
       <div className="cafeOrdersRpanel__search">
@@ -409,47 +526,11 @@ export const RightMenuPanel = ({
         />
       </div>
 
-      <div className="cafeOrdersRpanel__list">
+      <div
+        className={`cafeOrdersRpanel__list cafeOrdersRpanel__list--${viewMode}`}
+      >
         {loading && <div className="cafeOrdersRpanel__empty">Загрузка…</div>}
-        {paginatedItems.map((m) => {
-          const img = menuImageUrl?.(m.id);
-          const cartItem = isCart(m.id);
-          const isWeight = !!m?.is_sold_by_weight;
-          const rawQty = cartItem?.quantity;
-          const cartQty =
-            rawQty === ""
-              ? "—"
-              : cartItem
-                ? formatLineQtyDisplay(rawQty, m?.sale_unit, isWeight)
-                : 0;
-          return (
-            <button
-              key={m.id}
-              type="button"
-              className={`cafeOrdersRpanel__item `}
-              onClick={() => onPick(m)}
-              title={m.title}
-            >
-              {/* <span className="cafeOrdersRpanel__thumb" aria-hidden>
-                  {img ? <img src={img} alt="" /> : <FaClipboardList />}
-                </span> */}
-              <div
-                className="cafeOrdersRpanel__image"
-                style={{ backgroundImage: `url(${img})` }}
-              ></div>
-              <span className="cafeOrdersRpanel__meta">
-                <span className="cafeOrdersRpanel__name">{m.title}</span>
-                <span className="cafeOrdersRpanel__price">
-                  {formatMenuPriceHint(m.price, m)}
-                </span>
-              </span>
-
-              <span className="cafeOrdersRpanel__add" aria-hidden>
-                {!cartItem ? <FaPlus /> : cartQty}
-              </span>
-            </button>
-          );
-        })}
+        {!loading && renderMenuItems()}
         {!loading && !paginatedItems.length && (
           <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
         )}

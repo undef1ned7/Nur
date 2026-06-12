@@ -28,6 +28,8 @@ import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { buildCafeReceiptPrintFinancials } from "../utils/cafeOrderFinancials";
+import { CafeOrderFinancialTotals } from "./components/CafeOrderFinancialTotals";
 import { canCafeOrderReturn } from "../../../../tools/cafeEmployeePermissions";
 import {
   formatLineQtyDisplay,
@@ -584,19 +586,7 @@ const CafeOrderHistory = () => {
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
       const isTakeaway = tableLabel === TAKEAWAY_LABEL;
-
-      return {
-        company: localStorage.getItem("company_name") || "КАССА",
-        doc_no: isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`,
-        created_at: dt,
-        cashier_name: cashier,
-        waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
-        discount: 0,
-        tax: 0,
-        paid_cash: 0,
-        paid_card: 0,
-        change: 0,
-        items: items.map((it) => {
+      const mappedItems = items.map((it) => {
           const meta = resolveLineWeightMeta(it, menuMap);
           const qtyNum = it.is_rejected
             ? lineQtyNum(it.quantity, meta.is_sold_by_weight, meta.sale_unit)
@@ -609,7 +599,23 @@ const CafeOrderHistory = () => {
               : null,
             price: linePrice(it),
           };
-        }),
+      });
+      const itemsSubtotal = mappedItems.reduce(
+        (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
+        0,
+      );
+      const financials = buildCafeReceiptPrintFinancials(order, itemsSubtotal);
+
+      return {
+        company: localStorage.getItem("company_name") || "КАССА",
+        doc_no: isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`,
+        created_at: dt,
+        cashier_name: cashier,
+        waiter_name: pickCafeOrderWaiterName(order, waiterIdLabelMap),
+        tax: 0,
+        change: 0,
+        ...financials,
+        items: mappedItems,
       };
     },
     [
@@ -876,14 +882,12 @@ const CafeOrderHistory = () => {
                   <div className="cafeOrders__receiptFooter">
                     <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
 
-                    <div className="cafeOrders__receiptTotal">
-                      <span className="cafeOrders__receiptTotalLabel">
-                        ИТОГО
-                      </span>
-                      <span className="cafeOrders__receiptTotalAmount">
-                        {fmtShort(totals.total)}
-                      </span>
-                    </div>
+                    <CafeOrderFinancialTotals
+                      order={o}
+                      itemsTotal={totals.total}
+                      fmt={fmtShort}
+                      variant="list"
+                    />
                     {totals.rejectedSum > 0 ? (
                       <div className="cafeOrders__receiptRejectedNote">
                         Возвраты не входят в сумму:{" "}
@@ -1042,10 +1046,12 @@ const CafeOrderHistory = () => {
 
                       <div className="cafeOrdersPay__divider cafeOrdersPay__divider--dashed" />
 
-                      <div className="cafeOrdersPay__total">
-                        <span>ИТОГО</span>
-                        <span>{fmtShort(totals.total)}</span>
-                      </div>
+                      <CafeOrderFinancialTotals
+                        order={viewOrder}
+                        itemsTotal={totals.total}
+                        fmt={fmtShort}
+                        variant="modal"
+                      />
                       {totals.rejectedSum > 0 ? (
                         <div className="cafeOrdersPay__rejectedLine">
                           <span>Возвраты (не в сумме)</span>
