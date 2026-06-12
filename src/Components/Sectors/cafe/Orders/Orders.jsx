@@ -44,6 +44,16 @@ import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
+import { useNetworkStatus } from "../../../../hooks/useNetworkStatus";
+import {
+  addOrderLocally,
+  updateOrderLocally,
+  removeOrderLocally,
+  getOpenOrdersLocally,
+  addToQueue,
+  updateTableStatusLocally,
+  getSnapshot,
+} from "../../../../services/cafeOfflineService";
 import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
@@ -368,6 +378,7 @@ const statusFilterOptions = [
    Orders
    ========================================================= */
 const Orders = () => {
+  const { isOnline } = useNetworkStatus();
   const alert = useAlert();
   const confirm = useConfirm();
   const { profile, company, tariff } = useUser();
@@ -429,8 +440,14 @@ const Orders = () => {
   const [openSelectId, setOpenSelectId] = useState(null);
 
   /* ===== API ===== */
-  const fetchTables = async () =>
+  const fetchTables = async () => {
+    if (!isOnline) {
+      const { tables } = await getSnapshot();
+      setTables(tables || []);
+      return;
+    }
     setTables(listFrom(await api.get("/cafe/tables/")));
+  };
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
@@ -464,6 +481,20 @@ const Orders = () => {
   };
 
   const fetchMenu = async (page = 1) => {
+    if (!isOnline) {
+      setMenuLoading(true);
+      try {
+        const snapshot = await getSnapshot();
+        setMenuItems({
+          results: snapshot.items,
+          count: snapshot.items.length,
+        });
+      } finally {
+        setMenuLoading(false);
+      }
+      return;
+    }
+
     setMenuLoading(true);
     const params = {
       category: selectedCategoryFilter,
@@ -585,6 +616,13 @@ const Orders = () => {
   };
 
   const fetchOrders = useCallback(async () => {
+    if (!isOnline) {
+      const localOrders = await getOpenOrdersLocally();
+      setOrders(localOrders);
+      setLoading(false);
+      return;
+    }
+
     const params = {
       search: debouncedOrderSearchQuery,
       status: "open",
@@ -609,6 +647,7 @@ const Orders = () => {
     debouncedOrderSearchQuery,
     waiterFilter,
     isStaff,
+    isOnline,
     ordersPagination.currentPage,
   ]);
   useEffect(() => {
@@ -1560,58 +1599,82 @@ const Orders = () => {
     setSaving(true);
     try {
       if (!isEditing) {
-        const basePayload = normalizeOrderPayload(form, true);
-        if (startPlan) delete basePayload.waiter;
-        else if (isStaff) basePayload.waiter = userId;
-        let res;
-        try {
-          res = await postWithWaiterFallback(
-            "/cafe/orders/",
-            basePayload,
-            "post",
-          );
-        } catch (createErr) {
-          // Некоторые бэкенды требуют items[].order даже при создании заказа.
-          // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
-          if (!hasNestedOrderRequiredError(createErr)) throw createErr;
-
-          const headerPayload = { ...basePayload, items: [] };
-          const created = await postWithWaiterFallback(
-            "/cafe/orders/",
-            headerPayload,
-            "post",
-          );
-          const createdOrderId = created?.data?.id;
-          if (!createdOrderId) throw createErr;
-
-          const patchPayload = normalizeOrderPayload(
-            form,
-            false,
-            createdOrderId,
-          );
-          if (startPlan) delete patchPayload.waiter;
-          await postWithWaiterFallback(
-            `/cafe/orders/${createdOrderId}/`,
-            patchPayload,
-            "patch",
-          );
-          res = created;
-        }
-
-        try {
+        if (!isOnline) {
+          await addToQueue("CREATE_ORDER", {
+            table_id: toId(form.table) || null,
+            items: form.items.map((i) => ({
+              menu_item_id: i.menu_item,
+              menu_item_name: i.title || i.menu_item_title || "",
+              quantity: i.quantity,
+              price: String(i.price || "0.00"),
+            })),
+          });
+          const localOrder = {
+            id: `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            table_id: toId(form.table) || null,
+            table: toId(form.table) || null,
+            status: "open",
+            created_at: new Date().toISOString(),
+            items: form.items,
+            offline: true,
+          };
           const tableId = toId(form.table);
           if (tableId) {
-            await api.patch(`/cafe/tables/${tableId}/`, { status: "busy" });
+            await updateTableStatusLocally(tableId, "busy");
           }
-        } catch {
-          // молча
+          setOrders((prev) => [...prev, localOrder]);
+          await addOrderLocally(localOrder);
+        } else {
+          const basePayload = normalizeOrderPayload(form, true);
+          if (startPlan) delete basePayload.waiter;
+          else if (isStaff) basePayload.waiter = userId;
+          let res;
+          try {
+            res = await postWithWaiterFallback(
+              "/cafe/orders/",
+              basePayload,
+              "post",
+            );
+          } catch (createErr) {
+            // Некоторые бэкенды требуют items[].order даже при создании заказа.
+            // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
+            if (!hasNestedOrderRequiredError(createErr)) throw createErr;
+
+            const headerPayload = { ...basePayload, items: [] };
+            const created = await postWithWaiterFallback(
+              "/cafe/orders/",
+              headerPayload,
+              "post",
+            );
+            const createdOrderId = created?.data?.id;
+            if (!createdOrderId) throw createErr;
+
+            const patchPayload = normalizeOrderPayload(
+              form,
+              false,
+              createdOrderId,
+            );
+            if (startPlan) delete patchPayload.waiter;
+            await postWithWaiterFallback(
+              `/cafe/orders/${createdOrderId}/`,
+              patchPayload,
+              "patch",
+            );
+            res = created;
+          }
+
+          try {
+            const tableId = toId(form.table);
+            if (tableId) {
+              await api.patch(`/cafe/tables/${tableId}/`, { status: "busy" });
+            }
+          } catch {
+            // молча
+          }
+
+          setOrders((prev) => [...prev, res.data]);
+          await addOrderLocally(res.data);
         }
-
-        setOrders((prev) => [...prev, res.data]);
-
-        // Печать на кухню не должна держать saving: иначе кнопки «Редактировать» / «Оплатить»
-        // у всех карточек остаются disabled, пока USB/Wi‑Fi не ответят.
-        // void autoPrintKitchenTickets(res?.data?.id).catch(() => {});
       } else {
         const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;
@@ -1620,6 +1683,37 @@ const Orders = () => {
           payload,
           "patch",
         );
+        await updateOrderLocally(editingId, {
+          items: form.items,
+          table_id: toId(form.table) || null,
+        });
+
+        if (!isOnline) {
+          await addToQueue("ADD_ITEM_TO_ORDER", {
+            order_id: editingId,
+            items: form.items.map((i) => ({
+              menu_item_id: i.menu_item,
+              quantity: i.quantity,
+            })),
+          });
+          setOrders((prev) =>
+            prev.map((o) =>
+              String(o.id) === String(editingId)
+                ? {
+                    ...o,
+                    items: form.items,
+                    table_id: toId(form.table) || null,
+                  }
+                : o,
+            ),
+          );
+          setModalOpen(false);
+          setMenuOpen(false);
+          setShowAddClient(false);
+          setOpenSelectId(null);
+          return;
+        }
+
         try {
           const { data: fresh } = await api.get(`/cafe/orders/${editingId}/`);
           if (fresh) {
@@ -1639,6 +1733,9 @@ const Orders = () => {
       setShowAddClient(false);
       setOpenSelectId(null);
 
+      if (!isOnline) {
+        return;
+      }
       await fetchOrders();
     } catch (err) {
       if (suppressOfflineError(err)) return;
@@ -1957,6 +2054,24 @@ const Orders = () => {
     setPaying(true);
     const paidBefore = toNum(order.paid_amount);
     try {
+      if (!isOnline) {
+        await addToQueue("CLOSE_ORDER", {
+          order_id: order.id,
+          payment_method: payForm.paymentMethod,
+          amount: toNum(payForm.payNow) || calcTotals(order).total,
+        });
+        await removeOrderLocally(order.id);
+        setOrders((prev) =>
+          prev.filter((o) => String(o.id) !== String(order.id)),
+        );
+        const tableId =
+          toId(order.table) ?? order.table_id ?? order.table?.id ?? null;
+        await updateTableStatusLocally(tableId, "free");
+        setPayOpen(false);
+        setPayOrder(null);
+        return;
+      }
+
       const { data } = await api.post(`/cafe/orders/${order.id}/pay/`, payload);
       await postPayCashflowDelta(order, paidBefore, data);
       await finishPaySuccess(order, data);

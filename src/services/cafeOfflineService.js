@@ -85,12 +85,30 @@ export async function markSynced(ids) {
   );
 }
 
-export async function updateOrderLocally(orderId, updater) {
+export async function updateTableStatusLocally(tableId, status) {
+  if (!tableId) return;
+  const table = await db.cafe_tables.get(tableId);
+  if (table) await db.cafe_tables.put({ ...table, status });
+}
+
+export async function addOrderLocally(order) {
+  await db.open_orders.put(order);
+}
+
+export async function updateOrderLocally(orderId, updates) {
   const order = await db.open_orders.get(orderId);
   if (!order) return null;
-  const updated = updater(order);
+  const updated = { ...order, ...updates };
   await db.open_orders.put(updated);
   return updated;
+}
+
+export async function removeOrderLocally(orderId) {
+  await db.open_orders.delete(orderId);
+}
+
+export async function getOpenOrdersLocally() {
+  return await db.open_orders.toArray();
 }
 
 export async function createOrderLocally(orderData) {
