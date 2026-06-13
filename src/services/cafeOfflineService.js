@@ -85,6 +85,28 @@ export async function markSynced(ids) {
   );
 }
 
+export async function saveIdMapping(offlineId, serverId) {
+  await db.id_mapping.put({ offline_id: offlineId, server_id: serverId });
+}
+
+export async function resolveOrderId(id) {
+  if (!String(id).startsWith("offline-")) return id;
+  const mapping = await db.id_mapping.get(id);
+  return mapping?.server_id || id;
+}
+
+export async function remapQueueOrderIds(offlineId, serverId) {
+  const all = await db.offline_queue.toArray();
+  for (const item of all) {
+    if (item.synced) continue;
+    if (item.payload?.order_id === offlineId) {
+      await db.offline_queue.update(item.id, {
+        payload: { ...item.payload, order_id: serverId },
+      });
+    }
+  }
+}
+
 export async function updateTableStatusLocally(tableId, status) {
   if (!tableId) return;
   const table = await db.cafe_tables.get(tableId);

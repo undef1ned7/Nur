@@ -53,7 +53,10 @@ import {
   addToQueue,
   updateTableStatusLocally,
   getSnapshot,
+  resolveOrderId,
 } from "../../../../services/cafeOfflineService";
+import CafeOpenShift from "../CafeOpenShift/CafeOpenShift";
+import { useShifts } from "../../../../store/slices/shiftSlice";
 import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
@@ -380,6 +383,7 @@ const statusFilterOptions = [
    ========================================================= */
 const Orders = () => {
   const { isOnline } = useNetworkStatus();
+  const { shifts, currentShift } = useShifts();
   const alert = useAlert();
   const confirm = useConfirm();
   const { profile, company, tariff } = useUser();
@@ -412,6 +416,8 @@ const Orders = () => {
 
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
+  const [showOpenShiftPage, setShowOpenShiftPage] = useState(false);
+  const [snapshotShift, setSnapshotShift] = useState(null);
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
 
   // Состояние пагинации меню
@@ -428,6 +434,18 @@ const Orders = () => {
       isStaff,
     };
   }, [profile]);
+
+  const hasOpenShift = useMemo(() => {
+    if (snapshotShift?.id) return true;
+    if (currentShift?.status === "open") return true;
+    return (shifts || []).some((s) => s.status === "open");
+  }, [shifts, currentShift, snapshotShift]);
+
+  useEffect(() => {
+    getSnapshot()
+      .then((s) => setSnapshotShift(s.current_shift))
+      .catch(() => {});
+  }, []);
 
   const canPayOrders = useMemo(() => canCafeOrderPay(profile), [profile]);
 
@@ -1606,30 +1624,53 @@ const Orders = () => {
     try {
       if (!isEditing) {
         if (!isOnline) {
+          const offlineOrderId =
+            "offline-" +
+            Date.now() +
+            "-" +
+            Math.random().toString(36).slice(2);
+
           await addToQueue("CREATE_ORDER", {
+            client_id: offlineOrderId,
             table_id: toId(form.table) || null,
             items: form.items.map((i) => ({
+              menu_item_id: i.menu_item,
+              quantity:
+                typeof i.quantity === "string"
+                  ? i.quantity
+                  : Number(i.quantity),
+            })),
+          });
+
+          const localOrder = {
+            id: offlineOrderId,
+            table_id: toId(form.table) || null,
+            table: toId(form.table) || null,
+            status: "open",
+            created_at: new Date().toISOString(),
+            items: form.items.map((i, idx) => ({
+              id: `${offlineOrderId}-item-${idx}`,
               menu_item_id: i.menu_item,
               menu_item_name: i.title || i.menu_item_title || "",
               quantity: i.quantity,
               price: String(i.price || "0.00"),
             })),
-          });
-          const localOrder = {
-            id: `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            table_id: toId(form.table) || null,
-            table: toId(form.table) || null,
-            status: "open",
-            created_at: new Date().toISOString(),
-            items: form.items,
+            total: String(
+              form.items
+                .reduce(
+                  (s, i) => s + toNum(i.price) * (Number(i.quantity) || 0),
+                  0,
+                )
+                .toFixed(2),
+            ),
             offline: true,
           };
           const tableId = toId(form.table);
           if (tableId) {
             await updateTableStatusLocally(tableId, "busy");
           }
-          setOrders((prev) => [...prev, localOrder]);
           await addOrderLocally(localOrder);
+          setOrders((prev) => [...prev, localOrder]);
         } else {
           const basePayload = normalizeOrderPayload(form, true);
           if (startPlan) delete basePayload.waiter;
@@ -1682,26 +1723,52 @@ const Orders = () => {
           await addOrderLocally(res.data);
         }
       } else {
-        const payload = normalizeOrderPayload(form, false, editingId);
-        if (startPlan) delete payload.waiter;
-        await postWithWaiterFallback(
-          `/cafe/orders/${editingId}/`,
-          payload,
-          "patch",
-        );
-        await updateOrderLocally(editingId, {
-          items: form.items,
-          table_id: toId(form.table) || null,
-        });
-
         if (!isOnline) {
-          await addToQueue("ADD_ITEM_TO_ORDER", {
-            order_id: editingId,
-            items: form.items.map((i) => ({
-              menu_item_id: i.menu_item,
-              quantity: i.quantity,
-            })),
+          const resolvedOrderId = await resolveOrderId(editingId);
+          const originalOrder = orders.find(
+            (o) => String(o.id) === String(editingId),
+          );
+          const originalItemIds = new Set(
+            (originalOrder?.items || []).map((it) =>
+              String(it.menu_item_id || it.menu_item),
+            ),
+          );
+
+          const newItems = form.items.filter(
+            (i) => !originalItemIds.has(String(i.menu_item)),
+          );
+
+          for (const item of newItems) {
+            await addToQueue("ADD_ITEM_TO_ORDER", {
+              order_id: resolvedOrderId,
+              menu_item_id: item.menu_item,
+              quantity:
+                typeof item.quantity === "string"
+                  ? item.quantity
+                  : Number(item.quantity),
+            });
+          }
+
+          const currentItemIds = new Set(
+            form.items.map((i) => String(i.menu_item)),
+          );
+          const removedItems = (originalOrder?.items || []).filter(
+            (it) =>
+              !currentItemIds.has(String(it.menu_item_id || it.menu_item)),
+          );
+
+          for (const item of removedItems) {
+            await addToQueue("REMOVE_ITEM_FROM_ORDER", {
+              order_id: resolvedOrderId,
+              order_item_id: item.id,
+            });
+          }
+
+          await updateOrderLocally(editingId, {
+            items: form.items,
+            table_id: toId(form.table) || null,
           });
+
           setOrders((prev) =>
             prev.map((o) =>
               String(o.id) === String(editingId)
@@ -1713,12 +1780,25 @@ const Orders = () => {
                 : o,
             ),
           );
+
           setModalOpen(false);
           setMenuOpen(false);
           setShowAddClient(false);
           setOpenSelectId(null);
           return;
         }
+
+        const payload = normalizeOrderPayload(form, false, editingId);
+        if (startPlan) delete payload.waiter;
+        await postWithWaiterFallback(
+          `/cafe/orders/${editingId}/`,
+          payload,
+          "patch",
+        );
+        await updateOrderLocally(editingId, {
+          items: form.items,
+          table_id: toId(form.table) || null,
+        });
 
         try {
           const { data: fresh } = await api.get(`/cafe/orders/${editingId}/`);
@@ -2061,8 +2141,9 @@ const Orders = () => {
     const paidBefore = toNum(order.paid_amount);
     try {
       if (!isOnline) {
+        const resolvedOrderId = await resolveOrderId(order.id);
         await addToQueue("CLOSE_ORDER", {
-          order_id: order.id,
+          order_id: resolvedOrderId,
           payment_method: payForm.paymentMethod,
           amount: toNum(payForm.payNow) || calcTotals(order).total,
         });
@@ -2149,6 +2230,21 @@ const Orders = () => {
     ];
   }, [clientOptions, payForm.clientId, payOrder]);
 
+  if (showOpenShiftPage) {
+    return (
+      <CafeOpenShift
+        onBack={() => {
+          setShowOpenShiftPage(false);
+          fetchOrders();
+          fetchTables();
+          getSnapshot()
+            .then((s) => setSnapshotShift(s.current_shift))
+            .catch(() => {});
+        }}
+      />
+    );
+  }
+
   return (
     <section className="cafeOrders">
       <div className="cafeOrders__header">
@@ -2187,6 +2283,16 @@ const Orders = () => {
               type="button"
             >
               <FaPlus /> Новый заказ
+            </button>
+          )}
+
+          {!hasOpenShift && (
+            <button
+              className="cafeOrders__btn cafeOrders__btn--primary"
+              onClick={() => setShowOpenShiftPage(true)}
+              type="button"
+            >
+              Открыть смену
             </button>
           )}
         </div>
@@ -2729,14 +2835,33 @@ const Orders = () => {
                             if (!ok) return;
                             setSaving(true);
                             try {
-                              await api.patch(`/cafe/orders/${editingId}/`, {
-                                status: "cancelled",
-                              });
+                              if (
+                                !isOnline ||
+                                String(editingId).startsWith("offline-")
+                              ) {
+                                const resolvedId =
+                                  await resolveOrderId(editingId);
+                                await addToQueue("CANCEL_ORDER", {
+                                  order_id: resolvedId,
+                                });
+                                await removeOrderLocally(editingId);
+                                setOrders((prev) =>
+                                  prev.filter(
+                                    (o) =>
+                                      String(o.id) !== String(editingId),
+                                  ),
+                                );
+                              } else {
+                                await api.patch(
+                                  `/cafe/orders/${editingId}/`,
+                                  { status: "cancelled" },
+                                );
+                                await fetchOrders();
+                              }
                               setModalOpen(false);
                               setMenuOpen(false);
                               setShowAddClient(false);
                               setOpenSelectId(null);
-                              await fetchOrders();
                             } catch (err) {
                               if (suppressOfflineError(err)) return;
                               const errorMessage = validateResErrors(

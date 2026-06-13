@@ -1,10 +1,25 @@
 import { useCafeSync } from "../../../../hooks/useCafeSync";
 
 export default function OfflineStatusBar() {
-  const { isOnline, pendingCount, isSyncing, syncError, justSynced, syncQueue } =
-    useCafeSync();
+  const {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    syncError,
+    justSynced,
+    syncQueue,
+    lastFailed,
+  } = useCafeSync();
 
-  if (isOnline && !isSyncing && !justSynced && !syncError) return null;
+  if (
+    isOnline &&
+    !isSyncing &&
+    !justSynced &&
+    !syncError &&
+    !(lastFailed?.length > 0)
+  ) {
+    return null;
+  }
 
   const baseStyle = {
     position: "fixed",
@@ -36,6 +51,18 @@ export default function OfflineStatusBar() {
       <div style={{ ...baseStyle, background: "#22c55e", color: "white" }}>
         <span>✓</span>
         <span>Синхронизировано</span>
+      </div>
+    );
+  }
+
+  if (lastFailed && lastFailed.length > 0) {
+    return (
+      <div style={{ ...baseStyle, background: "#f97316", color: "white" }}>
+        <span>⚠️</span>
+        <span>
+          Синхронизировано частично — {lastFailed.length} действий не
+          применились. Проверьте заказы.
+        </span>
       </div>
     );
   }

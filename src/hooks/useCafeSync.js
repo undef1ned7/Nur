@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNetworkStatus } from "./useNetworkStatus";
-import { getPendingQueue, markSynced } from "../services/cafeOfflineService";
+import {
+  getPendingQueue,
+  markSynced,
+  saveIdMapping,
+  remapQueueOrderIds,
+  saveSnapshot,
+} from "../services/cafeOfflineService";
 import api from "../api";
 
 export function useCafeSync() {
@@ -9,6 +15,7 @@ export function useCafeSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(null);
   const [justSynced, setJustSynced] = useState(false);
+  const [lastFailed, setLastFailed] = useState([]);
   const prevOnline = useRef(isOnline);
 
   useEffect(() => {
@@ -27,8 +34,13 @@ export function useCafeSync() {
 
     setIsSyncing(true);
     setSyncError(null);
+    setLastFailed([]);
 
     try {
+      const createOrderItems = queue.filter(
+        (item) => item.type === "CREATE_ORDER",
+      );
+
       const response = await api.post("/cafe/offline-sync/", {
         actions: queue.map((item) => ({
           type: item.type,
@@ -37,8 +49,43 @@ export function useCafeSync() {
         })),
       });
 
-      await markSynced(queue.map((item) => item.id));
-      setPendingCount(0);
+      const { failed, created_order_ids } = response.data;
+
+      if (Array.isArray(created_order_ids) && createOrderItems.length) {
+        for (let i = 0; i < createOrderItems.length; i++) {
+          const offlineId =
+            createOrderItems[i].payload?.client_id ||
+            createOrderItems[i].payload?.order_id;
+          const serverId = created_order_ids[i];
+          if (offlineId && serverId) {
+            await saveIdMapping(String(offlineId), String(serverId));
+            await remapQueueOrderIds(String(offlineId), String(serverId));
+          }
+        }
+      }
+
+      const failedIndexes = new Set((failed || []).map((f) => f.action_index));
+      const syncedIds = queue
+        .filter((_, idx) => !failedIndexes.has(idx))
+        .map((item) => item.id);
+
+      await markSynced(syncedIds);
+
+      if (failed && failed.length > 0) {
+        setLastFailed(failed);
+      }
+
+      try {
+        const { data: snapshot } = await api.get("/cafe/offline-snapshot/");
+        await saveSnapshot(snapshot);
+      } catch {
+        // снимок не critical — продолжаем
+      }
+
+      window.dispatchEvent(new Event("orders:refresh"));
+
+      const newPending = await getPendingQueue();
+      setPendingCount(newPending.length);
       setJustSynced(true);
       setTimeout(() => setJustSynced(false), 3000);
 
@@ -58,5 +105,13 @@ export function useCafeSync() {
     prevOnline.current = isOnline;
   }, [isOnline, syncQueue]);
 
-  return { isOnline, pendingCount, isSyncing, syncError, justSynced, syncQueue };
+  return {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    syncError,
+    justSynced,
+    syncQueue,
+    lastFailed,
+  };
 }
