@@ -23,6 +23,7 @@ import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
   ensurePrinterConnectedInteractively,
+  enrichMarketReceiptPayload,
 } from "../../../pages/Sell/services/printService";
 import api from "../../../../api";
 import "./PaymentPage.scss";
@@ -88,8 +89,15 @@ const PaymentPage = ({
   const [splitTransferAmount, setSplitTransferAmount] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [printing, setPrinting] = useState(false);
+  const [successEnterBlockedUntil, setSuccessEnterBlockedUntil] = useState(0);
   const amountReceivedInputRef = useRef(null);
   const deferredDueDateInputRef = useRef(null);
+  const payingInFlightRef = useRef(false);
+  const acceptPaymentRef = useRef(async () => {});
+  const showSuccessModalRef = useRef(false);
+  const showCustomerModalRef = useRef(false);
+  const alertModalOpenRef = useRef(false);
+  const successEnterBlockedUntilRef = useRef(0);
   const [alertModal, setAlertModal] = useState({
     open: false,
     type: "error",
@@ -333,7 +341,52 @@ const PaymentPage = ({
     }
   };
 
+  const readAmountReceived = () => {
+    const raw =
+      amountReceivedInputRef.current?.value ??
+      amountReceived ??
+      String(total ?? 0);
+    const n = parseFloat(String(raw).replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const buildReceiptPrintPayload = (apiPayload, splitParts = null) => {
+    const received = readAmountReceived();
+    let paidCash = 0;
+    let paidCard = 0;
+
+    if (paymentMethod === "cash") {
+      paidCash = total;
+    } else if (paymentMethod === "split" && splitParts) {
+      paidCash = splitParts.transfer;
+      paidCard = splitParts.online;
+    } else if (paymentMethod === "cashless") {
+      paidCard = total;
+    } else if (paymentMethod === "deferred" && deferredPrepaymentValue > 0) {
+      paidCash = deferredPrepaymentValue;
+    }
+
+    try {
+      const enriched = enrichMarketReceiptPayload(apiPayload, {
+        paymentMethod,
+        total,
+        amountReceived: paymentMethod === "cash" ? received : undefined,
+        paidCash,
+        paidCard,
+        change: paymentMethod === "cash" ? Math.max(0, received - total) : 0,
+      });
+      if (enriched && Array.isArray(enriched.items)) return enriched;
+    } catch (err) {
+      console.warn("[PaymentPage] enrich receipt payload failed:", err);
+    }
+    return apiPayload;
+  };
+
   const handleAcceptPayment = async () => {
+    if (payingInFlightRef.current) return;
+    payingInFlightRef.current = true;
+
+    try {
     if (!saleId) {
       showAlert("error", "Ошибка", "Продажа не найдена");
       return;
@@ -415,7 +468,7 @@ const PaymentPage = ({
 
     // Валидация для наличных
     if (paymentMethod === "cash") {
-      const received = parseFloat(amountReceived) || 0;
+      const received = readAmountReceived();
       if (received < total) {
         showAlert(
           "warning",
@@ -426,8 +479,7 @@ const PaymentPage = ({
       }
     }
 
-    try {
-      // Маппинг способов оплаты
+    // Маппинг способов оплаты
       // payment_method может быть: cash, transfer, debt, mbank, optima, obank, bakai
       let paymentMethodApi = "cash";
       let checkoutPayments = null;
@@ -489,7 +541,7 @@ const PaymentPage = ({
             paymentMethod === "split" || paymentMethod === "deferred"
               ? checkoutCashReceived
               : paymentMethod === "cash"
-              ? parseFloat(amountReceived) || total
+              ? readAmountReceived() || total
               : null,
         })
       );
@@ -660,13 +712,19 @@ const PaymentPage = ({
             // Важно: сначала печатаем из checkout JSON (в нем есть ekassa/ekassa_fiscal),
             // чтобы применился наш новый формат ККМ.
             if (result.payload) {
-              let ok = await printReceiptSmart(result.payload);
+              const printPayload = buildReceiptPrintPayload(
+                result.payload,
+                splitParts,
+              );
+              let ok = await printReceiptSmart(printPayload);
               if (!ok) {
                 const receiptResult = await dispatch(
                   getProductCheckout(saleIdForReceipt)
                 );
                 if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-                  ok = await printReceiptSmart(receiptResult.payload);
+                  ok = await printReceiptSmart(
+                    buildReceiptPrintPayload(receiptResult.payload, splitParts),
+                  );
                 }
               }
               if (!ok) {
@@ -699,12 +757,17 @@ const PaymentPage = ({
         }
 
         // Показываем модалку успеха с возможностью повторной печати
+        successEnterBlockedUntilRef.current = Date.now() + 800;
+        setSuccessEnterBlockedUntil(successEnterBlockedUntilRef.current);
         setShowSuccessModal(true);
 
         // Сохраняем данные для печати (на случай, если пользователь захочет распечатать позже)
         setReceiptData({
           saleId: saleIdForReceipt,
-          checkoutResponse: result.payload,
+          checkoutResponse: buildReceiptPrintPayload(
+            result.payload,
+            splitParts,
+          ),
         });
       } else {
         const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
@@ -722,6 +785,8 @@ const PaymentPage = ({
         "Ошибка",
         errorMessage
       );
+    } finally {
+      payingInFlightRef.current = false;
     }
   };
 
@@ -870,63 +935,39 @@ const PaymentPage = ({
     alertModal.open,
   ]);
 
-  // Обработка нажатия Enter для закрытия модалки успеха
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (showSuccessModal && e.key === "Enter") {
-        setShowSuccessModal(false);
-        onComplete();
-      }
-    };
+  showSuccessModalRef.current = showSuccessModal;
+  showCustomerModalRef.current = showCustomerModal;
+  alertModalOpenRef.current = alertModal.open;
+  acceptPaymentRef.current = handleAcceptPayment;
 
-    if (showSuccessModal) {
-      window.addEventListener("keydown", handleKeyPress);
-      return () => window.removeEventListener("keydown", handleKeyPress);
-    }
-  }, [showSuccessModal, onComplete]);
-
-  // Обработка нажатия Enter для принятия оплаты
+  // Enter: принять оплату (capture — раньше других обработчиков)
   useEffect(() => {
-    const handleKeyPress = (e) => {
-      // Пропускаем, если открыты модалки
-      if (showSuccessModal || showCustomerModal || alertModal.open) {
+    const handleKeyDown = (e) => {
+      if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey) return;
+      if (showSuccessModalRef.current) return;
+      if (showCustomerModalRef.current || alertModalOpenRef.current) return;
+      if (payingInFlightRef.current) {
+        e.preventDefault();
         return;
       }
 
-      // Пропускаем, если фокус в поле ввода суммы
       const activeElement = document.activeElement;
-      if (
-        activeElement &&
-        (activeElement.tagName === "INPUT" ||
-          activeElement.tagName === "TEXTAREA")
-      ) {
-        // Если это поле ввода суммы, разрешаем Enter для принятия оплаты
-        if (
-          activeElement.className?.includes("payment-page__amount-input") ||
-          activeElement.className?.includes("payment-page__debt-days-input")
-        ) {
-          // Enter в поле ввода суммы также принимает оплату
-          if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            handleAcceptPayment();
-          }
-        } else {
-          // Для других полей ввода не обрабатываем Enter
-          return;
-        }
+      const tag = activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        const cls = String(activeElement?.className || "");
+        const isAmount = cls.includes("payment-page__amount-input");
+        const isDebtDays = cls.includes("payment-page__debt-days-input");
+        if (!isAmount && !isDebtDays) return;
       }
 
-      // Если нажали Enter и нет открытых модалок
-      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        handleAcceptPayment();
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      void acceptPaymentRef.current();
     };
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSuccessModal, showCustomerModal, alertModal.open]);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 
   // Расчет сдачи (только для наличных)
   const change =
@@ -1446,6 +1487,7 @@ const PaymentPage = ({
               />
             </label>
             <button
+              type="button"
               className="payment-page__accept-btn"
               onClick={handleAcceptPayment}
             >
@@ -1474,6 +1516,7 @@ const PaymentPage = ({
           printing={printing}
           total={total}
           cashAmount={paymentAmounts.cash}
+          blockEnterCloseUntil={successEnterBlockedUntil}
           cashlessAmount={paymentAmounts.cashless}
           deferredAmount={paymentAmounts.deferred}
           amountReceived={parseFloat(amountReceived) || 0}
