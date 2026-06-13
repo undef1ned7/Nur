@@ -21,6 +21,9 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const DECIMAL_QTY_PATTERN = /^\d*([.,]\d*)?$/;
+const INTEGER_QTY_PATTERN = /^\d*$/;
+
 const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
 const AddProductModal = ({ onClose, onChanged, item }) => {
@@ -34,6 +37,8 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
   // если item не передан — блокируем форму
   const itemId = item?.id;
   const itemName = item?.name ?? "—";
+  const isWeightProduct = Boolean(item?.is_weight);
+  const unitLabel = item?.unit || "шт";
 
   const [qty, setQty] = useState("");
   const [purchasePrice, setPurchasePrice] = useState(
@@ -93,11 +98,21 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
     }
   }, [cashBoxes, selectCashBox]);
 
+  const handleQtyChange = (value) => {
+    const nextValue = String(value ?? "");
+    const pattern = isWeightProduct ? DECIMAL_QTY_PATTERN : INTEGER_QTY_PATTERN;
+    if (nextValue && !pattern.test(nextValue)) return;
+    setQty(nextValue);
+  };
+
   const validate = () => {
     if (!itemId) return "Нет выбранного товара.";
+    if (!String(qty).trim()) return "Введите количество";
     if (!q) return "Введите количество";
     if (q <= 0) return "Количество должно быть больше 0";
-    if (!Number.isInteger(q)) return "Количество должно быть целым числом";
+    if (!isWeightProduct && !Number.isInteger(q)) {
+      return "Количество должно быть целым числом";
+    }
     if (pp < 0) return "Введите корректную закупочную цену";
     if (!rp || rp <= 0) return "Введите корректную розничную цену";
     if (selectedSupplier && (paymentType === "debt" || paymentType === "prepayment")) {
@@ -247,7 +262,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
             </div>
           {!!itemId && (
               <div className="sklad-add-product-modal__meta">
-              В наличии сейчас: <b>{stockQty}</b> шт.
+              В наличии сейчас: <b>{stockQty}</b> {unitLabel}
             </div>
           )}
           </div>
@@ -256,15 +271,13 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
             <label htmlFor="add-product-qty">Количество</label>
             <input
               id="add-product-qty"
-              type="number"
+              type="text"
               name="qty"
               placeholder="Количество"
               className="add-modal__input"
               value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              min={1}
-              step={1}
-              inputMode="numeric"
+              onChange={(e) => handleQtyChange(e.target.value)}
+              inputMode={isWeightProduct ? "decimal" : "numeric"}
               disabled={!itemId}
             />
           </div>
