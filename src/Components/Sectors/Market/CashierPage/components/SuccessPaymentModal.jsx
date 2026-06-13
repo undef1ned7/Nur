@@ -18,6 +18,7 @@ const SuccessPaymentModal = ({
   amountReceived = 0,
   change = 0,
   saleId,
+  blockEnterCloseUntil = 0,
 }) => {
   const dispatch = useDispatch();
   const [isTotalExpanded, setIsTotalExpanded] = useState(true);
@@ -28,6 +29,10 @@ const SuccessPaymentModal = ({
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (open && e.key === "Enter") {
+        if (Date.now() < blockEnterCloseUntil) {
+          e.preventDefault();
+          return;
+        }
         e.preventDefault();
         onClose();
       }
@@ -37,7 +42,7 @@ const SuccessPaymentModal = ({
       window.addEventListener("keydown", handleKeyPress);
       return () => window.removeEventListener("keydown", handleKeyPress);
     }
-  }, [open, onClose]);
+  }, [open, onClose, blockEnterCloseUntil]);
 
   // Вспомогательная функция для скачивания blob
   const downloadBlob = (blob, filename) => {
@@ -231,9 +236,9 @@ const SuccessPaymentModal = ({
             </button>
           )}
           <button
+            type="button"
             className="success-payment-modal__close-btn"
             onClick={onClose}
-            autoFocus
           >
             ЗАКРЫТЬ{" "}
             <span className="success-payment-modal__enter-hint">[ENTER]</span>
