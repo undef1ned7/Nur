@@ -245,6 +245,15 @@ function lr(left, right, width = 32) {
   return L + " ".repeat(spaces) + R;
 }
 
+/** lr с учётом ESC ! (двойная ширина — в 2 раза меньше символов в строке). */
+function lrSized(left, right, width, escSize = 0) {
+  const isDoubleWidth = (escSize & 0x20) !== 0;
+  const lineWidth = isDoubleWidth
+    ? Math.max(12, Math.floor(width / 2))
+    : width;
+  return lr(left, right, lineWidth);
+}
+
 /** Одна ячейка фиксированной ширины для узкого чека (моноширинная логика). */
 function fitCell(str, w, align = "L") {
   let t = String(str ?? "")
@@ -313,20 +322,20 @@ function joinEncodedMarketTableCells(enc, cells) {
   return concatUint8Arrays(...parts);
 }
 
-function buildMarketItemTableCells(width, noStr, priceStr, qtyStr, discStr, totalStr) {
-  const wNo = 3;
-  const wPrice = 8;
+/** Строка данных позиции: Цена | Кол-о | Скидка | Итого (без №). */
+function buildMarketItemDataCells(width, priceStr, qtyStr, discStr, totalStr) {
+  const wPrice = 9;
   const wQty = 5;
-  const sepDisplayLen = 2; // " |"
-  const sepTotal = sepDisplayLen * 4;
-  const wDisc = Math.max(6, width - wNo - wPrice - wQty - sepTotal - 8);
-  const wTot = width - wNo - wPrice - wQty - wDisc - sepTotal;
+  const sepDisplayLen = 2;
+  const sepTotal = sepDisplayLen * 3;
+  const wTot = 9;
+  const wDisc = Math.max(5, width - wPrice - wQty - wTot - sepTotal);
+  const actualWTot = Math.max(7, width - wPrice - wQty - wDisc - sepTotal);
   return [
-    fitCell(noStr, wNo, "R"),
     fitCell(priceStr, wPrice, "R"),
     fitCell(qtyStr, wQty, "R"),
     fitCell(discStr, wDisc, "L"),
-    fitCell(totalStr, wTot, "R"),
+    fitCell(totalStr, actualWTot, "R"),
   ].map((s) => (s.length > width ? s.slice(0, width) : s));
 }
 
@@ -340,6 +349,45 @@ function formatMarketLineDiscountCell(lineDiscountAmt) {
   const amt = Math.max(0, toNum(lineDiscountAmt));
   if (amt <= 0) return "0";
   return money(amt).replace(/\.00$/, "");
+}
+
+/** Акценты ESC/POS для чека маркета (без слишком крупного шрифта). */
+function pushReceiptBoldOn(chunks) {
+  chunks.push(ESC(0x1b, 0x45, 0x01));
+}
+
+function pushReceiptBoldOff(chunks) {
+  chunks.push(ESC(0x1b, 0x45, 0x00));
+}
+
+function pushReceiptSlightLargeOn(chunks) {
+  chunks.push(ESC(0x1b, 0x21, 0x08));
+}
+
+function pushReceiptMediumLargeOn(chunks) {
+  chunks.push(ESC(0x1b, 0x21, 0x10));
+}
+
+/** Пропорционально крупнее (ширина + высота), без «вытянутого» вида. */
+function pushReceiptProportionalLargeOn(chunks) {
+  chunks.push(ESC(0x1b, 0x21, 0x30));
+}
+
+function pushReceiptSizeOff(chunks) {
+  chunks.push(ESC(0x1b, 0x21, 0x00));
+}
+
+function pushMarketDataCellsRow(chunks, enc, width, cells) {
+  pushReceiptBoldOn(chunks);
+  pushReceiptSlightLargeOn(chunks);
+  chunks.push(
+    concatUint8Arrays(
+      joinEncodedMarketTableCells(enc, cells),
+      enc("\n"),
+    ),
+  );
+  pushReceiptSizeOff(chunks);
+  pushReceiptBoldOff(chunks);
 }
 
 /** Строка чека маркета: скидка как в eKassa (сумма + %), те же поля что при fiscal merge. */
@@ -498,6 +546,8 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const paidCash = ekassaFields
     ? Math.max(0, total - paidCard)
     : Math.max(0, toNum(payload.paid_cash));
+  const cashReceived = Math.max(0, toNum(payload.cash_received));
+  const change = Math.max(0, toNum(payload.change));
   const kkm = String(
     ekassaFields
       ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "")
@@ -532,9 +582,16 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
     chunks.push(enc("СПАСИБО ЗА ПОКУПКУ!\n"));
     chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+    chunks.push(enc("\n"));
   }
   chunks.push(enc("Контрольно-кассовый чек - Продажа\n"));
-  if (hasText(company)) chunks.push(enc(company + "\n"));
+  if (hasText(company)) {
+    pushReceiptBoldOn(chunks);
+    pushReceiptSlightLargeOn(chunks);
+    chunks.push(enc(`Магазин: ${company}\n`));
+    pushReceiptSizeOff(chunks);
+    pushReceiptBoldOff(chunks);
+  }
   if (hasText(inn)) chunks.push(enc(`ИНН ${inn}\n`));
   if (hasText(address)) chunks.push(enc(address + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x00)); // left
@@ -549,49 +606,51 @@ function buildReceiptFromJSON(payload, opts = {}) {
   if (hasText(cashier)) chunks.push(enc(lr("Кассир", cashier, width) + "\n"));
   if (hasText(shift)) chunks.push(enc(lr("Смена", shift, width) + "\n"));
   chunks.push(enc(divider + "\n"));
-  chunks.push(enc("СНО: Общий налоговый режим\n"));
-  chunks.push(enc(divider + "\n"));
-  if (emphasizeMarketReceipt) {
-    chunks.push(
-      concatUint8Arrays(
-        joinEncodedMarketTableCells(
-          enc,
-          buildMarketItemTableCells(width, "№", "Цена", "Кол-о", "Скидка", "Итого"),
-        ),
-        enc("\n"),
-      ),
-    );
+  if (ekassaFields) {
+    chunks.push(enc("СНО: Общий налоговый режим\n"));
     chunks.push(enc(divider + "\n"));
+  }
+  if (emphasizeMarketReceipt) {
+    pushMarketDataCellsRow(
+      chunks,
+      enc,
+      width,
+      buildMarketItemDataCells(width, "Цена", "Кол-о", "Скидка", "Итого"),
+    );
+    chunks.push(enc("\n"));
     for (const [index, it] of items.entries()) {
       const name = String(it.name ?? "Товар");
       const qty = Number(it.qty || 1);
       const price = Number(it.price || 0);
       const lineTotal = Number(it.total ?? qty * price);
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
-
-      const nameLines = wrapReceiptName(name, Math.max(10, width - 2));
-      for (const nl of nameLines) {
-        chunks.push(enc(`  ${fitCell(nl, width - 2, "L")}\n`));
-      }
-
       const discCell = formatMarketLineDiscountCell(lineDiscountAmt);
+      const prefix = `${index + 1}) `;
+      const nameLines = wrapReceiptName(name, Math.max(8, width - prefix.length));
 
-      chunks.push(
-        concatUint8Arrays(
-          joinEncodedMarketTableCells(
-            enc,
-            buildMarketItemTableCells(
-              width,
-              String(index + 1),
-              money(price),
-              String(qty),
-              discCell,
-              money(lineTotal),
-            ),
-          ),
-          enc("\n"),
+      pushReceiptBoldOn(chunks);
+      chunks.push(enc(prefix + nameLines[0] + "\n"));
+      for (let i = 1; i < nameLines.length; i += 1) {
+        chunks.push(enc(`   ${nameLines[i]}\n`));
+      }
+      pushReceiptBoldOff(chunks);
+      chunks.push(enc("\n"));
+
+      pushMarketDataCellsRow(
+        chunks,
+        enc,
+        width,
+        buildMarketItemDataCells(
+          width,
+          money(price),
+          String(qty),
+          discCell,
+          money(lineTotal),
         ),
       );
+      if (index < items.length - 1) {
+        chunks.push(enc(divider + "\n"));
+      }
     }
   } else {
     for (const [index, it] of items.entries()) {
@@ -638,20 +697,38 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(enc(lr("Всего", money(total), width) + "\n"));
     chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
     chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+    if (cashReceived > paidCash) {
+      chunks.push(enc(lr("Получено", money(cashReceived), width) + "\n"));
+    }
+    if (change > 0) {
+      chunks.push(ESC(0x1b, 0x45, 0x01));
+      chunks.push(enc(lr("Сдача", money(change), width) + "\n"));
+      chunks.push(ESC(0x1b, 0x45, 0x00));
+    }
     chunks.push(enc(lr("Вид расчета", "Полный расчет", width) + "\n"));
     chunks.push(enc(lr("НДС 0%", "0.00", width) + "\n"));
     chunks.push(enc(lr("НсП 0%", "0.00", width) + "\n"));
   } else {
     if (paidCash > 0) chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
     if (paidCard > 0) chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+    if (cashReceived > paidCash) {
+      chunks.push(enc(lr("Получено", money(cashReceived), width) + "\n"));
+    }
+    if (change > 0) {
+      chunks.push(ESC(0x1b, 0x45, 0x01));
+      chunks.push(enc(lr("Сдача", money(change), width) + "\n"));
+      chunks.push(ESC(0x1b, 0x45, 0x00));
+    }
   }
   if (emphasizeMarketReceipt) {
     chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
   }
 
-  chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
-  chunks.push(enc(lr("Итог", money(total) + " СОМ", width) + "\n"));
-  chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
+  pushReceiptBoldOn(chunks);
+  pushReceiptProportionalLargeOn(chunks);
+  chunks.push(enc(lrSized("Итог", `${money(total)} СОМ`, width, 0x30) + "\n"));
+  pushReceiptSizeOff(chunks);
+  pushReceiptBoldOff(chunks);
   chunks.push(enc(divider + "\n"));
   if (hasText(kkm)) {
     if (ekassaFields) {
@@ -1036,6 +1113,42 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
 }
 
 /* ---------- Главная функция обработки ответа для печати ---------- */
+export function enrichMarketReceiptPayload(payload, meta = {}) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  const next = { ...payload };
+  const orderTotal = toNum(
+    meta.total ?? next.total_amount ?? next.paid_cash ?? next.paid_card,
+  );
+  const method = String(
+    meta.paymentMethod ?? next.payment_method ?? "",
+  ).toLowerCase();
+  const received = toNum(
+    meta.amountReceived ?? meta.cash_received ?? next.cash_received,
+  );
+  const paidCash = toNum(meta.paidCash ?? next.paid_cash);
+  const paidCard = toNum(meta.paidCard ?? next.paid_card);
+  const cashPaid = paidCash > 0 ? paidCash : orderTotal;
+
+  if (method === "cash" || paidCash > 0 || received > 0) {
+    const cashReceived =
+      received > 0 ? received : cashPaid > 0 ? cashPaid : orderTotal;
+    const change = toNum(
+      meta.change ?? next.change ?? Math.max(0, cashReceived - cashPaid),
+    );
+
+    next.payment_method = next.payment_method || method || "cash";
+    next.cash_received = cashReceived;
+    next.paid_cash = cashPaid;
+    next.change = change;
+  }
+
+  if (paidCard > 0) next.paid_card = paidCard;
+
+  return next;
+}
+
 export async function handleCheckoutResponseForPrinting(res, options = {}) {
   const printable = unwrapPrintablePayload(res);
 
