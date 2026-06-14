@@ -44,6 +44,13 @@ export const consultingMenu = [
         implemented: true,
       },
       {
+        label: "Воронка продаж",
+        to: "/crm/consulting/funnel",
+        icon: menuIcons.layers,
+        permission: "can_view_sale",
+        implemented: true,
+      },
+      {
         label: "Продажи",
         to: "/crm/consulting/sale",
         icon: menuIcons.shoppingCart,
