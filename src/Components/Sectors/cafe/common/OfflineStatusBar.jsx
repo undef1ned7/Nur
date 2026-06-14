@@ -1,4 +1,17 @@
+import { useState, useEffect } from "react";
 import { useCafeSync } from "../../../../hooks/useCafeSync";
+import { removeQueueAction } from "../../../../services/cafeOfflineService";
+
+function formatSyncError(error) {
+  if (!error) return "Неизвестная ошибка";
+  if (typeof error === "string") {
+    const m = error.match(/string='([^']+)'/);
+    if (m) return m[1];
+    return error;
+  }
+  if (error?.detail) return String(error.detail);
+  return JSON.stringify(error);
+}
 
 export default function OfflineStatusBar() {
   const {
@@ -8,8 +21,15 @@ export default function OfflineStatusBar() {
     syncError,
     justSynced,
     syncQueue,
-    lastFailed,
+    lastFailed: lastFailedFromHook,
   } = useCafeSync();
+
+  const [lastFailed, setLastFailed] = useState([]);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    setLastFailed(lastFailedFromHook);
+  }, [lastFailedFromHook]);
 
   if (
     isOnline &&
@@ -57,12 +77,100 @@ export default function OfflineStatusBar() {
 
   if (lastFailed && lastFailed.length > 0) {
     return (
-      <div style={{ ...baseStyle, background: "#f97316", color: "white" }}>
-        <span>⚠️</span>
-        <span>
-          Синхронизировано частично — {lastFailed.length} действий не
-          применились. Проверьте заказы.
-        </span>
+      <div
+        style={{
+          ...baseStyle,
+          background: "#f97316",
+          color: "white",
+          flexDirection: "column",
+          alignItems: "stretch",
+          gap: 4,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <span>⚠️</span>
+          <span>
+            Синхронизировано частично — {lastFailed.length} действий не
+            применились
+          </span>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              background: "none",
+              border: "1px solid white",
+              color: "white",
+              padding: "2px 8px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            {expanded ? "Скрыть" : "Подробнее"}
+          </button>
+        </div>
+
+        {expanded && (
+          <div
+            style={{
+              background: "rgba(0,0,0,0.15)",
+              borderRadius: 6,
+              padding: 8,
+              fontSize: 13,
+            }}
+          >
+            {lastFailed.map((f, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "4px 0",
+                  borderBottom:
+                    idx < lastFailed.length - 1
+                      ? "1px solid rgba(255,255,255,0.2)"
+                      : "none",
+                }}
+              >
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontWeight: 600 }}>{f.type}</div>
+                  <div>{formatSyncError(f.error)}</div>
+                </div>
+                {f.queueItem?.id && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await removeQueueAction(f.queueItem.id);
+                      setLastFailed((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                    style={{
+                      background: "none",
+                      border: "1px solid white",
+                      color: "white",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      whiteSpace: "nowrap",
+                    }}
+                    title="Убрать это действие из очереди — оно не будет повторяться"
+                  >
+                    Убрать
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

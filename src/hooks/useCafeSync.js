@@ -6,6 +6,8 @@ import {
   saveIdMapping,
   remapQueueOrderIds,
   saveSnapshot,
+  pruneDeadQueueActions,
+  getFailedQueueDetails,
 } from "../services/cafeOfflineService";
 import api from "../api";
 
@@ -29,6 +31,8 @@ export function useCafeSync() {
   }, []);
 
   const syncQueue = useCallback(async () => {
+    await pruneDeadQueueActions();
+
     const queue = await getPendingQueue();
     if (queue.length === 0) return;
 
@@ -72,7 +76,8 @@ export function useCafeSync() {
       await markSynced(syncedIds);
 
       if (failed && failed.length > 0) {
-        setLastFailed(failed);
+        const detailed = await getFailedQueueDetails(failed, queue);
+        setLastFailed(detailed);
       }
 
       try {

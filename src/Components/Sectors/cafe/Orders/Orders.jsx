@@ -1648,13 +1648,23 @@ const Orders = () => {
             table: toId(form.table) || null,
             status: "open",
             created_at: new Date().toISOString(),
-            items: form.items.map((i, idx) => ({
-              id: `${offlineOrderId}-item-${idx}`,
-              menu_item_id: i.menu_item,
-              menu_item_name: i.title || i.menu_item_title || "",
-              quantity: i.quantity,
-              price: String(i.price || "0.00"),
-            })),
+            items: form.items.map((i, idx) => {
+              const isService =
+                String(i.line_kind || "menu").toLowerCase() === "service";
+              return {
+                id: `${offlineOrderId}-item-${idx}`,
+                line_kind: i.line_kind || "menu",
+                menu_item_id: i.menu_item || null,
+                menu_item_title: isService ? null : i.title || "",
+                menu_item_name: isService ? null : i.title || "",
+                service_title: isService ? i.service_title || "Услуга" : null,
+                title: i.title || i.service_title || "",
+                unit_price: String(i.price || "0.00"),
+                price: String(i.price || "0.00"),
+                quantity: i.quantity,
+                comment: i.comment || "",
+              };
+            }),
             total: String(
               form.items
                 .reduce(

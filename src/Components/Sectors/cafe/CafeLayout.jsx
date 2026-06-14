@@ -28,6 +28,7 @@ export default function CafeLayout() {
   const [notificationDeps, setNotificationDeps] = useState(null);
   const [notificationOrder, setNotificationOrder] = useState(null);
   const [notificationOptions, setNotificationOptions] = useState(null);
+  const [waiterIdLabelMap, setWaiterIdLabelMap] = useState(new Map());
   const { profile } = useUser();
   const location = useLocation();
   const notifiedTasksRef = useRef(new Set()); // taskKey -> notified once on this device
@@ -38,6 +39,7 @@ export default function CafeLayout() {
   const printingReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printing now
   const printingKitchenDiffRef = useRef(new Set()); // orderId -> diff printing now
   const retryTimersRef = useRef(new Map()); // orderId -> timeoutId
+  const permanentlyFailedPrintsRef = useRef(new Map()); // orderId -> timestamp последней неудачи
   const notifiedOrdersRef = useRef(new Set()); // orderId -> notified once on this device (cook page)
   const printKitchenTicketsForOrderRef = useRef(() => Promise.resolve());
   const printReceiptForOrderRef = useRef(() => Promise.resolve());
@@ -55,6 +57,7 @@ export default function CafeLayout() {
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
   const PRINT_QUEUE_DELAY_MS = 1000;
+  const PRINT_FAILURE_COOLDOWN_MS = 60 * 1000; // 1 минута
 
   // const [kitchens, setKitchens] = useState([]);
   // const fetchKitchens = useCallback(async () => {
@@ -93,6 +96,26 @@ export default function CafeLayout() {
       return false;
     }
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/users/employees/");
+        const arr = data?.results || data || [];
+        const map = new Map();
+        for (const e of arr) {
+          const label =
+            [e.last_name, e.first_name].filter(Boolean).join(" ").trim() ||
+            String(e.email || "").trim();
+          if (e?.id != null && label) map.set(String(e.id), label);
+        }
+        setWaiterIdLabelMap(map);
+      } catch {
+        // офлайн или ошибка — fetchCafeWaiterLabelByEmployeeId закеширует неудачи
+      }
+    })();
+  }, []);
+
   const shouldAutoPrintNow = async () => {
     // If explicitly disabled -> never auto print
     try {
@@ -371,7 +394,10 @@ export default function CafeLayout() {
 
         let waiterName = pickCafeOrderWaiterName(detail);
         if (!waiterName) {
-          waiterName = await fetchCafeWaiterLabelByEmployeeId(detail?.waiter);
+          const waiterId = detail?.waiter;
+          waiterName =
+            waiterIdLabelMap.get(String(waiterId)) ||
+            (await fetchCafeWaiterLabelByEmployeeId(waiterId));
         }
         const payload = {
           ...buildReceiptPayload(detail),
@@ -401,6 +427,7 @@ export default function CafeLayout() {
       enqueuePrintJob,
       isReceiptMarkedPrinted,
       markReceiptPrintedPersist,
+      waiterIdLabelMap,
     ],
   );
 
@@ -579,6 +606,12 @@ export default function CafeLayout() {
     if (!oid) return;
     if (printedOrdersRef.current.has(oid)) return;
     if (printingOrdersRef.current.has(oid)) return;
+
+    const lastFailure = permanentlyFailedPrintsRef.current.get(oid);
+    if (lastFailure && Date.now() - lastFailure < PRINT_FAILURE_COOLDOWN_MS) {
+      return;
+    }
+
     try {
       if (localStorage.getItem(`cafe_kitchen_printed_${oid}`)) return;
     } catch {}
@@ -594,6 +627,7 @@ export default function CafeLayout() {
           attempt,
           why,
         });
+        permanentlyFailedPrintsRef.current.set(oid, Date.now());
         return;
       }
       const delay = [400, 800, 1500, 2500, 4000][attempt] || 2000;
@@ -680,9 +714,10 @@ export default function CafeLayout() {
 
       let kitchenWaiterName = pickCafeOrderWaiterName(detail);
       if (!kitchenWaiterName) {
-        kitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
-          detail?.waiter,
-        );
+        const waiterId = detail?.waiter;
+        kitchenWaiterName =
+          waiterIdLabelMap.get(String(waiterId)) ||
+          (await fetchCafeWaiterLabelByEmployeeId(waiterId));
       }
 
       for (const [kid, kitItems] of groups.entries()) {
@@ -728,6 +763,7 @@ export default function CafeLayout() {
 
       // Mark as printed only after successful run (no early dedupe)
       printedOrdersRef.current.add(oid);
+      permanentlyFailedPrintsRef.current.delete(oid);
       try {
         localStorage.setItem(`cafe_kitchen_printed_${oid}`, "true");
       } catch {}
@@ -953,9 +989,10 @@ export default function CafeLayout() {
 
         let diffKitchenWaiterName = pickCafeOrderWaiterName(orderDetail);
         if (!diffKitchenWaiterName) {
-          diffKitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
-            orderDetail?.waiter,
-          );
+          const waiterId = orderDetail?.waiter;
+          diffKitchenWaiterName =
+            waiterIdLabelMap.get(String(waiterId)) ||
+            (await fetchCafeWaiterLabelByEmployeeId(waiterId));
         }
 
         const printOne = async (kid, menuTitle, items) => {
@@ -1053,6 +1090,7 @@ export default function CafeLayout() {
       TAKEAWAY_LABEL,
       writeOrderItemsSnapshot,
       enqueuePrintJob,
+      waiterIdLabelMap,
     ],
   );
 
@@ -1171,6 +1209,7 @@ export default function CafeLayout() {
       }
       // Auto print kitchen diff on order edit (added/removed items)
       if (orderId && !isPaidStatusRef.current(updatedOrder)) {
+        permanentlyFailedPrintsRef.current.delete(String(orderId));
         void printKitchenDiffTicketsForOrderRef.current(orderId);
       }
     }
@@ -1206,6 +1245,7 @@ export default function CafeLayout() {
         context={{
           socketOrders: orders,
           socketTables: tables,
+          waiterIdLabelMap,
         }}
       />
     </>

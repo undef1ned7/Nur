@@ -79,6 +79,19 @@ export async function getPendingQueue() {
     );
 }
 
+export async function getFailedQueueDetails(failedList, originalQueue = null) {
+  if (!failedList?.length) return [];
+  const queue = originalQueue || (await getPendingQueue());
+  return failedList.map((f) => ({
+    ...f,
+    queueItem: queue[f.action_index] || null,
+  }));
+}
+
+export async function removeQueueAction(queueItemId) {
+  await db.offline_queue.delete(queueItemId);
+}
+
 export async function markSynced(ids) {
   await Promise.all(
     ids.map((id) => db.offline_queue.update(id, { synced: true })),
@@ -105,6 +118,45 @@ export async function remapQueueOrderIds(offlineId, serverId) {
       });
     }
   }
+}
+
+export async function pruneDeadQueueActions() {
+  const all = await db.offline_queue.toArray();
+  const pending = all.filter((item) => item.synced === false);
+  const toDelete = [];
+
+  for (const item of pending) {
+    if (item.type === "CREATE_ORDER") continue;
+
+    const orderId = String(item.payload?.order_id || "");
+    const orderItemId = String(item.payload?.order_item_id || "");
+
+    if (orderId.startsWith("offline-")) {
+      if (
+        item.type === "REMOVE_ITEM_FROM_ORDER" &&
+        orderItemId.startsWith("offline-")
+      ) {
+        toDelete.push(item.id);
+        continue;
+      }
+    }
+
+    if (
+      item.type === "REMOVE_ITEM_FROM_ORDER" &&
+      orderItemId.startsWith("offline-")
+    ) {
+      toDelete.push(item.id);
+    }
+  }
+
+  if (toDelete.length) {
+    await db.offline_queue.bulkDelete(toDelete);
+    console.warn(
+      `pruneDeadQueueActions: удалено ${toDelete.length} неактуальных actions`,
+    );
+  }
+
+  return toDelete.length;
 }
 
 export async function updateTableStatusLocally(tableId, status) {
