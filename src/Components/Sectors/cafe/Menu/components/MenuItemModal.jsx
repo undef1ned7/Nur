@@ -301,6 +301,121 @@ const MenuItemModal = ({
               </button>
             </div>
 
+            {/* Фискальные коды */}
+            <details style={{ marginTop: 16 }}>
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  userSelect: "none",
+                  marginBottom: 10,
+                }}
+              >
+                Фискальные коды (ккм)
+              </summary>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px 16px",
+                  marginTop: 10,
+                }}
+              >
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Код НДС (vat)</label>
+                  <input
+                    className="cafeMenu__input"
+                    type="number"
+                    min="0"
+                    placeholder="Напр.: 12 (VAT_12) или 0"
+                    value={form?.fiscal_vat_code ?? ""}
+                    onChange={(e) =>
+                      updateField({
+                        fiscal_vat_code:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Код НСП (st)</label>
+                  <input
+                    className="cafeMenu__input"
+                    type="number"
+                    min="0"
+                    placeholder="0–5"
+                    value={form?.fiscal_st_code ?? ""}
+                    onChange={(e) =>
+                      updateField({
+                        fiscal_st_code:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">
+                    Признак предмета расчёта
+                  </label>
+                  <input
+                    className="cafeMenu__input"
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={form?.fiscal_calc_item_attr_code ?? ""}
+                    onChange={(e) =>
+                      updateField({
+                        fiscal_calc_item_attr_code:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">
+                    Единица измерения
+                  </label>
+                  <input
+                    className="cafeMenu__input"
+                    type="text"
+                    placeholder="шт"
+                    maxLength={20}
+                    value={form?.fiscal_measure ?? ""}
+                    onChange={(e) =>
+                      updateField({ fiscal_measure: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="cafeMenu__field" style={{ gridColumn: "1 / -1" }}>
+                  <label className="cafeMenu__label">
+                    ТНВЭД / Маркировка (sgtin)
+                  </label>
+                  <input
+                    className="cafeMenu__input"
+                    type="text"
+                    placeholder="Необязательно"
+                    maxLength={100}
+                    value={form?.fiscal_sgtin ?? ""}
+                    onChange={(e) =>
+                      updateField({ fiscal_sgtin: e.target.value || null })
+                    }
+                  />
+                </div>
+              </div>
+
+              <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
+                Если поля не заполнены — бэк подставит дефолтные коды из настроек
+                фискальной кассы.
+              </p>
+            </details>
+
             {/* Кнопки действий */}
             <div className="cafeMenu__formActions">
               <button

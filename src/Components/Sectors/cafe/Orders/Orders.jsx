@@ -57,6 +57,8 @@ import {
 } from "../../../../services/cafeOfflineService";
 import CafeOpenShift from "../CafeOpenShift/CafeOpenShift";
 import { useShifts } from "../../../../store/slices/shiftSlice";
+import { useFiscalSettings } from "../../../../hooks/useFiscalSettings";
+import { sendReceipt } from "../../../../services/fiscalDriverService";
 import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
@@ -384,6 +386,7 @@ const statusFilterOptions = [
 const Orders = () => {
   const { isOnline } = useNetworkStatus();
   const { shifts, currentShift } = useShifts();
+  const { settings: fiscalSettings } = useFiscalSettings();
   const alert = useAlert();
   const confirm = useConfirm();
   const { profile, company, tariff } = useUser();
@@ -2042,6 +2045,45 @@ const Orders = () => {
     setPayOrder(null);
   };
 
+  /**
+   * Фискализация чека: получить payload с бэка, пробить на коннекторе, записать ФД в Nur.
+   * Не бросает при некритических ошибках — в офлайне или при отключённой кассе возвращает null.
+   */
+  const runFiscalReceipt = async (orderId, paymentMethod, cashReceived) => {
+    if (!fiscalSettings?.enabled) return null;
+
+    try {
+      const params = new URLSearchParams({ operation_type: "INCOME" });
+      if (paymentMethod === "cash" && cashReceived) {
+        params.set("cash_received", String(cashReceived));
+      }
+      const { data: receiptPayload } = await api.get(
+        `/cafe/fiscal/orders/${orderId}/receipt-payload/?${params}`,
+      );
+
+      const connectorResult = await sendReceipt(fiscalSettings, receiptPayload.body);
+
+      // Сохранить ФД в Nur (в фоне, не блокируем кассира)
+      api
+        .post(`/cafe/fiscal/orders/${orderId}/receipt/`, {
+          kind: "sale",
+          operation_type: "INCOME",
+          fd_number: connectorResult?.fdNumber ?? null,
+          fn_serial_number: connectorResult?.fnSerialNumber ?? null,
+          request_payload: receiptPayload.body,
+          response_payload: connectorResult,
+        })
+        .catch((e) => console.warn("[fiscal] Не удалось сохранить ФД:", e));
+
+      return connectorResult;
+    } catch (fiscalErr) {
+      console.warn("[fiscal] Ошибка фискализации:", fiscalErr?.message);
+      // Показать предупреждение, но не блокировать оплату
+      alert(`Фискальный чек не пробит: ${fiscalErr?.message}`, true);
+      return null;
+    }
+  };
+
   const submitCheckoutPay = async () => {
     if (!payOrder?.id) return;
     if (!canPayOrders) {
@@ -2151,7 +2193,13 @@ const Orders = () => {
     const paidBefore = toNum(order.paid_amount);
     try {
       if (!isOnline) {
+        // Офлайн: фискализация через коннектор (не требует интернета после open-shift)
         const resolvedOrderId = await resolveOrderId(order.id);
+        await runFiscalReceipt(
+          resolvedOrderId,
+          payForm.paymentMethod,
+          toNum(payForm.payNow) || calcTotals(order).total,
+        );
         await addToQueue("CLOSE_ORDER", {
           order_id: resolvedOrderId,
           payment_method: payForm.paymentMethod,
@@ -2168,6 +2216,15 @@ const Orders = () => {
         setPayOrder(null);
         return;
       }
+
+      // Онлайн: сначала фискализация, потом учёт в Nur
+      await runFiscalReceipt(
+        order.id,
+        payForm.paymentMethod,
+        payForm.paymentMethod === "cash"
+          ? toNum(payForm.payNow) || calcTotals(order).total
+          : undefined,
+      );
 
       const { data } = await api.post(`/cafe/orders/${order.id}/pay/`, payload);
       await postPayCashflowDelta(order, paidBefore, data);
