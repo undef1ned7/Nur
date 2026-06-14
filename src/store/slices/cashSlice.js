@@ -15,7 +15,7 @@ export const getCashBoxes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const { data: response } = await api.get("/construction/cashboxes/");
-      return response.results;
+      return response?.results ?? (Array.isArray(response) ? response : []);
     } catch (e) {
       return handleThunkError(e, rejectWithValue);
     }

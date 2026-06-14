@@ -19,7 +19,7 @@ import {
   printViaWiFiSimple,
   setActivePrinterByKey,
 } from "./Orders/OrdersPrintService";
-import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { resolveTableLabel, TAKEAWAY_LABEL } from "./utils/resolveTableLabel";
 import * as logger from "../../../utils/logger";
 import OfflineStatusBar from "./common/OfflineStatusBar";
 

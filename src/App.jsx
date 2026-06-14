@@ -23,11 +23,23 @@ function AppRoutes({ profile }) {
 
     let cancelled = false;
 
-    import("./config/routes/index.js").then((mod) => {
-      if (!cancelled) {
-        setCrmRoutesElements(mod.crmRoutes(profile));
-      }
-    });
+    const loadRoutes = () =>
+      import("./config/routes/index.js")
+        .then((mod) => {
+          if (!cancelled) {
+            setCrmRoutesElements(mod.crmRoutes(profile));
+          }
+        })
+        .catch((err) => {
+          console.error("Не удалось загрузить CRM-маршруты:", err);
+          if (!cancelled) {
+            setTimeout(() => {
+              if (!cancelled) loadRoutes();
+            }, 1500);
+          }
+        });
+
+    loadRoutes();
 
     return () => {
       cancelled = true;
