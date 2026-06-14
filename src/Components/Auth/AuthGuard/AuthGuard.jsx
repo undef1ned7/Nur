@@ -70,23 +70,22 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
         }
       } catch (err) {
         const isNetworkError =
-          !err.response &&
-          (err.code === "ERR_NETWORK" ||
-            err.code === "ECONNABORTED" ||
-            err.message === "Network Error" ||
+          !err?.response &&
+          (err?.code === "ERR_NETWORK" ||
+            err?.code === "ECONNABORTED" ||
+            err?.message === "Network Error" ||
             !navigator.onLine);
 
         if (isNetworkError) {
           console.warn("AuthGuard: нет сети, сессия сохранена");
-          return;
-        }
+        } else {
+          console.error("Ошибка проверки токена:", err);
+          clearTokens();
 
-        console.error("Ошибка проверки токена:", err);
-        clearTokens();
-
-        if (!isAllowedPathWithoutToken(currentPath)) {
-          window.location.href = DEFAULT_UNAUTHENTICATED_PATH;
-          return;
+          if (!isAllowedPathWithoutToken(currentPath)) {
+            window.location.href = DEFAULT_UNAUTHENTICATED_PATH;
+            return;
+          }
         }
       } finally {
         setIsCheckingToken(false);

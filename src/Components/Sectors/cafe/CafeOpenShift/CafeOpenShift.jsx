@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { ArrowLeft, Wallet } from "lucide-react";
 import {
@@ -32,7 +32,7 @@ const FISCAL_STEPS = [
 
 export default function CafeOpenShift({ onBack }) {
   const dispatch = useDispatch();
-  const { list: cashBoxes } = useCash();
+  const { list: cashBoxes, loading: cashBoxesLoading } = useCash();
   const { currentUser, userId } = useUser();
   const { settings: fiscalSettings, loading: fiscalLoading } = useFiscalSettings();
 
@@ -55,6 +55,10 @@ export default function CafeOpenShift({ onBack }) {
   };
 
   const fiscalEnabled = fiscalSettings?.enabled === true;
+
+  useEffect(() => {
+    dispatch(getCashBoxes());
+  }, [dispatch]);
 
   /** Шаги фискального открытия смены */
   const runFiscalOpenShift = async () => {
@@ -124,7 +128,14 @@ export default function CafeOpenShift({ onBack }) {
       return;
     }
 
-    if (!cashBoxes || cashBoxes.length === 0) {
+    let availableCashBoxes = cashBoxes;
+    try {
+      availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
+    } catch {
+      /* fallback на уже загруженный список */
+    }
+    const list = Array.isArray(availableCashBoxes) ? availableCashBoxes : [];
+    if (list.length === 0) {
       showAlert(
         "error",
         "Ошибка",
@@ -133,7 +144,7 @@ export default function CafeOpenShift({ onBack }) {
       return;
     }
 
-    const firstCashBox = cashBoxes[0];
+    const firstCashBox = list[0];
     const cashboxId = firstCashBox?.id;
     if (!cashboxId) {
       showAlert("error", "Ошибка", "Не удалось определить кассу");
@@ -270,7 +281,7 @@ export default function CafeOpenShift({ onBack }) {
           <button
             className="open-shift-page__submit-btn"
             onClick={handleOpenShift}
-            disabled={loading || !openingCash || fiscalLoading}
+            disabled={loading || cashBoxesLoading || !openingCash || fiscalLoading}
             type="button"
           >
             {loading
