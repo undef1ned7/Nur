@@ -12,6 +12,7 @@ function isCafeUrl(url = "") {
 export async function getOfflineFallback(config) {
   if (!config?.url) return null;
   if (!isCafeUrl(config.url)) return null;
+  if (config.url.includes("/fiscal/")) return null;
 
   const { categories, items, tables, open_orders, current_shift } =
     await getSnapshot();
@@ -49,7 +50,49 @@ export async function getOfflineFallback(config) {
     return { results: tables, count: tables.length };
   }
 
+  if (method === "get" && url.includes("/kitchen/tasks")) {
+    const { kitchen_tasks } = await getSnapshot();
+    let tasks = kitchen_tasks || [];
+
+    const params = config.params || {};
+
+    if (params.status) {
+      const statuses = String(params.status)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statuses.length) {
+        tasks = tasks.filter((t) => statuses.includes(String(t.status)));
+      }
+    }
+
+    if (params.search) {
+      const q = String(params.search).toLowerCase();
+      tasks = tasks.filter(
+        (t) =>
+          String(t.menu_item_title || "")
+            .toLowerCase()
+            .includes(q) ||
+          String(t.table_number || "").includes(q) ||
+          String(t.guest || "")
+            .toLowerCase()
+            .includes(q),
+      );
+    }
+
+    tasks = [...tasks].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at),
+    );
+
+    return { count: tasks.length, results: tasks };
+  }
+
   if (method === "get" && url.includes("/orders/")) {
+    const offlineIdMatch = url.match(/orders\/(offline-[^/?]+)/);
+    if (offlineIdMatch) {
+      const order = open_orders.find((o) => o.id === offlineIdMatch[1]);
+      return order || null;
+    }
     const orderIdMatch = url.match(/orders\/([0-9a-f-]{36})/i);
     if (orderIdMatch) {
       const order = open_orders.find((o) => o.id === orderIdMatch[1]);

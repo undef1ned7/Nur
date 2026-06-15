@@ -58,9 +58,15 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
         return;
       }
 
+      // Если нет сети — доверяем токену, не делаем API-запрос
+      if (!navigator.onLine) {
+        console.warn("AuthGuard: нет сети, токен принят без проверки");
+        setIsCheckingToken(false);
+        return;
+      }
+
       // Проверяем валидность токена через API
       try {
-        // const response = await api.get("/users/profile/");
         await getProfileFunc();
 
         // Если токен валиден и мы на публичной странице - редирект на /crm

@@ -1,5 +1,10 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api";
+import {
+  addToQueue,
+  updateKitchenTasksLocally,
+  getCurrentEmployeeInfo,
+} from "../../services/cafeOfflineService";
 
 // Моки данных для локального использования (KitchenTask формат)
 const MOCK_TASKS = [
@@ -218,8 +223,22 @@ export const claimKitchenTaskAsync = createAsyncThunk(
         return updatedTasks;
       }
 
-      // Реальный API вызов
-      const response = await api.post(`/cafe/kitchen/tasks/claim/`, { task_ids: tasks_ids });
+      const response = await api.post(`/cafe/kitchen/tasks/claim/`, {
+        task_ids: tasks_ids,
+      });
+
+      if (response?.offline) {
+        const cook = getCurrentEmployeeInfo();
+        await addToQueue("CLAIM_TASK", { task_ids: tasks_ids });
+        const updated = await updateKitchenTasksLocally(tasks_ids, {
+          status: "in_progress",
+          cook: cook.id,
+          cook_id: cook.id,
+          started_at: new Date().toISOString(),
+        });
+        return { claimed: updated };
+      }
+
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -278,8 +297,19 @@ export const readyKitchenTaskAsync = createAsyncThunk(
         return updatedTasks;
       }
 
-      // Реальный API вызов
-      const response = await api.post(`/cafe/kitchen/tasks/ready/`, { task_ids: tasks_ids });
+      const response = await api.post(`/cafe/kitchen/tasks/ready/`, {
+        task_ids: tasks_ids,
+      });
+
+      if (response?.offline) {
+        await addToQueue("READY_TASK", { task_ids: tasks_ids });
+        const updated = await updateKitchenTasksLocally(tasks_ids, {
+          status: "ready",
+          finished_at: new Date().toISOString(),
+        });
+        return updated;
+      }
+
       return response.data;
     } catch (error) {
       return rejectWithValue(
