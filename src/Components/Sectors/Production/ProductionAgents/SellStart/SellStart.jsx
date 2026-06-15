@@ -97,6 +97,12 @@ const getDiscountAmountByMode = ({ subtotal, value, mode }) => {
 
 const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
+/** ID строки корзины для PATCH/DELETE /main/pos/carts/{sale}/items/{id}/ */
+const getMarketCartLineId = (item) => {
+  const id = item?.id ?? item?.itemId;
+  return id != null && String(id).trim() ? id : null;
+};
+
 const paymentBanks = [
   { id: "mbank", name: "МБанк" },
   { id: "optima", name: "Оптима Банк" },
@@ -948,18 +954,15 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       );
     } else if (isMarketPosMode && selectedItem) {
       const saleId = getMarketSaleId();
-      if (!saleId) return;
+      const cartLineId = getMarketCartLineId(selectedItem);
+      if (!saleId || !cartLineId) return;
       dispatch(
         updateProductInCart({
           id: saleId,
-          productId: selectedItem.product ?? selectedItem.product_id ?? selectedItem.id,
+          productId: cartLineId,
           data: { discount_total: v },
         }),
-      ).then(() => {
-        marketMultiCart.refreshActiveSale().catch(() => {
-          dispatch(getSale({ id: saleId }));
-        });
-      });
+      );
     } else {
       dispatch(
         manualFillingInAgent({
@@ -1056,15 +1059,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         );
       }
     } else if (isMarketPosMode) {
-      const saleId = getMarketSaleId();
-      if (saleId) {
-        marketMultiCart.refreshActiveSale().catch((error) => {
-          console.error("Ошибка при обновлении корзины:", error);
-          dispatch(getSale({ id: saleId }));
-        });
-      } else {
-        dispatch(startSale());
-      }
+      // Корзина обновляется из ответа POST/PATCH в saleSlice — полный /start/ не нужен
+      return;
     } else {
       dispatch(startSaleInAgent());
     }
@@ -1165,7 +1161,6 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         ).unwrap();
         setCustomItem({ name: "", price: "", quantity: "1" });
         setShowCustomItemModal(false);
-        onRefresh();
         setAlert({
           open: true,
           type: "success",
@@ -1318,16 +1313,21 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
     } else if (isMarketPosMode) {
       const saleId = getMarketSaleId();
-      if (!saleId) return;
+      const cartLineId = getMarketCartLineId(item);
+      if (!saleId || !cartLineId) return;
+      const nextQty = (Number(item.quantity) || 0) + 1;
       try {
         await dispatch(
           updateManualFilling({
             id: saleId,
-            productId: item.product ?? item.product_id ?? item.id,
-            quantity: (Number(item.quantity) || 0) + 1,
+            productId: cartLineId,
+            quantity: nextQty,
           }),
         ).unwrap();
-        onRefresh();
+        setItemQuantities((prev) => ({
+          ...prev,
+          [item.id]: String(nextQty),
+        }));
       } catch (error) {
         const errorMessage = validateResErrors(
           error,
@@ -1394,7 +1394,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
     } else if (isMarketPosMode) {
       const saleId = getMarketSaleId();
-      if (!saleId) return;
+      const cartLineId = getMarketCartLineId(item);
+      if (!saleId || !cartLineId) return;
       const currentQty = Number(item.quantity) || 0;
       const next = Math.max(0, currentQty - 1);
       try {
@@ -1402,19 +1403,22 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           await dispatch(
             deleteProductInCart({
               id: saleId,
-              productId: item.product ?? item.product_id ?? item.id,
+              productId: cartLineId,
             }),
           ).unwrap();
         } else {
           await dispatch(
             updateManualFilling({
               id: saleId,
-              productId: item.product ?? item.product_id ?? item.id,
+              productId: cartLineId,
               quantity: next,
             }),
           ).unwrap();
+          setItemQuantities((prev) => ({
+            ...prev,
+            [item.id]: String(next),
+          }));
         }
-        onRefresh();
       } catch (error) {
         const errorMessage = validateResErrors(
           error,
@@ -1480,15 +1484,15 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
     } else if (isMarketPosMode) {
       const saleId = getMarketSaleId();
-      if (!saleId) return;
+      const cartLineId = getMarketCartLineId(item);
+      if (!saleId || !cartLineId) return;
       try {
         await dispatch(
           deleteProductInCart({
             id: saleId,
-            productId: item.product ?? item.product_id ?? item.id,
+            productId: cartLineId,
           }),
         ).unwrap();
-        onRefresh();
         if (selectedId === item.id) {
           setSelectedId(null);
         }
@@ -1581,7 +1585,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       }
     } else if (isMarketPosMode) {
       const saleId = getMarketSaleId();
-      if (!saleId) return;
+      const cartLineId = getMarketCartLineId(item);
+      if (!saleId || !cartLineId) return;
       const inputValue = itemQuantities[item.id] || "";
       let qtyNum;
       if (inputValue === "" || inputValue === "0") {
@@ -1601,11 +1606,10 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         await dispatch(
           updateManualFilling({
             id: saleId,
-            productId: item.product ?? item.product_id ?? item.id,
+            productId: cartLineId,
             quantity: qtyNum,
           }),
         ).unwrap();
-        onRefresh();
       } catch (error) {
         const errorMessage = validateResErrors(
           error,
@@ -1659,14 +1663,14 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
   const patchCartItemPrice = async (item, value) => {
     const saleId = getMarketSaleId();
-    if (!isMarketPosMode || !saleId) return;
-    const productId = item.product ?? item.product_id ?? item.id;
+    const cartLineId = getMarketCartLineId(item);
+    if (!isMarketPosMode || !saleId || !cartLineId) return;
     const num = Math.max(0, toNum(value));
     try {
       await dispatch(
         updateProductInCart({
           id: saleId,
-          productId,
+          productId: cartLineId,
           data: { unit_price: num.toFixed(2) },
         }),
       ).unwrap();
@@ -1674,7 +1678,6 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         ...prev,
         [item.id]: formatInputDecimal(num),
       }));
-      onRefresh();
     } catch (error) {
       const errorMessage = validateResErrors(
         error,
@@ -1695,8 +1698,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const patchCartItemDiscount = async (item, value, options = {}) => {
     const { mode = "amount", displayValue } = options;
     const saleId = getMarketSaleId();
-    if (!isMarketPosMode || !saleId) return;
-    const productId = item.product ?? item.product_id ?? item.id;
+    const cartLineId = getMarketCartLineId(item);
+    if (!isMarketPosMode || !saleId || !cartLineId) return;
     const lineTotal = previewCartMetrics.byId[item.id]?.lineTotal ??
       toNum(item.unit_price ?? item.price) * toNum(item.quantity);
     const discountAmount =
@@ -1707,7 +1710,7 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       await dispatch(
         updateProductInCart({
           id: saleId,
-          productId,
+          productId: cartLineId,
           data: { discount_total: discountAmount.toFixed(2) },
         }),
       ).unwrap();
@@ -1720,7 +1723,6 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
               ? formatInputDecimal(discountAmount)
               : "",
       }));
-      onRefresh();
     } catch (error) {
       const errorMessage = validateResErrors(
         error,
@@ -1973,14 +1975,31 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     });
   };
 
-  // Инициализация локальных значений количества для элементов таблицы
+  // Инициализация количества: только новые строки, без сброса при каждом ответе API
   useEffect(() => {
     const items = currentItems || [];
-    const quantities = {};
-    items.forEach((item) => {
-      quantities[item.id] = String(item.quantity ?? "");
+    setItemQuantities((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      const activeIds = new Set();
+
+      items.forEach((item) => {
+        activeIds.add(String(item.id));
+        if (next[item.id] === undefined) {
+          next[item.id] = String(item.quantity ?? "");
+          changed = true;
+        }
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!activeIds.has(String(key))) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
     });
-    setItemQuantities(quantities);
   }, [currentItems]);
 
   useEffect(() => {
@@ -2558,18 +2577,23 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       const productId = product.product ?? product.id;
       const existingItem = currentItems.find(
         (item) =>
-          String(item.product ?? item.product_id ?? item.id) ===
-          String(productId),
+          String(item.product ?? item.product_id) === String(productId),
       );
 
       if (existingItem) {
+        const cartLineId = getMarketCartLineId(existingItem);
+        const nextQty = (Number(existingItem.quantity) || 0) + 1;
         await dispatch(
           updateManualFilling({
             id: saleId,
-            productId,
-            quantity: (Number(existingItem.quantity) || 0) + 1,
+            productId: cartLineId,
+            quantity: nextQty,
           }),
         ).unwrap();
+        setItemQuantities((prev) => ({
+          ...prev,
+          [existingItem.id]: String(nextQty),
+        }));
       } else {
         await dispatch(
           manualFilling({
@@ -2579,7 +2603,6 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           }),
         ).unwrap();
       }
-      onRefresh();
       return;
     }
 

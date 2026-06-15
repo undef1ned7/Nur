@@ -4,23 +4,14 @@ import {
   buildPosStartPayload,
   getMainCartSaleId,
 } from "../../../tools/posSaleCarts";
+import {
+  normalizeDealCreateInput,
+  ruStatusToKind,
+  toDecimalString,
+} from "../../tools/clientDeals";
 import { handleThunkError } from "./utils/handleThunkError";
 
 // ===== Helpers для сделок =====
-const ruStatusToKind = (ru) => {
-  const s = String(ru).trim();
-  if (s === "Долги" || s === "Предоплата") return "debt";
-  return "sale";
-};
-
-const toDecimalString = (v) => {
-  const s = String(v ?? "")
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/,/g, ".");
-  const num = Number(s);
-  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
-};
 
 const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
 
@@ -514,7 +505,6 @@ export const createDeal = createAsyncThunk(
           ? Math.max(0, Math.round(debtDaysNum))
           : 0;
 
-        // 2) Если пришла предоплата (режим "Предоплата") — шлём prepayment
         if (
           prepayment !== undefined &&
           prepayment !== null &&
@@ -526,13 +516,16 @@ export const createDeal = createAsyncThunk(
           }
         }
 
-        // 3) Дата первого платежа (YYYY-MM-DD)
         if (first_due_date) {
           payload.first_due_date = first_due_date;
         }
 
-        // 4) Автоматическое планирование графика — всегда включено
         payload.auto_schedule = true;
+      } else if (kind === "prepayment") {
+        const prepaymentNum = Number(prepayment ?? amount);
+        payload.prepayment = toDecimalString(
+          Number.isFinite(prepaymentNum) ? prepaymentNum : 0,
+        );
       }
 
       const { data } = await api.post(

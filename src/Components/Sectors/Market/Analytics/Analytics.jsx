@@ -30,6 +30,7 @@ import { useSelector } from "react-redux";
 import api from "../../../../api/index";
 import { useUser } from "../../../../store/slices/userSlice";
 import { useCash } from "../../../../store/slices/cashSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import "./Analytics.scss";
 
 ChartJS.register(
@@ -62,9 +63,17 @@ const normalizeLowStockStatusType = (status) => {
 };
 
 const MARKET_ANALYTICS_TIMEOUT_MS = 160000;
+const START_HIDDEN_SALES_KPI_TITLES = new Set([
+  "Валовая прибыль",
+  "Маржа",
+]);
+const START_HIDDEN_PRODUCTS_KPI_TITLES = new Set([
+  "Товаров с низким остатком",
+]);
 
 const Analytics = () => {
   const { company, currentUser } = useUser();
+  const isStartTariff = isStartPlan(company?.subscription_plan?.name);
   const { list: cashBoxes } = useCash();
   const { list: branches } = useSelector(
     (state) => state.branches || { list: [] },
@@ -90,6 +99,27 @@ const Analytics = () => {
   useEffect(() => {
     if (activeTab !== "users") setExpandedUserPerformanceId(null);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!isStartTariff) return;
+    if (
+      activeTab === "suppliers" ||
+      activeTab === "users" ||
+      activeTab === "purchases"
+    ) {
+      setActiveTab("sales");
+    }
+  }, [activeTab, isStartTariff]);
+
+  useEffect(() => {
+    if (!isStartTariff) return;
+    if (
+      openProductTable === "topByRevenue" ||
+      openProductTable === "lowStockProducts"
+    ) {
+      setOpenProductTable("topByQuantity");
+    }
+  }, [isStartTariff, openProductTable]);
 
   // Фильтры для всех вкладок
   const [filters, setFilters] = useState({
@@ -394,9 +424,14 @@ const Analytics = () => {
 
   // Данные для вкладки "Продажи"
   const salesData = useMemo(() => {
+    const filterSalesKpis = (kpis) =>
+      isStartTariff
+        ? kpis.filter((kpi) => !START_HIDDEN_SALES_KPI_TITLES.has(kpi.title))
+        : kpis;
+
     if (!analyticsData || activeTab !== "sales") {
       return {
-        kpis: [
+        kpis: filterSalesKpis([
           {
             title: "Выручка",
             value: "0",
@@ -443,7 +478,7 @@ const Analytics = () => {
             icon: Users,
             color: "#f7d617",
           },
-        ],
+        ]),
         salesChart: {
           labels: [],
           data: [],
@@ -468,7 +503,7 @@ const Analytics = () => {
     };
 
     return {
-      kpis: [
+      kpis: filterSalesKpis([
         {
           title: "Выручка",
           value: formatNumber(cards.revenue || "0"),
@@ -519,7 +554,7 @@ const Analytics = () => {
           icon: Users,
           color: "#f7d617",
         },
-      ],
+      ]),
       salesChart: {
         labels:
           charts.sales_dynamics?.map((item) => formatDateForChart(item.date)) ||
@@ -552,7 +587,7 @@ const Analytics = () => {
           ) || [],
       },
     };
-  }, [analyticsData, activeTab]);
+  }, [analyticsData, activeTab, isStartTariff]);
 
   // Данные для вкладки "Склад"
   const warehouseData = useMemo(() => {
@@ -946,9 +981,16 @@ const Analytics = () => {
 
   // Данные для вкладки "Товары"
   const productsData = useMemo(() => {
+    const filterProductsKpis = (kpis) =>
+      isStartTariff
+        ? kpis.filter(
+            (kpi) => !START_HIDDEN_PRODUCTS_KPI_TITLES.has(kpi.title),
+          )
+        : kpis;
+
     if (!analyticsData || activeTab !== "products") {
       return {
-        kpis: [
+        kpis: filterProductsKpis([
           {
             title: "Общее кол-во товаров",
             value: "0",
@@ -984,7 +1026,7 @@ const Analytics = () => {
             color: "#f7d617",
             subtitle: "sales_lines_missing_product_count",
           },
-        ],
+        ]),
         topByRevenue: [],
         topByQuantity: [],
         categories: [],
@@ -997,7 +1039,7 @@ const Analytics = () => {
     const tables = analyticsData.tables || {};
 
     return {
-      kpis: [
+      kpis: filterProductsKpis([
         {
           title: "Общее кол-во товаров",
           value: formatNumber(cards.catalog_products_count || 0),
@@ -1033,7 +1075,7 @@ const Analytics = () => {
           color: "#f7d617",
           subtitle: "sales_lines_missing_product_count",
         },
-      ],
+      ]),
       topByRevenue: tables.top_by_revenue || [],
       topByQuantity: tables.top_by_quantity || [],
       categories: tables.categories || [],
@@ -1045,7 +1087,7 @@ const Analytics = () => {
           statusType: normalizeLowStockStatusType(item.status),
         })) || [],
     };
-  }, [analyticsData, activeTab]);
+  }, [analyticsData, activeTab, isStartTariff]);
 
   const suppliersData = useMemo(() => {
     if (!analyticsData || activeTab !== "suppliers") {
@@ -1679,14 +1721,16 @@ const Analytics = () => {
         >
           Склад
         </button>
-        <button
-          className={`analytics-page__tab ${
-            activeTab === "purchases" ? "analytics-page__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("purchases")}
-        >
-          Закупки
-        </button>
+        {!isStartTariff && (
+          <button
+            className={`analytics-page__tab ${
+              activeTab === "purchases" ? "analytics-page__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab("purchases")}
+          >
+            Закупки
+          </button>
+        )}
         <button
           className={`analytics-page__tab ${
             activeTab === "cashiers" ? "analytics-page__tab--active" : ""
@@ -1711,22 +1755,26 @@ const Analytics = () => {
         >
           Товары
         </button>
-        <button
-          className={`analytics-page__tab ${
-            activeTab === "suppliers" ? "analytics-page__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("suppliers")}
-        >
-          Поставщики
-        </button>
-        <button
-          className={`analytics-page__tab ${
-            activeTab === "users" ? "analytics-page__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("users")}
-        >
-          Сотрудники
-        </button>
+        {!isStartTariff && (
+          <>
+            <button
+              className={`analytics-page__tab ${
+                activeTab === "suppliers" ? "analytics-page__tab--active" : ""
+              }`}
+              onClick={() => setActiveTab("suppliers")}
+            >
+              Поставщики
+            </button>
+            <button
+              className={`analytics-page__tab ${
+                activeTab === "users" ? "analytics-page__tab--active" : ""
+              }`}
+              onClick={() => setActiveTab("users")}
+            >
+              Сотрудники
+            </button>
+          </>
+        )}
         <button
           className={`analytics-page__tab ${
             activeTab === "finance" ? "analytics-page__tab--active" : ""
@@ -2034,27 +2082,29 @@ const Analytics = () => {
             </div>
           </div>
 
-          <div className="analytics-page__table-card">
-            <h3 className="analytics-page__table-title">
-              Остатки товаров
-            </h3>
-            <table className="analytics-page__table">
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Остаток</th>
-                </tr>
-              </thead>
-              <tbody>
-                {warehouseData.lowStock.map((item, index) => (
-                  <tr key={index}>
-                    <td>{item.name}</td>
-                    <td>{formatAnalyticsQty(item.stock)}</td>
+          {!isStartTariff && (
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Остатки товаров
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Остаток</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {warehouseData.lowStock.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.name}</td>
+                      <td>{formatAnalyticsQty(item.stock)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -2443,45 +2493,46 @@ const Analytics = () => {
           </div>
 
           <div className="analytics-page__grid">
-            {renderProductsAccordion(
-              "topByRevenue",
-              "Топ по выручке",
-              <table className="analytics-page__table">
-                <thead>
-                  <tr>
-                    <th>Товар</th>
-                    <th>Категория</th>
-                    <th>Бренд</th>
-                    <th>Продано</th>
-                    <th>Выручка</th>
-                    <th>Транзакций</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productsData.topByRevenue.length > 0 ? (
-                    productsData.topByRevenue.map((row) => (
-                      <tr key={row.product_id}>
-                        <td>{row.name}</td>
-                        <td>{row.category}</td>
-                        <td>{row.brand}</td>
-                        <td>{row.qty_sold}</td>
-                        <td>{formatCurrency(row.revenue, 0)}</td>
-                        <td>{row.transactions}</td>
-                      </tr>
-                    ))
-                  ) : (
+            {!isStartTariff &&
+              renderProductsAccordion(
+                "topByRevenue",
+                "Топ по выручке",
+                <table className="analytics-page__table">
+                  <thead>
                     <tr>
-                      <td
-                        colSpan={6}
-                        style={{ textAlign: "center", color: "#6b7280" }}
-                      >
-                        Нет данных
-                      </td>
+                      <th>Товар</th>
+                      <th>Категория</th>
+                      <th>Бренд</th>
+                      <th>Продано</th>
+                      <th>Выручка</th>
+                      <th>Транзакций</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>,
-            )}
+                  </thead>
+                  <tbody>
+                    {productsData.topByRevenue.length > 0 ? (
+                      productsData.topByRevenue.map((row) => (
+                        <tr key={row.product_id}>
+                          <td>{row.name}</td>
+                          <td>{row.category}</td>
+                          <td>{row.brand}</td>
+                          <td>{row.qty_sold}</td>
+                          <td>{formatCurrency(row.revenue, 0)}</td>
+                          <td>{row.transactions}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          style={{ textAlign: "center", color: "#6b7280" }}
+                        >
+                          Нет данных
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>,
+              )}
 
             {renderProductsAccordion(
               "topByQuantity",
@@ -2590,51 +2641,52 @@ const Analytics = () => {
             )}
           </div>
 
-          {renderProductsAccordion(
-            "lowStockProducts",
-            "Товары с низким остатком",
-            <table className="analytics-page__table">
-              <thead>
-                <tr>
-                  <th>Код</th>
-                  <th>Товар</th>
-                  <th>Количество</th>
-                  <th>Цена</th>
-                  <th>Закупочная</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productsData.lowStockProducts.length > 0 ? (
-                  productsData.lowStockProducts.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.code}</td>
-                      <td>{row.name}</td>
-                      <td>{row.quantity}</td>
-                      <td>{formatCurrency(row.price, 0)}</td>
-                      <td>{formatCurrency(row.purchase_price, 0)}</td>
-                      <td>
-                        <span
-                          className={`analytics-page__status analytics-page__status--${row.statusType}`}
-                        >
-                          {row.status}
-                        </span>
+          {!isStartTariff &&
+            renderProductsAccordion(
+              "lowStockProducts",
+              "Товары с низким остатком",
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Код</th>
+                    <th>Товар</th>
+                    <th>Количество</th>
+                    <th>Цена</th>
+                    <th>Закупочная</th>
+                    <th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsData.lowStockProducts.length > 0 ? (
+                    productsData.lowStockProducts.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.code}</td>
+                        <td>{row.name}</td>
+                        <td>{row.quantity}</td>
+                        <td>{formatCurrency(row.price, 0)}</td>
+                        <td>{formatCurrency(row.purchase_price, 0)}</td>
+                        <td>
+                          <span
+                            className={`analytics-page__status analytics-page__status--${row.statusType}`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      style={{ textAlign: "center", color: "#6b7280" }}
-                    >
-                      Нет данных
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>,
-          )}
+                  )}
+                </tbody>
+              </table>,
+            )}
         </div>
       )}
 

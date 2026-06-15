@@ -2534,12 +2534,20 @@
   }
 }
 
-.sellReturn__modal {
-  width: min(1120px, calc(100vw - 48px)) !important;
-  max-width: 1120px !important;
+/* Refund modal rendered via Portal (outside .sell tree) */
+.common-modal-overlay:has(.sellReturnModal) {
+  z-index: 10050;
+}
+
+.sellReturnModal {
+  width: min(1120px, calc(100vw - 48px));
+  max-width: 1120px;
   max-height: min(88vh, 980px);
-  padding: 24px !important;
-  border-radius: 18px !important;
+  border-radius: 18px;
+}
+
+.sellReturnModal__content {
+  padding: 20px 24px 24px;
 }
 
 .sellReturn {
@@ -2775,12 +2783,15 @@
 }
 
 @media (max-width: 768px) {
-  .sellReturn__modal {
-    width: calc(100vw - 20px) !important;
-    max-width: none !important;
+  .sellReturnModal {
+    width: calc(100vw - 20px);
+    max-width: none;
     max-height: calc(100vh - 20px);
-    padding: 16px !important;
-    border-radius: 16px !important;
+    border-radius: 16px;
+  }
+
+  .sellReturnModal__content {
+    padding: 16px;
   }
 
   .sellReturn__lead {
@@ -2832,12 +2843,20 @@
 }
 
 @media (max-width: 480px) {
-  .sellReturn__modal {
-    width: 100vw !important;
+  .common-modal-overlay:has(.sellReturnModal) {
+    padding: 0;
+  }
+
+  .sellReturnModal {
+    width: 100vw;
+    max-width: none;
     max-height: 100vh;
     min-height: 100vh;
-    padding: 14px !important;
-    border-radius: 0 !important;
+    border-radius: 0;
+  }
+
+  .sellReturnModal__content {
+    padding: 14px;
   }
 
   .sellReturn {

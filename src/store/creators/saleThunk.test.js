@@ -75,7 +75,7 @@ describe("saleThunk", () => {
   });
 
   describe("createDeal", () => {
-    it("builds debt deal payload with prepayment and schedule", async () => {
+    it("builds prepayment deal payload", async () => {
       api.post.mockResolvedValue({ data: { id: 99 } });
 
       const store = createTestStore();
@@ -85,20 +85,45 @@ describe("saleThunk", () => {
           title: "  Сделка  ",
           statusRu: "Предоплата",
           amount: "1 000,50",
-          debtDays: 30,
           prepayment: "200",
-          first_due_date: "2026-07-01",
         }),
       );
 
       expect(api.post).toHaveBeenCalledWith("/main/clients/5/deals/", {
         title: "Сделка",
-        kind: "debt",
+        kind: "prepayment",
         amount: "1000.50",
         note: "",
         client: 5,
-        debt_days: 30,
         prepayment: "200.00",
+      });
+      expect(result.type).toBe("deals/create/fulfilled");
+    });
+
+    it("builds debt deal payload with schedule", async () => {
+      api.post.mockResolvedValue({ data: { id: 100 } });
+
+      const store = createTestStore();
+      const result = await store.dispatch(
+        createDeal({
+          clientId: 5,
+          title: "Долг",
+          statusRu: "Долг",
+          amount: "30",
+          debtDays: 30,
+          prepayment: "0",
+          first_due_date: "2026-07-01",
+        }),
+      );
+
+      expect(api.post).toHaveBeenCalledWith("/main/clients/5/deals/", {
+        title: "Долг",
+        kind: "debt",
+        amount: "30.00",
+        note: "",
+        client: 5,
+        debt_days: 30,
+        prepayment: "0.00",
         first_due_date: "2026-07-01",
         auto_schedule: true,
       });

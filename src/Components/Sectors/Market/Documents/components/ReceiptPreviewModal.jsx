@@ -357,37 +357,37 @@ const ReceiptPreviewModal = ({
               )}
             </div>
 
-            {/* Позиции — таблица как на чеке маркета */}
+            {/* Позиции — как на чеке маркета */}
             <div className="receipt-preview-modal__items">
               {items.length > 0 ? (
-                <div className="receipt-preview-modal__items-table">
-                  <div className="receipt-preview-modal__items-table-head">
-                    <span>№</span>
-                    <span>Цена</span>
-                    <span>Кол-о</span>
-                    <span>Скидка</span>
-                    <span>Итого</span>
+                <>
+                  <div className="receipt-preview-modal__item-row receipt-preview-modal__item-row--head">
+                    <span className="receipt-preview-modal__item-price">
+                      Цена x Кол-о - Скидка
+                    </span>
+                    <span className="receipt-preview-modal__item-total">Итого</span>
                   </div>
                   {items.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="receipt-preview-modal__items-table-item"
-                    >
-                      <div className="receipt-preview-modal__item-name">
-                        {item.name}
-                      </div>
-                      <div className="receipt-preview-modal__items-table-row">
-                        <span>{index + 1}</span>
-                        <span>{formatMoney(item.price)}</span>
-                        <span>{item.qty}</span>
-                        <span>
-                          {formatLineDiscountDisplay(item.lineDiscount)}
-                        </span>
-                        <span>{formatMoney(item.total)}</span>
-                      </div>
+                  <div
+                    key={item.id || index}
+                    className="receipt-preview-modal__items-table-item"
+                  >
+                    <div className="receipt-preview-modal__item-name">
+                      {index + 1}) {item.name}
                     </div>
-                  ))}
-                </div>
+                    <div className="receipt-preview-modal__item-row">
+                      <span className="receipt-preview-modal__item-price">
+                        {formatMoney(item.price)} x {item.qty}
+                        {item.lineDiscount > 0 &&
+                          ` - ${formatLineDiscountDisplay(item.lineDiscount)}`}
+                      </span>
+                      <span className="receipt-preview-modal__item-total">
+                        {formatMoney(item.total)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                </>
               ) : (
                 <div className="receipt-preview-modal__item">
                   <div className="receipt-preview-modal__item-name">

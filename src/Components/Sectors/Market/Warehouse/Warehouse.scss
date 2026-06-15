@@ -1358,6 +1358,145 @@
 }
 
 /* ============================================
+   PURCHASE BATCH HISTORY
+   ============================================ */
+.purchase-batch-history {
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  &__hint {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  &__footnote {
+    margin: 12px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  &__summary {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  &__error {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 14px;
+  }
+
+  &__table-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+
+    thead {
+      background: #f9fafb;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: #fcfcfd;
+    }
+  }
+
+  &__empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px 16px !important;
+  }
+
+  &__receipt-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: #1d4ed8;
+    }
+  }
+
+  &__all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: var(--primary);
+    }
+  }
+}
+
+.purchase-batch-history-modal.common-modal-dialog {
+  width: min(960px, 100%);
+}
+
+.product-detail__price-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ============================================
    MOVEMENT HISTORY
    ============================================ */
 .movement-history {

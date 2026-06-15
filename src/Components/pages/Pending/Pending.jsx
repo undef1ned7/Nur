@@ -123,7 +123,7 @@ const Pending = () => {
     }
 
     if (item.source_business_operation_id === "Оплата долга") {
-      dispatch(onPayDebtDeal(item?.source_cashbox_flow_id));
+      dispatch(onPayDebtDeal({ id: item?.source_cashbox_flow_id }));
     }
 
     if (item.source_business_operation_id === "Сырье") {

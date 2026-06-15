@@ -1,5 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api/";
+import { normalizeDealCreateInput } from "../../tools/clientDeals";
 export const fetchClientsAsync = createAsyncThunk(
   "client/fetchAll",
   async (clientParams, { rejectWithValue }) => {
@@ -69,9 +70,10 @@ export const createDeals = createAsyncThunk(
   "client/createDeals",
   async ({ clientId, ...data }, { rejectWithValue }) => {
     try {
+      const payload = normalizeDealCreateInput({ clientId, ...data });
       const { data: response } = await api.post(
         `/main/clients/${clientId}/deals/`,
-        data
+        payload,
       );
       return response;
     } catch (err) {
@@ -205,9 +207,14 @@ export const cancellationOfPayment = createAsyncThunk(
 
 export const deleteDebt = createAsyncThunk(
   "client/deleteDebt",
-  async (id, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const { data: response } = await api.delete(`/main/clientdeals/${id}/`);
+      const id = typeof arg === "object" ? arg.id : arg;
+      const clientId = typeof arg === "object" ? arg.clientId : null;
+      const url = clientId
+        ? `/main/clients/${clientId}/deals/${id}/`
+        : `/main/clientdeals/${id}/`;
+      const { data: response } = await api.delete(url);
       return response;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

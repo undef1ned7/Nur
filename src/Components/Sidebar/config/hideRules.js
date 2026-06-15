@@ -15,6 +15,8 @@ export const HIDE_RULES = [
       labels: [
         "Обзор",
         "Закупки",
+        "Поставщики",
+        "Сотрудники",
         "Бронирование",
         "Клиенты",
         "Отделы",
@@ -196,6 +198,20 @@ export const HIDE_RULES = [
         "/crm/raspisanie",
         "/crm/analytics",
       ],
+    },
+  },
+  {
+    when: { tariff: "Старт", sector: "Магазин" },
+    hide: {
+      labels: ["Сотрудники", "Поставщики", "Закупки"],
+      toIncludes: ["/crm/employ", "/crm/market/suppliers", "/crm/market/procurement"],
+    },
+  },
+  {
+    when: { tariff: "Старт", sector: "Цветочный магазин" },
+    hide: {
+      labels: ["Сотрудники", "Поставщики", "Закупки"],
+      toIncludes: ["/crm/employ", "/crm/market/suppliers", "/crm/market/procurement"],
     },
   },
   {

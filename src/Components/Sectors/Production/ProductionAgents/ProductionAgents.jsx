@@ -46,6 +46,7 @@ import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { resolveDebtFromDeals } from "../../../../tools/clientDeals";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
   getAgentSalesList,
@@ -1764,19 +1765,6 @@ const ProductionAgents = () => {
     });
     return Array.from(unique.values());
   }, [agents, profile?.role]);
-
-  const resolveDebtFromDeals = (deals) => {
-    const list = Array.isArray(deals) ? deals : [];
-    return list.reduce((sum, deal) => {
-      const kind = String(deal?.kind || "").toLowerCase();
-      if (kind !== "debt") return sum;
-      const remaining = Number(deal?.remaining_debt);
-      if (Number.isFinite(remaining)) return sum + Math.max(remaining, 0);
-      const amount = Number(deal?.amount || 0);
-      const prepayment = Number(deal?.prepayment || 0);
-      return sum + Math.max(amount - prepayment, 0);
-    }, 0);
-  };
 
   const openAgentClientsControl = useCallback(async (agent) => {
     if (!agent?.id) return;

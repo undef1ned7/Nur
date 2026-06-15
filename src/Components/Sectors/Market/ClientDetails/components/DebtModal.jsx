@@ -6,12 +6,21 @@ import {
   toYYYYMMDD,
   formatDateDDMMYYYY,
   toNumber,
+  toDecimalString,
+  getInstallmentRemaining,
+  getInstallmentStatus,
+  dealHasPayments,
 } from "../clientDetails.helpers";
 import { useClient } from "../../../../../store/slices/ClientSlice";
 import { addCashFlows, getCashBoxes, useCash } from "../../../../../store/slices/cashSlice";
-import { deleteDebt, getClientDealDetail, payDebtDeal, updateDealDetail } from "../../../../../store/creators/clientCreators";
+import {
+  deleteDebt,
+  getClientDealDetail,
+  payDebtDeal,
+  refundDeal,
+  updateDealDetail,
+} from "../../../../../store/creators/clientCreators";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
-import api from "../../../../../api";
 
 const DebtModal = ({ id, onClose, onChanged, clientType }) => {
   const dispatch = useDispatch();
@@ -23,8 +32,10 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
 
   const [state, setState] = useState({
     amount: "",
-    debt_months: "",
+    debt_days: "",
     first_due_date: "",
+    title: "",
+    note: "",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [cashData, setCashData] = useState(() => ({
@@ -74,16 +85,24 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
     if (dealDetail) {
       setState({
         amount: dealDetail.amount != null ? String(dealDetail.amount) : "",
-        debt_months:
-          dealDetail.debt_months != null ? String(dealDetail.debt_months) : "",
+        debt_days:
+          dealDetail.debt_days != null
+            ? String(dealDetail.debt_days)
+            : dealDetail.debt_months != null
+              ? String(Number(dealDetail.debt_months) * 30)
+              : "",
         first_due_date: dealDetail.first_due_date
           ? toYYYYMMDD(dealDetail.first_due_date)
           : "",
+        title: dealDetail.title || "",
+        note: dealDetail.note || "",
       });
       setInstallmentEdits({});
       setPaymentAmounts({});
     }
   }, [dealDetail]);
+
+  const hasPayments = useMemo(() => dealHasPayments(dealDetail), [dealDetail]);
 
   const installments = useMemo(
     () =>
@@ -106,15 +125,15 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
   }, [dealDetail]);
 
   const amountNum = toNumber(isEditing ? state.amount : dealDetail?.amount);
-  const monthsNum = toNumber(
-    isEditing ? state.debt_months : dealDetail?.debt_months
+  const debtDaysNum = toNumber(
+    isEditing ? state.debt_days : dealDetail?.debt_days,
   );
 
-  const monthly = isEditing
-    ? Number.isFinite(amountNum) && Number.isFinite(monthsNum) && monthsNum > 0
-      ? (amountNum / monthsNum).toFixed(2)
+  const dailyPayment = isEditing
+    ? Number.isFinite(amountNum) && Number.isFinite(debtDaysNum) && debtDaysNum > 0
+      ? (amountNum / debtDaysNum).toFixed(2)
       : "—"
-    : dealDetail?.monthly_payment ?? "—";
+    : dealDetail?.daily_payment ?? dealDetail?.monthly_payment ?? "—";
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -123,98 +142,120 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
 
   const onSubmit = async () => {
     try {
-        const amount = Number(state.amount);
-        const months = Number(state.debt_months);
+      const payload = hasPayments
+        ? {
+            title: String(state.title || "").trim(),
+            note: String(state.note || "").trim(),
+          }
+        : {
+            title: String(state.title || dealDetail?.title || "").trim(),
+            note: String(state.note || "").trim(),
+            amount: Number(state.amount) || 0,
+            debt_days: Number(state.debt_days) || 0,
+            ...(state.first_due_date
+              ? { first_due_date: toYYYYMMDD(state.first_due_date) }
+              : {}),
+          };
 
-        let installmentsPayload = null;
-        if (Array.isArray(installments) && installments.length) {
-        installmentsPayload = installments.map((p) => {
-            const edit = installmentEdits[p.number] || {};
-
-            const rawAmount =
+      if (!hasPayments && Array.isArray(installments) && installments.length) {
+        const installmentsPayload = installments.map((p) => {
+          const edit = installmentEdits[p.number] || {};
+          const rawAmount =
             edit.amount !== undefined && edit.amount !== null
-                ? edit.amount
-                : p.amount;
-
-            const rawDate =
+              ? edit.amount
+              : p.amount;
+          const rawDate =
             edit.due_date !== undefined && edit.due_date !== null
-                ? edit.due_date
-                : p.due_date;
-
-            const parsedAmount = Number(
-            String(rawAmount).toString().replace(",", ".")
-            );
-
-            return {
+              ? edit.due_date
+              : p.due_date;
+          const parsedAmount = Number(
+            String(rawAmount).toString().replace(",", "."),
+          );
+          return {
             number: p.number,
             amount: Number.isFinite(parsedAmount)
-                ? parsedAmount.toFixed(2)
-                : Number(p.amount || 0).toFixed(2),
+              ? parsedAmount.toFixed(2)
+              : Number(p.amount || 0).toFixed(2),
             due_date: toYYYYMMDD(rawDate),
-            };
+          };
         });
-        }
-
-        const payload = {
-        amount: Number.isFinite(amount) ? amount : 0,
-        debt_months: Number.isFinite(months) ? months : 0,
-        ...(state.first_due_date
-            ? { first_due_date: toYYYYMMDD(state.first_due_date) }
-            : {}),
-        };
-
-        if (installmentsPayload && installmentsPayload.length) {
-        payload.auto_schedule = true;       
+        payload.auto_schedule = true;
         payload.installments = installmentsPayload;
-        }
+      }
 
-        await dispatch(
+      await dispatch(
         updateDealDetail({
-            id,
-            data: payload,
-            clientId,
-        })
-        ).unwrap();
+          id,
+          data: payload,
+          clientId,
+        }),
+      ).unwrap();
 
-        onChanged?.();
-        dispatch(getClientDealDetail({ clientId, dealId: id }));
-
-        setIsEditing(false);
-        setInstallmentEdits({});
+      onChanged?.();
+      dispatch(getClientDealDetail({ clientId, dealId: id }));
+      setIsEditing(false);
+      setInstallmentEdits({});
     } catch (e) {
-        console.error(e);
-        setAlert({
+      console.error(e);
+      setAlert({
         open: true,
         type: "error",
         message: "Не удалось сохранить изменения",
-        });
+      });
     }
-    };
+  };
 
 
 
   const onPayDeal = async (data) => {
     try {
-      // Проверяем, не оплачен ли уже взнос
       if (data.installment_id) {
         const installment = installments.find((i) => i.id === data.installment_id);
         if (installment && installment.paid_on) {
-          return; // Взнос уже полностью оплачен
+          return;
         }
       }
 
-      // Добавляем idempotency_key если его нет
       if (!data.idempotency_key) {
         data.idempotency_key = crypto.randomUUID();
       }
 
-      await dispatch(
-        payDebtDeal({ id, clientId, data })
-      ).unwrap();
+      await dispatch(payDebtDeal({ id, clientId, data })).unwrap();
       onChanged?.();
       dispatch(getClientDealDetail({ clientId, dealId: id }));
     } catch (e) {
       console.error(e);
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Не удалось провести оплату",
+      });
+    }
+  };
+
+  const onRefundDeal = async (installment, refundAmount) => {
+    try {
+      const paid = Number(installment?.paid_amount || 0);
+      if (paid <= 0) return;
+
+      const data = {
+        idempotency_key: crypto.randomUUID(),
+        installment_id: installment.id,
+      };
+      if (refundAmount != null && refundAmount !== "") {
+        data.amount = toDecimalString(refundAmount);
+      }
+
+      await dispatch(refundDeal({ id, clientId, data })).unwrap();
+      onChanged?.();
+      dispatch(getClientDealDetail({ clientId, dealId: id }));
+    } catch (e) {
+      console.error(e);
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Не удалось оформить возврат",
+      });
     }
   };
 
@@ -224,7 +265,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
       message: "Удалить сделку?",
       onConfirm: async () => {
         try {
-          await dispatch(deleteDebt(debtId)).unwrap();
+          await dispatch(deleteDebt({ id: debtId, clientId })).unwrap();
           onClose();
           onChanged?.();
           setConfirmDialog({ open: false, message: "", onConfirm: null });
@@ -284,7 +325,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
               >
                 Размер долга
               </label>
-              {isEditing ? (
+              {isEditing && !hasPayments ? (
                 <input
                   id="debt-modal-amount"
                   type="number"
@@ -306,25 +347,25 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
             <div className="debt-modal__info-item">
               <label
                 className="debt-modal__info-label"
-                htmlFor="debt-modal-debt_months"
+                htmlFor="debt-modal-debt_days"
               >
-                Срок продления (мес.)
+                Срок долга (дней)
               </label>
-              {isEditing ? (
+              {isEditing && !hasPayments ? (
                 <input
-                  id="debt-modal-debt_months"
+                  id="debt-modal-debt_days"
                   type="number"
                   inputMode="numeric"
                   className="debt-modal__input debt__input"
                   step="1"
                   min="1"
-                  name="debt_months"
-                  value={state.debt_months}
+                  name="debt_days"
+                  value={state.debt_days}
                   onChange={onChange}
                 />
               ) : (
                 <div className="debt-modal__info-value">
-                  {dealDetail?.debt_months ?? "—"}
+                  {dealDetail?.debt_days ?? dealDetail?.debt_months ?? "—"}
                 </div>
               )}
             </div>
@@ -336,7 +377,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
               >
                 Дата первого платежа
               </label>
-              {isEditing ? (
+              {isEditing && !hasPayments ? (
                 <input
                   id="debt-modal-first_due_date"
                   type="date"
@@ -364,8 +405,8 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
             )}
 
             <div className="debt-modal__info-item">
-              <div className="debt-modal__info-label">Ежемесячный платёж</div>
-              <div className="debt-modal__info-value">{monthly}</div>
+              <div className="debt-modal__info-label">Ежедневный платёж</div>
+              <div className="debt-modal__info-value">{dailyPayment}</div>
             </div>
 
             <div className="debt-modal__info-item">
@@ -398,6 +439,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                         <th style={{ textAlign: "left" }}>Срок оплаты</th>
                         <th style={{ textAlign: "right" }}>Сумма</th>
                         <th style={{ textAlign: "right" }}>Остаток</th>
+                        <th style={{ textAlign: "left" }}>Статус</th>
                         <th style={{ textAlign: "right" }}>Оплачен</th>
                         <th style={{ textAlign: "right" }}>Сумма оплаты</th>
                         <th></th>
@@ -405,7 +447,9 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                     </thead>
                     <tbody>
                     {installments.map((p) => {
-                        const paid = Boolean(p.paid_on);
+                        const instStatus = getInstallmentStatus(p);
+                        const isFullyPaid = instStatus.key === "paid";
+                        const remaining = getInstallmentRemaining(p);
                         const edit = installmentEdits[p.number] || {};
 
                         const amountInputValue =
@@ -422,17 +466,19 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                         <tr
                             key={p.number}
                             className={
-                              paid
+                              isFullyPaid
                                 ? "debt-modal__schedule-row--paid schedule__row--paid"
-                                : undefined
+                                : instStatus.key === "overdue"
+                                  ? "debt-modal__schedule-row--overdue"
+                                  : undefined
                             }
-                            aria-checked={paid}
+                            aria-checked={isFullyPaid}
                         >
                             <td style={{ textAlign: "left" }}>{p.number}</td>
 
                             {/* Срок оплаты (редактируемый) */}
                             <td style={{ textAlign: "left" }}>
-                            {isEditing ? (
+                            {isEditing && !hasPayments ? (
                                 <input
                                 type="date"
                                 className="debt-modal__input debt__input"
@@ -455,7 +501,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
 
                             {/* Сумма (редактируемая) */}
                             <td style={{ textAlign: "right" }}>
-                            {isEditing ? (
+                            {isEditing && !hasPayments ? (
                                 <input
                                 type="number"
                                 step="0.01"
@@ -482,13 +528,21 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                             {p.balance_after}
                             </td>
 
+                            <td style={{ textAlign: "left" }}>
+                              <span
+                                className={`debt-modal__inst-status debt-modal__inst-status--${instStatus.key}`}
+                              >
+                                {instStatus.label}
+                              </span>
+                            </td>
+
                             <td style={{ textAlign: "right" }}>
                             {p.paid_on ? formatDateDDMMYYYY(p.paid_on) : "—"}
                             </td>
 
                             {/* Сумма оплаты (фактический платеж сейчас) */}
                             <td style={{ textAlign: "right" }}>
-                            {paid ? (
+                            {isFullyPaid ? (
                                 <span title="Платёж уже проведён">—</span>
                             ) : (
                                 <>
@@ -509,11 +563,8 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                     }));
                                     }}
                                     placeholder={
-                                    p.paid_amount
-                                        ? `${(
-                                            Number(p.amount) -
-                                            Number(p.paid_amount || 0)
-                                        ).toFixed(2)} (остаток)`
+                                    remaining > 0
+                                        ? `${remaining.toFixed(2)} (остаток)`
                                         : `${p.amount} (полная сумма)`
                                     }
                                     style={{
@@ -541,11 +592,11 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                             )}
                             </td>
                             <td style={{ textAlign: "right" }}>
-                            {paid ? (
+                            {isFullyPaid ? (
                                 <span title="Платёж уже проведён">
                                 Оплачено ✓
                                 </span>
-                            ) : (
+                            ) : remaining > 0 ? (
                                 <button
                                 className="debt-modal__pay-btn schedule__pay-btn"
                                 onClick={() => {
@@ -559,9 +610,9 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                     const alreadyPaid = Number(
                                     p.paid_amount || 0
                                     );
-                                    const remaining = fullAmount - alreadyPaid;
+                                    const remainingAmount = getInstallmentRemaining(p);
 
-                                    if (remaining <= 0) {
+                                    if (remainingAmount <= 0) {
                                     setAlert({
                                         open: true,
                                         type: "error",
@@ -586,11 +637,11 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                         });
                                         return;
                                     }
-                                    if (userEnteredAmount > remaining) {
+                                    if (userEnteredAmount > remainingAmount) {
                                         setAlert({
                                         open: true,
                                         type: "error",
-                                        message: `Сумма оплаты не может превышать остаток (${remaining.toFixed(
+                                        message: `Сумма оплаты не может превышать остаток (${remainingAmount.toFixed(
                                             2
                                         )} сом)`,
                                         });
@@ -598,9 +649,9 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                     }
                                     paymentAmount = userEnteredAmount;
                                     shouldSendAmount =
-                                        paymentAmount < remaining;
+                                        paymentAmount < remainingAmount;
                                     } else {
-                                    paymentAmount = remaining;
+                                    paymentAmount = remainingAmount;
                                     shouldSendAmount = false;
                                     }
 
@@ -649,7 +700,28 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                 >
                                 Оплатить
                                 </button>
-                            )}
+                            ) : Number(p.paid_amount || 0) > 0 ? (
+                                <button
+                                  type="button"
+                                  className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
+                                  onClick={() => {
+                                    setConfirmDialog({
+                                      open: true,
+                                      message: `Вернуть оплату по взносу №${p.number}?`,
+                                      onConfirm: () => {
+                                        onRefundDeal(p);
+                                        setConfirmDialog({
+                                          open: false,
+                                          message: "",
+                                          onConfirm: null,
+                                        });
+                                      },
+                                    });
+                                  }}
+                                >
+                                  Возврат
+                                </button>
+                            ) : null}
                             </td>
                         </tr>
                         );
@@ -721,13 +793,17 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                       dealDetail?.amount != null
                         ? String(dealDetail.amount)
                         : "",
-                    debt_months:
-                      dealDetail?.debt_months != null
-                        ? String(dealDetail.debt_months)
-                        : "",
+                    debt_days:
+                      dealDetail?.debt_days != null
+                        ? String(dealDetail.debt_days)
+                        : dealDetail?.debt_months != null
+                          ? String(Number(dealDetail.debt_months) * 30)
+                          : "",
                     first_due_date: dealDetail?.first_due_date
                       ? toYYYYMMDD(dealDetail.first_due_date)
                       : "",
+                    title: dealDetail?.title || "",
+                    note: dealDetail?.note || "",
                   });
                   setInstallmentEdits({});
                   setIsEditing(false);

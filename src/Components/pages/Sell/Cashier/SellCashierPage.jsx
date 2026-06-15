@@ -43,7 +43,12 @@ import ReceiptsModal from "./components/ReceiptsModal";
 import PaymentPage from "./PaymentPage";
 import { Button } from "@mui/material";
 import { useUser } from "@/store/slices/userSlice";
-import { openShiftAsync } from "@/store/creators/shiftThunk";
+import {
+  fetchOwnOpenShift,
+  findOwnOpenShiftInList,
+  isOwnOpenShift,
+  resolveCashierId,
+} from "../../../../../tools/cashierOpenShift";
 
 const SellCashierPage = () => {
   const navigate = useNavigate();
@@ -58,6 +63,10 @@ const SellCashierPage = () => {
   const { list: clients } = useClient();
   const { list: cashBoxes } = useCash();
   const { currentUser, userId } = useUser();
+  const cashierId = useMemo(
+    () => resolveCashierId({ currentUser, userId }),
+    [currentUser, userId],
+  );
 
   const { start: currentSale, loading: saleLoading } = useSale();
   const { shifts } = useShifts();
@@ -109,57 +118,34 @@ const SellCashierPage = () => {
     return String(num).replace(/\.?0+$/, "");
   };
 
-  // Функция для поиска открытой смены на всех страницах
   const findOpenShift = useCallback(async () => {
     try {
-      // Пробуем загрузить с фильтром по статусу (если API поддерживает)
-      const firstCashBox = cashBoxes[0];
-      if (!firstCashBox) return;
-      const cashboxId = firstCashBox?.id;
-      const cashierId = currentUser?.id || userId;
-      console.log("asdasdasdasdasd2222");
-
-      try {
-        const response = await api.get("/construction/shifts/", {
-          params: { status: "open" },
-        });
-        const findedShift = response.data?.results?.find(
-          (el) => el.status === "open" && cashierId === el.cashier,
-        );
-        if (findedShift) {
-          setOpenShiftState(findedShift);
-          return;
-        }
-        const data = await dispatch(
-          openShiftAsync({
-            cashbox: cashboxId,
-            cashier: cashierId,
-            opening_cash: 0,
-          }),
-        ).unwrap();
-        console.log("OPEEND SHIDT", data);
-
-        setOpenShiftState(null);
-        return null;
-      } catch (e) {
-        // Если фильтр не поддерживается, продолжаем поиск по страницам
-        console.log("Filter by status not supported, searching all pages");
+      const ownShift = await fetchOwnOpenShift(api, cashierId);
+      if (ownShift) {
+        setOpenShiftState(ownShift);
+        return ownShift;
       }
-
+      setOpenShiftState((prev) =>
+        prev && isOwnOpenShift(prev, cashierId) ? prev : null,
+      );
       return null;
     } catch (error) {
       console.error("Ошибка при поиске открытой смены:", error);
-      setOpenShiftState(null);
+      setOpenShiftState((prev) =>
+        prev && isOwnOpenShift(prev, cashierId) ? prev : null,
+      );
       return null;
     }
-  }, [currentUser, cashBoxes]);
+  }, [cashierId]);
 
   // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
   // Используем локальное состояние, если оно есть, иначе ищем в загруженных сменах
   const openShift = React.useMemo(() => {
-    if (openShiftState) return openShiftState;
-    return shifts.find((s) => s.status === "open");
-  }, [shifts, openShiftState, cashBoxes]);
+    if (openShiftState && isOwnOpenShift(openShiftState, cashierId)) {
+      return openShiftState;
+    }
+    return findOwnOpenShiftInList(shifts, cashierId);
+  }, [shifts, openShiftState, cashierId]);
 
   const openShiftId = openShift?.id;
 
@@ -583,27 +569,20 @@ const SellCashierPage = () => {
 
   // Поиск открытой смены при загрузке и обновлении списка смен
   useEffect(() => {
-    // Проверяем, есть ли открытая смена в загруженных сменах
-    const foundInLoaded = shifts.find(
-      (s) => s.status === "open" && s.cashier === userId,
-    );
+    const foundInLoaded = findOwnOpenShiftInList(shifts, cashierId);
 
     if (foundInLoaded) {
       setOpenShiftState(foundInLoaded);
-    } else if (!openShiftState) {
-      // Если в загруженных нет и локального состояния тоже нет, ищем на всех страницах
+    } else if (!openShiftState || !isOwnOpenShift(openShiftState, cashierId)) {
       findOpenShift();
     } else {
-      // Если есть локальное состояние, проверяем его актуальность
-      // Проверяем, не была ли смена закрыта (если она есть в загруженных, но статус изменился)
       const shiftInLoaded = shifts.find((s) => s.id === openShiftState.id);
       if (shiftInLoaded && shiftInLoaded.status !== "open") {
-        // Смена была закрыта, сбрасываем состояние
         setOpenShiftState(null);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shifts]);
+  }, [shifts, cashierId]);
 
   // Закрываем экран открытия смены, если смена открыта или пользователь на странице смены
   useEffect(() => {

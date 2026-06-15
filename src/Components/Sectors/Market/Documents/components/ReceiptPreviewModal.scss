@@ -233,6 +233,14 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 4px;
+
+    &--head {
+      font-weight: 700;
+      font-size: 11px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #d1d5db;
+    }
   }
 
   &__item-name {

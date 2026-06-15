@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   toDecimalString,
   ruStatusToKind,
@@ -6,9 +6,12 @@ import {
   toYYYYMMDD,
   msgFromError,
   normalizeDealFromApi,
+  buildDealPayload,
+  dealHasPayments,
 } from "../clientDetails.helpers";
 import api from "../../../../../api";
 import { useConfirm } from "../../../../../hooks/useDialog";
+
 export default function DealFormModal({
   open,
   clientId,
@@ -22,8 +25,15 @@ export default function DealFormModal({
   const [dealName, setDealName] = useState("");
   const [dealBudget, setDealBudget] = useState("");
   const [dealStatus, setDealStatus] = useState("Продажа");
-  const [dealDebtMonths, setDealDebtMonths] = useState("");
+  const [dealDebtDays, setDealDebtDays] = useState("");
+  const [dealPrepayment, setDealPrepayment] = useState("");
   const [dealFirstDueDate, setDealFirstDueDate] = useState("");
+  const [dealNote, setDealNote] = useState("");
+
+  const paymentsExist = useMemo(
+    () => dealHasPayments(editingDeal),
+    [editingDeal],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -32,92 +42,67 @@ export default function DealFormModal({
       setDealBudget(
         editingDeal.amount !== undefined && editingDeal.amount !== null
           ? String(editingDeal.amount)
-          : ""
+          : "",
       );
       setDealStatus(kindToRu(editingDeal.kind));
-      setDealDebtMonths(
-        editingDeal.debt_months !== undefined &&
-          editingDeal.debt_months !== null
-          ? String(editingDeal.debt_months)
-          : ""
+      setDealDebtDays(
+        editingDeal.debt_days != null
+          ? String(editingDeal.debt_days)
+          : editingDeal.debt_months != null
+            ? String(Number(editingDeal.debt_months) * 30)
+            : "",
+      );
+      setDealPrepayment(
+        editingDeal.prepayment != null ? String(editingDeal.prepayment) : "",
       );
       setDealFirstDueDate(
         editingDeal.first_due_date
           ? toYYYYMMDD(editingDeal.first_due_date)
-          : ""
+          : "",
       );
+      setDealNote(editingDeal.note || "");
     } else {
       setDealName("");
       setDealBudget("");
       setDealStatus("Продажа");
-      setDealDebtMonths("");
+      setDealDebtDays("");
+      setDealPrepayment("");
       setDealFirstDueDate("");
+      setDealNote("");
     }
   }, [open, editingDeal]);
 
-  const isDebtSelected = ruStatusToKind(dealStatus) === "debt";
+  const dealKind = ruStatusToKind(dealStatus);
+  const isDebtSelected = dealKind === "debt";
+  const isPrepaymentSelected = dealKind === "prepayment";
 
   const canSaveDeal =
     String(dealName).trim().length >= 1 &&
     Number(toDecimalString(dealBudget)) >= 0 &&
     !!clientId &&
-    (!isDebtSelected || Number(dealDebtMonths) >= 1);
+    (paymentsExist || !isDebtSelected || Number(dealDebtDays) >= 1);
 
-  // GUARD — теперь после всех хуков
   if (!open || !clientId) return null;
 
-  const createDealApi = async ({
-    title,
-    statusRu,
-    amount,
-    debt_months,
-    first_due_date,
-  }) => {
-    const payload = {
-      title: String(title || "").trim(),
-      kind: ruStatusToKind(statusRu),
-      amount: toDecimalString(amount),
-      note: "",
-      client: clientId,
-      ...(ruStatusToKind(statusRu) === "debt" && Number(debt_months) > 0
-        ? { debt_months: parseInt(debt_months, 10) }
-        : {}),
-      ...(ruStatusToKind(statusRu) === "debt" &&
-        first_due_date &&
-        toYYYYMMDD(first_due_date)
-        ? { first_due_date: toYYYYMMDD(first_due_date) }
-        : {}),
-    };
+  const createDealApi = async (form) => {
+    const payload = buildDealPayload({
+      ...form,
+      clientId,
+      forCreate: true,
+      paymentsExist: false,
+    });
     const res = await api.post(`/main/clients/${clientId}/deals/`, payload);
     return normalizeDealFromApi(res);
   };
 
-  const updateDealApi = async ({
-    dealId,
-    title,
-    statusRu,
-    amount,
-    debt_months,
-    first_due_date,
-  }) => {
-    const payload = {
-      title: String(title || "").trim(),
-      kind: ruStatusToKind(statusRu),
-      amount: toDecimalString(amount),
-      note: "",
-      client: clientId,
-      ...(ruStatusToKind(statusRu) === "debt" && Number(debt_months) > 0
-        ? { debt_months: parseInt(debt_months, 10) }
-        : {}),
-      ...(ruStatusToKind(statusRu) === "debt" &&
-        first_due_date &&
-        toYYYYMMDD(first_due_date)
-        ? { first_due_date: toYYYYMMDD(first_due_date) }
-        : {}),
-    };
+  const updateDealApi = async (form) => {
+    const payload = buildDealPayload({
+      ...form,
+      paymentsExist,
+    });
     const res = await api.patch(
-      `/main/clients/${clientId}/deals/${dealId}/`,
-      payload
+      `/main/clients/${clientId}/deals/${form.dealId}/`,
+      payload,
     );
     return normalizeDealFromApi(res);
   };
@@ -129,32 +114,32 @@ export default function DealFormModal({
   const handleSave = async () => {
     if (!canSaveDeal) {
       onError?.(
-        isDebtSelected
-          ? "Заполните название, сумму и срок долга"
-          : "Заполните название и корректную сумму"
+        isDebtSelected && !paymentsExist
+          ? "Заполните название, сумму и срок долга (дней)"
+          : "Заполните название и корректную сумму",
       );
       return;
     }
 
+    const form = {
+      title: dealName,
+      statusRu: dealStatus,
+      amount: dealBudget,
+      debt_days: dealDebtDays,
+      prepayment: dealPrepayment,
+      first_due_date: dealFirstDueDate,
+      note: dealNote,
+    };
+
     try {
       if (editingDeal) {
         const updated = await updateDealApi({
+          ...form,
           dealId: editingDeal.id,
-          title: dealName,
-          statusRu: dealStatus,
-          amount: dealBudget,
-          debt_months: dealDebtMonths,
-          first_due_date: dealFirstDueDate,
         });
         onSaved?.(updated);
       } else {
-        const created = await createDealApi({
-          title: dealName,
-          statusRu: dealStatus,
-          amount: dealBudget,
-          debt_months: dealDebtMonths,
-          first_due_date: dealFirstDueDate,
-        });
+        const created = await createDealApi(form);
         onSaved?.(created);
       }
       onClose?.();
@@ -179,14 +164,10 @@ export default function DealFormModal({
     });
   };
 
-  const handleClose = () => {
-    onClose?.();
-  };
-
   return (
     <div
       className="deal-form-modal__overlay modal-overlay"
-      onClick={handleClose}
+      onClick={() => onClose?.()}
     >
       <div
         className="deal-form-modal modal"
@@ -200,7 +181,7 @@ export default function DealFormModal({
           </h3>
           <button
             className="deal-form-modal__close"
-            onClick={handleClose}
+            onClick={() => onClose?.()}
             aria-label="Закрыть"
           >
             ×
@@ -208,6 +189,13 @@ export default function DealFormModal({
         </div>
 
         <div className="deal-form-modal__content">
+          {paymentsExist && (
+            <div className="deal-form-modal__hint hint">
+              По сделке уже есть платежи — можно изменить только название и
+              комментарий.
+            </div>
+          )}
+
           <div className="deal-form-modal__fields">
             <label className="deal-form-modal__field field">
               <span className="deal-form-modal__label">
@@ -222,48 +210,54 @@ export default function DealFormModal({
               />
             </label>
 
-            <label className="deal-form-modal__field field">
-              <span className="deal-form-modal__label">
-                Сумма <b className="req">*</b>
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                className="deal-form-modal__input"
-                value={dealBudget}
-                onChange={(e) => setDealBudget(e.target.value)}
-                onBlur={() => setDealBudget(toDecimalString(dealBudget))}
-                placeholder="0.00"
-                onFocus={() => {
-                  if (toDecimalString(dealBudget) === "0.00" || toDecimalString(dealBudget) === "0") {
-                    setDealBudget("");
-                  }
-                }}
-              />
-            </label>
-
-            <label className="deal-form-modal__field field">
-              <span className="deal-form-modal__label">
-                Статус <b className="req">*</b>
-              </span>
-              <select
-                className="deal-form-modal__input deal-form-modal__select"
-                value={dealStatus}
-                onChange={(e) => setDealStatus(e.target.value)}
-              >
-                <option>Продажа</option>
-                <option>Долг</option>
-                <option>Аванс</option>
-                <option>Предоплата</option>
-              </select>
-            </label>
-
-            {isDebtSelected && (
+            {!paymentsExist && (
               <>
                 <label className="deal-form-modal__field field">
                   <span className="deal-form-modal__label">
-                    Срок долга (мес.) <b className="req">*</b>
+                    Сумма <b className="req">*</b>
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    className="deal-form-modal__input"
+                    value={dealBudget}
+                    onChange={(e) => setDealBudget(e.target.value)}
+                    onBlur={() => setDealBudget(toDecimalString(dealBudget))}
+                    placeholder="0.00"
+                    onFocus={() => {
+                      if (
+                        toDecimalString(dealBudget) === "0.00" ||
+                        toDecimalString(dealBudget) === "0"
+                      ) {
+                        setDealBudget("");
+                      }
+                    }}
+                  />
+                </label>
+
+                <label className="deal-form-modal__field field">
+                  <span className="deal-form-modal__label">
+                    Тип <b className="req">*</b>
+                  </span>
+                  <select
+                    className="deal-form-modal__input deal-form-modal__select"
+                    value={dealStatus}
+                    onChange={(e) => setDealStatus(e.target.value)}
+                  >
+                    <option>Продажа</option>
+                    <option>Долг</option>
+                    <option>Предоплата</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            {!paymentsExist && isDebtSelected && (
+              <>
+                <label className="deal-form-modal__field field">
+                  <span className="deal-form-modal__label">
+                    Срок долга (дней) <b className="req">*</b>
                   </span>
                   <input
                     type="number"
@@ -271,17 +265,29 @@ export default function DealFormModal({
                     step="1"
                     min="1"
                     className="deal-form-modal__input"
-                    value={dealDebtMonths}
-                    onChange={(e) => setDealDebtMonths(e.target.value)}
-                    onBlur={() => {
-                      const n = parseInt(dealDebtMonths || "0", 10);
-                      setDealDebtMonths(
-                        Number.isFinite(n) && n > 0 ? String(n) : ""
-                      );
-                    }}
-                    placeholder="Например: 6"
+                    value={dealDebtDays}
+                    onChange={(e) => setDealDebtDays(e.target.value)}
+                    placeholder="Например: 30"
                   />
                 </label>
+
+                <label className="deal-form-modal__field field">
+                  <span className="deal-form-modal__label">Предоплата</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    className="deal-form-modal__input"
+                    value={dealPrepayment}
+                    onChange={(e) => setDealPrepayment(e.target.value)}
+                    onBlur={() =>
+                      setDealPrepayment(toDecimalString(dealPrepayment))
+                    }
+                    placeholder="0.00"
+                  />
+                </label>
+
                 <label className="deal-form-modal__field field">
                   <span className="deal-form-modal__label">
                     Дата первого платежа
@@ -291,15 +297,43 @@ export default function DealFormModal({
                     className="deal-form-modal__input"
                     value={dealFirstDueDate}
                     onChange={(e) => setDealFirstDueDate(e.target.value)}
-                    placeholder="Выберите дату"
                   />
                   <div className="deal-form-modal__hint hint">
-                    График платежей будет формироваться с этой даты (того же
-                    числа каждого месяца)
+                    Если не указана — сегодня + срок в днях
                   </div>
                 </label>
               </>
             )}
+
+            {!paymentsExist && isPrepaymentSelected && (
+              <label className="deal-form-modal__field field">
+                <span className="deal-form-modal__label">Сумма предоплаты</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  className="deal-form-modal__input"
+                  value={dealPrepayment}
+                  onChange={(e) => setDealPrepayment(e.target.value)}
+                  onBlur={() =>
+                    setDealPrepayment(toDecimalString(dealPrepayment || dealBudget))
+                  }
+                  placeholder={toDecimalString(dealBudget)}
+                />
+              </label>
+            )}
+
+            <label className="deal-form-modal__field field">
+              <span className="deal-form-modal__label">Комментарий</span>
+              <textarea
+                className="deal-form-modal__input"
+                rows={2}
+                value={dealNote}
+                onChange={(e) => setDealNote(e.target.value)}
+                placeholder="Необязательно"
+              />
+            </label>
           </div>
         </div>
 
@@ -308,13 +342,6 @@ export default function DealFormModal({
             className="deal-form-modal__btn deal-form-modal__btn--primary btn btn--yellow"
             onClick={handleSave}
             disabled={!canSaveDeal}
-            title={
-              !canSaveDeal
-                ? isDebtSelected
-                  ? "Заполните название, сумму и срок долга"
-                  : "Заполните название и сумму"
-                : ""
-            }
           >
             {editingDeal ? "Сохранить" : "Добавить"}
           </button>
@@ -328,7 +355,7 @@ export default function DealFormModal({
           )}
           <button
             className="deal-form-modal__btn deal-form-modal__btn--secondary btn btn--ghost"
-            onClick={handleClose}
+            onClick={() => onClose?.()}
           >
             Отмена
           </button>

@@ -324,7 +324,9 @@ const Documents = () => {
               company: documentData.company?.name || "",
               payment: documentData.payment || {},
             };
-            await handleCheckoutResponseForPrinting(printData);
+            await handleCheckoutResponseForPrinting(printData, {
+              receiptStyle: "market",
+            });
           } else {
             throw new Error("Нет данных для печати");
           }

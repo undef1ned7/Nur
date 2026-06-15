@@ -40,6 +40,12 @@ import "./sell.scss";
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import DataContainer from "../../common/DataContainer/DataContainer";
 import Modal from "../../common/Modal/Modal";
+import {
+  hasMarketReturnPermission,
+  isMarketSectorName,
+  isProfileOwnerOrAdmin,
+  isReturnableSaleStatus,
+} from "../../../tools/saleReturn";
 
 /**
  * Создание долга для клиента.
@@ -141,11 +147,8 @@ const Sell = () => {
     [searchParams],
   );
   const currentUserId = String(profile?.id || userId || "").trim();
-  const currentUserRole = String(profile?.role || "").trim().toLowerCase();
-  const isOwnerOrAdmin =
-    currentUserRole === "owner" || currentUserRole === "admin";
-  const canMarketEmployeeReturn =
-    isOwnerOrAdmin || profile?.can_view_market_employee_return === true;
+  const isOwnerOrAdmin = isProfileOwnerOrAdmin(profile);
+  const canMarketEmployeeReturn = hasMarketReturnPermission(profile);
   const userParam = String(searchParams.get("user") || "").trim();
 
   const [showDetailSell, setShowDetailSell] = useState(false);
@@ -158,7 +161,7 @@ const Sell = () => {
   const [selectCashBox1, setSelectCashBox1] = useState("");
   const [clearing, setClearing] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [itemId, setItemId] = useState({});
+  const [itemId, setItemId] = useState(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [error, setError] = useState(null);
@@ -255,7 +258,7 @@ const Sell = () => {
   } = useMemo(() => {
     const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
     const isBuildingCompany = sectorName === "строительная компания";
-    const isMarketCompany = sectorName === "магазин";
+    const isMarketCompany = isMarketSectorName(sectorName);
     const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
     const isStartPlanCompany = planName === "старт";
     const hidden = hiddenIds;
@@ -457,8 +460,10 @@ const Sell = () => {
     setSellId(id);
     setShowDetailSell(true);
   };
-  const handleOpen = (id) => {
-    setItemId(id);
+  const handleOpenRefund = (sale, event) => {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    setItemId(sale);
     setShowRefundModal(true);
   };
 
@@ -530,10 +535,7 @@ const Sell = () => {
   const canReturnSale = (sale) => {
     if (!isMarketCompany) return false;
     if (!canMarketEmployeeReturn) return false;
-    const status = String(sale?.status || "")
-      .trim()
-      .toLowerCase();
-    return status === "paid" || status === "debt";
+    return isReturnableSaleStatus(sale?.status);
   };
 
   const handleAddCashbox = async () => {
@@ -954,7 +956,7 @@ const Sell = () => {
                                 <button
                                   type="button"
                                   className="sellTable__refund"
-                                  onClick={() => handleOpen(item)}
+                                  onClick={(event) => handleOpenRefund(item, event)}
                                 >
                                   Возврат
                                 </button>
@@ -1069,7 +1071,7 @@ const Sell = () => {
                               <button
                                 type="button"
                                 className="sellCard__refund"
-                                onClick={() => handleOpen(item)}
+                                onClick={(event) => handleOpenRefund(item, event)}
                               >
                                 Возврат
                               </button>
@@ -1126,10 +1128,13 @@ const Sell = () => {
           onClose={() => setShowSellModal(false)}
         />
       )}
-      {showRefundModal && (
+      {showRefundModal && itemId?.id && (
         <RefundPurchase
           item={itemId}
-          onClose={() => setShowRefundModal(false)}
+          onClose={() => {
+            setShowRefundModal(false);
+            setItemId(null);
+          }}
           onChanged={(updatedSale) => {
             if (String(updatedSale?.status || "").toLowerCase() === "canceled") {
               hideSaleId(updatedSale?.id || itemId?.id);
