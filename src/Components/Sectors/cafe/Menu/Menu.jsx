@@ -21,6 +21,7 @@ import {
 } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 
 // Утилиты
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
@@ -287,6 +288,7 @@ const Menu = () => {
           );
           setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
         } catch (err) {
+          if (suppressOfflineError(err)) return;
           const errorMessage = validateResErrors(
             err,
             "Ошибка при удалении блюда",
@@ -311,6 +313,7 @@ const Menu = () => {
               prev.filter((c) => String(c.id) !== String(id)),
             );
           } catch (err) {
+            if (suppressOfflineError(err)) return;
             const errorMessage = validateResErrors(
               err,
               "Ошибка при удалении категории",
@@ -354,6 +357,7 @@ const Menu = () => {
       }
       setCatModalOpen(false);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(
         err,
         "Ошибка при сохранении категории",

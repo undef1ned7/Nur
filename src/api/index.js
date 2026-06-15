@@ -1,6 +1,8 @@
 import axios from "axios";
-import "../i18n.js"
-import "../i18n"
+import { createAuthResponseInterceptor } from "./authInterceptors";
+import { getOfflineFallback } from "../services/cafeOfflineFallback";
+import "../i18n.js";
+import "../i18n";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "https://app.nurcrm.kg/api",
   timeout: 20000,
@@ -20,85 +22,40 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
-let isRefreshing = false;
-let failedQueue = [];
-
-const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
 
 api.interceptors.response.use(
   (res) => res,
-  async (err) => {
-    const originalRequest = err.config;
-    const accessToken = localStorage.getItem("accessToken");
-    const refreshToken = localStorage.getItem("refreshToken");
+  createAuthResponseInterceptor(api, axios),
+);
 
-    if (
-      err.response?.status === 401 &&
-      !originalRequest._retry &&
-      accessToken &&
-      !originalRequest?.url?.includes("/users/auth/refresh/")
-    ) {
-      if (!refreshToken) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(err);
-      }
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const isNetworkError =
+      !error.response &&
+      (error.code === "ERR_NETWORK" ||
+        error.code === "ECONNABORTED" ||
+        error.message === "Network Error" ||
+        !navigator.onLine);
 
-      if (isRefreshing) {
-        return new Promise(function (resolve, reject) {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = "Bearer " + token;
-            return axios(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const response = await api.post("/users/auth/refresh/", {
-          refresh: refreshToken,
-        });
-
-        const newAccessToken = response.data.access;
-        localStorage.setItem("accessToken", newAccessToken);
-
-        api.defaults.headers.common["Authorization"] = "Bearer " + newAccessToken;
-        originalRequest.headers["Authorization"] = "Bearer " + newAccessToken;
-
-        processQueue(null, newAccessToken);
-        return api(originalRequest);
-      } catch (err) {
-        processQueue(err, null);
-
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
+    if (isNetworkError) {
+      const fallback = await getOfflineFallback(error.config);
+      if (fallback !== null) {
+        return {
+          data: fallback,
+          status: 200,
+          statusText: "OK",
+          headers: {},
+          config: error.config,
+          offline: true,
+        };
       }
     }
 
-    return Promise.reject(err);
-  }
+    return Promise.reject(error);
+  },
 );
 
 export default api;

@@ -9,6 +9,7 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import Suppliers from "../../../Contact/Suppliers/Suppliers";
 
 const PAGE_SIZE = 100;
@@ -110,6 +111,7 @@ const Stock = () => {
       setWarehouseNext(data?.next ?? null);
       setWarehousePrevious(data?.previous ?? null);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка загрузки склада");
       alertRef.current(errorMessage, true);
       setItems([]);
@@ -296,6 +298,7 @@ const Stock = () => {
         setModalOpen(false);
       }
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка сохранения товара");
       alert(errorMessage, true);
     }
@@ -322,6 +325,7 @@ const Stock = () => {
 
       setDeleteItem(null);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка удаления товара");
       alert(errorMessage, true);
     }
@@ -382,6 +386,7 @@ const Stock = () => {
       }
       setMoveOpen(false);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка применения движения");
       alert(errorMessage, true);
     }

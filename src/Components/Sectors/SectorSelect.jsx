@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import s from "./SectorSelect.module.scss";
-import { setSector, resetSector } from "../../store/slices/sectorSlice";
+import {
+  setSector,
+  resetSector,
+  selectSectorSelected,
+} from "../../store/slices/sectorSlice";
 
 const OPTIONS = [
   { id: "barber", title: "Барбершоп", desc: "Запись, услуги, мастера" },
@@ -15,14 +19,13 @@ const OPTIONS = [
 export default function SectorSelect() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const selectedFromStore = useSelector(selectSectorSelected);
 
-  const [sector, setSectorLocal] = useState(
-    localStorage.getItem("selectedSector") || ""
-  );
+  const [sector, setSectorLocal] = useState(selectedFromStore || "");
 
   useEffect(() => {
-    if (sector) localStorage.setItem("selectedSector", sector);
-  }, [sector]);
+    setSectorLocal(selectedFromStore || "");
+  }, [selectedFromStore]);
 
   const handleSelect = (id) => {
     setSectorLocal(id);
@@ -39,7 +42,6 @@ export default function SectorSelect() {
   const handleReset = () => {
     dispatch(resetSector());
     setSectorLocal("");
-    localStorage.removeItem("selectedSector");
   };
 
   return (

@@ -21,12 +21,14 @@ import {
 } from "./Orders/OrdersPrintService";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 import * as logger from "../../../utils/logger";
+import OfflineStatusBar from "./common/OfflineStatusBar";
 
 export default function CafeLayout() {
   const { orders, tables } = useCafeWebSocketManager();
   const [notificationDeps, setNotificationDeps] = useState(null);
   const [notificationOrder, setNotificationOrder] = useState(null);
   const [notificationOptions, setNotificationOptions] = useState(null);
+  const [waiterIdLabelMap, setWaiterIdLabelMap] = useState(new Map());
   const { profile } = useUser();
   const location = useLocation();
   const notifiedTasksRef = useRef(new Set()); // taskKey -> notified once on this device
@@ -37,6 +39,7 @@ export default function CafeLayout() {
   const printingReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printing now
   const printingKitchenDiffRef = useRef(new Set()); // orderId -> diff printing now
   const retryTimersRef = useRef(new Map()); // orderId -> timeoutId
+  const permanentlyFailedPrintsRef = useRef(new Map()); // orderId -> timestamp последней неудачи
   const notifiedOrdersRef = useRef(new Set()); // orderId -> notified once on this device (cook page)
   const printKitchenTicketsForOrderRef = useRef(() => Promise.resolve());
   const printReceiptForOrderRef = useRef(() => Promise.resolve());
@@ -54,6 +57,7 @@ export default function CafeLayout() {
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
   const PRINT_QUEUE_DELAY_MS = 1000;
+  const PRINT_FAILURE_COOLDOWN_MS = 60 * 1000; // 1 минута
 
   // const [kitchens, setKitchens] = useState([]);
   // const fetchKitchens = useCallback(async () => {
@@ -92,6 +96,26 @@ export default function CafeLayout() {
       return false;
     }
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/users/employees/");
+        const arr = data?.results || data || [];
+        const map = new Map();
+        for (const e of arr) {
+          const label =
+            [e.last_name, e.first_name].filter(Boolean).join(" ").trim() ||
+            String(e.email || "").trim();
+          if (e?.id != null && label) map.set(String(e.id), label);
+        }
+        setWaiterIdLabelMap(map);
+      } catch {
+        // офлайн или ошибка — fetchCafeWaiterLabelByEmployeeId закеширует неудачи
+      }
+    })();
+  }, []);
+
   const shouldAutoPrintNow = async () => {
     // If explicitly disabled -> never auto print
     try {
@@ -179,7 +203,7 @@ export default function CafeLayout() {
     return m;
   }, [tables]);
 
-const fullName = useCallback(
+  const fullName = useCallback(
     (u = {}) =>
       [u?.last_name || "", u?.first_name || ""]
         .filter(Boolean)
@@ -307,7 +331,8 @@ const fullName = useCallback(
     if (!oid) return false;
     if (printedReceiptsRef.current.has(oid)) return true;
     try {
-      if (localStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`)) return true;
+      if (localStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`))
+        return true;
     } catch {}
     try {
       if (sessionStorage.getItem(`${RECEIPT_PRINT_DEDUPE_PREFIX}${oid}`))
@@ -328,16 +353,21 @@ const fullName = useCallback(
     } catch {}
   }, []);
 
-  const enqueuePrintJob = useCallback(async (job) => {
-    const run = async () => {
-      await new Promise((resolve) => setTimeout(resolve, PRINT_QUEUE_DELAY_MS));
-      return job();
-    };
-    const next = printQueueRef.current.then(run, run);
-    // Keep the queue chain alive even after failures
-    printQueueRef.current = next.catch(() => {});
-    return next;
-  }, [PRINT_QUEUE_DELAY_MS]);
+  const enqueuePrintJob = useCallback(
+    async (job) => {
+      const run = async () => {
+        await new Promise((resolve) =>
+          setTimeout(resolve, PRINT_QUEUE_DELAY_MS),
+        );
+        return job();
+      };
+      const next = printQueueRef.current.then(run, run);
+      // Keep the queue chain alive even after failures
+      printQueueRef.current = next.catch(() => {});
+      return next;
+    },
+    [PRINT_QUEUE_DELAY_MS],
+  );
 
   const printReceiptForOrder = useCallback(
     async (orderId) => {
@@ -364,7 +394,10 @@ const fullName = useCallback(
 
         let waiterName = pickCafeOrderWaiterName(detail);
         if (!waiterName) {
-          waiterName = await fetchCafeWaiterLabelByEmployeeId(detail?.waiter);
+          const waiterId = detail?.waiter;
+          waiterName =
+            waiterIdLabelMap.get(String(waiterId)) ||
+            (await fetchCafeWaiterLabelByEmployeeId(waiterId));
         }
         const payload = {
           ...buildReceiptPayload(detail),
@@ -394,6 +427,7 @@ const fullName = useCallback(
       enqueuePrintJob,
       isReceiptMarkedPrinted,
       markReceiptPrintedPersist,
+      waiterIdLabelMap,
     ],
   );
 
@@ -572,6 +606,12 @@ const fullName = useCallback(
     if (!oid) return;
     if (printedOrdersRef.current.has(oid)) return;
     if (printingOrdersRef.current.has(oid)) return;
+
+    const lastFailure = permanentlyFailedPrintsRef.current.get(oid);
+    if (lastFailure && Date.now() - lastFailure < PRINT_FAILURE_COOLDOWN_MS) {
+      return;
+    }
+
     try {
       if (localStorage.getItem(`cafe_kitchen_printed_${oid}`)) return;
     } catch {}
@@ -587,6 +627,7 @@ const fullName = useCallback(
           attempt,
           why,
         });
+        permanentlyFailedPrintsRef.current.set(oid, Date.now());
         return;
       }
       const delay = [400, 800, 1500, 2500, 4000][attempt] || 2000;
@@ -607,7 +648,10 @@ const fullName = useCallback(
         return;
       }
       const _tableId =
-        detail?.table_id ?? detail?.tableId ?? detail?.table?.id ?? detail?.table;
+        detail?.table_id ??
+        detail?.tableId ??
+        detail?.table?.id ??
+        detail?.table;
       if (_tableId && tablesMap.size === 0) {
         await new Promise((res) => setTimeout(res, 1500));
       }
@@ -670,9 +714,10 @@ const fullName = useCallback(
 
       let kitchenWaiterName = pickCafeOrderWaiterName(detail);
       if (!kitchenWaiterName) {
-        kitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
-          detail?.waiter,
-        );
+        const waiterId = detail?.waiter;
+        kitchenWaiterName =
+          waiterIdLabelMap.get(String(waiterId)) ||
+          (await fetchCafeWaiterLabelByEmployeeId(waiterId));
       }
 
       for (const [kid, kitItems] of groups.entries()) {
@@ -718,6 +763,7 @@ const fullName = useCallback(
 
       // Mark as printed only after successful run (no early dedupe)
       printedOrdersRef.current.add(oid);
+      permanentlyFailedPrintsRef.current.delete(oid);
       try {
         localStorage.setItem(`cafe_kitchen_printed_${oid}`, "true");
       } catch {}
@@ -747,7 +793,9 @@ const fullName = useCallback(
   };
 
   const isCancelledOrderStatus = useCallback((order) => {
-    const s = String(order?.status || "").toLowerCase().trim();
+    const s = String(order?.status || "")
+      .toLowerCase()
+      .trim();
     return ["cancelled", "canceled", "отменен", "отменён"].includes(s);
   }, []);
 
@@ -903,7 +951,9 @@ const fullName = useCallback(
           removedByKitchen.size === 0
         ) {
           const createdRaw =
-            orderDetail?.created_at || orderDetail?.date || orderDetail?.created;
+            orderDetail?.created_at ||
+            orderDetail?.date ||
+            orderDetail?.created;
           const createdMs = createdRaw ? new Date(createdRaw).getTime() : 0;
           if (
             createdMs > 0 &&
@@ -939,9 +989,10 @@ const fullName = useCallback(
 
         let diffKitchenWaiterName = pickCafeOrderWaiterName(orderDetail);
         if (!diffKitchenWaiterName) {
-          diffKitchenWaiterName = await fetchCafeWaiterLabelByEmployeeId(
-            orderDetail?.waiter,
-          );
+          const waiterId = orderDetail?.waiter;
+          diffKitchenWaiterName =
+            waiterIdLabelMap.get(String(waiterId)) ||
+            (await fetchCafeWaiterLabelByEmployeeId(waiterId));
         }
 
         const printOne = async (kid, menuTitle, items) => {
@@ -1039,6 +1090,7 @@ const fullName = useCallback(
       TAKEAWAY_LABEL,
       writeOrderItemsSnapshot,
       enqueuePrintJob,
+      waiterIdLabelMap,
     ],
   );
 
@@ -1119,7 +1171,7 @@ const fullName = useCallback(
         setNotificationOptions({ variant: "waiter", sticky: true });
       }
     }
-    
+
     // Auto print to kitchen printers on order created (for the device that has printers configured)
     if (type === "order_created") {
       // Notify cook (only on Kitchen page)
@@ -1157,6 +1209,7 @@ const fullName = useCallback(
       }
       // Auto print kitchen diff on order edit (added/removed items)
       if (orderId && !isPaidStatusRef.current(updatedOrder)) {
+        permanentlyFailedPrintsRef.current.delete(String(orderId));
         void printKitchenDiffTicketsForOrderRef.current(orderId);
       }
     }
@@ -1182,6 +1235,7 @@ const fullName = useCallback(
 
   return (
     <>
+      <OfflineStatusBar />
       <NotificationCafeSound
         notification={notificationOrder}
         notificationKey={notificationDeps}
@@ -1191,6 +1245,7 @@ const fullName = useCallback(
         context={{
           socketOrders: orders,
           socketTables: tables,
+          waiterIdLabelMap,
         }}
       />
     </>

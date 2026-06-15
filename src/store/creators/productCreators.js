@@ -22,7 +22,7 @@ import {
   getProductByBarcodeApi, // GET /main/products/barcode/{barcode}/
   addProductToWarehouseApi, // POST /main/products/add-to-warehouse/
 } from "../../api/products";
-import { getApiErrorPayload } from "../../../tools/validateResErrors";
+import { handleThunkError } from "./utils/handleThunkError";
 
 /* =================================================================== */
 /*                               PRODUCTS                              */
@@ -35,7 +35,7 @@ export const fetchProductsAsync = createAsyncThunk(
       // если нет helpers — замени на api.get("/main/products/", { params })
       return await fetchProductsApi(params);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -47,7 +47,7 @@ export const createProductAsync = createAsyncThunk(
       // если нет helpers — замени на (await api.post("/main/products/", data)).data
       return await createProductApi(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -59,10 +59,7 @@ export const updateProductAsync = createAsyncThunk(
       // если нет helpers — (await api.patch(`/main/products/${productId}/`, updatedData)).data
       return await updateProductApi(productId, updatedData);
     } catch (error) {
-      const payload = getApiErrorPayload(error);
-      return rejectWithValue(
-        payload != null && payload !== "" ? payload : "Ошибка при сохранении товара",
-      );
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -75,7 +72,7 @@ export const deleteProductAsync = createAsyncThunk(
       await deleteProductApi(productId);
       return productId;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -90,7 +87,7 @@ export const bulkDeleteProductsAsync = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -105,7 +102,7 @@ export const fetchBrandsAsync = createAsyncThunk(
     try {
       return await fetchBrands(params);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -116,7 +113,7 @@ export const createBrandAsync = createAsyncThunk(
     try {
       return await createBrandApi(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -127,7 +124,7 @@ export const updateBrandAsync = createAsyncThunk(
     try {
       return await updateBrandApi(brandId, updatedData);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -139,7 +136,7 @@ export const deleteBrandAsync = createAsyncThunk(
       await deleteBrandApi(brandId);
       return brandId;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -154,7 +151,7 @@ export const fetchCategoriesAsync = createAsyncThunk(
     try {
       return await fetchCategories(params);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -165,7 +162,7 @@ export const createCategoryAsync = createAsyncThunk(
     try {
       return await createCategoryApi(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -176,7 +173,7 @@ export const updateCategoryAsync = createAsyncThunk(
     try {
       return await updateCategoryApi(categoryId, updatedData);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -188,7 +185,7 @@ export const deleteCategoryAsync = createAsyncThunk(
       await deleteCategoryApi(categoryId);
       return categoryId;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -224,7 +221,7 @@ export const getItemsMake = createAsyncThunk(
       });
       return parseItemsMakeResponse(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -239,7 +236,7 @@ export const getProcessedItemsMake = createAsyncThunk(
       });
       return parseItemsMakeResponse(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -254,7 +251,7 @@ export const getProcessingQueueItemsMake = createAsyncThunk(
       });
       return parseItemsMakeResponse(data);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -273,7 +270,7 @@ export const processItemMake = createAsyncThunk(
       } catch (_) {}
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -292,7 +289,7 @@ export const updateItemsMake = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -304,7 +301,7 @@ export const deleteItemsMake = createAsyncThunk(
       const { data: response } = await api.delete(`/main/items-make/${id}/`);
       return response;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -320,7 +317,7 @@ export const createItemMake = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -341,14 +338,8 @@ export const setItemMakeQuantity = createAsyncThunk(
       } catch (_) {}
       return data;
     } catch (error) {
-      const payload = {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
-      };
-      // eslint-disable-next-line no-console
-      console.error("setItemMakeQuantity error:", payload);
-      return rejectWithValue(payload);
+      console.error("setItemMakeQuantity error:", error);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -389,14 +380,8 @@ export const consumeItemsMake = createAsyncThunk(
 
       return results;
     } catch (error) {
-      const payload = {
-        status: error?.response?.status,
-        data: error?.response?.data,
-        message: error?.message,
-      };
-      // eslint-disable-next-line no-console
-      console.error("consumeItemsMake error:", payload);
-      return rejectWithValue(payload);
+      console.error("consumeItemsMake error:", error);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -415,7 +400,7 @@ export const createKassa = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -430,7 +415,7 @@ export const createProductWithBarcode = createAsyncThunk(
       );
       return data;
     } catch (e) {
-      return rejectWithValue(e);
+      return handleThunkError(e, rejectWithValue);
     }
   }
 );
@@ -446,7 +431,7 @@ export const scanWarehouseProductAsync = createAsyncThunk(
       );
       return data;
     } catch (e) {
-      return rejectWithValue(e);
+      return handleThunkError(e, rejectWithValue);
     }
   }
 );
@@ -461,7 +446,7 @@ export const fetchAgentProductsAsync = createAsyncThunk(
     try {
       return await fetchAgentProductsApi(params);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -473,7 +458,7 @@ export const fetchProductHistoryAsync = createAsyncThunk(
     try {
       return await fetchProductHistoryApi(params);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -485,7 +470,7 @@ export const getProductByBarcodeAsync = createAsyncThunk(
     try {
       return await getProductByBarcodeApi(barcode);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -497,7 +482,7 @@ export const addProductToWarehouseAsync = createAsyncThunk(
     try {
       return await addProductToWarehouseApi(productData);
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );

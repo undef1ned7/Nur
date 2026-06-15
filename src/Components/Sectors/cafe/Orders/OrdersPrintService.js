@@ -360,21 +360,30 @@ export function employeeToCafeWaiterLabel(emp) {
 }
 
 const waiterLabelByIdCache = new Map();
+const failedLookupCache = new Map();
+const FAILED_LOOKUP_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Подгрузить имя официанта по UUID (когда в заказе только waiter: "<uuid>").
- * Результаты кешируются; при ошибке сети можно повторить печать.
+ * Результаты кешируются; неудачные lookup кешируются на 5 минут.
  */
 export async function fetchCafeWaiterLabelByEmployeeId(waiterId) {
   const id = String(waiterId ?? "").trim();
   if (!id || !CAFE_WAITER_UUID_RE.test(id)) return "";
   if (waiterLabelByIdCache.has(id)) return waiterLabelByIdCache.get(id);
+
+  const failedAt = failedLookupCache.get(id);
+  if (failedAt && Date.now() - failedAt < FAILED_LOOKUP_TTL_MS) {
+    return "";
+  }
+
   try {
     const r = await api.get(`/users/employees/${encodeURIComponent(id)}/`);
     const label = employeeToCafeWaiterLabel(r?.data) || "";
-    if (label) waiterLabelByIdCache.set(id, label);
+    waiterLabelByIdCache.set(id, label);
     return label;
   } catch {
+    failedLookupCache.set(id, Date.now());
     return "";
   }
 }

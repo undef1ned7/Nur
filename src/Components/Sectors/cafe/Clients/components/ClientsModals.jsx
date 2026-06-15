@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../../utils/cafeOfflineError";
 import { useAlert } from "../../../../../hooks/useDialog";
 import api from "../../../../../api";
 import { computeBalanceDue, getClient, fetchCafeOrderDetail } from "../clientStore";
@@ -287,6 +288,7 @@ const ClientCard = ({
         );
         if (mounted) setMenuMap(m);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки меню");
         alert(errorMessage, true);
       }
@@ -533,6 +535,7 @@ const ClientCard = ({
       await loadCardData();
       alert("Взнос по долгу проведён");
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка погашения долга");
       alert(errorMessage, true);
     } finally {

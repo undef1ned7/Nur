@@ -6,20 +6,19 @@ import {
   deleteOrderApi,
   updateOrderApi,
   fetchSalesHistoryApi,
-} from "../../api/orders"; // Импортируем API-функции
+} from "../../api/orders";
+import { handleThunkError } from "./utils/handleThunkError";
 
 export const fetchOrdersAsync = createAsyncThunk(
   "orders/fetchOrders",
   async (params = {}, { rejectWithValue }) => {
     try {
       const response = await fetchOrdersApi(params);
-      // console.log(response,'response');
-
       return response;
     } catch (error) {
-      return rejectWithValue(error);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
 
 export const fetchOrderByIdAsync = createAsyncThunk(
@@ -29,9 +28,9 @@ export const fetchOrderByIdAsync = createAsyncThunk(
       const order = await fetchOrderByIdApi(orderId);
       return order;
     } catch (error) {
-      return rejectWithValue(error);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
 
 export const createOrderAsync = createAsyncThunk(
@@ -41,9 +40,9 @@ export const createOrderAsync = createAsyncThunk(
       const newOrder = await createOrderApi(orderData);
       return newOrder;
     } catch (error) {
-      return rejectWithValue(error);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
 
 export const deleteOrderAsync = createAsyncThunk(
@@ -53,9 +52,9 @@ export const deleteOrderAsync = createAsyncThunk(
       await deleteOrderApi(orderId);
       return orderId;
     } catch (error) {
-      return rejectWithValue(error);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
 
 export const updateOrderAsync = createAsyncThunk(
@@ -65,12 +64,11 @@ export const updateOrderAsync = createAsyncThunk(
       const updatedOrder = await updateOrderApi(orderId, updatedData);
       return updatedOrder;
     } catch (error) {
-      return rejectWithValue(error);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
 
-// История продаж для сотрудника
 export const historySellProduct = createAsyncThunk(
   "orders/historySellProduct",
   async (params = {}, { rejectWithValue }) => {
@@ -78,7 +76,7 @@ export const historySellProduct = createAsyncThunk(
       const response = await fetchSalesHistoryApi(params);
       return response;
     } catch (error) {
-      return rejectWithValue(error?.response?.data || error?.message);
+      return handleThunkError(error, rejectWithValue);
     }
-  }
+  },
 );
