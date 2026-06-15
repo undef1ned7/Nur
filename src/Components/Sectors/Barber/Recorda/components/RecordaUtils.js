@@ -2,6 +2,32 @@
 export const pad = (n) => String(n).padStart(2, "0");
 export const norm = (s) => String(s || "").trim();
 
+export const OPEN_HOUR = 9;
+export const CLOSE_HOUR = 21;
+
+export const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`;
+};
+
+/** Округление текущего времени вниз до ближайшего слота (30 мин по умолчанию) */
+export const getNowSlot = (slotMin = 30) => {
+  const now = new Date();
+  let mins = now.getHours() * 60 + now.getMinutes();
+  mins = Math.floor(mins / slotMin) * slotMin;
+  if (mins < OPEN_HOUR * 60) mins = OPEN_HOUR * 60;
+  if (mins > CLOSE_HOUR * 60) mins = CLOSE_HOUR * 60;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${pad(h)}:${pad(m)}`;
+};
+
+/** Время по умолчанию для записи на конкретную дату */
+export const defaultTimeForDate = (dateStr, slotMin = 30) => {
+  if (dateStr === todayStr()) return getNowSlot(slotMin);
+  return `${pad(OPEN_HOUR)}:00`;
+};
+
 export const normalizePhone = (p) => norm(p).replace(/[^\d]/g, "");
 export const isValidPhone = (p) => normalizePhone(p).length >= 10;
 export const normalizeName = (s) =>
@@ -19,9 +45,6 @@ export const makeISO = (date, time) => `${date}T${time}:00${TZ}`;
 export const ts = (iso) => new Date(iso).getTime();
 
 export const overlaps = (a1, a2, b1, b2) => a1 < b2 && b1 < a2;
-
-export const OPEN_HOUR = 9;
-export const CLOSE_HOUR = 21;
 
 export const minsOf = (hhmm) => {
   const [h, m] = String(hhmm || "").split(":").map(Number);

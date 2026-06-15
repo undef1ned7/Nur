@@ -23,6 +23,7 @@ import {
   updateManualFilling,
   updateSellProduct,
   deleteSale, // <-- обработаем статусы создания сделок
+  addCustomItem,
   fetchDocuments,
   getSale,
 } from "../creators/saleThunk";
@@ -166,18 +167,12 @@ const saleSlice = createSlice({
       })
 
       .addCase(manualFilling.pending, (state) => {
-        state.loading = true;
+        // Не ставим loading: иначе касса «мигает» при каждом добавлении строки
       })
       .addCase(manualFilling.fulfilled, (state, { payload }) => {
         state.cart = payload;
-        // Обновляем state.start если payload содержит полные данные продажи
-        if (
-          payload &&
-          payload.id &&
-          state.start &&
-          state.start.id === payload.id
-        ) {
-          state.start = payload;
+        if (payload && typeof payload === "object") {
+          applyPosCartItemPatchToState(state, payload);
         }
         state.loading = false;
       })
@@ -186,7 +181,7 @@ const saleSlice = createSlice({
         state.loading = false;
       })
       .addCase(updateManualFilling.pending, (state) => {
-        state.loading = true;
+        // Не ставим loading: PATCH строки корзины обновляет state из ответа
       })
       .addCase(updateManualFilling.fulfilled, (state, { payload }) => {
         if (payload && typeof payload === "object") {
@@ -225,13 +220,29 @@ const saleSlice = createSlice({
       })
 
       .addCase(deleteProductInCart.pending, (state) => {
-        state.loading = true;
+        // Не ставим loading: DELETE строки корзины обновляет state из ответа
       })
-      .addCase(deleteProductInCart.fulfilled, (state, action) => {
+      .addCase(deleteProductInCart.fulfilled, (state, { payload }) => {
         state.loading = false;
-        state.start = action.payload
+        if (payload && typeof payload === "object") {
+          applyPosCartItemPatchToState(state, payload);
+        }
       })
       .addCase(deleteProductInCart.rejected, (state, action) => {
+        state.error = ensureError(action);
+        state.loading = false;
+      })
+
+      .addCase(addCustomItem.pending, (state) => {
+        // Не ставим loading
+      })
+      .addCase(addCustomItem.fulfilled, (state, { payload }) => {
+        if (payload && typeof payload === "object") {
+          applyPosCartItemPatchToState(state, payload);
+        }
+        state.loading = false;
+      })
+      .addCase(addCustomItem.rejected, (state, action) => {
         state.error = ensureError(action);
         state.loading = false;
       })

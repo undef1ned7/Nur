@@ -1227,6 +1227,7 @@ import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
 import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -1256,8 +1257,21 @@ const Settings = () => {
   const canViewOnline = useMemo(() => {
     const hasSlug = Boolean(company?.slug);
     const canViewShowcase = Boolean(profile?.can_view_showcase);
-    return hasSlug && (isOwner || canViewShowcase);
-  }, [company?.slug, profile?.can_view_showcase, isOwner]);
+    if (!hasSlug) return false;
+    return canAccessOnlineShowcase({
+      tariffName: tariff || company?.subscription_plan?.name,
+      sectorName: company?.sector?.name,
+      isOwner,
+      canViewShowcase,
+    });
+  }, [
+    company?.slug,
+    company?.subscription_plan?.name,
+    company?.sector?.name,
+    profile?.can_view_showcase,
+    isOwner,
+    tariff,
+  ]);
 
   // Определяем начальный активный таб в зависимости от доступных табов
   const initialTab = useMemo(() => {

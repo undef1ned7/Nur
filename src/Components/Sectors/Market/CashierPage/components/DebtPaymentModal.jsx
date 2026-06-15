@@ -10,6 +10,10 @@ import {
 } from "../../../../../store/slices/cashSlice";
 import { useUser } from "../../../../../store/slices/userSlice";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import {
+  getInstallmentRemaining,
+  getInstallmentStatus,
+} from "../../../../../tools/clientDeals";
 import "./DebtPaymentModal.scss";
 
 const DebtPaymentModal = ({ onClose, customers = [] }) => {
@@ -235,23 +239,22 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
       return;
     }
 
-    const paymentAmount = parseFloat(
-      paymentAmounts[`${deal.id}-${installment.number}`] ||
-        installment.remaining_for_period ||
-        0
-    );
+    const remaining = getInstallmentRemaining(installment);
+    const rawInput = paymentAmounts[`${deal.id}-${installment.number}`];
+    const paymentAmount =
+      rawInput !== undefined && rawInput !== "" ? parseFloat(rawInput) : 0;
+    const effectiveAmount = paymentAmount > 0 ? paymentAmount : remaining;
 
-    if (paymentAmount <= 0) {
+    if (effectiveAmount <= 0) {
       showAlert("warning", "Предупреждение", "Введите сумму для погашения");
       return;
     }
 
-    const remaining = parseFloat(installment.remaining_for_period || 0);
-    if (paymentAmount > remaining) {
+    if (effectiveAmount > remaining) {
       showAlert(
         "warning",
         "Предупреждение",
-        `Сумма не может превышать ${remaining.toFixed(2)} сом`
+        `Сумма не может превышать ${remaining.toFixed(2)} сом`,
       );
       return;
     }
@@ -259,11 +262,13 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
     try {
       const paymentData = {
         idempotency_key: crypto.randomUUID(),
-        installment_id: installment.id, // Используем ID взноса вместо номера
-        amount: paymentAmount.toFixed(2),
+        installment_id: installment.id,
         date: new Date().toISOString().split("T")[0],
         note: "",
       };
+      if (effectiveAmount < remaining) {
+        paymentData.amount = effectiveAmount.toFixed(2);
+      }
 
       // Погашаем долг
       const updatedDeal = await dispatch(
@@ -286,7 +291,7 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
             cashbox: selectedCashBox,
             type: "income",
             name: `Погашение долга: ${deal.title || "Долг"}`,
-            amount: paymentAmount.toFixed(2),
+            amount: effectiveAmount.toFixed(2),
             source_cashbox_flow_id: deal.id,
             source_business_operation_id: "Погашение долга",
             status:
@@ -417,10 +422,9 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
                   {deal.installments && deal.installments.length > 0 && (
                     <div className="debt-payment-modal__installments">
                       {deal.installments.map((installment) => {
-                        const isPaid = Boolean(installment.paid_on);
-                        const remaining = parseFloat(
-                          installment.remaining_for_period || 0
-                        );
+                        const instStatus = getInstallmentStatus(installment);
+                        const isPaid = instStatus.key === "paid";
+                        const remaining = getInstallmentRemaining(installment);
 
                         return (
                           <div
@@ -443,6 +447,9 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
                                 Сумма:{" "}
                                 {parseFloat(installment.amount || 0).toFixed(2)}{" "}
                                 сом
+                              </div>
+                              <div className="debt-payment-modal__installment-status">
+                                {instStatus.label}
                               </div>
                               {isPaid ? (
                                 <div className="debt-payment-modal__installment-paid">

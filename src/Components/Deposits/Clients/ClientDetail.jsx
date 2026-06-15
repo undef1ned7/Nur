@@ -20,6 +20,7 @@ const AddModal = ({ onClose }) => {
     amount: "",
     note: "",
     kind: "sale",
+    debt_days: "",
   });
 
   const onChange = (e) => {
@@ -99,15 +100,28 @@ const AddModal = ({ onClose }) => {
             <option value="prepayment">Предоплата</option>
           </select>
         </div>
+        {form.kind === "debt" && (
+          <div className="add-modal__section">
+            <label>Срок долга (дней) *</label>
+            <input
+              name="debt_days"
+              className="add-modal__input"
+              value={form.debt_days}
+              onChange={onChange}
+              type="number"
+              min="1"
+              required
+            />
+          </div>
+        )}
         <div className="add-modal__section">
-          <label>Комментарий *</label>
+          <label>Комментарий</label>
           <input
             name="note"
             className="add-modal__input"
             value={form.note}
             onChange={onChange}
             type="text"
-            required
           />
         </div>
         <div className="add-modal__footer">

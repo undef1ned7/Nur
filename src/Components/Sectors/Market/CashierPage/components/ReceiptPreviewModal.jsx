@@ -87,7 +87,9 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
           company: dataToPrint.company?.name || "",
           payment: dataToPrint.payment || {},
         };
-        await handleCheckoutResponseForPrinting(printData);
+        await handleCheckoutResponseForPrinting(printData, {
+          receiptStyle: "market",
+        });
       } else {
         throw new Error("Нет данных для печати");
       }
@@ -155,14 +157,52 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
   }
 
   // Нормализация данных из нового формата API
+  const resolveMarketPreviewItem = (item) => {
+    const qty = parseFloat(item.qty ?? item.quantity) || 1;
+    const price = parseFloat(item.unit_price ?? item.price) || 0;
+    let lineDiscount =
+      parseFloat(
+        item.line_discount ??
+          item.discount_total ??
+          item.line_discount_total ??
+          0,
+      ) || 0;
+    const lineTotalRaw = item.line_total ?? item.total;
+    const lineTotalParsed =
+      lineTotalRaw != null && lineTotalRaw !== ""
+        ? parseFloat(lineTotalRaw)
+        : null;
+    const gross = Math.max(0, qty * price);
+    if (
+      lineDiscount <= 0 &&
+      lineTotalParsed != null &&
+      Number.isFinite(lineTotalParsed) &&
+      gross > lineTotalParsed + 1e-9
+    ) {
+      lineDiscount = gross - lineTotalParsed;
+    }
+    const total =
+      lineTotalParsed != null && Number.isFinite(lineTotalParsed)
+        ? lineTotalParsed
+        : Math.max(0, gross - lineDiscount);
+    return {
+      id: item.id,
+      name: item.name || "Товар",
+      qty,
+      price,
+      lineDiscount: Math.max(0, lineDiscount),
+      total,
+    };
+  };
+
+  const formatLineDiscountDisplay = (amt) => {
+    const n = parseFloat(amt) || 0;
+    if (n <= 0) return "0";
+    return formatMoney(n);
+  };
+
   const items = Array.isArray(receiptData?.items)
-    ? receiptData.items.map((item) => ({
-        id: item.id,
-        name: item.name || "Товар",
-        qty: parseFloat(item.qty || 0),
-        price: parseFloat(item.unit_price || 0),
-        total: parseFloat(item.total || 0),
-      }))
+    ? receiptData.items.map(resolveMarketPreviewItem)
     : [];
 
   const subtotal = parseFloat(receiptData?.totals?.subtotal || 0);
@@ -228,21 +268,29 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
             {/* Товары */}
             <div className="receipt-preview-modal__receipt-items">
               {items.length > 0 ? (
-                items.map((item, index) => (
+                <>
+                  <div className="receipt-preview-modal__item-details receipt-preview-modal__item-details--head">
+                    <span>Цена x Кол-о - Скидка</span>
+                    <span className="receipt-preview-modal__item-total">Итого</span>
+                  </div>
+                  {items.map((item, index) => (
                   <div key={item.id || index} className="receipt-preview-modal__item">
                     <div className="receipt-preview-modal__item-name">
-                      {item.name}
+                      {index + 1}) {item.name}
                     </div>
                     <div className="receipt-preview-modal__item-details">
                       <span>
-                        {item.qty} x {formatMoney(item.price)}
+                        {formatMoney(item.price)} x {item.qty}
+                        {item.lineDiscount > 0 &&
+                          ` - ${formatLineDiscountDisplay(item.lineDiscount)}`}
                       </span>
                       <span className="receipt-preview-modal__item-total">
-                        {formatMoney(item.qty * item.price)}
+                        {formatMoney(item.total)}
                       </span>
                     </div>
                   </div>
-                ))
+                ))}
+                </>
               ) : (
                 <div className="receipt-preview-modal__item">
                   <div className="receipt-preview-modal__item-name">Нет товаров</div>

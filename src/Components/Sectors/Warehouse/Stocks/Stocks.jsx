@@ -28,6 +28,10 @@ import { formatDeleteMessage } from "../../Market/Warehouse/utils";
 import "./StocksGroups.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import {
+  compareByAlphabetEnRu,
+  sortByAlphabetEnRu,
+} from "../../../../utils/sortByAlphabetEnRu";
 
 const Stocks = () => {
   const dispatch = useDispatch();
@@ -167,6 +171,11 @@ const Stocks = () => {
   const { products, loading, count, next, previous } =
     useWarehouseData(requestParams);
 
+  const sortedProducts = useMemo(
+    () => sortByAlphabetEnRu(products, (item) => item?.name ?? ""),
+    [products],
+  );
+
   // Хук для пагинации с реальными данными
   const {
     currentPage,
@@ -215,7 +224,7 @@ const Stocks = () => {
     handleSelectAll,
     clearSelection,
     setSelectedRows,
-  } = useProductSelection(products);
+  } = useProductSelection(sortedProducts);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -312,7 +321,7 @@ const Stocks = () => {
     });
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) =>
-        String(a?.name || "").localeCompare(String(b?.name || "")),
+        compareByAlphabetEnRu(a, b, (item) => item?.name ?? ""),
       );
       map.set(k, arr);
     }
@@ -670,7 +679,7 @@ const Stocks = () => {
         onViewModeChange={handleViewModeChange}
         onOpenFilters={() => setShowFilterModal(true)}
         count={count}
-        foundCount={products.length}
+        foundCount={sortedProducts.length}
       />
 
       <BulkActionsBar
@@ -826,7 +835,7 @@ const Stocks = () => {
         <div className="warehouse-table-container w-full stocksContent">
           {viewMode === VIEW_MODES.TABLE ? (
             <ProductTable
-              products={products}
+              products={sortedProducts}
               loading={loading}
               selectedRows={selectedRows}
               isAllSelected={isAllSelected}
@@ -839,7 +848,7 @@ const Stocks = () => {
             />
           ) : (
             <ProductCards
-              products={products}
+              products={sortedProducts}
               loading={loading}
               selectedRows={selectedRows}
               isAllSelected={isAllSelected}

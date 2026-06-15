@@ -30,43 +30,50 @@ yarn install
 
 ### Настройка окружения
 
-Создайте файл `.env` в корне проекта:
+Скопируйте `.env.example` в `.env` и при необходимости измените переменные:
 
 ```env
-REACT_APP_API_BASE_URL=https://app.nurcrm.kg/api
+VITE_API_URL=https://app.nurcrm.kg/api
+VITE_WS_API_URL=https://app.nurcrm.kg
+VITE_REGISTER_ACCESS_PASSWORD=nurcrm2026
+VITE_REGISTER_ACCESS_BACKEND=false
 ```
+
+Полный список переменных — в `.env.example`.
 
 ### Запуск в режиме разработки
 
 ```bash
-npm start
+npm run dev
 # или
-yarn start
+yarn dev
 ```
 
 Приложение откроется по адресу [http://localhost:3000](http://localhost:3000)
 
 ## 📦 Доступные команды
 
-### `npm start`
+### `npm run dev`
 
-Запускает приложение в режиме разработки.  
+Запускает Vite dev-сервер.  
 Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
 ### `npm test`
 
-Запускает тестовый раннер в интерактивном режиме.
+Запускает unit-тесты (Vitest) в однократном режиме.
+
+### `npm run lint`
+
+Проверяет код ESLint (flat config в `eslint.config.js`).
 
 ### `npm run build`
 
 Создает production сборку в папке `build/`.  
 Приложение оптимизировано для production и готово к деплою.
 
-### `npm run eject`
+### `npm run preview`
 
-**⚠️ Внимание: это необратимая операция!**
-
-Извлекает конфигурацию Create React App в проект для полного контроля.
+Локальный просмотр production-сборки из `build/`.
 
 ## ☕ Cafe: Wi‑Fi принтеры (XPrinter XP‑N160II / RAW 9100)
 
@@ -228,6 +235,7 @@ PRINTER_BRIDGE_HOST=0.0.0.0 npm run printer-bridge
 ## 📚 Дополнительная документация
 
 - [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md) — полная документация проекта
+- [docs/UBL_INVOICE_INTEGRATION.md](./docs/UBL_INVOICE_INTEGRATION.md) — подключение пакета ubl-invoice
 - [ADAPTIVE_GUIDE.md](./ADAPTIVE_GUIDE.md) — руководство по адаптивности
 - [ORDERS_API_DOCUMENTATION.md](./ORDERS_API_DOCUMENTATION.md) — документация API заказов
 - [CODE_ANALYSIS_SellMainStart.md](./CODE_ANALYSIS_SellMainStart.md) — анализ кода компонента продаж

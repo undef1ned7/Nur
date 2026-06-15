@@ -1,99 +1,88 @@
-import { useEffect, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useEffect, useState } from "react";
+import { useDispatch, useStore } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import SellStart from "../ProductionAgents/SellStart/SellStart";
 import { startSale } from "../../../../store/creators/saleThunk";
-import {
-  fetchShiftsAsync,
-  openShiftAsync,
-} from "../../../../store/creators/shiftThunk";
-import { getCashBoxes } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import sleep from "../../../../../tools/sleep";
+
+const extractThunkError = (err, fallback = "Не удалось начать продажу") => {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  const data = err?.data ?? err;
+  if (typeof data === "string") return data;
+  if (data?.detail) return String(data.detail);
+  if (Array.isArray(data?.detail)) return data.detail.join(", ");
+  if (data?.message) return String(data.message);
+  if (err?.message) return String(err.message);
+  return fallback;
+};
 
 const ProductionSellStartPage = () => {
   const dispatch = useDispatch();
+  const store = useStore();
   const navigate = useNavigate();
-  const { profile, currentUser, userId } = useUser();
-  const [loading, setLoading] = useState(true);
+  const { profile } = useUser();
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const bootstrappedRef = useRef(false);
 
   useEffect(() => {
-    if (profile?.role !== "owner") {
-      navigate("/crm/production/sell", { replace: true });
-      return;
-    }
-    if (bootstrappedRef.current) return;
-    bootstrappedRef.current = true;
-
     let cancelled = false;
-    setLoading(true);
-    setError("");
 
-    const ensureShiftIsOpen = async () => {
-      const freshShiftsPayload = await dispatch(fetchShiftsAsync()).unwrap();
-      const freshShifts = Array.isArray(freshShiftsPayload?.results)
-        ? freshShiftsPayload.results
-        : Array.isArray(freshShiftsPayload)
-          ? freshShiftsPayload
-          : [];
-
-      const openShift = freshShifts.find((s) => s.status === "open");
-
-      if (openShift?.id) return openShift;
-
-      let availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
-      if (!availableCashBoxes || availableCashBoxes.length === 0) {
-        throw new Error(
-          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены.",
-        );
+    const waitForProfileRole = async () => {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        if (cancelled) return "";
+        const role = String(
+          store.getState().user?.profile?.role || profile?.role || "",
+        ).toLowerCase();
+        if (role) return role;
+        await sleep(100);
       }
-
-      const cashboxId = availableCashBoxes[0]?.id;
-      if (!cashboxId) {
-        throw new Error("Не удалось определить кассу");
-      }
-
-      const cashierId = currentUser?.id || userId || profile?.id;
-      if (!cashierId) {
-        throw new Error("Не удалось определить кассира");
-      }
-
-      const openedShift = await dispatch(
-        openShiftAsync({
-          cashbox: cashboxId,
-          cashier: cashierId,
-          opening_cash: "0",
-        }),
-      ).unwrap();
-
-      await dispatch(fetchShiftsAsync()).unwrap().catch(() => null);
-      return openedShift;
+      return String(profile?.role || "").toLowerCase();
     };
 
-    (async () => {
+    const bootstrap = async () => {
+      setReady(false);
+      setError("");
+
+      const role = await waitForProfileRole();
+      if (cancelled) return;
+
+      if (!role) {
+        setError("Не удалось загрузить профиль пользователя");
+        setReady(true);
+        return;
+      }
+
+      if (role !== "owner") {
+        navigate("/crm/production/sell", { replace: true });
+        return;
+      }
+
       try {
-        const openShift = await ensureShiftIsOpen();
-        await dispatch(startSale({ shift: openShift?.id })).unwrap();
+        await Promise.race([
+          dispatch(startSale()).unwrap(),
+          sleep(15000).then(() => {
+            throw new Error("Превышено время ожидания запуска продажи");
+          }),
+        ]);
       } catch (err) {
         if (!cancelled) {
-          const msg =
-            err?.data?.detail ||
-            err?.message ||
-            "Не удалось начать продажу";
-          setError(msg);
+          setError(extractThunkError(err));
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setReady(true);
       }
-    })();
+    };
+
+    bootstrap();
 
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.id, dispatch, navigate, profile?.id, profile?.role, userId]);
+  }, [dispatch, navigate, profile?.id, profile?.role, store]);
 
-  if (loading) {
+  if (!ready) {
     return <div style={{ padding: 24 }}>Загрузка продажи...</div>;
   }
 

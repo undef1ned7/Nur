@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import "../Warehouse.scss";
-import MovementHistory from "./MovementHistory";
+import PurchaseBatchHistory from "./PurchaseBatchHistory";
 import api from "../../../../../api";
 import noImage from "./placeholder.png";
 import AddProductModal from "../../../../Deposits/Sklad/AddProduct/AddProductModal";
@@ -389,7 +389,12 @@ const ProductDetail = () => {
                 <thead>
                   <tr>
                     <th>Цена продажи</th>
-                    <th>Цена закупки</th>
+                    <th>
+                      Цена закупки
+                      <span className="product-detail__price-hint">
+                        (последняя партия)
+                      </span>
+                    </th>
                     {/* <th>Себестоимость</th> */}
                     <th>Наценка</th>
                     {/* <th>Маржинальность</th> */}
@@ -420,6 +425,12 @@ const ProductDetail = () => {
                 </tbody>
               </table>
             </div>
+
+            <PurchaseBatchHistory
+              productId={product.id}
+              productName={product.name}
+              batches={product.purchase_batches}
+            />
 
             {/* Warehouse Section */}
             {/* <div className="product-detail__section">

@@ -56,6 +56,7 @@ import ReactPortal from "../../../common/Portal/ReactPortal";
 import CreateCounterpartyModal from "../../Market/Counterparties/components/CreateCounterpartyModal";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { exportInvoiceToExcel } from "./components/invoiceExcelExport";
+import { sortByAlphabetEnRu } from "../../../../utils/sortByAlphabetEnRu";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -70,6 +71,8 @@ const VALID_DOC_TYPES = [
 ];
 
 const MULTI_WAREHOUSE_DOC_TYPES = ["SALE", "SALE_RETURN", "COMMERCIAL_OFFER"];
+const WAREHOUSE_CREATE_DOC_CATALOG_WIDTH_KEY =
+  "warehouse_create_document_catalog_width_pct";
 
 const resolveEntityId = (value) => {
   if (value == null || value === "") return "";
@@ -401,6 +404,24 @@ const CreateSaleDocument = () => {
   );
   const [showSavePrintMenu, setShowSavePrintMenu] = useState(false);
   const dateInputRef = useRef(null);
+  const contentRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const isResizingRef = useRef(false);
+  const [isCompactCatalog, setIsCompactCatalog] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(
+    () => typeof window !== "undefined" && window.innerWidth > 1024,
+  );
+  const [desktopCatalogWidth, setDesktopCatalogWidth] = useState(() => {
+    try {
+      const raw = Number(
+        localStorage.getItem(WAREHOUSE_CREATE_DOC_CATALOG_WIDTH_KEY),
+      );
+      if (Number.isFinite(raw)) return Math.min(50, Math.max(18, raw));
+    } catch {
+      /* ignore */
+    }
+    return 26;
+  });
   const [documentDiscount, setDocumentDiscount] = useState("");
   const [documentDiscountAmount, setDocumentDiscountAmount] = useState("");
   const [comment, setComment] = useState("");
@@ -495,7 +516,7 @@ const CreateSaleDocument = () => {
         const searchEntry = groupProducts?.[searchKey];
         if (key === "ArrowLeft" || key === "ArrowRight") return;
 
-        const targetItems = sortProductsByDate(
+        const targetItems = sortProductsAlphabetically(
           getVisibleProducts(searchKey, searchEntry?.items),
         );
         if (!targetItems.length) return;
@@ -619,7 +640,7 @@ const CreateSaleDocument = () => {
         ? groupProducts?.[preferredKey]
         : null;
       const preferredItems = Array.isArray(preferredEntry?.items)
-        ? sortProductsByDate(
+        ? sortProductsAlphabetically(
             getVisibleProducts(preferredKey, preferredEntry.items),
           )
         : [];
@@ -637,7 +658,7 @@ const CreateSaleDocument = () => {
         if (!fallbackKey) return;
         targetGroupKey = String(fallbackKey);
         const fallbackItems = groupProducts?.[targetGroupKey]?.items || [];
-        targetItems = sortProductsByDate(
+        targetItems = sortProductsAlphabetically(
           getVisibleProducts(targetGroupKey, fallbackItems),
         );
       }
@@ -891,15 +912,76 @@ const CreateSaleDocument = () => {
     });
   }, []);
 
-  // Сортировка товаров по дате (новые сверху)
-  const sortProductsByDate = (list) => {
-    const arr = Array.isArray(list) ? list : [];
-    return [...arr].sort((a, b) => {
-      const dateA = a?.updated_at || a?.created_at || 0;
-      const dateB = b?.updated_at || b?.created_at || 0;
-      return new Date(dateB) - new Date(dateA);
+  const handleDesktopResizeStart = useCallback((e) => {
+    if (window.innerWidth <= 1024) return;
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsDesktopLayout(window.innerWidth > 1024);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el || !isDesktopLayout) {
+      setIsCompactCatalog(false);
+      return undefined;
+    }
+
+    const updateCompact = (width) => {
+      setIsCompactCatalog(width > 0 && width < 340);
+    };
+
+    updateCompact(el.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver(([entry]) => {
+      updateCompact(entry.contentRect.width);
     });
-  };
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [isDesktopLayout, desktopCatalogWidth]);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!isResizingRef.current || !contentRef.current) return;
+      const rect = contentRef.current.getBoundingClientRect();
+      if (!rect.width) return;
+      const relativeX = e.clientX - rect.left;
+      const nextPct = (relativeX / rect.width) * 100;
+      setDesktopCatalogWidth(Math.min(50, Math.max(18, nextPct)));
+    };
+
+    const onUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(
+          WAREHOUSE_CREATE_DOC_CATALOG_WIDTH_KEY,
+          String(desktopCatalogWidth),
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [desktopCatalogWidth]);
+
+  const sortProductsAlphabetically = (list) =>
+    sortByAlphabetEnRu(list, (item) => item?.name ?? "");
 
   const renderGroupProductsList = (gKey, entry, { addOn = "click" } = {}) => {
     if (entry?.loading) {
@@ -917,7 +999,7 @@ const CreateSaleDocument = () => {
       );
     }
 
-    const visibleProducts = sortProductsByDate(
+    const visibleProducts = sortProductsAlphabetically(
       getVisibleProducts(gKey, entry?.items),
     );
     if (!visibleProducts.length) {
@@ -1315,7 +1397,7 @@ const CreateSaleDocument = () => {
                   </div>
                 ) : (
                   (() => {
-                    const visibleProducts = sortProductsByDate(
+                    const visibleProducts = sortProductsAlphabetically(
                       cached?.items || [],
                     );
                     const currentIndex =
@@ -3354,9 +3436,23 @@ const CreateSaleDocument = () => {
 
   return (
     <div className="create-sale-document">
-      <div className="create-sale-document__container">
+      <div className="create-sale-document__container" ref={contentRef}>
         {/* Левая панель — каталог товаров */}
-        <div className="create-sale-document__sidebar">
+        <div
+          ref={sidebarRef}
+          className={`create-sale-document__sidebar${
+            isCompactCatalog ? " create-sale-document__sidebar--compact" : ""
+          }`}
+          style={
+            isDesktopLayout
+              ? {
+                  flex: "0 0 auto",
+                  width: `calc(${desktopCatalogWidth}% - 4px)`,
+                  minWidth: 260,
+                }
+              : undefined
+          }
+        >
           <h2 className="create-sale-document__sidebar-title">
             КАТАЛОГ ТОВАРОВ
             {cartItems.length > 0 && (
@@ -3515,8 +3611,27 @@ const CreateSaleDocument = () => {
           </button>
         </div>
 
+        <div
+          className="create-sale-document__splitter"
+          onMouseDown={handleDesktopResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панелей"
+        />
+
         {/* Основная область */}
-        <div className="create-sale-document__main">
+        <div
+          className="create-sale-document__main"
+          style={
+            isDesktopLayout
+              ? {
+                  flex: "0 0 auto",
+                  width: `calc(${100 - desktopCatalogWidth}% - 4px)`,
+                  minWidth: 360,
+                }
+              : undefined
+          }
+        >
           <div className="create-sale-document__header">
             <div className="create-sale-document__header-left">
               <button

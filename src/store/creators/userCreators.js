@@ -8,7 +8,9 @@ import {
   migrateUserPermissions,
 } from "../../api/auth";
 import api from "../../api";
-import axios from "axios";
+import { setSector } from "../slices/sectorSlice";
+import { mapSectorNameToSlug } from "../../utils/sectorMapping";
+import { handleThunkError } from "./utils/handleThunkError";
 
 export const registerUserAsync = createAsyncThunk(
   "user/register",
@@ -20,16 +22,14 @@ export const registerUserAsync = createAsyncThunk(
       }
       return response;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || { detail: error.message || "Register error" }
-      );
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
 
 export const loginUserAsync = createAsyncThunk(
   "user/login",
-  async (formData, { rejectWithValue }) => {
+  async (formData, { rejectWithValue, dispatch }) => {
     try {
       const response = await loginUser(formData);
       localStorage.setItem("userData", JSON.stringify(response));
@@ -47,14 +47,26 @@ export const loginUserAsync = createAsyncThunk(
         } catch (migrationError) {
           console.error("Migration failed:", migrationError);
         }
+
+        // Синхронизируем sector slug в Redux + localStorage для persistence
+        try {
+          const { data: company } = await api.get("/users/company/", {
+            headers: {
+              Authorization: `Bearer ${response.access}`,
+            },
+          });
+          const slug = mapSectorNameToSlug(company?.sector?.name);
+          if (slug) {
+            dispatch(setSector(slug));
+          }
+        } catch (companyError) {
+          console.error("Failed to sync sector on login:", companyError);
+        }
       }
 
       return response;
     } catch (error) {
-      // В реджект кладём только полезный payload с бэка
-      return rejectWithValue(
-        error?.response?.data || { detail: error.message || "Login error" }
-      );
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -66,9 +78,7 @@ export const getIndustriesAsync = createAsyncThunk(
       const response = await getIndustries();
       return response;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || { detail: error.message || "Industries error" }
-      );
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -80,9 +90,7 @@ export const getSubscriptionPlansAsync = createAsyncThunk(
       const response = await getSubscriptionPlans();
       return response;
     } catch (error) {
-      return rejectWithValue(
-        error?.response?.data || { detail: error.message || "Plans error" }
-      );
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -98,7 +106,7 @@ export const getCompany = createAsyncThunk(
       });
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -110,7 +118,7 @@ export const submitApplicationAsync = createAsyncThunk(
       const response = await api.post("/main/applications/", applicationData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -122,7 +130,7 @@ export const getApplicationList = createAsyncThunk(
       const { data } = await api.get("/main/applications/");
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return handleThunkError(error, rejectWithValue);
     }
   }
 );
@@ -137,7 +145,7 @@ export const updateApplication = createAsyncThunk(
       );
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return handleThunkError(err, rejectWithValue);
     }
   }
 );
@@ -152,7 +160,7 @@ export const updateUserData = createAsyncThunk(
       );
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return handleThunkError(err, rejectWithValue);
     }
   }
 );
@@ -164,7 +172,7 @@ export const updateUserCompanyName = createAsyncThunk(
       const { data } = await api.patch(`/users/settings/company/`, userData);
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return handleThunkError(err, rejectWithValue);
     }
   }
 );
@@ -176,7 +184,7 @@ export const getScalesToken = createAsyncThunk(
       const { data } = await api.get("/users/scales/token/");
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return handleThunkError(err, rejectWithValue);
     }
   }
 );
@@ -188,7 +196,7 @@ export const sendProductsToScales = createAsyncThunk(
       const { data } = await api.post("/users/scales/send-products/", payload);
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return handleThunkError(err, rejectWithValue);
     }
   }
 );

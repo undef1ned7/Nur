@@ -13,6 +13,7 @@ import {
 import api from "../../../../api";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import {
   pickExpenseIdFromResponse,
   recordCafePurchaseExpense,
@@ -86,6 +87,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setItems(listFrom(itemsRes));
       setSessions(listFrom(sessionsRes));
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       alertRef.current(
         validateResErrors(e, "Не удалось загрузить посуду и расходники"),
         true,
@@ -210,6 +212,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setItemModalOpen(false);
       await loadAll();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка сохранения позиции"), true);
     }
   };
@@ -221,6 +224,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
         await api.delete(`/cafe/household-items/${row.id}/`);
         await loadAll();
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         alert(validateResErrors(err, "Ошибка удаления"), true);
       }
     });
@@ -298,6 +302,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setMoveOpen(false);
       await loadAll();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(
         validateResErrors(
           err,
@@ -353,6 +358,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setSessionModalOpen(false);
       await loadAll();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка создания акта"), true);
     }
   };
@@ -363,6 +369,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setViewSession(data);
       setViewSessionOpen(true);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка загрузки акта"), true);
     }
   };
@@ -378,6 +385,7 @@ const HouseholdInventoryTab = ({ query = "" }) => {
       setViewSessionOpen(false);
       await loadAll();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Ошибка проведения акта"), true);
     } finally {
       setConfirmBusy(false);

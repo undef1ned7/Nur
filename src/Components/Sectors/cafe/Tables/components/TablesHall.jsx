@@ -4,6 +4,7 @@ import { FaSearch, FaPlus, FaTimes, FaEdit, FaTrash, FaChair, FaChevronDown, FaC
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import { useAlert } from "../../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../../utils/cafeOfflineError";
 // SearchableCombobox используется в модалке создания/редактирования стола
 
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -210,6 +211,7 @@ const TablesHall = ({
       const ok = editId ? await updateTable(editId, payload) : await createTable(payload);
       if (ok) closeModal();
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка сохранения стола");
       alert(errorMessage, true);
     } finally {

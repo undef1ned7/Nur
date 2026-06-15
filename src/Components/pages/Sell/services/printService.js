@@ -7,6 +7,8 @@
 const usbState = { dev: null, opening: null };
 
 const DEFAULT_DOTS_PER_LINE = 576; // 80мм принтер обычно 576 точек
+const MARKET_DEFAULT_DOTS_PER_LINE = 384; // 58мм
+const MARKET_DEFAULT_CHARS_PER_LINE = 42; // font B: 384 / 9
 const DEFAULT_FONT = "B";
 const DEFAULT_CODEPAGE = 17; // PC866 (часто 17 или 66)
 
@@ -35,6 +37,10 @@ const safeByte = (raw, fallback) => {
   const b = Math.trunc(n);
   return b >= 0 && b <= 255 ? b : fallback;
 };
+
+function hasEscposWidthSettings() {
+  return safeLsGet("escpos_dpl") != null || safeLsGet("escpos_cpl") != null;
+}
 
 // Быстрые тюнеры (пригодятся в консоли):
 export function setEscposDotsPerLine(n) {
@@ -124,16 +130,20 @@ function encodePC936(s = "") {
   }
   return new Uint8Array(out);
 }
-export function getEscposRuntimeConfig() {
+export function getEscposRuntimeConfig(opts = {}) {
+  const useMarketDefault = Boolean(opts.marketDefault) && !hasEscposWidthSettings();
   const fontRaw = String(safeLsGet("escpos_font") || DEFAULT_FONT).toUpperCase();
   const font = fontRaw === "A" ? "A" : "B";
   const charDotWidth = font === "B" ? 9 : 12;
 
-  const dotsPerLine = safeNumber(safeLsGet("escpos_dpl"), DEFAULT_DOTS_PER_LINE);
-  const charsPerLine = safeNumber(
-    safeLsGet("escpos_cpl"),
-    Math.floor(dotsPerLine / charDotWidth)
-  );
+  const fallbackDots = useMarketDefault
+    ? MARKET_DEFAULT_DOTS_PER_LINE
+    : DEFAULT_DOTS_PER_LINE;
+  const dotsPerLine = safeNumber(safeLsGet("escpos_dpl"), fallbackDots);
+  const fallbackChars = useMarketDefault
+    ? MARKET_DEFAULT_CHARS_PER_LINE
+    : Math.floor(dotsPerLine / charDotWidth);
+  const charsPerLine = safeNumber(safeLsGet("escpos_cpl"), fallbackChars);
   const lineDotHeight = safeNumber(
     safeLsGet("escpos_line"),
     font === "B" ? 22 : 24
@@ -297,46 +307,12 @@ function wrapReceiptName(text, maxWidth) {
   return lines.length ? lines : [""];
 }
 
-/** Между колонками маркет-таблицы на чеке — « |»; в ESC/POS вставляем байты 0x20 0x7C (пробел + ASCII |), не полагаясь на Unicode-вертикальную черту в строке. */
-const MARKET_TABLE_PIPE_SEP = new Uint8Array([0x20, 0x7c]);
-
-function concatUint8Arrays(...arrays) {
-  let n = 0;
-  for (const a of arrays) n += a.length;
-  const r = new Uint8Array(n);
-  let o = 0;
-  for (const a of arrays) {
-    r.set(a, o);
-    o += a.length;
-  }
-  return r;
-}
-
-/** Склеивает ячейки, уже переведённые enc() в байты, с ASCII pipe между ними. */
-function joinEncodedMarketTableCells(enc, cells) {
-  const parts = [];
-  for (let i = 0; i < cells.length; i++) {
-    if (i > 0) parts.push(MARKET_TABLE_PIPE_SEP);
-    parts.push(enc(cells[i]));
-  }
-  return concatUint8Arrays(...parts);
-}
-
-/** Строка данных позиции: Цена | Кол-о | Скидка | Итого (без №). */
-function buildMarketItemDataCells(width, priceStr, qtyStr, discStr, totalStr) {
-  const wPrice = 9;
-  const wQty = 5;
-  const sepDisplayLen = 2;
-  const sepTotal = sepDisplayLen * 3;
-  const wTot = 9;
-  const wDisc = Math.max(5, width - wPrice - wQty - wTot - sepTotal);
-  const actualWTot = Math.max(7, width - wPrice - wQty - wDisc - sepTotal);
-  return [
-    fitCell(priceStr, wPrice, "R"),
-    fitCell(qtyStr, wQty, "R"),
-    fitCell(discStr, wDisc, "L"),
-    fitCell(totalStr, actualWTot, "R"),
-  ].map((s) => (s.length > width ? s.slice(0, width) : s));
+/** Левая часть строки позиции маркета: «Цена x Кол-о» или «Цена x Кол-о - Скидка». */
+function buildMarketItemLineLeft(price, qty, lineDiscountAmt) {
+  const base = `${money(price)} x ${qty}`;
+  const amt = Math.max(0, toNum(lineDiscountAmt));
+  if (amt <= 0) return base;
+  return `${base} - ${formatMarketLineDiscountCell(lineDiscountAmt)}`;
 }
 
 const toNum = (v) => {
@@ -377,15 +353,27 @@ function pushReceiptSizeOff(chunks) {
   chunks.push(ESC(0x1b, 0x21, 0x00));
 }
 
-function pushMarketDataCellsRow(chunks, enc, width, cells) {
+function pushMarketItemHeaderRow(chunks, enc, width) {
   pushReceiptBoldOn(chunks);
   pushReceiptSlightLargeOn(chunks);
-  chunks.push(
-    concatUint8Arrays(
-      joinEncodedMarketTableCells(enc, cells),
-      enc("\n"),
-    ),
-  );
+  chunks.push(enc(lr("Цена x Кол-о - Скидка", "Итого", width) + "\n"));
+  pushReceiptSizeOff(chunks);
+  pushReceiptBoldOff(chunks);
+}
+
+function pushMarketItemLineRow(
+  chunks,
+  enc,
+  width,
+  price,
+  qty,
+  lineDiscountAmt,
+  lineTotal,
+) {
+  const left = buildMarketItemLineLeft(price, qty, lineDiscountAmt);
+  pushReceiptBoldOn(chunks);
+  pushReceiptSlightLargeOn(chunks);
+  chunks.push(enc(lr(left, money(lineTotal), width) + "\n"));
   pushReceiptSizeOff(chunks);
   pushReceiptBoldOff(chunks);
 }
@@ -458,12 +446,15 @@ function buildEscPosQr(text) {
   ];
 }
 function buildReceiptFromJSON(payload, opts = {}) {
-  const cfg = getEscposRuntimeConfig();
-  const width = Math.max(42, opts.width || cfg.charsPerLine);
+  const emphasizeMarketReceipt = opts.receiptStyle === "market";
+  const cfg = getEscposRuntimeConfig({ marketDefault: emphasizeMarketReceipt });
+  const width = Math.max(
+    emphasizeMarketReceipt ? 32 : 42,
+    opts.width || cfg.charsPerLine
+  );
   const divider = "-".repeat(width);
   const codepage = opts.codepage || cfg.codepage;
   const enc = opts.encoder || getEncoder(codepage);
-  const emphasizeMarketReceipt = opts.receiptStyle === "market";
   const hasText = (v) => {
     const s = String(v ?? "").trim();
     return s !== "" && s !== "—";
@@ -611,12 +602,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(enc(divider + "\n"));
   }
   if (emphasizeMarketReceipt) {
-    pushMarketDataCellsRow(
-      chunks,
-      enc,
-      width,
-      buildMarketItemDataCells(width, "Цена", "Кол-о", "Скидка", "Итого"),
-    );
+    pushMarketItemHeaderRow(chunks, enc, width);
     chunks.push(enc("\n"));
     for (const [index, it] of items.entries()) {
       const name = String(it.name ?? "Товар");
@@ -624,7 +610,6 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const price = Number(it.price || 0);
       const lineTotal = Number(it.total ?? qty * price);
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
-      const discCell = formatMarketLineDiscountCell(lineDiscountAmt);
       const prefix = `${index + 1}) `;
       const nameLines = wrapReceiptName(name, Math.max(8, width - prefix.length));
 
@@ -636,17 +621,14 @@ function buildReceiptFromJSON(payload, opts = {}) {
       pushReceiptBoldOff(chunks);
       chunks.push(enc("\n"));
 
-      pushMarketDataCellsRow(
+      pushMarketItemLineRow(
         chunks,
         enc,
         width,
-        buildMarketItemDataCells(
-          width,
-          money(price),
-          String(qty),
-          discCell,
-          money(lineTotal),
-        ),
+        price,
+        qty,
+        lineDiscountAmt,
+        lineTotal,
       );
       if (index < items.length - 1) {
         chunks.push(enc(divider + "\n"));
@@ -1000,7 +982,8 @@ async function printReceiptFromPdfUSB(pdfBlob, options = {}) {
   saveVidPidToLS(dev);
 
   // печатаем на ширину принтера
-  const cfg = getEscposRuntimeConfig();
+  const isMarket = options?.receiptStyle === "market";
+  const cfg = getEscposRuntimeConfig({ marketDefault: isMarket });
   const canvas = await pdfBlobToCanvas(pdfBlob, cfg.dotsPerLine);
   const { raster, bytesPerLine, h } = canvasToRasterBytes(canvas);
   const escpos = buildEscPosForRaster(raster, bytesPerLine, h);
@@ -1024,7 +1007,8 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
   const { outEP } = await openUsbDevice(dev);
   saveVidPidToLS(dev);
 
-  const cfg = getEscposRuntimeConfig();
+  const isMarket = options?.receiptStyle === "market";
+  const cfg = getEscposRuntimeConfig({ marketDefault: isMarket });
   const parts = buildReceiptFromJSON(payload, {
     width: cfg.charsPerLine,
     codepage: cfg.codepage,
@@ -1149,7 +1133,17 @@ export function enrichMarketReceiptPayload(payload, meta = {}) {
   return next;
 }
 
+function resolveMarketPrintOptions(options = {}) {
+  if (options.receiptStyle) return options;
+  const sectorSlug = String(safeLsGet("selectedSector") || "").toLowerCase();
+  if (sectorSlug === "market") {
+    return { ...options, receiptStyle: "market" };
+  }
+  return options;
+}
+
 export async function handleCheckoutResponseForPrinting(res, options = {}) {
+  const printOptions = resolveMarketPrintOptions(options);
   const printable = unwrapPrintablePayload(res);
 
   if (typeof printable === "string") {
@@ -1157,13 +1151,13 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     if (text.startsWith("data:application/pdf;base64,")) {
       const b64 = text.split(",")[1] || "";
       const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-      await printReceiptFromPdfUSB(new Blob([bin], { type: "application/pdf" }), options);
+      await printReceiptFromPdfUSB(new Blob([bin], { type: "application/pdf" }), printOptions);
       return;
     }
     try {
       const json = JSON.parse(text);
       if (json && Array.isArray(json.items)) {
-        await printReceiptJSONViaUSB(json, options);
+        await printReceiptJSONViaUSB(json, printOptions);
         return;
       }
     } catch {
@@ -1177,21 +1171,21 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     !(printable instanceof Blob) &&
     Array.isArray(printable.items)
   ) {
-    await printReceiptJSONViaUSB(printable, options);
+    await printReceiptJSONViaUSB(printable, printOptions);
     return;
   }
   if (printable instanceof Blob) {
     if (await looksLikePdf(printable)) {
-      await printReceiptFromPdfUSB(printable, options);
+      await printReceiptFromPdfUSB(printable, printOptions);
       return;
     }
     const parsed = await tryParseJsonFromBlob(printable);
     if (parsed?.json) {
-      await printReceiptJSONViaUSB(parsed.json, options);
+      await printReceiptJSONViaUSB(parsed.json, printOptions);
       return;
     }
     if (parsed?.pdfBlob && (await looksLikePdf(parsed.pdfBlob))) {
-      await printReceiptFromPdfUSB(parsed.pdfBlob, options);
+      await printReceiptFromPdfUSB(parsed.pdfBlob, printOptions);
       return;
     }
     // не PDF и не JSON — сохраним как файл (фолбэк)
@@ -1204,7 +1198,7 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
   }
   if (printable && typeof printable === "object" && Array.isArray(printable.items)) {
-    await printReceiptJSONViaUSB(printable, options);
+    await printReceiptJSONViaUSB(printable, printOptions);
     return;
   }
   throw new Error("Неизвестный формат ответа для печати");

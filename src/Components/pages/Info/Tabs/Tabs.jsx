@@ -63,6 +63,7 @@
 // src/Components/pages/Info/Settings/Tabs/Tabs.jsx
 import React, { useMemo } from "react";
 import "./Tabs.scss";
+import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
 
 const allTabs = ["Моя компания", "Безопасность", "Токен для весов", "Интерфейс", "Печать", "Онлайн"];
 
@@ -94,12 +95,26 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   const canViewOnline = useMemo(() => {
     const hasSlug = Boolean(company?.slug);
     const canViewShowcase = Boolean(profile?.can_view_showcase);
-    // Показываем владельцу всегда, а сотрудникам — если есть доступ к витрине и slug
-    // Для барбершопа, кафе и магазина показываем вкладку "Онлайн"
     const hasSectorWithOnline =
       isBarberSector || isCafeSector || isMarketSector || isProductionSector;
-    return hasSlug && hasSectorWithOnline && (isOwner || canViewShowcase);
-  }, [company?.slug, profile?.can_view_showcase, isOwner, isBarberSector, isCafeSector, isMarketSector, isProductionSector]);
+    if (!hasSlug || !hasSectorWithOnline) return false;
+    return canAccessOnlineShowcase({
+      tariffName: company?.subscription_plan?.name,
+      sectorName: company?.sector?.name,
+      isOwner,
+      canViewShowcase,
+    });
+  }, [
+    company?.slug,
+    company?.subscription_plan?.name,
+    company?.sector?.name,
+    profile?.can_view_showcase,
+    isOwner,
+    isBarberSector,
+    isCafeSector,
+    isMarketSector,
+    isProductionSector,
+  ]);
 
   const visibleTabs = useMemo(() => {
     return allTabs.filter((tab) => {

@@ -427,6 +427,22 @@ $col-header-h: 56px;
       }
     }
 
+    &--walkin {
+      background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+      color: #166534;
+      border-color: #86efac;
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+
+      svg {
+        color: #166534;
+      }
+
+      &:hover {
+        background: linear-gradient(135deg, #bbf7d0 0%, #86efac 100%);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+      }
+    }
+
     &--square {
       width: 42px;
       height: 42px;
@@ -970,12 +986,12 @@ $col-header-h: 56px;
   &__modal {
     position: relative;
     width: min(1040px, 94vw);
-    max-height: min(92vh, 780px);
+    max-height: min(92vh, 820px);
     background: #fff;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    display: grid;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 
     @media (max-width: 480px) {
@@ -1034,8 +1050,9 @@ $col-header-h: 56px;
   }
 
   &__form {
-    display: grid;
-    grid-template-rows: auto auto auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
   }
 
@@ -1044,6 +1061,7 @@ $col-header-h: 56px;
     padding: 18px 20px 10px;
     overflow: auto;
     min-height: 0;
+    flex: 1 1 auto;
 
     @media (max-width: 480px) {
       padding: 14px 12px 8px;
@@ -1509,34 +1527,60 @@ $col-header-h: 56px;
     }
   }
 
-  /* ===== итог "К ОПЛАТЕ" ===== */
+  /* ===== итог по услугам (не кнопка!) ===== */
   &__totalCard {
     margin-top: 4px;
-    border-radius: 16px;
-    background: var(--primary);
-    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px dashed rgba(0, 0, 0, 0.12);
+    background: #fafafa;
+    padding: 12px 16px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    text-align: center;
+    gap: 12px;
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
 
     @media (max-width: 480px) {
-      padding: 12px 14px;
-      border-radius: 12px;
-    }
-
-    @media (max-width: 360px) {
-      padding: 10px 12px;
+      padding: 10px 14px;
+      gap: 10px;
     }
   }
 
+  &__totalCardIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #9ca3af;
+    font-size: 15px;
+  }
+
+  &__totalCardBody {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   &__totalLabel {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  &__totalHint {
     font-size: 11px;
-    font-weight: 450;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(0, 0, 0, 0.6);
+    font-weight: 400;
+    color: #9ca3af;
+    line-height: 1.3;
   }
 
   .barberrecorda__comboTrigger,
@@ -1547,9 +1591,12 @@ $col-header-h: 56px;
 
 
   &__totalValue {
-    margin-top: 4px;
-    font-size: 22px;
-    font-weight: 500;
+    flex-shrink: 0;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    white-space: nowrap;
   }
 
   /* ===== нижняя подсказка ===== */
@@ -2484,6 +2531,322 @@ $col-header-h: 56px;
     &__timeSlotsLegend {
       flex-direction: column;
       gap: 8px;
+    }
+  }
+
+  /* ===== РЕЖИМЫ МОДАЛКИ ===== */
+  &__modeTabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 20px 0;
+  }
+
+  &__modeTab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-radius: 14px;
+    background: #fafafa;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.12);
+      background: #fff;
+    }
+
+    &.is-active {
+      border-color: var(--primary);
+      background: #fffef5;
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.15);
+    }
+  }
+
+  &__modeTabIcon {
+    font-size: 18px;
+    color: #9ca3af;
+    flex-shrink: 0;
+
+    .is-active & {
+      color: #166534;
+    }
+  }
+
+  &__modeTabText {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    strong {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    small {
+      font-size: 11px;
+      color: #9ca3af;
+      font-weight: 400;
+    }
+  }
+
+  &__modeTab.is-active &__modeTabText strong {
+    color: #111;
+  }
+
+  &__modeBanner {
+    margin: 10px 20px 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+
+    &--walkin {
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    &--booking {
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+  }
+
+  &__preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 20px 0;
+  }
+
+  &__previewChip {
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #f3f4f6;
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+
+    &--price {
+      background: #fff7d1;
+      color: #92400e;
+      font-weight: 600;
+    }
+  }
+
+  /* ===== ШАГИ ФОРМЫ ===== */
+  &__step {
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #fff;
+    transition: border-color 0.15s ease;
+
+    &.is-active {
+      border-color: rgba(250, 204, 21, 0.5);
+      background: #fffef5;
+    }
+
+    &.is-done {
+      border-color: #bbf7d0;
+      background: #fafdfa;
+    }
+
+    &.is-invalid {
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+  }
+
+  &__stepHead {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  &__stepNum {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b7280;
+    flex-shrink: 0;
+
+    .is-done & {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .is-active & {
+      background: var(--primary);
+      color: #111;
+    }
+  }
+
+  &__stepTitles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__stepTitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__stepHint {
+    font-size: 12px;
+    color: #9ca3af;
+    line-height: 1.3;
+  }
+
+  &__stepBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__timeSectionHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* ===== WALK-IN: СЕЙЧАС ===== */
+  &__nowTime {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+  }
+
+  &__nowTimeMain {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  &__nowTimeIcon {
+    font-size: 22px;
+    color: #16a34a;
+    flex-shrink: 0;
+  }
+
+  &__nowTimeLabel {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #166534;
+    margin-bottom: 2px;
+  }
+
+  &__nowTimeValue {
+    display: block;
+    font-size: 18px;
+    font-weight: 700;
+    color: #111;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__nowTimeDur {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-left: 6px;
+  }
+
+  &__nowTimeRefresh {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #bbf7d0;
+    background: #fff;
+    color: #166534;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #dcfce7;
+    }
+  }
+
+  &__quickServiceBtn.is-selected {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    color: #111;
+  }
+
+  &__modal--walkin {
+    .barberrecorda__modeTab.is-active {
+      border-color: #86efac;
+      background: #f0fdf4;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+
+      .barberrecorda__modeTabIcon {
+        color: #166534;
+      }
+    }
+  }
+
+  @media (max-width: 600px) {
+    &__modeTabs {
+      padding: 10px 14px 0;
+      gap: 6px;
+    }
+
+    &__modeTab {
+      padding: 10px 12px;
+      gap: 8px;
+    }
+
+    &__modeTabText strong {
+      font-size: 12px;
+    }
+
+    &__modeTabText small {
+      display: none;
+    }
+
+    &__modeBanner {
+      margin: 8px 14px 0;
+      font-size: 12px;
+    }
+
+    &__preview {
+      padding: 8px 14px 0;
+    }
+
+    &__step {
+      padding: 12px 14px;
+    }
+
+    &__nowTimeValue {
+      font-size: 16px;
     }
   }
 }

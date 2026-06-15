@@ -36,6 +36,10 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     HIDE_RULES.forEach((rule) => {
       const { when = {}, hide = {} } = rule;
       const sectorOk = !when.sector || when.sector === sector;
+      const sectorInOk =
+        !when.sectorIn ||
+        !sector ||
+        when.sectorIn.includes(sector);
       const sectorNotInOk =
         !when.sectorNotIn ||
         !sector ||
@@ -48,6 +52,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
 
       if (
         sectorOk &&
+        sectorInOk &&
         sectorNotInOk &&
         tariffOk &&
         tariffInOk &&

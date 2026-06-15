@@ -206,7 +206,7 @@ export default function NotificationCafeSound({
             <audio ref={defaultAudioRef} src="/sounds/notification.mp3" preload="auto" className="hidden" />
             <audio ref={waiterAudioRef} src="/sounds/waiter_notification.mp3" preload="auto" className="hidden" />
 
-            <style jsx>{`
+            <style>{`
                 @keyframes slide-up {
                     from {
                         transform: translateY(100px);

@@ -43,6 +43,22 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import * as logger from "../../../../utils/logger";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
+import { useNetworkStatus } from "../../../../hooks/useNetworkStatus";
+import {
+  addOrderLocally,
+  updateOrderLocally,
+  removeOrderLocally,
+  getOpenOrdersLocally,
+  addToQueue,
+  updateTableStatusLocally,
+  getSnapshot,
+  resolveOrderId,
+} from "../../../../services/cafeOfflineService";
+import CafeOpenShift from "../CafeOpenShift/CafeOpenShift";
+import { useShifts } from "../../../../store/slices/shiftSlice";
+import { useFiscalSettings } from "../../../../hooks/useFiscalSettings";
+import { sendReceipt } from "../../../../services/fiscalDriverService";
 import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   MAX_QTY,
@@ -368,6 +384,9 @@ const statusFilterOptions = [
    Orders
    ========================================================= */
 const Orders = () => {
+  const { isOnline } = useNetworkStatus();
+  const { shifts, currentShift } = useShifts();
+  const { settings: fiscalSettings } = useFiscalSettings();
   const alert = useAlert();
   const confirm = useConfirm();
   const { profile, company, tariff } = useUser();
@@ -400,6 +419,8 @@ const Orders = () => {
 
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
+  const [showOpenShiftPage, setShowOpenShiftPage] = useState(false);
+  const [snapshotShift, setSnapshotShift] = useState(null);
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
 
   // Состояние пагинации меню
@@ -417,6 +438,18 @@ const Orders = () => {
     };
   }, [profile]);
 
+  const hasOpenShift = useMemo(() => {
+    if (snapshotShift?.id) return true;
+    if (currentShift?.status === "open") return true;
+    return (shifts || []).some((s) => s.status === "open");
+  }, [shifts, currentShift, snapshotShift]);
+
+  useEffect(() => {
+    getSnapshot()
+      .then((s) => setSnapshotShift(s.current_shift))
+      .catch(() => {});
+  }, []);
+
   const canPayOrders = useMemo(() => canCafeOrderPay(profile), [profile]);
 
   const [printingId, setPrintingId] = useState(null);
@@ -429,8 +462,14 @@ const Orders = () => {
   const [openSelectId, setOpenSelectId] = useState(null);
 
   /* ===== API ===== */
-  const fetchTables = async () =>
+  const fetchTables = async () => {
+    if (!isOnline) {
+      const { tables } = await getSnapshot();
+      setTables(tables || []);
+      return;
+    }
     setTables(listFrom(await api.get("/cafe/tables/")));
+  };
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
@@ -456,13 +495,28 @@ const Orders = () => {
       const r = await api.get("/cafe/kitchens/");
       setKitchens(listFrom(r) || []);
     } catch (e) {
-      const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+      if (suppressOfflineError(e)) return;
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке кухонь");
       alert(errorMessage, true);
       setKitchens([]);
     }
   };
 
   const fetchMenu = async (page = 1) => {
+    if (!isOnline) {
+      setMenuLoading(true);
+      try {
+        const snapshot = await getSnapshot();
+        setMenuItems({
+          results: snapshot.items,
+          count: snapshot.items.length,
+        });
+      } finally {
+        setMenuLoading(false);
+      }
+      return;
+    }
+
     setMenuLoading(true);
     const params = {
       category: selectedCategoryFilter,
@@ -488,6 +542,7 @@ const Orders = () => {
         });
       }
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка при загрузке меню");
       alert(errorMessage, true);
     } finally {
@@ -535,6 +590,7 @@ const Orders = () => {
 
         setMenuCurrentPage(newPage);
       } catch (err) {
+        if (suppressOfflineError(err)) return;
         const errorMessage = validateResErrors(err, "Ошибка загрузке меню");
         alert(errorMessage, true);
       } finally {
@@ -582,6 +638,13 @@ const Orders = () => {
   };
 
   const fetchOrders = useCallback(async () => {
+    if (!isOnline) {
+      const localOrders = await getOpenOrdersLocally();
+      setOrders(localOrders);
+      setLoading(false);
+      return;
+    }
+
     const params = {
       search: debouncedOrderSearchQuery,
       status: "open",
@@ -606,6 +669,7 @@ const Orders = () => {
     debouncedOrderSearchQuery,
     waiterFilter,
     isStaff,
+    isOnline,
     ordersPagination.currentPage,
   ]);
   useEffect(() => {
@@ -625,6 +689,7 @@ const Orders = () => {
           fetchCashboxes(),
         ]);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       }
@@ -636,6 +701,7 @@ const Orders = () => {
         await fetchTables();
         setForm((prev) => ({ ...prev, table: "" }));
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       }
@@ -800,6 +866,7 @@ const Orders = () => {
       try {
         await fetchOrders();
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки");
         alert(errorMessage, true);
       } finally {
@@ -1037,6 +1104,7 @@ const Orders = () => {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
         } catch {}
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка при печати чека");
         alert(errorMessage, true);
       } finally {
@@ -1274,6 +1342,7 @@ const Orders = () => {
         const data = await getAllClients();
         if (mounted) setClients(Array.isArray(data) ? data : []);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
         alert(errorMessage, true);
         if (mounted) setClientsErr("Не удалось загрузить клиентов");
@@ -1557,59 +1626,181 @@ const Orders = () => {
     setSaving(true);
     try {
       if (!isEditing) {
-        const basePayload = normalizeOrderPayload(form, true);
-        if (startPlan) delete basePayload.waiter;
-        else if (isStaff) basePayload.waiter = userId;
-        let res;
-        try {
-          res = await postWithWaiterFallback(
-            "/cafe/orders/",
-            basePayload,
-            "post",
-          );
-        } catch (createErr) {
-          // Некоторые бэкенды требуют items[].order даже при создании заказа.
-          // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
-          if (!hasNestedOrderRequiredError(createErr)) throw createErr;
+        if (!isOnline) {
+          const offlineOrderId =
+            "offline-" +
+            Date.now() +
+            "-" +
+            Math.random().toString(36).slice(2);
 
-          const headerPayload = { ...basePayload, items: [] };
-          const created = await postWithWaiterFallback(
-            "/cafe/orders/",
-            headerPayload,
-            "post",
-          );
-          const createdOrderId = created?.data?.id;
-          if (!createdOrderId) throw createErr;
+          await addToQueue("CREATE_ORDER", {
+            client_id: offlineOrderId,
+            table_id: toId(form.table) || null,
+            items: form.items.map((i) => ({
+              menu_item_id: i.menu_item,
+              quantity:
+                typeof i.quantity === "string"
+                  ? i.quantity
+                  : Number(i.quantity),
+            })),
+          });
 
-          const patchPayload = normalizeOrderPayload(
-            form,
-            false,
-            createdOrderId,
-          );
-          if (startPlan) delete patchPayload.waiter;
-          await postWithWaiterFallback(
-            `/cafe/orders/${createdOrderId}/`,
-            patchPayload,
-            "patch",
-          );
-          res = created;
-        }
-
-        try {
+          const localOrder = {
+            id: offlineOrderId,
+            table_id: toId(form.table) || null,
+            table: toId(form.table) || null,
+            status: "open",
+            created_at: new Date().toISOString(),
+            items: form.items.map((i, idx) => {
+              const isService =
+                String(i.line_kind || "menu").toLowerCase() === "service";
+              return {
+                id: `${offlineOrderId}-item-${idx}`,
+                line_kind: i.line_kind || "menu",
+                menu_item_id: i.menu_item || null,
+                menu_item_title: isService ? null : i.title || "",
+                menu_item_name: isService ? null : i.title || "",
+                service_title: isService ? i.service_title || "Услуга" : null,
+                title: i.title || i.service_title || "",
+                unit_price: String(i.price || "0.00"),
+                price: String(i.price || "0.00"),
+                quantity: i.quantity,
+                comment: i.comment || "",
+              };
+            }),
+            total: String(
+              form.items
+                .reduce(
+                  (s, i) => s + toNum(i.price) * (Number(i.quantity) || 0),
+                  0,
+                )
+                .toFixed(2),
+            ),
+            offline: true,
+          };
           const tableId = toId(form.table);
           if (tableId) {
-            await api.patch(`/cafe/tables/${tableId}/`, { status: "busy" });
+            await updateTableStatusLocally(tableId, "busy");
           }
-        } catch {
-          // молча
+          await addOrderLocally(localOrder);
+          setOrders((prev) => [...prev, localOrder]);
+        } else {
+          const basePayload = normalizeOrderPayload(form, true);
+          if (startPlan) delete basePayload.waiter;
+          else if (isStaff) basePayload.waiter = userId;
+          let res;
+          try {
+            res = await postWithWaiterFallback(
+              "/cafe/orders/",
+              basePayload,
+              "post",
+            );
+          } catch (createErr) {
+            // Некоторые бэкенды требуют items[].order даже при создании заказа.
+            // Тогда создаем "шапку" заказа и отдельным PATCH отправляем items с order=<id заказа>.
+            if (!hasNestedOrderRequiredError(createErr)) throw createErr;
+
+            const headerPayload = { ...basePayload, items: [] };
+            const created = await postWithWaiterFallback(
+              "/cafe/orders/",
+              headerPayload,
+              "post",
+            );
+            const createdOrderId = created?.data?.id;
+            if (!createdOrderId) throw createErr;
+
+            const patchPayload = normalizeOrderPayload(
+              form,
+              false,
+              createdOrderId,
+            );
+            if (startPlan) delete patchPayload.waiter;
+            await postWithWaiterFallback(
+              `/cafe/orders/${createdOrderId}/`,
+              patchPayload,
+              "patch",
+            );
+            res = created;
+          }
+
+          try {
+            const tableId = toId(form.table);
+            if (tableId) {
+              await api.patch(`/cafe/tables/${tableId}/`, { status: "busy" });
+            }
+          } catch {
+            // молча
+          }
+
+          setOrders((prev) => [...prev, res.data]);
+          await addOrderLocally(res.data);
+        }
+      } else {
+        if (!isOnline) {
+          const resolvedOrderId = await resolveOrderId(editingId);
+          const originalOrder = orders.find(
+            (o) => String(o.id) === String(editingId),
+          );
+          const originalItemIds = new Set(
+            (originalOrder?.items || []).map((it) =>
+              String(it.menu_item_id || it.menu_item),
+            ),
+          );
+
+          const newItems = form.items.filter(
+            (i) => !originalItemIds.has(String(i.menu_item)),
+          );
+
+          for (const item of newItems) {
+            await addToQueue("ADD_ITEM_TO_ORDER", {
+              order_id: resolvedOrderId,
+              menu_item_id: item.menu_item,
+              quantity:
+                typeof item.quantity === "string"
+                  ? item.quantity
+                  : Number(item.quantity),
+            });
+          }
+
+          const currentItemIds = new Set(
+            form.items.map((i) => String(i.menu_item)),
+          );
+          const removedItems = (originalOrder?.items || []).filter(
+            (it) =>
+              !currentItemIds.has(String(it.menu_item_id || it.menu_item)),
+          );
+
+          for (const item of removedItems) {
+            await addToQueue("REMOVE_ITEM_FROM_ORDER", {
+              order_id: resolvedOrderId,
+              order_item_id: item.id,
+            });
+          }
+
+          await updateOrderLocally(editingId, {
+            items: form.items,
+            table_id: toId(form.table) || null,
+          });
+
+          setOrders((prev) =>
+            prev.map((o) =>
+              String(o.id) === String(editingId)
+                ? {
+                    ...o,
+                    items: form.items,
+                    table_id: toId(form.table) || null,
+                  }
+                : o,
+            ),
+          );
+
+          setModalOpen(false);
+          setMenuOpen(false);
+          setShowAddClient(false);
+          setOpenSelectId(null);
+          return;
         }
 
-        setOrders((prev) => [...prev, res.data]);
-
-        // Печать на кухню не должна держать saving: иначе кнопки «Редактировать» / «Оплатить»
-        // у всех карточек остаются disabled, пока USB/Wi‑Fi не ответят.
-        // void autoPrintKitchenTickets(res?.data?.id).catch(() => {});
-      } else {
         const payload = normalizeOrderPayload(form, false, editingId);
         if (startPlan) delete payload.waiter;
         await postWithWaiterFallback(
@@ -1617,6 +1808,11 @@ const Orders = () => {
           payload,
           "patch",
         );
+        await updateOrderLocally(editingId, {
+          items: form.items,
+          table_id: toId(form.table) || null,
+        });
+
         try {
           const { data: fresh } = await api.get(`/cafe/orders/${editingId}/`);
           if (fresh) {
@@ -1636,8 +1832,12 @@ const Orders = () => {
       setShowAddClient(false);
       setOpenSelectId(null);
 
+      if (!isOnline) {
+        return;
+      }
       await fetchOrders();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка сохранения заказа");
       alert(errorMessage, true);
       // Ошибка сохранения заказа
@@ -1675,6 +1875,7 @@ const Orders = () => {
     try {
       await api.patch(`/cafe/tables/${tableId}/`, { status: "free" });
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Не удалось освободить стол");
       alert(errorMessage, true);
     }
@@ -1792,6 +1993,7 @@ const Orders = () => {
       setPayNewClientPhone("");
       setPayAddClientOpen(false);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       alert(validateResErrors(err, "Не удалось создать гостя"), true);
     } finally {
       setPayAddClientSaving(false);
@@ -1808,6 +2010,7 @@ const Orders = () => {
         const data = await getAllClients();
         if (mounted) setClients(Array.isArray(data) ? data : []);
       } catch (e) {
+        if (suppressOfflineError(e)) return;
         const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
         alert(errorMessage, true);
         if (mounted) setClientsErr("Не удалось загрузить клиентов");
@@ -1840,6 +2043,45 @@ const Orders = () => {
     await fetchOrders();
     setPayOpen(false);
     setPayOrder(null);
+  };
+
+  /**
+   * Фискализация чека: получить payload с бэка, пробить на коннекторе, записать ФД в Nur.
+   * Не бросает при некритических ошибках — в офлайне или при отключённой кассе возвращает null.
+   */
+  const runFiscalReceipt = async (orderId, paymentMethod, cashReceived) => {
+    if (!fiscalSettings?.enabled) return null;
+
+    try {
+      const params = new URLSearchParams({ operation_type: "INCOME" });
+      if (paymentMethod === "cash" && cashReceived) {
+        params.set("cash_received", String(cashReceived));
+      }
+      const { data: receiptPayload } = await api.get(
+        `/cafe/fiscal/orders/${orderId}/receipt-payload/?${params}`,
+      );
+
+      const connectorResult = await sendReceipt(fiscalSettings, receiptPayload.body);
+
+      // Сохранить ФД в Nur (в фоне, не блокируем кассира)
+      api
+        .post(`/cafe/fiscal/orders/${orderId}/receipt/`, {
+          kind: "sale",
+          operation_type: "INCOME",
+          fd_number: connectorResult?.fdNumber ?? null,
+          fn_serial_number: connectorResult?.fnSerialNumber ?? null,
+          request_payload: receiptPayload.body,
+          response_payload: connectorResult,
+        })
+        .catch((e) => console.warn("[fiscal] Не удалось сохранить ФД:", e));
+
+      return connectorResult;
+    } catch (fiscalErr) {
+      console.warn("[fiscal] Ошибка фискализации:", fiscalErr?.message);
+      // Показать предупреждение, но не блокировать оплату
+      alert(`Фискальный чек не пробит: ${fiscalErr?.message}`, true);
+      return null;
+    }
   };
 
   const submitCheckoutPay = async () => {
@@ -1950,10 +2192,45 @@ const Orders = () => {
     setPaying(true);
     const paidBefore = toNum(order.paid_amount);
     try {
+      if (!isOnline) {
+        // Офлайн: фискализация через коннектор (не требует интернета после open-shift)
+        const resolvedOrderId = await resolveOrderId(order.id);
+        await runFiscalReceipt(
+          resolvedOrderId,
+          payForm.paymentMethod,
+          toNum(payForm.payNow) || calcTotals(order).total,
+        );
+        await addToQueue("CLOSE_ORDER", {
+          order_id: resolvedOrderId,
+          payment_method: payForm.paymentMethod,
+          amount: toNum(payForm.payNow) || calcTotals(order).total,
+        });
+        await removeOrderLocally(order.id);
+        setOrders((prev) =>
+          prev.filter((o) => String(o.id) !== String(order.id)),
+        );
+        const tableId =
+          toId(order.table) ?? order.table_id ?? order.table?.id ?? null;
+        await updateTableStatusLocally(tableId, "free");
+        setPayOpen(false);
+        setPayOrder(null);
+        return;
+      }
+
+      // Онлайн: сначала фискализация, потом учёт в Nur
+      await runFiscalReceipt(
+        order.id,
+        payForm.paymentMethod,
+        payForm.paymentMethod === "cash"
+          ? toNum(payForm.payNow) || calcTotals(order).total
+          : undefined,
+      );
+
       const { data } = await api.post(`/cafe/orders/${order.id}/pay/`, payload);
       await postPayCashflowDelta(order, paidBefore, data);
       await finishPaySuccess(order, data);
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка оплаты заказа");
       alert(errorMessage, true);
     } finally {
@@ -2020,6 +2297,21 @@ const Orders = () => {
     ];
   }, [clientOptions, payForm.clientId, payOrder]);
 
+  if (showOpenShiftPage) {
+    return (
+      <CafeOpenShift
+        onBack={() => {
+          setShowOpenShiftPage(false);
+          fetchOrders();
+          fetchTables();
+          getSnapshot()
+            .then((s) => setSnapshotShift(s.current_shift))
+            .catch(() => {});
+        }}
+      />
+    );
+  }
+
   return (
     <section className="cafeOrders">
       <div className="cafeOrders__header">
@@ -2058,6 +2350,16 @@ const Orders = () => {
               type="button"
             >
               <FaPlus /> Новый заказ
+            </button>
+          )}
+
+          {!hasOpenShift && (
+            <button
+              className="cafeOrders__btn cafeOrders__btn--primary"
+              onClick={() => setShowOpenShiftPage(true)}
+              type="button"
+            >
+              Открыть смену
             </button>
           )}
         </div>
@@ -2600,15 +2902,35 @@ const Orders = () => {
                             if (!ok) return;
                             setSaving(true);
                             try {
-                              await api.patch(`/cafe/orders/${editingId}/`, {
-                                status: "cancelled",
-                              });
+                              if (
+                                !isOnline ||
+                                String(editingId).startsWith("offline-")
+                              ) {
+                                const resolvedId =
+                                  await resolveOrderId(editingId);
+                                await addToQueue("CANCEL_ORDER", {
+                                  order_id: resolvedId,
+                                });
+                                await removeOrderLocally(editingId);
+                                setOrders((prev) =>
+                                  prev.filter(
+                                    (o) =>
+                                      String(o.id) !== String(editingId),
+                                  ),
+                                );
+                              } else {
+                                await api.patch(
+                                  `/cafe/orders/${editingId}/`,
+                                  { status: "cancelled" },
+                                );
+                                await fetchOrders();
+                              }
                               setModalOpen(false);
                               setMenuOpen(false);
                               setShowAddClient(false);
                               setOpenSelectId(null);
-                              await fetchOrders();
                             } catch (err) {
+                              if (suppressOfflineError(err)) return;
                               const errorMessage = validateResErrors(
                                 err,
                                 "Ошибка при отмене заказа",

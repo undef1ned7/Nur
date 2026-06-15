@@ -20,6 +20,7 @@ import "./CafeInventory.scss";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import {
   pickExpenseIdFromResponse,
   recordCafePurchaseExpense,
@@ -144,6 +145,7 @@ const CafeInventory = () => {
       setWarehouseItems(listFrom(warehouseRes));
       setStockCheckSessions(listFrom(stockCheckRes));
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка загрузки данных");
       alert(errorMessage, true);
       // Ошибка загрузки данных
@@ -325,6 +327,7 @@ const CafeInventory = () => {
       }
       setModalOpen(false);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка сохранения оборудования");
       alert(errorMessage, true);
     }
@@ -350,6 +353,7 @@ const CafeInventory = () => {
       setEquipment((prev) => prev.filter((e) => e.id !== deleteId));
       closeDeleteConfirm();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка удаления оборудования");
       alert(errorMessage, true);
     } finally {
@@ -421,6 +425,7 @@ const CafeInventory = () => {
       setSessionModalOpen(false);
       fetchAll();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка создания акта");
       alert(errorMessage, true);
     }
@@ -434,6 +439,7 @@ const CafeInventory = () => {
       setViewingSession(res.data);
       setViewSessionModalOpen(true);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка загрузки акта");
       alert(errorMessage, true);
     }
@@ -462,6 +468,7 @@ const CafeInventory = () => {
       setViewSessionModalOpen(false);
       closeConfirmSession();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка подтверждения акта");
       alert(errorMessage, true);
     } finally {
@@ -543,6 +550,7 @@ const CafeInventory = () => {
       setStockCheckModalOpen(false);
       await fetchAll(); // Обновляем список продуктов
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка создания акта сверки");
       alert(errorMessage, true);
     }
@@ -554,6 +562,7 @@ const CafeInventory = () => {
       setViewingStockCheck(res.data);
       setViewStockCheckModalOpen(true);
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка загрузки акта");
       alert(errorMessage, true);
     }
@@ -580,6 +589,7 @@ const CafeInventory = () => {
       setViewStockCheckModalOpen(false);
       closeConfirmStockCheck();
     } catch (err) {
+      if (suppressOfflineError(err)) return;
       const errorMessage = validateResErrors(err, "Ошибка подтверждения акта");
       alert(errorMessage, true);
     } finally {

@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { X } from "lucide-react";
 import {
   historySellProductDetail,
   returnSale,
 } from "../../../store/creators/saleThunk";
 import { useUser } from "../../../store/slices/userSlice";
+import {
+  isReturnableSaleStatus,
+  normalizeSaleStatus,
+} from "../../../tools/saleReturn";
+import Modal from "../../common/Modal/Modal";
 
 const extractApiError = (errorLike) => {
   const value =
@@ -119,9 +123,8 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
   }, [quantities, saleItems]);
 
   const partialCount = partialItems.length;
-  const isReturnableStatus = ["paid", "debt"].includes(
-    String(currentItem?.status || "").trim().toLowerCase(),
-  );
+  const isReturnableStatus = isReturnableSaleStatus(currentItem?.status);
+  const statusLabel = normalizeSaleStatus(currentItem?.status) || currentItem?.status || "—";
 
   const formatMoney = (value) =>
     Number(value || 0).toLocaleString("ru-RU", {
@@ -214,154 +217,145 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
   }, [onClose, onConfirmFull, onConfirmPartial, partialCount]);
 
   return (
-    <div
-      className="add-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="refund-title"
+    <Modal
+      open
+      onClose={onClose}
+      title="Возврат продажи"
+      className="sellReturnModal"
+      contentClassName="sellReturnModal__content"
+      wrapperId="sell-return-modal"
     >
-      <div className="add-modal__overlay" onClick={onClose} />
+      <div className="sellReturn">
+        {loading ? (
+          <div className="sellReturn__loading">
+            <p>Загрузка данных о продаже...</p>
+          </div>
+        ) : (
+          <>
+            <p className="sellReturn__lead">
+              Для полной отмены нажмите <b>Вернуть весь чек</b>. Если нужен
+              частичный возврат, укажите количество только в нужных позициях.
+            </p>
 
-      <div className="add-modal__content sellReturn__modal">
-        <div className="add-modal__header">
-          <h3 id="refund-title">Возврат продажи</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
-        </div>
-
-        <div className="sellReturn">
-          {loading ? (
-            <div className="sellReturn__loading">
-              <p>Загрузка данных о продаже...</p>
+            <div className="sellReturn__summary">
+              <div className="sellReturn__summaryMain">
+                <div className="sellReturn__summaryTitle">
+                  {currentItem?.client_name || "Без клиента"}
+                </div>
+                <div className="sellReturn__summaryMeta">
+                  Чек #{String(currentItem?.id || "").slice(0, 8) || "—"}
+                </div>
+              </div>
+              <div className="sellReturn__summaryGrid">
+                <div className="sellReturn__summaryItem">
+                  <span>Статус</span>
+                  <b>{statusLabel}</b>
+                </div>
+                <div className="sellReturn__summaryItem">
+                  <span>Сумма</span>
+                  <b>{formatMoney(currentItem?.total || currentItem?.amount)} сом</b>
+                </div>
+                <div className="sellReturn__summaryItem">
+                  <span>Позиций</span>
+                  <b>{saleItems.length}</b>
+                </div>
+              </div>
             </div>
-          ) : (
-            <>
-              <p className="sellReturn__lead">
-                Для полной отмены нажмите <b>Вернуть весь чек</b>. Если нужен
-                частичный возврат, укажите количество только в нужных позициях.
-              </p>
 
-              <div className="sellReturn__summary">
-                <div className="sellReturn__summaryMain">
-                  <div className="sellReturn__summaryTitle">
-                    {currentItem?.client_name || "Без клиента"}
-                  </div>
-                  <div className="sellReturn__summaryMeta">
-                    Чек #{String(currentItem?.id || "").slice(0, 8) || "—"}
-                  </div>
+            {saleItems.length > 0 && (
+              <div className="sellReturn__items">
+                <div className="sellReturn__itemsHead">
+                  <span>Позиция</span>
+                  <span>Макс. возврат</span>
+                  <span>Вернуть</span>
                 </div>
-                <div className="sellReturn__summaryGrid">
-                  <div className="sellReturn__summaryItem">
-                    <span>Статус</span>
-                    <b>{currentItem?.status || "—"}</b>
-                  </div>
-                  <div className="sellReturn__summaryItem">
-                    <span>Сумма</span>
-                    <b>{formatMoney(currentItem?.total || currentItem?.amount)} сом</b>
-                  </div>
-                  <div className="sellReturn__summaryItem">
-                    <span>Позиций</span>
-                    <b>{saleItems.length}</b>
-                  </div>
-                </div>
-              </div>
 
-              {saleItems.length > 0 && (
-                <div className="sellReturn__items">
-                  <div className="sellReturn__itemsHead">
-                    <span>Позиция</span>
-                    <span>Макс. возврат</span>
-                    <span>Вернуть</span>
-                  </div>
-
-                  {saleItems.map((saleItem) => (
-                    <div key={saleItem.id} className="sellReturn__itemRow">
-                      <div className="sellReturn__itemInfo">
-                        <div className="sellReturn__itemName">{saleItem.name}</div>
-                        <div className="sellReturn__itemMeta">
-                          {formatMoney(saleItem.unitPrice)} сом x {saleItem.quantity}
-                        </div>
+                {saleItems.map((saleItem) => (
+                  <div key={saleItem.id} className="sellReturn__itemRow">
+                    <div className="sellReturn__itemInfo">
+                      <div className="sellReturn__itemName">{saleItem.name}</div>
+                      <div className="sellReturn__itemMeta">
+                        {formatMoney(saleItem.unitPrice)} сом x {saleItem.quantity}
                       </div>
-                      <div className="sellReturn__itemAvailable">
-                        {saleItem.quantity} {saleItem.unit}
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max={saleItem.quantity}
-                        step={isAgent ? "1" : "0.001"}
-                        inputMode="decimal"
-                        className="sellReturn__qtyInput"
-                        value={quantities[saleItem.id] ?? ""}
-                        onChange={(e) =>
-                          setQuantities((prev) => ({
-                            ...prev,
-                            [saleItem.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {isAgent && saleItems.length > 0 && (
-                <div className="sellReturn__hint">
-                  Для агентских продаж частичный возврат доступен только целым
-                  количеством.
-                </div>
-              )}
-
-              {error && (
-                <div className="sellReturn__error">{error}</div>
-              )}
-
-              <div className="sellReturn__actions">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={onClose}
-                  disabled={submitting || loading}
-                  style={{ flex: 1, justifyContent: "center" }}
-                >
-                  Отмена
-                </button>
-
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={onConfirmFull}
-                  disabled={submitting || loading || !isReturnableStatus}
-                  style={{ flex: 1, justifyContent: "center" }}
-                >
-                  {submitting && partialCount === 0
-                    ? "Оформляем..."
-                    : "Вернуть весь чек"}
-                </button>
-
-                <button
-                  type="button"
-                  className="btn danger-btn"
-                  onClick={onConfirmPartial}
-                  disabled={
-                    submitting || loading || !isReturnableStatus || partialCount === 0
-                  }
-                  style={{ flex: 1, justifyContent: "center" }}
-                >
-                  {submitting && partialCount > 0
-                    ? "Оформляем..."
-                    : `Частичный возврат${partialCount > 0 ? ` (${partialCount})` : ""}`}
-                </button>
+                    <div className="sellReturn__itemAvailable">
+                      {saleItem.quantity} {saleItem.unit}
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max={saleItem.quantity}
+                      step={isAgent ? "1" : "0.001"}
+                      inputMode="decimal"
+                      className="sellReturn__qtyInput"
+                      value={quantities[saleItem.id] ?? ""}
+                      onChange={(e) =>
+                        setQuantities((prev) => ({
+                          ...prev,
+                          [saleItem.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                ))}
               </div>
+            )}
 
+            {isAgent && saleItems.length > 0 && (
               <div className="sellReturn__hint">
-                Подсказка: Enter — подтвердить, Esc — закрыть.
+                Для агентских продаж частичный возврат доступен только целым
+                количеством.
               </div>
-            </>
-          )}
-        </div>
+            )}
+
+            {error && <div className="sellReturn__error">{error}</div>}
+
+            <div className="sellReturn__actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={onClose}
+                disabled={submitting || loading}
+                style={{ flex: 1, justifyContent: "center" }}
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                className="btn"
+                onClick={onConfirmFull}
+                disabled={submitting || loading || !isReturnableStatus}
+                style={{ flex: 1, justifyContent: "center" }}
+              >
+                {submitting && partialCount === 0
+                  ? "Оформляем..."
+                  : "Вернуть весь чек"}
+              </button>
+
+              <button
+                type="button"
+                className="btn danger-btn"
+                onClick={onConfirmPartial}
+                disabled={
+                  submitting || loading || !isReturnableStatus || partialCount === 0
+                }
+                style={{ flex: 1, justifyContent: "center" }}
+              >
+                {submitting && partialCount > 0
+                  ? "Оформляем..."
+                  : `Частичный возврат${partialCount > 0 ? ` (${partialCount})` : ""}`}
+              </button>
+            </div>
+
+            <div className="sellReturn__hint">
+              Подсказка: Enter — подтвердить, Esc — закрыть.
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };
 

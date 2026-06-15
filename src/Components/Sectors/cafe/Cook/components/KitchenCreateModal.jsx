@@ -12,6 +12,7 @@ import {
 import "./KitchenCreateModal.scss";
 import { useAlert } from "../../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import { suppressOfflineError } from "../../../../../utils/cafeOfflineError";
 
 const safeName = (p) => p?.name || "USB Printer";
 const shortKey = (k) => String(k || "").split(":").slice(0, 2).join(":");
@@ -64,6 +65,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       setActiveKey(a);
       setSelectedKey((prev) => prev || a);
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка обновления списка принтеров");
       alert(errorMessage, true);
     } finally {
@@ -84,6 +86,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       await choosePrinterByDialog();
       await refresh();
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка выбора принтера");
       alert(errorMessage, true);
     } finally {
@@ -99,6 +102,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       const a = getActivePrinterKey();
       setActiveKey(a);
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка установки активного принтера");
       alert(errorMessage, true);
     } finally {
@@ -165,6 +169,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       onCreated?.(created);
       onClose?.();
     } catch (e) {
+      if (suppressOfflineError(e)) return;
       const errorMessage = validateResErrors(e, "Ошибка создания кухни");
       alert(errorMessage, true);
     } finally {
