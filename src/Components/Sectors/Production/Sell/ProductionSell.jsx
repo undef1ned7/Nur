@@ -1,4 +1,4 @@
-import { Banknote, Receipt, Search } from "lucide-react";
+import { Banknote, Eye, Receipt, RotateCcw, Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
@@ -112,7 +112,14 @@ const ProductionSell = () => {
     return s === "paid" || s === "debt";
   };
 
-  const handleOpenRefund = useCallback((item) => {
+  const handleOpenDetail = useCallback((item) => {
+    setDetailId(item.id);
+    setShowDetail(true);
+  }, []);
+
+  const handleOpenRefund = useCallback((item, event) => {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
     setRefundItem(item);
     setShowRefundModal(true);
   }, []);
@@ -172,7 +179,7 @@ const ProductionSell = () => {
   return (
     <div>
       <div className="sell__header">
-        <div className="sell__header-left">
+        <div className="sell__header-left !w-auto">
           <div className="sell__header-input">
             <input
               className="w-full"
@@ -256,7 +263,10 @@ const ProductionSell = () => {
             </div>
           </div>
           <div className="sell__history-toolbarRight">
-            <div className="sell__history-stats" aria-label="Сводка по продажам">
+            <div
+              className="sell__history-stats"
+              aria-label="Сводка по продажам"
+            >
               <div className="sell__history-stat">
                 <Receipt size={16} aria-hidden />
                 <span className="sell__history-stat-label">Всего продаж</span>
@@ -300,6 +310,17 @@ const ProductionSell = () => {
           </div>
         </div>
 
+        {!loading && list.length > 0 && (
+          <div className="production-sell-hint" role="note">
+            <Eye size={16} aria-hidden />
+            <span>
+              Нажмите на строку или кнопку <b>«Подробнее»</b>, чтобы открыть
+              детали продажи. Кнопка <b>«Возврат»</b> доступна для оплаченных
+              чеков и долгов.
+            </span>
+          </div>
+        )}
+
         {error && <p style={{ color: "#b91c1c", padding: 12 }}>{error}</p>}
 
         {loading && <div className="sell__empty">Загрузка...</div>}
@@ -323,7 +344,7 @@ const ProductionSell = () => {
                       <th>Позиции</th>
                       <th>Дата</th>
                       <th>Клиент</th>
-                      <th />
+                      <th>Действия</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -338,16 +359,11 @@ const ProductionSell = () => {
                           className="sellTable__row"
                           role="button"
                           tabIndex={0}
-                          onClick={() => {
-                            setDetailId(item.id);
-                            setShowDetail(true);
-                          }}
+                          onClick={() => handleOpenDetail(item)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              setDetailId(item.id);
-                              setShowDetail(true);
-                            }
+                            if (e.key === "Enter") handleOpenDetail(item);
                           }}
+                          title="Открыть детали продажи"
                         >
                           <td className="sellTable__no">№ {idx + 1}</td>
                           <td>
@@ -372,15 +388,28 @@ const ProductionSell = () => {
                             {item.client_name ?? "—"}
                           </td>
                           <td
-                            className="sellTable__actions"
+                            className="sellTable__actions production-sell__actions"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <button
+                              type="button"
+                              className="production-sell__detailBtn"
+                              onClick={() => handleOpenDetail(item)}
+                              title="Подробнее о продаже"
+                            >
+                              <Eye size={14} aria-hidden />
+                              Подробнее
+                            </button>
                             {canReturnSale(item) && (
                               <button
                                 type="button"
                                 className="sellTable__refund"
-                                onClick={() => handleOpenRefund(item)}
+                                onClick={(event) =>
+                                  handleOpenRefund(item, event)
+                                }
+                                title="Оформить возврат"
                               >
+                                <RotateCcw size={14} aria-hidden />
                                 Возврат
                               </button>
                             )}
@@ -404,16 +433,11 @@ const ProductionSell = () => {
                       className="sellCard"
                       role="button"
                       tabIndex={0}
-                      onClick={() => {
-                        setDetailId(item.id);
-                        setShowDetail(true);
-                      }}
+                      onClick={() => handleOpenDetail(item)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setDetailId(item.id);
-                          setShowDetail(true);
-                        }
+                        if (e.key === "Enter") handleOpenDetail(item);
                       }}
+                      title="Открыть детали продажи"
                     >
                       <div className="sellCard__top">
                         <span className="sellCard__no">№ {idx + 1}</span>
@@ -459,15 +483,26 @@ const ProductionSell = () => {
                           </div>
                         </div>
                         <div
-                          className="sellCard__actions"
+                          className="sellCard__actions production-sell__cardActions"
                           onClick={(e) => e.stopPropagation()}
                         >
+                          <button
+                            type="button"
+                            className="production-sell__detailBtn production-sell__detailBtn--card"
+                            onClick={() => handleOpenDetail(item)}
+                            title="Подробнее о продаже"
+                          >
+                            <Eye size={15} aria-hidden />
+                            Подробнее
+                          </button>
                           {canReturnSale(item) && (
                             <button
                               type="button"
                               className="sellCard__refund"
-                              onClick={() => handleOpenRefund(item)}
+                              onClick={(event) => handleOpenRefund(item, event)}
+                              title="Оформить возврат"
                             >
+                              <RotateCcw size={15} aria-hidden />
                               Возврат
                             </button>
                           )}
@@ -490,7 +525,6 @@ const ProductionSell = () => {
             setShowDetail(false);
             setDetailId("");
           }}
-          onReturnSuccess={fetchList}
           onOpenRefund={(sale) => {
             setShowDetail(false);
             setDetailId("");
