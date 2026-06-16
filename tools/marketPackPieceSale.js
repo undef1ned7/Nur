@@ -39,6 +39,28 @@ export function maxPiecesAvailable(stockPacks, otherConsumePacks, pkg) {
   return Math.floor(freePacks * ipp);
 }
 
+/** null = пачка/учётная единица; uuid = поштучная продажа */
+export const normalizeCartLineSalePackage = (salePackage) => {
+  if (salePackage == null || salePackage === "") return null;
+  return String(salePackage);
+};
+
+export const isPieceSaleCartLine = (item) =>
+  normalizeCartLineSalePackage(item?.salePackage ?? item?.sale_package) != null;
+
+/** Совпадение строки корзины по (product, sale_package) */
+export const cartLinesMatchProductAndPackage = (line, productId, salePackageId) => {
+  const lineProductId = line?.product ?? line?.product_id;
+  if (String(lineProductId) !== String(productId)) return false;
+  return (
+    normalizeCartLineSalePackage(line?.sale_package ?? line?.salePackage) ===
+    normalizeCartLineSalePackage(salePackageId)
+  );
+};
+
+export const formatCartLineNameSuffix = (item) =>
+  isPieceSaleCartLine(item) ? " (штуч)" : "";
+
 export function cartItemUnitLabel(item, product) {
   if (item?.salePackage || item?.sale_package) {
     const salePackageId = item.salePackage || item.sale_package;

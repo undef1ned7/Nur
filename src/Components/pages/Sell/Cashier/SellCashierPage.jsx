@@ -48,7 +48,7 @@ import {
   findOwnOpenShiftInList,
   isOwnOpenShift,
   resolveCashierId,
-} from "../../../../../tools/cashierOpenShift";
+} from "../../../../tools/cashierOpenShift";
 
 const SellCashierPage = () => {
   const navigate = useNavigate();

@@ -102,18 +102,97 @@ const mergeSaleIntoStateStart = (state, sale) => {
   const nextId = String(sale.id);
   if (prev && prevId && nextId && prevId === nextId) {
     const prevItems = prev.items ?? prev.cart?.items;
-    const nextItems = sale.items ?? sale.cart?.items;
-    // POST /start/ и иногда PATCH — sale без items: не затираем строки корзины
-    if (
-      Array.isArray(prevItems) &&
-      prevItems.length > 0 &&
-      (!Array.isArray(nextItems) || nextItems.length === 0)
-    ) {
+    const nextItemsMissing =
+      sale.items === undefined &&
+      (sale.cart === undefined || sale.cart.items === undefined);
+    // POST /start/ и иногда PATCH — sale без items: не затираем строки корзины.
+    // Пустой массив items[] (после удаления последней позиции) — применяем.
+    if (Array.isArray(prevItems) && prevItems.length > 0 && nextItemsMissing) {
       state.start = { ...sale, items: prevItems };
       return;
     }
   }
   state.start = sale;
+};
+
+/** Ответ POST add-item / PATCH строки — одна позиция, не вся продажа */
+export const isCartLineItemResponse = (data) => {
+  if (!data || typeof data !== "object") return false;
+  if (Array.isArray(data.carts) || data.sale != null) return false;
+  if (Array.isArray(data.items) || Array.isArray(data.cart?.items)) return false;
+  const productId = data.product ?? data.product_id;
+  if (productId == null || data.id == null) return false;
+  if (
+    data.shift != null &&
+    data.quantity == null &&
+    data.product_name == null &&
+    data.display_name == null
+  ) {
+    return false;
+  }
+  return true;
+};
+
+export const mergeCartLineIntoStart = (state, lineItem) => {
+  if (!state.start?.id) return false;
+  const prevItems = [...(state.start.items ?? state.start.cart?.items ?? [])];
+  const lineId = lineItem.id;
+  const idx = prevItems.findIndex((it) => String(it.id) === String(lineId));
+  const nextItems =
+    idx >= 0
+      ? prevItems.map((it, i) =>
+          i === idx
+            ? {
+                ...it,
+                ...lineItem,
+                sale_package:
+                  lineItem.sale_package ??
+                  lineItem.sale_package_id ??
+                  it.sale_package ??
+                  null,
+              }
+            : it,
+        )
+      : [
+          ...prevItems,
+          {
+            ...lineItem,
+            sale_package:
+              lineItem.sale_package ?? lineItem.sale_package_id ?? null,
+          },
+        ];
+
+  state.start = {
+    ...state.start,
+    items: nextItems,
+    ...(state.start.cart
+      ? { cart: { ...state.start.cart, items: nextItems } }
+      : {}),
+  };
+  if (Array.isArray(state.posCarts) && state.posCarts.length) {
+    state.posCarts = patchCartTabFromSale(state.posCarts, state.start);
+  }
+  return true;
+};
+
+export const removeCartLineFromStart = (state, itemId) => {
+  if (!state.start?.id || itemId == null) return false;
+  const prevItems = state.start.items ?? state.start.cart?.items ?? [];
+  if (!Array.isArray(prevItems)) return false;
+  const nextItems = prevItems.filter((it) => String(it.id) !== String(itemId));
+  if (nextItems.length === prevItems.length) return false;
+
+  state.start = {
+    ...state.start,
+    items: nextItems,
+    ...(state.start.cart
+      ? { cart: { ...state.start.cart, items: nextItems } }
+      : {}),
+  };
+  if (Array.isArray(state.posCarts) && state.posCarts.length) {
+    state.posCarts = patchCartTabFromSale(state.posCarts, state.start);
+  }
+  return true;
 };
 
 export const applyPosStartToState = (state, data) => {
@@ -135,6 +214,11 @@ export const applyPosCartItemPatchToState = (state, data) => {
 
   if (Array.isArray(data.carts)) {
     applyPosStartToState(state, data);
+    return;
+  }
+
+  if (isCartLineItemResponse(data)) {
+    mergeCartLineIntoStart(state, data);
     return;
   }
 

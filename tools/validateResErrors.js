@@ -30,7 +30,7 @@ const formatCandidate = (candidate) => {
     return candidate.trim();
   }
   if (Array.isArray(candidate) && candidate.length > 0) {
-    const joined = candidate
+    const parts = candidate
       .map((item) => {
         if (typeof item === "string") return item;
         if (item && typeof item === "object") {
@@ -43,9 +43,10 @@ const formatCandidate = (candidate) => {
         }
         return "";
       })
-      .filter(Boolean)
-      .join(", ");
-    if (joined) return joined;
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(parts.length > 1 ? "\n" : ", ");
+    }
   }
   if (candidate && typeof candidate === "object") {
     const nested = formatCandidate(

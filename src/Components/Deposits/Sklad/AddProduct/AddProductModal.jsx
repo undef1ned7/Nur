@@ -12,6 +12,7 @@ import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { updateProductAsync } from "../../../../store/creators/productCreators";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import ReactPortal from "../../../common/Portal/ReactPortal";
 import "./AddProductModal.scss";
 import { validateResErrors } from '../../../../../tools/validateResErrors'
 import api from "../../../../api";
@@ -247,9 +248,10 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
   const disabled = !!validate();
 
   return (
-    <div className="add-modal z-50! sklad-add-product-modal">
-      <div className="add-modal__overlay z-50!" onClick={onClose} />
-      <div className="add-modal__content z-50!">
+    <ReactPortal wrapperId="add-product-modal">
+      <div className="add-modal sklad-add-product-modal">
+        <div className="add-modal__overlay" onClick={onClose} />
+        <div className="add-modal__content">
         <div className="add-modal__header ">
           <h3 className="text-xl!">Добавление товара</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
@@ -430,8 +432,9 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
             Сохранить
           </button>
         </form>
+        </div>
       </div>
-    </div>
+    </ReactPortal>
   );
 };
 
