@@ -421,7 +421,6 @@ const AddWarehouseProductPage = () => {
             quantity: product.quantity || "",
             client: product.client || "",
             purchase_price: product.purchase_price || "",
-            wholesale_price: product.wholesale_price || "",
             plu: product.plu || "",
             scale_type: product.scale_type || "",
           });
@@ -523,7 +522,6 @@ const AddWarehouseProductPage = () => {
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
         purchase_price: product.purchase_price || "",
-        wholesale_price: product.wholesale_price || "",
         plu: product.plu || "",
         scale_type: product.scale_type || "",
       });

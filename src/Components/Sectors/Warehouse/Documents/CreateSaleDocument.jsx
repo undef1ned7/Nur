@@ -58,7 +58,6 @@ import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { exportInvoiceToExcel } from "./components/invoiceExcelExport";
 import { sortByAlphabetEnRu } from "../../../../utils/sortByAlphabetEnRu";
 import { listCompanyAgentRequests } from "../../../../api/warehouse";
-import { resolveProductSalePrice } from "../utils/wholesalePricing";
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -3803,6 +3802,35 @@ const CreateSaleDocument = () => {
                       Документ проведён
                     </span>
                   </label>
+                )}
+                {showWholesaleToggle && (
+                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                    <span className="create-sale-document__wholesale-label">
+                      Цены:
+                    </span>
+                    <button
+                      type="button"
+                      className={`create-sale-document__wholesale-btn ${
+                        !isWholesale
+                          ? "create-sale-document__wholesale-btn--active"
+                          : ""
+                      }`}
+                      onClick={() => handleWholesaleModeChange(false)}
+                    >
+                      Розница
+                    </button>
+                    <button
+                      type="button"
+                      className={`create-sale-document__wholesale-btn ${
+                        isWholesale
+                          ? "create-sale-document__wholesale-btn--active"
+                          : ""
+                      }`}
+                      onClick={() => handleWholesaleModeChange(true)}
+                    >
+                      Опт
+                    </button>
+                  </div>
                 )}
                 {isPaymentKindRelevant && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">

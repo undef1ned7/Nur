@@ -5503,6 +5503,17 @@ const Agents = () => {
                           </option>
                         ))}
                       </select>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newMembershipCanSellWholesale}
+                          onChange={(e) =>
+                            setNewMembershipCanSellWholesale(e.target.checked)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        Оптовые продажи
+                      </label>
                       <button
                         type="button"
                         className="agents-action-btn agents-action-btn--approve"
