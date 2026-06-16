@@ -31,8 +31,10 @@ import { parsePosSalesListTotalAmount } from "../../tools/posSalesListResponse";
 import {
   applyPosCartItemPatchToState,
   applyPosStartToState,
+  isCartLineItemResponse,
   normalizePosStartResponse,
   patchCartTabFromSale,
+  removeCartLineFromStart,
 } from "../../../tools/posSaleCarts";
 import {
   fetchWarehouseDocuments,
@@ -169,10 +171,19 @@ const saleSlice = createSlice({
       .addCase(manualFilling.pending, (state) => {
         // Не ставим loading: иначе касса «мигает» при каждом добавлении строки
       })
-      .addCase(manualFilling.fulfilled, (state, { payload }) => {
+      .addCase(manualFilling.fulfilled, (state, { payload, meta }) => {
         state.cart = payload;
         if (payload && typeof payload === "object") {
-          applyPosCartItemPatchToState(state, payload);
+          let patch = payload;
+          const salePackageId = meta?.arg?.salePackageId;
+          if (
+            isCartLineItemResponse(payload) &&
+            salePackageId &&
+            !patch.sale_package
+          ) {
+            patch = { ...patch, sale_package: salePackageId };
+          }
+          applyPosCartItemPatchToState(state, patch);
         }
         state.loading = false;
       })
@@ -222,10 +233,20 @@ const saleSlice = createSlice({
       .addCase(deleteProductInCart.pending, (state) => {
         // Не ставим loading: DELETE строки корзины обновляет state из ответа
       })
-      .addCase(deleteProductInCart.fulfilled, (state, { payload }) => {
+      .addCase(deleteProductInCart.fulfilled, (state, { payload, meta }) => {
         state.loading = false;
         if (payload && typeof payload === "object") {
           applyPosCartItemPatchToState(state, payload);
+        }
+        const deletedItemId = meta?.arg?.productId;
+        if (deletedItemId) {
+          const items = state.start?.items ?? state.start?.cart?.items ?? [];
+          const stillPresent =
+            Array.isArray(items) &&
+            items.some((it) => String(it.id) === String(deletedItemId));
+          if (stillPresent) {
+            removeCartLineFromStart(state, deletedItemId);
+          }
         }
       })
       .addCase(deleteProductInCart.rejected, (state, action) => {

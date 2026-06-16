@@ -62,6 +62,8 @@ import CashierCartsBar from "./components/CashierCartsBar";
 import PieceSaleModal from "./components/PieceSaleModal";
 import {
   cartItemUnitLabel,
+  cartLinesMatchProductAndPackage,
+  formatCartLineNameSuffix,
   getDefaultPackage,
   maxPiecesAvailable,
   supportsPieceFromPack,
@@ -1478,7 +1480,7 @@ const CashierPage = () => {
           const productId = item.product || item.product_id;
           const cartItemId = item.id;
           const isCustom = !productId;
-          const salePackage = item.sale_package || null;
+          const salePackage = item.sale_package ?? item.sale_package_id ?? null;
           // Для обычных товаров ключ строим по itemId, чтобы не конфликтовали
           // строки одного и того же товара с разными sale_package.
           const localId = isCustom
@@ -2174,16 +2176,9 @@ const CashierPage = () => {
         currentSale?.items ||
         currentSale?.cart?.items ||
         [];
-      const existingItem = items.find((item) => {
-        const itemProductId = item.product || item.product_id;
-        const itemSalePackage = item.sale_package || null;
-        const normalizedItemPkg = itemSalePackage ?? null;
-        const normalizedNewPkg = salePackageId ?? null;
-        return (
-          itemProductId === product.id &&
-          normalizedItemPkg === normalizedNewPkg
-        );
-      });
+      const existingItem = items.find((item) =>
+        cartLinesMatchProductAndPackage(item, product.id, salePackageId),
+      );
 
       if (existingItem) {
         const currentQty = normalizeQuantity(existingItem.quantity);
@@ -2201,11 +2196,9 @@ const CashierPage = () => {
           productId: product.id,
           salePackage: salePackageId ?? null,
         });
-        // Обновляем продажу после успешного обновления
-        // await refreshSale();
       } else {
         // Добавляем новый товар
-        await dispatch(
+        const res = await dispatch(
           manualFilling({
             id: saleId,
             productId: product.id,
@@ -2217,9 +2210,19 @@ const CashierPage = () => {
           productId: product.id,
           salePackage: salePackageId ?? null,
         });
-        // Обновляем продажу после успешного добавления
-        // cartOrderRef будет обновлен автоматически в useEffect при обновлении currentSale
-        // await refreshSale();
+        // Некоторые бэки возвращают не строку корзины, а sale без items.
+        // Тогда принудительно обновляем активную продажу, иначе новая позиция не появится в UI.
+        const payload = res?.payload;
+        const hasItemsInResponse =
+          Array.isArray(payload?.items) || Array.isArray(payload?.cart?.items);
+        const hasCartsInResponse = Array.isArray(payload?.carts) || payload?.sale;
+        if (payload && !hasItemsInResponse && !hasCartsInResponse) {
+          try {
+            await multiCartRef.current?.refreshActiveSale?.();
+          } catch (refreshErr) {
+            console.warn("Не удалось обновить продажу после добавления:", refreshErr);
+          }
+        }
       }
     } catch (error) {
       console.error("Ошибка при добавлении товара в корзину:", error);
@@ -3206,13 +3209,24 @@ const CashierPage = () => {
               filteredProducts.map((product) => {
                 const piecePackage = getDefaultPackage(product);
                 const cartItem = cart.find(
-                  (item) => !item.isCustom && item.productId === product.id,
+                  (item) =>
+                    !item.isCustom &&
+                    item.productId === product.id &&
+                    !item.salePackage,
+                );
+                const pieceCartItem = cart.find(
+                  (item) =>
+                    !item.isCustom &&
+                    item.productId === product.id &&
+                    item.salePackage,
                 );
                 return (
                   <div
                     key={product.id}
                     className={`cashier-page__product-card ${
-                      cartItem ? "cashier-page__product-card--selected" : ""
+                      cartItem || pieceCartItem
+                        ? "cashier-page__product-card--selected"
+                        : ""
                     }`}
                     onClick={(e) => handleProductCardClick(product, e)}
                   >
@@ -3240,7 +3254,15 @@ const CashierPage = () => {
                     </button>
                     {cartItem && (
                       <div className="cashier-page__product-badge">
-                        {formatQuantity(product.cartQty || 0)}
+                        {formatQuantity(cartItem.quantity || product.cartQty || 0)}
+                      </div>
+                    )}
+                    {pieceCartItem && (
+                      <div
+                        className="cashier-page__product-badge cashier-page__product-badge--piece"
+                        title="Поштучно в корзине"
+                      >
+                        {formatQuantity(pieceCartItem.quantity)} штуч
                       </div>
                     )}
                     <div className="cashier-page__product-name">
@@ -3391,7 +3413,7 @@ const CashierPage = () => {
                       <div className="cashier-page__cart-item-name-wrap">
                         <span className="cashier-page__cart-item-name">
                           {item.name}
-                          {item.salePackage ? ` (${cartUnitLabel})` : ""}
+                          {formatCartLineNameSuffix(item)}
                         </span>
                         {Array.isArray(item.promotionRules) &&
                           item.promotionRules.length > 0 && (
