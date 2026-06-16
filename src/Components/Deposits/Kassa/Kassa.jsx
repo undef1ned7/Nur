@@ -321,7 +321,7 @@ const CashboxList = () => {
       </div>
 
       {createOpen && (
-        <div className="kassa-modal" style={{ display: "block" }}>
+        <div className="kassa-modal">
           <div
             className="kassa-modal__overlay"
             onClick={() => setCreateOpen(false)}

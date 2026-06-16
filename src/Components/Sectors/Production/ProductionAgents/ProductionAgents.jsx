@@ -1,5 +1,6 @@
 import { Plus, Search, LayoutGrid, Table2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
 
 import {
@@ -42,6 +43,7 @@ import {
 } from "../../../../store/creators/saleThunk";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
+import "./productionAgentsModals.scss";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
@@ -55,6 +57,11 @@ import {
   getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
 import ProductionAgentRequestCartsTab from "./ProductionAgentRequestCartsTab";
+
+const renderProductionModal = (node) =>
+  typeof document !== "undefined" && node
+    ? createPortal(node, document.body)
+    : null;
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({
@@ -348,9 +355,9 @@ const PendingModal = ({ onClose, onChanged }) => {
 
   return (
     <div className="add-modal accept">
-      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__overlay" onClick={onClose} />
       <div
-        className="add-modal__content z-100!"
+        className="add-modal__content"
         role="dialog"
         aria-modal="true"
       >
@@ -496,9 +503,9 @@ const MyReturnsModal = ({
 
   return (
     <div className="add-modal accept my-returns-modal">
-      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__overlay" onClick={onClose} />
       <div
-        className="add-modal__content z-100!"
+        className="add-modal__content"
         role="dialog"
         aria-modal="true"
       >
@@ -707,8 +714,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   if (!item || !item.subreals || item.subreals.length === 0) {
     return (
       <div className="add-modal return-product-modal">
-        <div className="add-modal__overlay z-100!" onClick={onClose} />
-        <div className="add-modal__content z-100!" style={{ height: "auto" }}>
+        <div className="add-modal__overlay" onClick={onClose} />
+        <div className="add-modal__content" style={{ height: "auto" }}>
           <div className="return-product-modal__header-inner">
             <div className="return-product-modal__title-row">
               <h3 className="return-product-modal__title">
@@ -825,9 +832,9 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
   return (
     <div className="add-modal return-product-modal">
-      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__overlay" onClick={onClose} />
       <div
-        className="add-modal__content z-100! !overflow-auto"
+        className="add-modal__content overflow-auto"
         style={{ height: "auto" }}
       >
         <div className="return-product-modal__header-inner">
@@ -1110,9 +1117,9 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
 
   return (
     <div className="add-modal accept">
-      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__overlay" onClick={onClose} />
       <div
-        className="add-modal__content z-100!"
+        className="add-modal__content"
         role="dialog"
         aria-modal="true"
         style={{ maxWidth: 720, width: "100%" }}
@@ -1223,9 +1230,9 @@ const AgentClientsDebtModal = ({
 
   return (
     <div className="add-modal">
-      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__overlay" onClick={onClose} />
       <div
-        className="add-modal__content z-100!"
+        className="add-modal__content"
         style={{ maxWidth: 980, width: "96%" }}
         role="dialog"
         aria-modal="true"
@@ -1317,6 +1324,99 @@ const AgentClientsDebtModal = ({
   );
 };
 
+const AgentHeldProductModal = ({ item, onClose, isOwner }) => {
+  if (!item) return null;
+
+  const subreals = Array.isArray(item.subreals) ? item.subreals : [];
+  const productName = item.product_name || item.name || "—";
+  const agentName = isOwner
+    ? `${item.agent_last_name || ""} ${item.agent_first_name || ""}`.trim()
+    : "";
+
+  return (
+    <div className="add-modal">
+      <div className="add-modal__overlay" onClick={onClose} />
+      <div
+        className="add-modal__content"
+        style={{ maxWidth: 720, width: "96%" }}
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="add-modal__header">
+          <h3>{productName}</h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+
+        <div className="add-modal__section" style={{ gap: 8 }}>
+          {isOwner && agentName && (
+            <div>
+              <strong>Агент:</strong> {agentName}
+              {item.agent_track_number
+                ? ` · машина ${item.agent_track_number}`
+                : ""}
+            </div>
+          )}
+          <div>
+            <strong>На руках у агента:</strong>{" "}
+            {item.qty_on_hand_effective ?? item.qty_on_hand ?? 0}
+          </div>
+          {item.last_movement_at && (
+            <div>
+              <strong>Последнее движение:</strong>{" "}
+              {new Date(item.last_movement_at).toLocaleString("ru-RU")}
+            </div>
+          )}
+        </div>
+
+        {subreals.length > 0 ? (
+          <DataContainer>
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 360, overflow: "auto", marginTop: 12 }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Передача</th>
+                    <th>Количество</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subreals.map((sr, idx) => (
+                    <tr key={sr.id || idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Передача">{sr.id || "—"}</td>
+                      <td data-label="Количество">
+                        {sr.qty_transferred ?? sr.qty ?? sr.quantity ?? "—"}
+                      </td>
+                      <td data-label="Дата">
+                        {sr.created_at
+                          ? new Date(sr.created_at).toLocaleDateString("ru-RU")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+        ) : (
+          <div className="add-modal__section">Нет данных по передачам.</div>
+        )}
+
+        <div className="add-modal__footer">
+          <button type="button" className="add-modal__cancel" onClick={onClose}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---- UI ---- */
 
 const ProductionAgents = () => {
@@ -1392,6 +1492,8 @@ const ProductionAgents = () => {
   const [agentClientsError, setAgentClientsError] = useState("");
   const [agentClientsData, setAgentClientsData] = useState([]);
   const [selectedAgentOwnerDebt, setSelectedAgentOwnerDebt] = useState(0);
+  const [showAgentProductModal, setShowAgentProductModal] = useState(false);
+  const [selectedAgentProduct, setSelectedAgentProduct] = useState(null);
 
   const [search, setSearch] = useState("");
   // Debounce для поиска
@@ -1554,6 +1656,20 @@ const ProductionAgents = () => {
       _pending_by_subreal: pendingBySubreal,
     });
   };
+
+  const handleAgentProductClick = useCallback(
+    (item) => {
+      if (!item) return;
+      if (profile?.role !== "owner") {
+        const qty = Number(item.qty_on_hand_effective ?? item.qty_on_hand ?? 0);
+        if (qty > 0) handleOpen3(item);
+        return;
+      }
+      setSelectedAgentProduct(item);
+      setShowAgentProductModal(true);
+    },
+    [profile?.role],
+  );
 
   const onEditDeleted = () => {
     setShowEdit(false);
@@ -2158,6 +2274,7 @@ const ProductionAgents = () => {
                               <tr
                                 key={item.id}
                                 className="warehouse-table__row"
+                                onClick={() => handleAgentProductClick(item)}
                               >
                                 <td>{idx + 1}</td>
                                 <td className="warehouse-table__name">
@@ -2315,6 +2432,7 @@ const ProductionAgents = () => {
                             <div
                               key={item.id}
                               className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                              onClick={() => handleAgentProductClick(item)}
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="text-xs text-slate-500">
@@ -2623,6 +2741,7 @@ const ProductionAgents = () => {
                               </div>
                             )}
                             <button
+                              type="button"
                               className="warehouse-header__create-btn"
                               style={{ marginTop: 10 }}
                               onClick={() => openAgentClientsControl(agent)}
@@ -2640,82 +2759,100 @@ const ProductionAgents = () => {
         </>
       )}
 
-      {showPendingModal && (
-        <PendingModal
-          onClose={() => setShowPendingModal(false)}
-          onChanged={() => {
-            refreshAfterAcceptOrReturn();
-          }}
-        />
-      )}
-      {showReturnProductModal && (
-        <ReturnProductModal
-          onClose={() => setShowReturnProductModal(false)}
-          onChanged={() => {
-            refreshAfterAcceptOrReturn();
-          }}
-          item={itemId3}
-        />
-      )}
-      {showMyReturnsModal && (
-        <MyReturnsModal
-          onClose={() => setShowMyReturnsModal(false)}
-          onRefresh={loadMyReturns}
-          loading={myReturnsLoading}
-          summary={myReturnsSummary}
-          returnsList={myReturns}
-        />
-      )}
-      {showSellModal && (
-        <SellModal
-          id={start?.id}
-          selectCashBox={selectCashBox}
-          onClose={() => setShowSellModal(false)}
-        />
-      )}
-      {showAddCashboxModal && (
-        <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
-      )}
+      {showPendingModal &&
+        renderProductionModal(
+          <PendingModal
+            onClose={() => setShowPendingModal(false)}
+            onChanged={() => {
+              refreshAfterAcceptOrReturn();
+            }}
+          />,
+        )}
+      {showReturnProductModal &&
+        renderProductionModal(
+          <ReturnProductModal
+            onClose={() => setShowReturnProductModal(false)}
+            onChanged={() => {
+              refreshAfterAcceptOrReturn();
+            }}
+            item={itemId3}
+          />,
+        )}
+      {showMyReturnsModal &&
+        renderProductionModal(
+          <MyReturnsModal
+            onClose={() => setShowMyReturnsModal(false)}
+            onRefresh={loadMyReturns}
+            loading={myReturnsLoading}
+            summary={myReturnsSummary}
+            returnsList={myReturns}
+          />,
+        )}
+      {showSellModal &&
+        renderProductionModal(
+          <SellModal
+            id={start?.id}
+            selectCashBox={selectCashBox}
+            onClose={() => setShowSellModal(false)}
+          />,
+        )}
+      {showAddCashboxModal &&
+        renderProductionModal(
+          <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />,
+        )}
 
-      {/* Модал детального просмотра продажи */}
-      {showSaleDetail && (
-        <SaleDetailModal
-          onClose={() => {
-            setShowSaleDetail(false);
-            setSelectedSaleId(null);
-            setSaleDetailUsesAgentApi(false);
-          }}
-          saleId={selectedSaleId}
-          useAgentSalesApi={saleDetailUsesAgentApi}
-          onSaleReturned={loadSalesHistory}
-        />
-      )}
-      {showOwnerReturnsModal && (
-        <OwnerReturnsQueueModal
-          onClose={() => setShowOwnerReturnsModal(false)}
-          onChanged={() => {
-            refreshProductsList();
-            refreshTransfers();
-          }}
-        />
-      )}
-      {showAgentClientsModal && (
-        <AgentClientsDebtModal
-          onClose={() => {
-            setShowAgentClientsModal(false);
-            setSelectedAgentForClients(null);
-            setAgentClientsData([]);
-            setAgentClientsError("");
-            setSelectedAgentOwnerDebt(0);
-          }}
-          agent={selectedAgentForClients}
-          loading={agentClientsLoading}
-          error={agentClientsError}
-          clients={agentClientsData}
-          totalClientDebt={selectedAgentClientsTotalDebt}
-          ownerDebt={selectedAgentOwnerDebt}
-        />
-      )}
+      {showSaleDetail &&
+        renderProductionModal(
+          <SaleDetailModal
+            onClose={() => {
+              setShowSaleDetail(false);
+              setSelectedSaleId(null);
+              setSaleDetailUsesAgentApi(false);
+            }}
+            saleId={selectedSaleId}
+            useAgentSalesApi={saleDetailUsesAgentApi}
+            onSaleReturned={loadSalesHistory}
+          />,
+        )}
+      {showOwnerReturnsModal &&
+        renderProductionModal(
+          <OwnerReturnsQueueModal
+            onClose={() => setShowOwnerReturnsModal(false)}
+            onChanged={() => {
+              refreshProductsList();
+              refreshTransfers();
+            }}
+          />,
+        )}
+      {showAgentClientsModal &&
+        renderProductionModal(
+          <AgentClientsDebtModal
+            onClose={() => {
+              setShowAgentClientsModal(false);
+              setSelectedAgentForClients(null);
+              setAgentClientsData([]);
+              setAgentClientsError("");
+              setSelectedAgentOwnerDebt(0);
+            }}
+            agent={selectedAgentForClients}
+            loading={agentClientsLoading}
+            error={agentClientsError}
+            clients={agentClientsData}
+            totalClientDebt={selectedAgentClientsTotalDebt}
+            ownerDebt={selectedAgentOwnerDebt}
+          />,
+        )}
+      {showAgentProductModal &&
+        renderProductionModal(
+          <AgentHeldProductModal
+            item={selectedAgentProduct}
+            isOwner={profile?.role === "owner"}
+            onClose={() => {
+              setShowAgentProductModal(false);
+              setSelectedAgentProduct(null);
+            }}
+          />,
+        )}
     </div>
   );
 };

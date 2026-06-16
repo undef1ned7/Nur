@@ -87,11 +87,11 @@
 .sklad-supply__pageBtn:disabled{opacity:.6;cursor:default}
 
 /* Модалка */
-.sklad-supply__overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:saturate(140%) blur(2px);z-index:70}
+.sklad-supply__overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:saturate(140%) blur(2px);z-index:10001}
 .sklad-supply__modal{
   position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(760px,96vw);max-height:min(92vh,680px);
-  background:#fff;border-radius:14px;box-shadow:var(--shadow);display:grid;grid-template-rows:auto 1fr;overflow:hidden;z-index:71;border:1px solid var(--border,#e5e7eb)
+  background:#fff;border-radius:14px;box-shadow:var(--shadow);display:grid;grid-template-rows:auto 1fr;overflow:hidden;z-index:10002;border:1px solid var(--border,#e5e7eb)
 }
 .sklad-supply__modalHeader{display:flex;justify-content:space-between;align-items:center;padding:14px var(--hpad);border-bottom:1px solid var(--border,#e5e7eb);background:#fff}
 .sklad-supply__modalTitle{margin:0;font-size:18px;font-weight:900}

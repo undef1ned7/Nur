@@ -1,0 +1,99 @@
+// Стили модалок на /crm/production/agents — отдельно от layout страницы
+@use "../../../Deposits/Sklad/addModalBase" as *;
+
+.add-modal__content {
+  background: #fff;
+  padding: 20px 16px;
+  border-radius: 8px;
+  width: min(480px, 96vw);
+}
+
+.add-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+}
+
+.add-modal__close-icon {
+  cursor: pointer;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.add-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-modal__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  color: #1a1a1a;
+  outline: none;
+}
+
+.add-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.add-modal__cancel {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 8px 12px;
+}
+
+.add-modal__save {
+  background-color: #ffd400;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.add-modal .sklad__table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 13px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th {
+    font-weight: 600;
+    background: #f9fafb;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}

@@ -1,0 +1,87 @@
+// Стили модалок «Общая скидка» и «Дополнительная услуга» на маркет-кассе.
+// Компоненты из Sell используют классы sell.scss; здесь — только для .cashier-page,
+// чтобы не тянуть весь sell.scss и не затрагивать SellMainStart / production sell.
+
+.cashier-page {
+  .universalModal {
+    z-index: 2600;
+  }
+
+  .universalModal__content {
+    min-width: min(379px, calc(100vw - 48px));
+  }
+
+  .start__discount,
+  .start__custom-service {
+    width: 379px;
+    max-width: 100%;
+  }
+
+  .start__discount,
+  .start__custom-service {
+    label {
+      margin: 10px 0 5px;
+      display: block;
+      font-family: Montserrat, sans-serif;
+      font-weight: 300;
+      font-size: 12px;
+      line-height: 100%;
+      color: #a8a8a8;
+    }
+  }
+
+  .sell__header-input {
+    width: 100%;
+    padding: 8px 13px;
+    outline: none;
+    border: 1px solid #00000033;
+    border-radius: 8px;
+    background-color: #ffffff;
+    font-family: Montserrat, sans-serif;
+    font-size: 12px;
+    box-sizing: border-box;
+
+    &::placeholder {
+      color: #91929e;
+    }
+  }
+
+  .sell__reset {
+    background: #f2f2f2;
+    padding: 8px 27px;
+    border-radius: 8px;
+    border: 1px solid #00000033;
+    color: #91929e;
+    font-family: Montserrat, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 100%;
+    cursor: pointer;
+  }
+
+  .start__total-pay {
+    background-color: #f7d617;
+    border: 2px solid #00000033;
+    font-family: Montserrat, sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 100%;
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #000;
+  }
+
+  @media screen and (max-width: 576px) {
+    .start__discount,
+    .start__custom-service {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .start__total-pay {
+      padding: 12px;
+      font-size: 14px;
+    }
+  }
+}

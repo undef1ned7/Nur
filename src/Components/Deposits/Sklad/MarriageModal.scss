@@ -1,4 +1,4 @@
-@import "./addModalBase";
+@use "./addModalBase" as *;
 
 .marriage-modal {
   // локальные переменные (с фолбэками)
