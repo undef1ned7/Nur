@@ -779,7 +779,7 @@ const FinishedGoodsAddModal = ({
           <div className="fg-add-modal__main">
             {createError && (
               <p className="fg-add-modal__error">
-                {createError?.message || "Ошибка при сохранении"}
+                {validateResErrors(createError, "Ошибка при сохранении")}
               </p>
             )}
 

@@ -10,6 +10,7 @@ import {
 import { useUser } from "../../../store/slices/userSlice";
 import { useLocation } from "react-router-dom";
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
+import ReactPortal from "../../common/Portal/ReactPortal";
 import "./MarriageModal.scss";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 
@@ -17,6 +18,9 @@ const toNum = (v) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+
+const DECIMAL_QTY_PATTERN = /^\d*([.,]\d*)?$/;
+const INTEGER_QTY_PATTERN = /^\d*$/;
 
 const MarriageModal = ({ onClose, onChanged, item }) => {
   const alert = useAlert()
@@ -29,6 +33,15 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
   const { company } = useUser();
   const { pathname } = useLocation();
   const isProductionWarehouse = pathname === "/crm/production/warehouse";
+  const isWeightProduct = Boolean(item?.is_weight);
+  const unitLabel = item?.unit || "шт";
+
+  const handleQtyChange = (value) => {
+    const nextValue = String(value ?? "");
+    const pattern = isWeightProduct ? DECIMAL_QTY_PATTERN : INTEGER_QTY_PATTERN;
+    if (nextValue && !pattern.test(nextValue)) return;
+    setDefectiveQty(nextValue);
+  };
 
   // себестоимость за 1 шт (или price для производства)
   const unitCost = useMemo(
@@ -64,20 +77,24 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     if (!item?.id) return "Нет выбранного товара";
     if (!q) return "Введите количество";
     if (q <= 0) return "Количество должно быть больше 0";
-    if (!Number.isInteger(q)) return "Количество должно быть целым числом";
+    if (!isWeightProduct && !Number.isInteger(q)) {
+      return "Количество должно быть целым числом";
+    }
     if (q > stockQty)
-      return `Нельзя списать больше, чем в наличии (${stockQty})`;
+      return `Нельзя списать больше, чем в наличии (${stockQty} ${unitLabel})`;
     if (unitCost < 0) return "Себестоимость указана неверно";
     return "";
-  }, [item, q, stockQty, unitCost]);
+  }, [item, q, stockQty, unitCost, isWeightProduct, unitLabel]);
 
   const validateReturn = useCallback(() => {
     if (!item?.id) return "Нет выбранного товара";
     if (!q) return "Введите количество для возврата";
     if (q <= 0) return "Количество должно быть больше 0";
-    if (!Number.isInteger(q)) return "Количество должно быть целым числом";
+    if (!isWeightProduct && !Number.isInteger(q)) {
+      return "Количество должно быть целым числом";
+    }
     if (q > stockQty)
-      return `Нельзя вернуть больше, чем в наличии (${stockQty})`;
+      return `Нельзя вернуть больше, чем в наличии (${stockQty} ${unitLabel})`;
     // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
     // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
     if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
@@ -88,7 +105,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     }
     if (unitCost < 0) return "Себестоимость указана неверно";
     return "";
-  }, [item, q, stockQty, cashBoxes, selectCashBox]);
+  }, [item, q, stockQty, cashBoxes, selectCashBox, unitCost, isWeightProduct, unitLabel]);
 
   const onFormSubmit = async (e) => {
     e.preventDefault();
@@ -155,7 +172,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     setError("");
     const confirmMsg = `Подтвердите возврат товара:
 Наименование: ${item?.name}
-Количество к возврату: ${q} шт.
+Количество к возврату: ${q} ${unitLabel}
 Сумма прихода: ${(q * unitCost).toFixed(2)}`;
     confirm(confirmMsg, async (result) => {
       if (result) {
@@ -198,9 +215,10 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
   };
 
   return (
-    <div className="add-modal marriage-modal z-50!">
-      <div className="add-modal__overlay z-50!" onClick={onClose} />
-      <div className="add-modal__content z-50!" style={{ height: "auto" }}>
+    <ReactPortal wrapperId="marriage-modal">
+      <div className="add-modal marriage-modal">
+        <div className="add-modal__overlay" onClick={onClose} />
+        <div className="add-modal__content" style={{ height: "auto" }}>
         <div className="add-modal__header">
           <h3 className="text-xl marriage-modal__heading">
             Списание брака / Возврат
@@ -213,7 +231,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             <div className="marriage-modal__title">{item?.name}</div>
             <div className="marriage-modal__meta">
               <div>
-                В наличии: <b>{stockQty}</b> шт.
+                В наличии: <b>{stockQty}</b> {unitLabel}
               </div>
               <div>
                 Себестоимость: <b>{unitCost}</b>
@@ -230,17 +248,14 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             </label>
             <input
               id="defectiveQty"
-              type="number"
+              type="text"
               name="defectiveQty"
               placeholder="Введите количество"
               className="marriage-modal__input"
               value={defectiveQty}
-              onChange={(e) => setDefectiveQty(e.target.value)}
-              min={1}
-              max={stockQty}
+              onChange={(e) => handleQtyChange(e.target.value)}
               onWheel={(e) => e.target.blur()}
-              step={1}
-              inputMode="numeric"
+              inputMode={isWeightProduct ? "decimal" : "numeric"}
             />
             <div className="marriage-modal__hint">
               {isProductionWarehouse
@@ -277,8 +292,9 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             </button>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </ReactPortal>
   );
 };
 
