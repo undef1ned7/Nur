@@ -2167,32 +2167,29 @@ const CashierPage = () => {
         return;
       }
 
-      // Проверяем, есть ли товар уже в корзине
-      // startSale возвращает items напрямую, а не cart.items
-      const saleFromStore = store.getState().sale?.start;
-      const items =
-        saleFromStore?.items ||
-        saleFromStore?.cart?.items ||
-        currentSale?.items ||
-        currentSale?.cart?.items ||
-        [];
-      const existingItem = items.find((item) =>
-        cartLinesMatchProductAndPackage(item, product.id, salePackageId),
+      // Проверяем, есть ли товар уже в корзине.
+      // Используем локальную корзину (cart), т.к. raw items из sale/start
+      // могут не содержать корректный sale_package сразу после добавления.
+      const existingCartLine = (cartRef.current || []).find(
+        (line) =>
+          !line.isCustom &&
+          String(line.productId) === String(product.id) &&
+          String(line.salePackage ?? "") === String(salePackageId ?? ""),
       );
 
-      if (existingItem) {
-        const currentQty = normalizeQuantity(existingItem.quantity);
+      if (existingCartLine?.itemId) {
+        const currentQty = normalizeQuantity(existingCartLine.quantity);
         const newQuantity = normalizeQuantity(currentQty + qtyToAdd);
         // Обновляем количество
         await dispatch(
           updateManualFilling({
             id: saleId,
-            productId: existingItem.id,
+            productId: existingCartLine.itemId,
             quantity: newQuantity,
           }),
         );
         requestCartQuantityFocus({
-          itemId: existingItem.id,
+          itemId: existingCartLine.itemId,
           productId: product.id,
           salePackage: salePackageId ?? null,
         });
@@ -3251,17 +3248,22 @@ const CashierPage = () => {
                     >
                       <Star size={16} fill="currentColor" />
                     </button>
-                    {cartItem && (
-                      <div className="cashier-page__product-badge">
-                        {formatQuantity(cartItem.quantity || product.cartQty || 0)}
-                      </div>
-                    )}
                     {pieceCartItem && (
                       <div
                         className="cashier-page__product-badge cashier-page__product-badge--piece"
                         title="Поштучно в корзине"
                       >
-                        {formatQuantity(pieceCartItem.quantity)} штуч
+                        <span className="cashier-page__product-badge-qty">
+                          {formatQuantity(pieceCartItem.quantity)}
+                        </span>
+                        <span className="cashier-page__product-badge-unit">
+                          шт.
+                        </span>
+                      </div>
+                    )}
+                    {cartItem && (
+                      <div className="cashier-page__product-badge">
+                        {formatQuantity(cartItem.quantity || product.cartQty || 0)}
                       </div>
                     )}
                     <div className="cashier-page__product-name">

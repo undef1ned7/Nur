@@ -31,7 +31,6 @@ import { parsePosSalesListTotalAmount } from "../../tools/posSalesListResponse";
 import {
   applyPosCartItemPatchToState,
   applyPosStartToState,
-  isCartLineItemResponse,
   normalizePosStartResponse,
   patchCartTabFromSale,
   removeCartLineFromStart,
@@ -174,16 +173,9 @@ const saleSlice = createSlice({
       .addCase(manualFilling.fulfilled, (state, { payload, meta }) => {
         state.cart = payload;
         if (payload && typeof payload === "object") {
-          let patch = payload;
-          const salePackageId = meta?.arg?.salePackageId;
-          if (
-            isCartLineItemResponse(payload) &&
-            salePackageId &&
-            !patch.sale_package
-          ) {
-            patch = { ...patch, sale_package: salePackageId };
-          }
-          applyPosCartItemPatchToState(state, patch);
+          applyPosCartItemPatchToState(state, payload, {
+            salePackageId: meta?.arg?.salePackageId,
+          });
         }
         state.loading = false;
       })

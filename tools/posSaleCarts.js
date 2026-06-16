@@ -95,24 +95,97 @@ export const normalizePosStartResponse = (data) => {
   };
 };
 
-const mergeSaleIntoStateStart = (state, sale) => {
+/**
+ * Бэк на add-item часто кладёт sale_package только в added_item, не в items[].
+ * Без этого поштучная строка теряет sale_package и пачка PATCH-ит её же.
+ */
+export const enrichPosSaleResponse = (data, options = {}) => {
+  if (!data || typeof data !== "object") return data;
+
+  const addedItemId = data.added_item_id ?? data.added_item?.id ?? null;
+  const addedSalePackage =
+    data.added_item?.sale_package ??
+    data.added_item?.sale_package_id ??
+    options.salePackageId ??
+    null;
+
+  if (!Array.isArray(data.items) && !Array.isArray(data.cart?.items)) {
+    if (
+      options.salePackageId &&
+      isCartLineItemResponse(data) &&
+      !data.sale_package
+    ) {
+      return { ...data, sale_package: options.salePackageId };
+    }
+    return data;
+  }
+
+  const rawItems = data.items ?? data.cart?.items ?? [];
+  const items = rawItems.map((item) => {
+    const existing = item.sale_package ?? item.sale_package_id ?? null;
+    if (existing != null && String(existing) !== "") {
+      return item;
+    }
+    const isAdded =
+      addedItemId != null && String(item.id) === String(addedItemId);
+    const pkg = isAdded ? addedSalePackage : null;
+    if (pkg == null || String(pkg) === "") return item;
+    return { ...item, sale_package: pkg };
+  });
+
+  const next = { ...data, items };
+  if (data.cart) {
+    next.cart = { ...data.cart, items };
+  }
+  return next;
+};
+
+const preserveSalePackageFromPrevItems = (nextItems, prevItems) => {
+  if (!Array.isArray(nextItems) || !Array.isArray(prevItems)) return nextItems;
+  return nextItems.map((item) => {
+    const existing = item.sale_package ?? item.sale_package_id ?? null;
+    if (existing != null && String(existing) !== "") return item;
+    const prevLine = prevItems.find((p) => String(p.id) === String(item.id));
+    if (prevLine?.sale_package) {
+      return { ...item, sale_package: prevLine.sale_package };
+    }
+    return item;
+  });
+};
+
+const mergeSaleIntoStateStart = (state, sale, options = {}) => {
   if (!sale?.id) return;
   const prev = state.start;
   const prevId = prev?.id != null ? String(prev.id) : "";
   const nextId = String(sale.id);
+
+  let nextSale = enrichPosSaleResponse(sale, options);
+
   if (prev && prevId && nextId && prevId === nextId) {
     const prevItems = prev.items ?? prev.cart?.items;
     const nextItemsMissing =
-      sale.items === undefined &&
-      (sale.cart === undefined || sale.cart.items === undefined);
+      nextSale.items === undefined &&
+      (nextSale.cart === undefined || nextSale.cart.items === undefined);
     // POST /start/ и иногда PATCH — sale без items: не затираем строки корзины.
     // Пустой массив items[] (после удаления последней позиции) — применяем.
     if (Array.isArray(prevItems) && prevItems.length > 0 && nextItemsMissing) {
-      state.start = { ...sale, items: prevItems };
+      state.start = { ...nextSale, items: prevItems };
       return;
     }
+
+    const nextItems = nextSale.items ?? nextSale.cart?.items;
+    if (Array.isArray(nextItems) && Array.isArray(prevItems)) {
+      const mergedItems = preserveSalePackageFromPrevItems(nextItems, prevItems);
+      nextSale = {
+        ...nextSale,
+        items: mergedItems,
+        ...(nextSale.cart
+          ? { cart: { ...nextSale.cart, items: mergedItems } }
+          : {}),
+      };
+    }
   }
-  state.start = sale;
+  state.start = nextSale;
 };
 
 /** Ответ POST add-item / PATCH строки — одна позиция, не вся продажа */
@@ -209,22 +282,24 @@ export const applyPosStartToState = (state, data) => {
  * PATCH /main/pos/carts/{saleId}/items/{itemId}/ — ответ с одной продажей.
  * Не подменяет список вкладок (posCarts), только активную продажу и метаданные вкладки.
  */
-export const applyPosCartItemPatchToState = (state, data) => {
+export const applyPosCartItemPatchToState = (state, data, options = {}) => {
   if (!data || typeof data !== "object") return;
 
-  if (Array.isArray(data.carts)) {
-    applyPosStartToState(state, data);
+  const payload = enrichPosSaleResponse(data, options);
+
+  if (Array.isArray(payload.carts)) {
+    applyPosStartToState(state, payload);
     return;
   }
 
-  if (isCartLineItemResponse(data)) {
-    mergeCartLineIntoStart(state, data);
+  if (isCartLineItemResponse(payload)) {
+    mergeCartLineIntoStart(state, payload);
     return;
   }
 
-  const { sale } = normalizePosStartResponse(data);
+  const { sale } = normalizePosStartResponse(payload);
   const patchSale =
-    sale ?? (data.id != null || data.sale_id != null ? data : null);
+    sale ?? (payload.id != null || payload.sale_id != null ? payload : null);
   if (!patchSale?.id) return;
 
   const patchId = String(patchSale.id ?? patchSale.sale_id);
@@ -236,10 +311,10 @@ export const applyPosCartItemPatchToState = (state, data) => {
 
   if (activeId && patchId !== activeId) return;
 
-  mergeSaleIntoStateStart(state, patchSale);
+  mergeSaleIntoStateStart(state, patchSale, options);
 
   if (Array.isArray(state.posCarts) && state.posCarts.length) {
-    state.posCarts = patchCartTabFromSale(state.posCarts, patchSale);
+    state.posCarts = patchCartTabFromSale(state.posCarts, state.start ?? patchSale);
   }
 };
 

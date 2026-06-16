@@ -7,6 +7,7 @@ import {
   getMainCartSaleId,
   isCartLineItemResponse,
   applyPosCartItemPatchToState,
+  enrichPosSaleResponse,
 } from "./posSaleCarts";
 
 describe("posSaleCarts", () => {
@@ -185,6 +186,35 @@ describe("posSaleCarts", () => {
       });
 
       expect(state.start.items).toHaveLength(1);
+    });
+  });
+
+  describe("enrichPosSaleResponse", () => {
+    it("copies sale_package from added_item into items[]", () => {
+      const apiResponse = {
+        id: "faab89d4-927f-4efe-bb37-01deb55ec589",
+        items: [
+          {
+            id: "e8f05a75-60f6-4ab0-bda7-743094311a4d",
+            product: "303cb660-039e-465d-81b3-392f2f6e6a2a",
+            quantity: "20.000",
+          },
+        ],
+        added_item_id: "e8f05a75-60f6-4ab0-bda7-743094311a4d",
+        added_item: {
+          id: "e8f05a75-60f6-4ab0-bda7-743094311a4d",
+          product: "303cb660-039e-465d-81b3-392f2f6e6a2a",
+          sale_package: "1f993aad-3cc2-4b0b-a210-86888c066b63",
+        },
+      };
+
+      const enriched = enrichPosSaleResponse(apiResponse, {
+        salePackageId: "1f993aad-3cc2-4b0b-a210-86888c066b63",
+      });
+
+      expect(enriched.items[0].sale_package).toBe(
+        "1f993aad-3cc2-4b0b-a210-86888c066b63",
+      );
     });
   });
 
