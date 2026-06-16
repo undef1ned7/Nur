@@ -1,4 +1,4 @@
-@import "../addModalBase";
+@use "../addModalBase" as *;
 
 .sklad-add-product-modal {
   --sap-bg: var(--panel-bg, #ffffff);

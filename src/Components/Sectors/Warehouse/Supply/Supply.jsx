@@ -42,6 +42,7 @@ const formatApiError = (error) => {
 
 const WarehouseSupply = () => {
   const navigate = useNavigate();
+  const [tab, setTab] = useState("sup"); // sup | po | rt
   const [q, setQ] = useState("");
 
   const [suppliers, setSuppliers] = useState([]);
@@ -233,15 +234,15 @@ const WarehouseSupply = () => {
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
-                setPageSup(1);
-                setPagePO(1);
-                setPageRT(1);
+                if (tab === "sup") setPageSup(1);
+                if (tab === "po") setPagePO(1);
+                if (tab === "rt") setPageRT(1);
               }}
               aria-label="Поиск"
             />
           </div>
 
-          {(
+          {tab === "sup" && (
             <button
               className="sklad-supply__btn sklad-supply__btn--primary"
               type="button"
@@ -251,20 +252,72 @@ const WarehouseSupply = () => {
               <span className="sklad-supply__btnText">Новый поставщик</span>
             </button>
           )}
+          {tab === "po" && (
+            <button
+              className="sklad-supply__btn sklad-supply__btn--primary"
+              type="button"
+              onClick={goToCreatePurchase}
+            >
+              <FaPlus aria-hidden />
+              <span className="sklad-supply__btnText">Новый документ покупки</span>
+            </button>
+          )}
+          {tab === "rt" && (
+            <button
+              className="sklad-supply__btn sklad-supply__btn--primary"
+              type="button"
+              onClick={goToCreateReturn}
+            >
+              <FaPlus aria-hidden />
+              <span className="sklad-supply__btnText">Новый возврат поставщику</span>
+            </button>
+          )}
         </div>
       </div>
 
       <div className="sklad-supply__tabs" role="tablist" aria-label="Разделы">
         <button
           role="tab"
-          aria-selected={true}
-          className="sklad-supply__tab is-active"
+          aria-selected={tab === "sup"}
+          aria-current={tab === "sup" ? "page" : undefined}
+          className={`sklad-supply__tab ${tab === "sup" ? "is-active" : ""}`}
           type="button"
+          onClick={() => {
+            setTab("sup");
+            setPageSup(1);
+          }}
         >
           Поставщики
         </button>
+        <button
+          role="tab"
+          aria-selected={tab === "po"}
+          aria-current={tab === "po" ? "page" : undefined}
+          className={`sklad-supply__tab ${tab === "po" ? "is-active" : ""}`}
+          type="button"
+          onClick={() => {
+            setTab("po");
+            setPagePO(1);
+          }}
+        >
+          Заказы поставщику
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "rt"}
+          aria-current={tab === "rt" ? "page" : undefined}
+          className={`sklad-supply__tab ${tab === "rt" ? "is-active" : ""}`}
+          type="button"
+          onClick={() => {
+            setTab("rt");
+            setPageRT(1);
+          }}
+        >
+          Возвраты поставщику
+        </button>
       </div>
 
+      {tab === "sup" && (
       <div className="sklad-supply__table sklad-supply__table--sup">
         <table className="sklad-supply-table">
           <thead>
@@ -326,19 +379,9 @@ const WarehouseSupply = () => {
           </div>
         )}
       </div>
+      )}
 
-      <div className="sklad-supply__section">
-        <h3 className="sklad-supply__sectionTitle">Покупка (документы)</h3>
-        <button
-          className="sklad-supply__btn sklad-supply__btn--primary"
-          type="button"
-          onClick={goToCreatePurchase}
-        >
-          <FaPlus aria-hidden />
-          Новый документ покупки
-        </button>
-      </div>
-
+      {tab === "po" && (
       <div className="sklad-supply__table sklad-supply__table--po">
         <table className="sklad-supply-table">
           <thead>
@@ -398,19 +441,9 @@ const WarehouseSupply = () => {
           </div>
         )}
       </div>
+      )}
 
-      <div className="sklad-supply__section">
-        <h3 className="sklad-supply__sectionTitle">Возвраты поставщику</h3>
-        <button
-          className="sklad-supply__btn sklad-supply__btn--primary"
-          type="button"
-          onClick={goToCreateReturn}
-        >
-          <FaPlus aria-hidden />
-          Новый возврат поставщику
-        </button>
-      </div>
-
+      {tab === "rt" && (
       <div className="sklad-supply__table sklad-supply__table--rt">
         <table className="sklad-supply-table">
           <thead>
@@ -468,6 +501,7 @@ const WarehouseSupply = () => {
           </div>
         )}
       </div>
+      )}
 
       {openSup && (
         <>
