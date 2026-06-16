@@ -3,9 +3,6 @@
     margin-top: 50px;
     margin-bottom: 30px;
   }
-  &__items {
-    width: 500px;
-  }
 }
 
 .content.content--sidebar-open {
@@ -2534,6 +2531,289 @@
   }
 }
 
+/* Sell detail modal rendered via Portal (outside .sell tree) */
+.common-modal-overlay:has(.sellDetailModal) {
+  z-index: 10050;
+}
+
+.sellDetailModal {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 760px;
+  max-height: min(90vh, 920px);
+  border-radius: 18px;
+}
+
+.sellDetailModal__content {
+  padding: 16px 20px 20px;
+}
+
+.sellDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sellDetail__loading {
+  text-align: center;
+  padding: 32px 16px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.sellDetail__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sellDetail__metaCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.sellDetail__metaLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.sellDetail__metaValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sellDetail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sellDetail__sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.sellDetail__sectionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sellDetail__empty {
+  padding: 20px;
+  text-align: center;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.sellDetail__items {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.sellDetail__itemsHead,
+.sellDetail__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 72px 88px 108px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.sellDetail__itemsHead {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.sellDetail__item + .sellDetail__item {
+  border-top: 1px solid #f1f5f9;
+}
+
+.sellDetail__itemName {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.sellDetail__itemNo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sellDetail__itemQty,
+.sellDetail__itemPrice {
+  font-size: 13px;
+  color: #374151;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sellDetail__itemTotal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+  }
+}
+
+.sellDetail__itemDiscount {
+  font-size: 11px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.sellDetail__totals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+}
+
+.sellDetail__totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #4b5563;
+
+  span:last-child {
+    font-variant-numeric: tabular-nums;
+    color: #111827;
+    font-weight: 500;
+  }
+
+  &--discount span:last-child {
+    color: #b45309;
+    font-weight: 600;
+  }
+
+  &--final {
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px dashed #fcd34d;
+    font-size: 15px;
+    color: #111827;
+
+    strong {
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+.sellDetail__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.sellDetail__actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &--primary {
+    background: #f7d617;
+    border-color: #00000022;
+    color: #111827;
+
+    &:hover {
+      background: #f5cf00;
+    }
+  }
+
+  &--secondary {
+    background: #fff;
+    border-color: #d1d5db;
+    color: #111827;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: #9ca3af;
+    }
+  }
+}
+
 /* Refund modal rendered via Portal (outside .sell tree) */
 .common-modal-overlay:has(.sellReturnModal) {
   z-index: 10050;
@@ -2783,6 +3063,73 @@
 }
 
 @media (max-width: 768px) {
+  .sellDetailModal {
+    width: calc(100vw - 20px);
+    max-width: none;
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
+  }
+
+  .sellDetailModal__content {
+    padding: 14px 16px 16px;
+  }
+
+  .sellDetail__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .sellDetail__itemsHead {
+    display: none;
+  }
+
+  .sellDetail__item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .sellDetail__itemQty,
+  .sellDetail__itemPrice,
+  .sellDetail__itemTotal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+
+    &::before {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #9ca3af;
+    }
+  }
+
+  .sellDetail__itemQty::before {
+    content: "Кол-во";
+  }
+
+  .sellDetail__itemPrice::before {
+    content: "Цена";
+  }
+
+  .sellDetail__itemTotal {
+    padding-top: 6px;
+    border-top: 1px dashed #e5e7eb;
+
+    &::before {
+      content: "Сумма";
+    }
+
+    strong {
+      font-size: 15px;
+    }
+  }
+
+  .sellDetail__actions {
+    grid-template-columns: 1fr;
+  }
+
   .sellReturnModal {
     width: calc(100vw - 20px);
     max-width: none;
@@ -2843,6 +3190,22 @@
 }
 
 @media (max-width: 480px) {
+  .common-modal-overlay:has(.sellDetailModal) {
+    padding: 0;
+  }
+
+  .sellDetailModal {
+    width: 100vw;
+    max-width: none;
+    max-height: 100vh;
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .sellDetailModal__content {
+    padding: 12px 14px 16px;
+  }
+
   .common-modal-overlay:has(.sellReturnModal) {
     padding: 0;
   }

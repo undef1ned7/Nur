@@ -1,8 +1,8 @@
-import { X } from "lucide-react";
-import { useEffect } from "react";
+import { FileText, Receipt } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate, useParams } from "react-router-dom";
 import { pdf } from "@react-pdf/renderer";
-// import "./Sklad.scss";
 
 import {
   getProductCheckout,
@@ -13,8 +13,8 @@ import {
 import { useSale } from "../../../store/slices/saleSlice";
 import { useUser } from "../../../store/slices/userSlice";
 import InvoicePdfDocument from "../../Sectors/Market/Documents/components/InvoicePdfDocument";
-import { de } from "date-fns/locale";
 import { handleCheckoutResponseForPrinting as printViaSharedService } from "./services/printService";
+import Modal from "../../common/Modal/Modal";
 
 /* ============================================================
    A) WebUSB + ESC/POS helpers (автоподключение + печать PDF)
@@ -540,21 +540,78 @@ async function printCyrPagesTest() {
    B) Компонент SellDetail
    ============================================================ */
 
-const SellDetail = ({ onClose, id }) => {
+const kindTranslate = {
+  new: "Новый",
+  paid: "Оплаченный",
+  canceled: "Возвращённый",
+  debt: "Долг",
+};
+
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return "—";
+  try {
+    return new Date(dateString).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(dateString);
+  }
+};
+
+const getStatusVariant = (status) => {
+  const s = String(status || "").toLowerCase();
+  if (s === "paid") return "paid";
+  if (s === "canceled" || s === "cancelled") return "canceled";
+  if (s === "debt") return "debt";
+  return "new";
+};
+
+const getLineDiscount = (product) =>
+  Number(
+    product?.line_discount ??
+      product?.line_discount_total ??
+      product?.discount_amount ??
+      product?.discount_total ??
+      0,
+  );
+
+const getLineTotal = (product) => {
+  const qty = Number(product?.quantity || 0);
+  const unitPrice = Number(product?.unit_price || 0);
+  const discount = getLineDiscount(product);
+  const computed = qty * unitPrice - discount;
+  const explicit = Number(product?.line_total);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return Math.max(0, computed);
+};
+
+const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { id: routeId } = useParams();
+  const id = idProp || routeId;
+  const onClose = onCloseProp || (() => navigate(-1));
   const { historyDetail: item, historyObjectDetail } = useSale();
   const { company } = useUser();
+  const [loading, setLoading] = useState(true);
 
   const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
   const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
   const isBuildingCompany = sectorName === "строительная компания";
   const isStartPlan = planName === "старт";
-
-  const kindTranslate = {
-    new: "Новый",
-    paid: "Оплаченный",
-    canceled: "возвращенный",
-  };
 
   const filterField = isStartPlan
     ? item
@@ -563,9 +620,27 @@ const SellDetail = ({ onClose, id }) => {
     : item;
 
   useEffect(() => {
-    dispatch(historySellProductDetail(id));
-    dispatch(historySellObjectDetail(id));
-  }, [id, dispatch]);
+    if (!id) {
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    const requests = [dispatch(historySellProductDetail(id))];
+    if (isBuildingCompany) {
+      requests.push(dispatch(historySellObjectDetail(id)));
+    }
+
+    Promise.all(requests).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, dispatch, isBuildingCompany]);
 
   // Автоподключение USB при монтировании
   useEffect(() => {
@@ -632,81 +707,148 @@ const SellDetail = ({ onClose, id }) => {
     }
   };
 
+  const statusVariant = getStatusVariant(filterField?.status);
+  const statusLabel =
+    kindTranslate[filterField?.status] || filterField?.status || "—";
+  const items = Array.isArray(filterField?.items) ? filterField.items : [];
+  const subtotal = Number(filterField?.subtotal || 0);
+  const discountTotal = Number(filterField?.discount_total || 0);
+  const taxTotal = Number(filterField?.tax_total || 0);
+  const total = Number(filterField?.total || 0);
+
   return (
-    <div className="sellDetail add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ width: "700px" }}>
-        <div className="add-modal__header">
-          <h3>Детали продажи</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
-        </div>
-        <div className="sellDetail__content">
-          <div className="sell__box">
-            <p className="receipt__title">Клиент: {filterField?.client_name}</p>
-            <p className="receipt__title">
-              Статус:{" "}
-              {kindTranslate[filterField?.status] || filterField?.status}
-            </p>
-            <p className="receipt__title">
-              Дата:{" "}
-              {filterField?.created_at
-                ? new Date(filterField.created_at).toLocaleString()
-                : "-"}
-            </p>
-          </div>
-
-          <div className="receipt">
-            {filterField?.items?.map((product, idx) => (
-              <div className="receipt__item" key={idx}>
-                <p className="receipt__item-name">
-                  {idx + 1}. {product.product_name ?? product.object_name}
-                </p>
-                <div>
-                  <p>
-                    Скидка:{" "}
-                    {Number(
-                      product.line_discount ??
-                        product.line_discount_total ??
-                        product.discount_amount ??
-                        product.discount_total ??
-                        0
-                    )}
-                  </p>
-                  <p className="receipt__item-price">
-                    {product.quantity} x {product.unit_price} ≡{" "}
-                    {Number(
-                      product.line_total ??
-                        Number(product.quantity || 0) *
-                          Number(product.unit_price || 0)
-                    )}
-                  </p>
-                </div>
+    <Modal
+      open
+      onClose={onClose}
+      title="Детали продажи"
+      className="sellDetailModal"
+      contentClassName="sellDetailModal__content"
+      wrapperId="sell-detail-modal"
+    >
+      <div className="sellDetail">
+        {loading ? (
+          <div className="sellDetail__loading">Загрузка данных о продаже...</div>
+        ) : (
+          <>
+            <div className="sellDetail__meta">
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Клиент</span>
+                <span className="sellDetail__metaValue">
+                  {filterField?.client_name || "Без клиента"}
+                </span>
               </div>
-            ))}
-
-            <div className="receipt__total">
-              <b>ИТОГО</b>
-              <p>Промежуточный итог: {filterField?.subtotal ?? 0}</p>
-              <p>Общая скидка: -{filterField?.discount_total ?? 0}</p>
-              <p>Налог: {filterField?.tax_total ?? 0}</p>
-              <b>≡ {filterField?.total ?? 0}</b>
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Статус</span>
+                <span className={`sellBadge sellBadge--${statusVariant}`}>
+                  {statusLabel}
+                </span>
+              </div>
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Дата</span>
+                <span className="sellDetail__metaValue">
+                  {formatDateTime(filterField?.created_at)}
+                </span>
+              </div>
             </div>
 
-            <div className="receipt__row">
-              <button className="receipt__row-btn" onClick={handlePrintReceipt}>
-                Чек
+            <section className="sellDetail__section" aria-label="Позиции продажи">
+              <h4 className="sellDetail__sectionTitle">
+                Позиции
+                <span className="sellDetail__sectionCount">{items.length}</span>
+              </h4>
+
+              {items.length === 0 ? (
+                <div className="sellDetail__empty">Нет позиций в продаже</div>
+              ) : (
+                <div className="sellDetail__items">
+                  <div className="sellDetail__itemsHead" aria-hidden>
+                    <span>Товар</span>
+                    <span>Кол-во</span>
+                    <span>Цена</span>
+                    <span>Сумма</span>
+                  </div>
+                  {items.map((product, idx) => {
+                    const name =
+                      product.product_name ?? product.object_name ?? "—";
+                    const qty = Number(product.quantity || 0);
+                    const unitPrice = Number(product.unit_price || 0);
+                    const lineDiscount = getLineDiscount(product);
+                    const lineTotal = getLineTotal(product);
+
+                    return (
+                      <div className="sellDetail__item" key={product.id ?? idx}>
+                        <div className="sellDetail__itemName">
+                          <span className="sellDetail__itemNo">{idx + 1}</span>
+                          <span>{name}</span>
+                        </div>
+                        <div className="sellDetail__itemQty">
+                          {qty.toLocaleString("ru-RU", {
+                            maximumFractionDigits: 3,
+                          })}
+                        </div>
+                        <div className="sellDetail__itemPrice">
+                          {formatMoney(unitPrice)}
+                        </div>
+                        <div className="sellDetail__itemTotal">
+                          <strong>{formatMoney(lineTotal)}</strong>
+                          {lineDiscount > 0 && (
+                            <span className="sellDetail__itemDiscount">
+                              −{formatMoney(lineDiscount)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="sellDetail__totals" aria-label="Итоги продажи">
+              <div className="sellDetail__totalRow">
+                <span>Промежуточный итог</span>
+                <span>{formatMoney(subtotal)} сом</span>
+              </div>
+              {discountTotal > 0 && (
+                <div className="sellDetail__totalRow sellDetail__totalRow--discount">
+                  <span>Скидка</span>
+                  <span>−{formatMoney(discountTotal)} сом</span>
+                </div>
+              )}
+              {taxTotal > 0 && (
+                <div className="sellDetail__totalRow">
+                  <span>Налог</span>
+                  <span>{formatMoney(taxTotal)} сом</span>
+                </div>
+              )}
+              <div className="sellDetail__totalRow sellDetail__totalRow--final">
+                <span>Итого к оплате</span>
+                <strong>{formatMoney(total)} сом</strong>
+              </div>
+            </section>
+
+            <div className="sellDetail__actions">
+              <button
+                type="button"
+                className="sellDetail__actionBtn sellDetail__actionBtn--primary"
+                onClick={handlePrintReceipt}
+              >
+                <Receipt size={18} strokeWidth={2.2} aria-hidden />
+                Печать чека
               </button>
               <button
-                className="receipt__row-btn"
+                type="button"
+                className="sellDetail__actionBtn sellDetail__actionBtn--secondary"
                 onClick={handleDownloadInvoice}
               >
-                Накладной
+                <FileText size={18} strokeWidth={2.2} aria-hidden />
+                Скачать накладную
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };
 

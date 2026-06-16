@@ -575,11 +575,12 @@
 
 import { useEffect, useMemo, useState, lazy, Suspense, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Plus, LayoutGrid, Table2 } from "lucide-react";
+import { ChevronDown, LayoutGrid, Plus, Search, Table2 } from "lucide-react";
 import "./Clients.scss";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import Modal from "../../../common/Modal/Modal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const HostelClients = lazy(() => import("../../Hostel/Clients/Clients"));
@@ -763,7 +764,10 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
 
       setRows(list);
     } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при загрузке списка клиентов. ")
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при загрузке списка клиентов. ",
+      );
       setError(errorMessage);
       setRows([]);
     } finally {
@@ -830,7 +834,7 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
           .includes(s) ||
         String(c.phone || "")
           .toLowerCase()
-          .includes(s)
+          .includes(s),
     );
   }, [rows, debouncedSearch, activeTab]);
 
@@ -852,6 +856,7 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
   const [addAddress, setAddAddress] = useState("");
   const [addSaving, setAddSaving] = useState(false);
   const [addErr, setAddErr] = useState("");
+  const [showAddExtra, setShowAddExtra] = useState(false);
 
   const canSaveAdd =
     String(addFullName).trim().length >= 1 &&
@@ -871,6 +876,7 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
     setAddBik("");
     setAddAddress("");
     setAddErr("");
+    setShowAddExtra(false);
   };
 
   const createRowApi = async ({
@@ -889,9 +895,9 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
     const variants = TYPE_VARIANTS_BY_TAB[activeTab] || [];
     const preferredFirst = acceptedTypeByTab[activeTab]
       ? [
-        acceptedTypeByTab[activeTab],
-        ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
-      ]
+          acceptedTypeByTab[activeTab],
+          ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
+        ]
       : variants;
 
     const tryList = preferredFirst.length
@@ -988,6 +994,24 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
   const resellersTabLabel =
     sectorName === "Строительная компания" ? "Подрядчики" : "Реализаторы";
 
+  const createEntityTitle =
+    activeTab === "clients"
+      ? "Новый клиент"
+      : activeTab === "suppliers"
+        ? "Новый поставщик"
+        : sectorName === "Строительная компания"
+          ? "Новый подрядчик"
+          : "Новый реализатор";
+
+  const createEntityHint =
+    activeTab === "clients"
+      ? "Достаточно указать имя и телефон — карточку можно дополнить позже."
+      : activeTab === "suppliers"
+        ? "Укажите название и контактный телефон поставщика."
+        : sectorName === "Строительная компания"
+          ? "Укажите название и контактный телефон подрядчика."
+          : "Укажите название и контактный телефон реализатора.";
+
   const title =
     activeTab === "clients"
       ? "Клиенты"
@@ -1041,8 +1065,9 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
           {TABS.map((t) => (
             <button
               key={t.key}
-              className={`clients-tabs__tab ${activeTab === t.key ? "clients-tabs__tab--active" : ""
-                }`}
+              className={`clients-tabs__tab ${
+                activeTab === t.key ? "clients-tabs__tab--active" : ""
+              }`}
               onClick={() => setActiveTab(t.key)}
               type="button"
             >
@@ -1105,8 +1130,9 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`clients-view-btn ${viewMode === "table" ? "clients-view-btn--active" : ""
-                }`}
+              className={`clients-view-btn ${
+                viewMode === "table" ? "clients-view-btn--active" : ""
+              }`}
             >
               <Table2 size={16} />
               Таблица
@@ -1115,8 +1141,9 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`clients-view-btn ${viewMode === "cards" ? "clients-view-btn--active" : ""
-                }`}
+              className={`clients-view-btn ${
+                viewMode === "cards" ? "clients-view-btn--active" : ""
+              }`}
             >
               <LayoutGrid size={16} />
               Карточки
@@ -1256,32 +1283,39 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
         </div>
       </DataContainer>
 
-      {/* ===== Add Modal ===== */}
-      {isAddOpen && (
-        <div className="modal-overlay" onMouseDown={handleAddCancel}>
-          <div
-            className="modal"
-            onMouseDown={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
+      <Modal
+        open={isAddOpen}
+        onClose={handleAddCancel}
+        title={createEntityTitle}
+        className="clientCreateModal"
+        contentClassName="clientCreateModal__content"
+        wrapperId="client-create-modal"
+      >
+        <div className="clientCreateModal__body">
+          <p className="clientCreateModal__lead">{createEntityHint}</p>
+
+          {addErr && (
+            <div className="clientCreateModal__error" role="alert">
+              {addErr}
+            </div>
+          )}
+
+          <section
+            className="clientCreateModal__section"
+            aria-labelledby="client-create-main-title"
           >
-            <div className="modal__header">
-              <h3>
-                {activeTab === "clients"
-                  ? "Новый клиент"
-                  : activeTab === "suppliers"
-                    ? "Новый поставщик"
-                    : sectorName === "Строительная компания"
-                      ? "Новый подрядчик"
-                      : "Новый реализатор"}
-              </h3>
+            <div className="clientCreateModal__sectionHead">
+              <h4 id="client-create-main-title" className="clientCreateModal__sectionTitle">
+                Основная информация
+              </h4>
+              <span className="clientCreateModal__requiredHint">
+                * обязательные поля
+              </span>
             </div>
 
-            {addErr && <div className="alert alert--error">{addErr}</div>}
-
-            <div className="modal__body">
-              <label className="field">
-                <span>ФИО *</span>
+            <div className="clientCreateModal__grid clientCreateModal__grid--main">
+              <label className="clientCreateModal__field clientCreateModal__field--required">
+                <span className="clientCreateModal__label">ФИО или название</span>
                 <input
                   type="text"
                   value={addFullName}
@@ -1291,18 +1325,22 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
                 />
               </label>
 
-              <label className="field">
-                <span>Телефон *</span>
+              <label className="clientCreateModal__field clientCreateModal__field--required">
+                <span className="clientCreateModal__label">Телефон</span>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
                   value={addPhone}
                   onChange={(e) => setAddPhone(e.target.value)}
                   placeholder="+996 700 00-00-00"
                 />
+                <span className="clientCreateModal__hint">
+                  Основной номер для связи
+                </span>
               </label>
 
-              <label className="field">
-                <span>Email</span>
+              <label className="clientCreateModal__field">
+                <span className="clientCreateModal__label">Email</span>
                 <input
                   type="email"
                   value={addEmail}
@@ -1311,102 +1349,136 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
                 />
               </label>
 
-              <label className="field">
-                <span>Дата</span>
+              <label className="clientCreateModal__field">
+                <span className="clientCreateModal__label">Дата регистрации</span>
                 <input
                   type="date"
                   value={addDate}
                   onChange={(e) => setAddDate(e.target.value)}
                 />
               </label>
-
-              <label className="field">
-                <span>Статус</span>
-                <input
-                  type="text"
-                  value={addStatus}
-                  onChange={(e) => setAddStatus(e.target.value)}
-                  placeholder="new"
-                />
-              </label>
-
-              <label className="field">
-                <span>ОсОО</span>
-                <input
-                  type="text"
-                  value={addLlc}
-                  onChange={(e) => setAddLlc(e.target.value)}
-                  placeholder="ОсОО"
-                />
-              </label>
-
-              <label className="field">
-                <span>ИНН</span>
-                <input
-                  type="text"
-                  value={addInn}
-                  onChange={(e) => setAddInn(e.target.value)}
-                  placeholder="ИНН"
-                />
-              </label>
-
-              <label className="field">
-                <span>ОКПО</span>
-                <input
-                  type="text"
-                  value={addOkpo}
-                  onChange={(e) => setAddOkpo(e.target.value)}
-                  placeholder="ОКПО"
-                />
-              </label>
-
-              <label className="field">
-                <span>Счет</span>
-                <input
-                  type="text"
-                  value={addScore}
-                  onChange={(e) => setAddScore(e.target.value)}
-                  placeholder="Расчетный счет"
-                />
-              </label>
-
-              <label className="field">
-                <span>БИК</span>
-                <input
-                  type="text"
-                  value={addBik}
-                  onChange={(e) => setAddBik(e.target.value)}
-                  placeholder="БИК"
-                />
-              </label>
-
-              <label className="field">
-                <span>Адрес</span>
-                <input
-                  type="text"
-                  value={addAddress}
-                  onChange={(e) => setAddAddress(e.target.value)}
-                  placeholder="Адрес"
-                />
-              </label>
             </div>
+          </section>
 
-            <div className="modal-actions">
-              <button
-                className="btn btn--yellow"
-                onClick={handleAddSave}
-                disabled={!canSaveAdd}
-                title={!canSaveAdd ? "Заполните обязательные поля" : ""}
-              >
-                {addSaving ? "Сохранение…" : "Добавить"}
-              </button>
-              <button className="btn btn--ghost" onClick={handleAddCancel}>
-                Отмена
-              </button>
-            </div>
+          <button
+            type="button"
+            className={`clientCreateModal__toggle${showAddExtra ? " clientCreateModal__toggle--open" : ""}`}
+            onClick={() => setShowAddExtra((prev) => !prev)}
+            aria-expanded={showAddExtra}
+            aria-controls="client-create-extra-fields"
+          >
+            <span>
+              Реквизиты и адрес
+              <small>необязательно</small>
+            </span>
+            <ChevronDown size={18} aria-hidden />
+          </button>
+
+          {showAddExtra && (
+            <section
+              id="client-create-extra-fields"
+              className="clientCreateModal__section clientCreateModal__section--extra"
+              aria-labelledby="client-create-extra-title"
+            >
+              <h4 id="client-create-extra-title" className="clientCreateModal__sectionTitle">
+                Дополнительные данные
+              </h4>
+
+              <div className="clientCreateModal__grid">
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">ОсОО / компания</span>
+                  <input
+                    type="text"
+                    value={addLlc}
+                    onChange={(e) => setAddLlc(e.target.value)}
+                    placeholder="ОсОО «Пример»"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">ИНН</span>
+                  <input
+                    type="text"
+                    value={addInn}
+                    onChange={(e) => setAddInn(e.target.value)}
+                    placeholder="12345678901234"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">ОКПО</span>
+                  <input
+                    type="text"
+                    value={addOkpo}
+                    onChange={(e) => setAddOkpo(e.target.value)}
+                    placeholder="12345678"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">Статус</span>
+                  <input
+                    type="text"
+                    value={addStatus}
+                    onChange={(e) => setAddStatus(e.target.value)}
+                    placeholder="Например: active"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">Расчётный счёт</span>
+                  <input
+                    type="text"
+                    value={addScore}
+                    onChange={(e) => setAddScore(e.target.value)}
+                    placeholder="12345678901234567890"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field">
+                  <span className="clientCreateModal__label">БИК</span>
+                  <input
+                    type="text"
+                    value={addBik}
+                    onChange={(e) => setAddBik(e.target.value)}
+                    placeholder="123456"
+                  />
+                </label>
+
+                <label className="clientCreateModal__field clientCreateModal__field--wide">
+                  <span className="clientCreateModal__label">Адрес</span>
+                  <input
+                    type="text"
+                    value={addAddress}
+                    onChange={(e) => setAddAddress(e.target.value)}
+                    placeholder="Город, улица, дом"
+                  />
+                </label>
+              </div>
+            </section>
+          )}
+
+          <div className="clientCreateModal__actions">
+            <button
+              type="button"
+              className="clientCreateModal__btn clientCreateModal__btn--ghost"
+              onClick={handleAddCancel}
+              disabled={addSaving}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              className="clientCreateModal__btn clientCreateModal__btn--primary"
+              onClick={handleAddSave}
+              disabled={!canSaveAdd}
+              title={!canSaveAdd ? "Заполните имя и телефон" : ""}
+            >
+              {addSaving ? "Сохранение…" : "Создать"}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
