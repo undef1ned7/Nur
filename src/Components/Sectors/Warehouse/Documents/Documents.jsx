@@ -351,9 +351,9 @@ const Documents = () => {
 
   const documentsTableColSpan = useMemo(() => {
     if (activeTab === "receipts") {
-      return (docType === "SALE" ? 9 : 8) + (docType === "RECEIPT" ? 1 : 0);
+      return (docType === "SALE" ? 10 : 8) + (docType === "RECEIPT" ? 1 : 0);
     }
-    return docType === "SALE" ? 9 : 8;
+    return docType === "SALE" ? 10 : 8;
   }, [activeTab, docType]);
 
   // Фильтрация по агенту (для продаж)
@@ -403,6 +403,7 @@ const Documents = () => {
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
         paymentKindLabel: formatWarehousePaymentKindLabel(doc.payment_kind),
+        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -432,6 +433,7 @@ const Documents = () => {
         statusType: getStatusType(resolvedStatus),
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
+        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -461,6 +463,7 @@ const Documents = () => {
         statusType: getStatusType(resolvedStatus),
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
+        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -1409,6 +1412,7 @@ const Documents = () => {
                       <th>Дата и время</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
+                      {docType === "SALE" && <th>Цены</th>}
                       {docType === "RECEIPT" && <th>Оплата</th>}
                       <th>Товаров</th>
                       <th>Сумма</th>
@@ -1474,6 +1478,9 @@ const Documents = () => {
                           <td>{item.client}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
+                          )}
+                          {docType === "SALE" && (
+                            <td>{item.wholesaleLabel ?? "—"}</td>
                           )}
                           {docType === "RECEIPT" && (
                             <td>{item.paymentKindLabel}</td>
@@ -1578,6 +1585,9 @@ const Documents = () => {
                           <td>{item.counterparty}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
+                          )}
+                          {docType === "SALE" && (
+                            <td>{item.wholesaleLabel ?? "—"}</td>
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
@@ -1694,6 +1704,9 @@ const Documents = () => {
                           <td>{item.counterparty}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
+                          )}
+                          {docType === "SALE" && (
+                            <td>{item.wholesaleLabel ?? "—"}</td>
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
@@ -1893,6 +1906,14 @@ const Documents = () => {
                         <span className="documents__card-label">Агент</span>
                         <span className="documents__card-value">
                           {item.agentDisplay ?? "—"}
+                        </span>
+                      </div>
+                    )}
+                    {docType === "SALE" && (
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Цены</span>
+                        <span className="documents__card-value">
+                          {item.wholesaleLabel ?? "—"}
                         </span>
                       </div>
                     )}

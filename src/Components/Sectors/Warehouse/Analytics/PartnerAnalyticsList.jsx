@@ -187,6 +187,7 @@ const PartnerAnalyticsList = () => {
                     <th scope="col">Приход</th>
                     <th scope="col">Расход</th>
                     <th scope="col">Сальдо</th>
+                    <th scope="col">Контрагенты</th>
                     <th scope="col" aria-hidden="true" />
                   </tr>
                 </thead>
@@ -234,6 +235,9 @@ const PartnerAnalyticsList = () => {
                         </td>
                         <td className="is-num">
                           {formatNum(s.money_net_amount)} сом
+                        </td>
+                        <td className="is-num">
+                          {formatNum(s.money_counterparty_net_amount)} сом
                         </td>
                         <td className="partner-analytics__arrow">
                           <ArrowRight size={16} aria-hidden="true" />

@@ -53,9 +53,8 @@ import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
   getAgentSalesList,
   getAgentSaleDetail,
-  agentSaleReturn,
-  getAllProductionSaleReturn,
 } from "../../../../api/agentSales";
+import ProductionRefundPurchase from "../Sell/ProductionRefundPurchase";
 import ProductionAgentRequestCartsTab from "./ProductionAgentRequestCartsTab";
 
 const renderProductionModal = (node) =>
@@ -68,15 +67,13 @@ const SaleDetailModal = ({
   onClose,
   saleId,
   useAgentSalesApi,
-  onSaleReturned,
+  onOpenRefund,
 }) => {
   const alert = useAlert();
-  const confirmDialog = useConfirm();
   const dispatch = useDispatch();
   const { historyDetail: saleDetail } = useSale();
   const [agentDetail, setAgentDetail] = useState(null);
   const [agentDetailLoading, setAgentDetailLoading] = useState(false);
-  const [saleReturning, setSaleReturning] = useState(false);
 
   useEffect(() => {
     if (!saleId) return;
@@ -119,49 +116,6 @@ const SaleDetailModal = ({
 
   const saleStatus = String(detail?.status || "").toLowerCase();
   const canReturnSale = saleStatus === "paid" || saleStatus === "debt";
-
-  const handleReturnSale = useCallback(() => {
-    if (!saleId) return;
-    const st = String(detail?.status || "").toLowerCase();
-    if (st !== "paid" && st !== "debt") {
-      alert(
-        "Возврат возможен только для оплаченных или долговых продаж.",
-        true,
-      );
-      return;
-    }
-    confirmDialog(
-      "Выполнить возврат продажи? Статус станет «Отменён»; товар вернётся на основной склад (обычная продажа) или снова у агента (агентская продажа).",
-      async (ok) => {
-        if (!ok) return;
-        setSaleReturning(true);
-        try {
-          if (useAgentSalesApi) {
-            await agentSaleReturn(saleId);
-            const data = await getAgentSaleDetail(saleId);
-            setAgentDetail(data);
-          } else {
-            await getAllProductionSaleReturn(saleId);
-            await dispatch(historySellProductDetail(saleId)).unwrap();
-          }
-          onSaleReturned?.();
-          alert("Возврат выполнен");
-        } catch (err) {
-          alert(validateResErrors(err, "Не удалось выполнить возврат"), true);
-        } finally {
-          setSaleReturning(false);
-        }
-      },
-    );
-  }, [
-    saleId,
-    detail?.status,
-    useAgentSalesApi,
-    confirmDialog,
-    dispatch,
-    onSaleReturned,
-    alert,
-  ]);
 
   const handlePrintReceipt = async () => {
     try {
@@ -268,10 +222,16 @@ const SaleDetailModal = ({
                   type="button"
                   className="receipt__row-btn"
                   style={{ background: "#b45309", color: "#fff" }}
-                  onClick={handleReturnSale}
-                  disabled={saleReturning}
+                  onClick={() =>
+                    onOpenRefund?.({
+                      id: detail?.id || saleId,
+                      status: detail?.status,
+                      client_name: detail?.client_name,
+                      total: detail?.total,
+                    })
+                  }
                 >
-                  {saleReturning ? "Возврат…" : "Вернуть продажу"}
+                  Возврат продажи
                 </button>
               )}
               <button className="receipt__row-btn" onClick={handlePrintReceipt}>
@@ -477,12 +437,25 @@ const PendingModal = ({ onClose, onChanged }) => {
   );
 };
 
+const formatReturnAmount = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return "—";
+  return `${n.toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} сом`;
+};
+
+const returnTypeLabel = (isDefect) => (isDefect ? "Брак" : "Возврат");
+
 const MyReturnsModal = ({
   onClose,
   onRefresh,
   loading,
   summary,
   returnsList,
+  defectFilter,
+  onDefectFilterChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -491,13 +464,14 @@ const MyReturnsModal = ({
     const q = String(searchQuery || "")
       .toLowerCase()
       .trim();
-    if (!q) return list;
     return list.filter((r) => {
       const p = String(
         r?.product || r?.product_name || r?.name || "",
       ).toLowerCase();
       const s = String(r?.status_display || r?.status || "").toLowerCase();
-      return p.includes(q) || s.includes(q);
+      const c = String(r?.client_name || "").toLowerCase();
+      const matchesSearch = !q || p.includes(q) || s.includes(q) || c.includes(q);
+      return matchesSearch;
     });
   }, [returnsList, searchQuery]);
 
@@ -517,12 +491,42 @@ const MyReturnsModal = ({
         <div className="my-returns-modal__summary">
           Ожидают приёма: <b>{summary?.pending_count ?? 0}</b> возвратов,{" "}
           <b>{summary?.pending_qty ?? 0}</b> шт.
+          {(summary?.defect_count > 0 || summary?.regular_return_count > 0) && (
+            <>
+              {" "}
+              · Брак: <b>{summary?.defect_count ?? 0}</b> (
+              {formatReturnAmount(summary?.defect_amount)}) · Обычные:{" "}
+              <b>{summary?.regular_return_count ?? 0}</b> (
+              {formatReturnAmount(summary?.regular_return_amount)})
+            </>
+          )}
+        </div>
+
+        <div
+          className="add-modal__section"
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
+        >
+          {[
+            { value: "all", label: "Все" },
+            { value: "false", label: "Возвраты" },
+            { value: "true", label: "Брак" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`add-modal__save ${defectFilter === opt.value ? "" : "add-modal__cancel"}`}
+              style={{ padding: "6px 12px" }}
+              onClick={() => onDefectFilterChange?.(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
 
         <div className="add-modal__section" style={{ marginBottom: 12 }}>
           <input
             type="text"
-            placeholder="Поиск по товару или статусу"
+            placeholder="Поиск по товару, клиенту или статусу"
             className="add-modal__input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -544,8 +548,11 @@ const MyReturnsModal = ({
                 <thead>
                   <tr>
                     <th>№</th>
+                    <th>Тип</th>
                     <th>Товар</th>
+                    <th>Клиент</th>
                     <th>Количество</th>
+                    <th>Сумма</th>
                     <th>Статус</th>
                     <th>Дата</th>
                   </tr>
@@ -554,10 +561,22 @@ const MyReturnsModal = ({
                   {filtered.map((r, idx) => (
                     <tr key={r?.id ?? idx}>
                       <td data-label="№">{idx + 1}</td>
+                      <td data-label="Тип">
+                        <span
+                          style={{
+                            color: r?.is_defect ? "#b45309" : "#047857",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {returnTypeLabel(Boolean(r?.is_defect))}
+                        </span>
+                      </td>
                       <td data-label="Товар">
                         {r?.product || r?.product_name || r?.name || "—"}
                       </td>
+                      <td data-label="Клиент">{r?.client_name || "—"}</td>
                       <td data-label="Количество">{r?.qty ?? 0}</td>
+                      <td data-label="Сумма">{formatReturnAmount(r?.amount)}</td>
                       <td data-label="Статус">
                         {r?.status_display || r?.status || "—"}
                       </td>
@@ -636,6 +655,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   );
   /** auto — распределение FIFO по партиям; manual — одна выбранная передача (как раньше) */
   const [returnMode, setReturnMode] = useState("auto");
+  const [isDefect, setIsDefect] = useState(false);
   const [state, setState] = useState({
     qty: "",
     subreal: "",
@@ -656,6 +676,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     const first = subrealOptions[0]?.id || "";
     setState((prev) => ({ ...prev, qty: "", subreal: first }));
     setReturnMode("auto");
+    setIsDefect(false);
     setValidationError("");
   }, [item, subrealOptions]);
 
@@ -787,6 +808,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
           createReturnAsync({
             subreal: state.subreal,
             qty,
+            is_defect: isDefect,
           }),
         ).unwrap();
         alert(`Возврат успешно создан.\nКоличество: ${qty}`, () => {
@@ -809,6 +831,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
           createReturnAsync({
             subreal: row.subreal,
             qty: row.qty,
+            is_defect: isDefect,
           }),
         ).unwrap();
       }
@@ -902,6 +925,44 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         )}
 
         <form onSubmit={handleSubmit} className="return-product-modal__body">
+          <div className="return-product-modal__section-label">Тип операции</div>
+          <div className="return-product-modal__modes" style={{ marginBottom: 16 }}>
+            <label
+              className={`return-product-modal__mode ${!isDefect ? "return-product-modal__mode--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="return-defect-type"
+                checked={!isDefect}
+                onChange={() => setIsDefect(false)}
+              />
+              <div className="return-product-modal__mode-text">
+                <div className="return-product-modal__mode-title">
+                  Обычный возврат на склад
+                </div>
+                <div className="return-product-modal__mode-desc">
+                  Товар вернётся на склад после приёмки владельцем.
+                </div>
+              </div>
+            </label>
+            <label
+              className={`return-product-modal__mode ${isDefect ? "return-product-modal__mode--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="return-defect-type"
+                checked={isDefect}
+                onChange={() => setIsDefect(true)}
+              />
+              <div className="return-product-modal__mode-text">
+                <div className="return-product-modal__mode-title">Брак</div>
+                <div className="return-product-modal__mode-desc">
+                  Товар списывается, на склад не возвращается.
+                </div>
+              </div>
+            </label>
+          </div>
+
           <div className="return-product-modal__section-label">
             Как списать партии
           </div>
@@ -1144,8 +1205,11 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
                 <thead>
                   <tr>
                     <th>№</th>
+                    <th>Тип</th>
                     <th>Агент / товар</th>
+                    <th>Клиент</th>
                     <th>Кол-во</th>
+                    <th>Сумма</th>
                     <th>Дата</th>
                     <th>Действия</th>
                   </tr>
@@ -1154,6 +1218,16 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
                   {rows.map((r, idx) => (
                     <tr key={r.id || idx}>
                       <td data-label="№">{idx + 1}</td>
+                      <td data-label="Тип">
+                        <span
+                          style={{
+                            color: r?.is_defect ? "#b45309" : "#047857",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {returnTypeLabel(Boolean(r?.is_defect))}
+                        </span>
+                      </td>
                       <td data-label="Товар">
                         <div>{r?.product_name || r?.product || "—"}</div>
                         <div style={{ fontSize: 12, opacity: 0.75 }}>
@@ -1163,7 +1237,9 @@ const OwnerReturnsQueueModal = ({ onClose, onChanged }) => {
                             ""}
                         </div>
                       </td>
+                      <td data-label="Клиент">{r?.client_name || "—"}</td>
                       <td data-label="Кол-во">{r?.qty ?? "—"}</td>
+                      <td data-label="Сумма">{formatReturnAmount(r?.amount)}</td>
                       <td data-label="Дата">
                         {r?.returned_at
                           ? new Date(r.returned_at).toLocaleString()
@@ -1456,6 +1532,10 @@ const ProductionAgents = () => {
   const [selectedSaleId, setSelectedSaleId] = useState(null);
   const [saleDetailUsesAgentApi, setSaleDetailUsesAgentApi] = useState(false);
   const [showOwnerReturnsModal, setShowOwnerReturnsModal] = useState(false);
+  const [showSaleRefundModal, setShowSaleRefundModal] = useState(false);
+  const [saleRefundItem, setSaleRefundItem] = useState(null);
+  const [saleRefundUseGlobalAccess, setSaleRefundUseGlobalAccess] =
+    useState(false);
 
   // const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -1485,7 +1565,14 @@ const ProductionAgents = () => {
   const [myReturnsSummary, setMyReturnsSummary] = useState({
     pending_count: 0,
     pending_qty: 0,
+    defect_count: 0,
+    defect_qty: 0,
+    defect_amount: 0,
+    regular_return_count: 0,
+    regular_return_qty: 0,
+    regular_return_amount: 0,
   });
+  const [myReturnsDefectFilter, setMyReturnsDefectFilter] = useState("all");
   const [showAgentClientsModal, setShowAgentClientsModal] = useState(false);
   const [selectedAgentForClients, setSelectedAgentForClients] = useState(null);
   const [agentClientsLoading, setAgentClientsLoading] = useState(false);
@@ -1521,15 +1608,28 @@ const ProductionAgents = () => {
     );
   }, [dispatch, profile?.id, profile?.role]);
 
-  const loadMyReturns = useCallback(async () => {
+  const loadMyReturns = useCallback(async (defectFilter = myReturnsDefectFilter) => {
     if (profile?.role === "owner") return;
     setMyReturnsLoading(true);
     try {
-      const { data } = await api.get("/main/agents/me/returns/");
+      const params = {};
+      if (defectFilter === "true" || defectFilter === "false") {
+        params.is_defect = defectFilter;
+      }
+      const { data } = await api.get("/main/agents/me/returns/", { params });
       const list = Array.isArray(data) ? data : data?.results || [];
       setMyReturns(list);
       setMyReturnsSummary(
-        data?.returns_summary || { pending_count: 0, pending_qty: 0 },
+        data?.returns_summary || {
+          pending_count: 0,
+          pending_qty: 0,
+          defect_count: 0,
+          defect_qty: 0,
+          defect_amount: 0,
+          regular_return_count: 0,
+          regular_return_qty: 0,
+          regular_return_amount: 0,
+        },
       );
     } catch (e) {
       const errorMessage = validateResErrors(
@@ -1538,11 +1638,28 @@ const ProductionAgents = () => {
       );
       alert(errorMessage, true);
       setMyReturns([]);
-      setMyReturnsSummary({ pending_count: 0, pending_qty: 0 });
+      setMyReturnsSummary({
+        pending_count: 0,
+        pending_qty: 0,
+        defect_count: 0,
+        defect_qty: 0,
+        defect_amount: 0,
+        regular_return_count: 0,
+        regular_return_qty: 0,
+        regular_return_amount: 0,
+      });
     } finally {
       setMyReturnsLoading(false);
     }
-  }, [profile?.role]);
+  }, [alert, myReturnsDefectFilter, profile?.role]);
+
+  const handleMyReturnsDefectFilterChange = useCallback(
+    (value) => {
+      setMyReturnsDefectFilter(value);
+      loadMyReturns(value);
+    },
+    [loadMyReturns],
+  );
 
   // Обновление списка товаров у агентов для owner (локальный state `agents`)
   const loadAgentsProducts = useCallback(() => {
@@ -2782,10 +2899,12 @@ const ProductionAgents = () => {
         renderProductionModal(
           <MyReturnsModal
             onClose={() => setShowMyReturnsModal(false)}
-            onRefresh={loadMyReturns}
+            onRefresh={() => loadMyReturns(myReturnsDefectFilter)}
             loading={myReturnsLoading}
             summary={myReturnsSummary}
             returnsList={myReturns}
+            defectFilter={myReturnsDefectFilter}
+            onDefectFilterChange={handleMyReturnsDefectFilterChange}
           />,
         )}
       {showSellModal &&
@@ -2811,7 +2930,33 @@ const ProductionAgents = () => {
             }}
             saleId={selectedSaleId}
             useAgentSalesApi={saleDetailUsesAgentApi}
-            onSaleReturned={loadSalesHistory}
+            onOpenRefund={(sale) => {
+              setSaleRefundItem(sale);
+              setSaleRefundUseGlobalAccess(!saleDetailUsesAgentApi);
+              setShowSaleRefundModal(true);
+            }}
+          />,
+        )}
+      {showSaleRefundModal &&
+        saleRefundItem &&
+        renderProductionModal(
+          <ProductionRefundPurchase
+            item={saleRefundItem}
+            useGlobalAccess={saleRefundUseGlobalAccess}
+            onClose={() => {
+              setShowSaleRefundModal(false);
+              setSaleRefundItem(null);
+            }}
+            onChanged={() => {
+              setShowSaleRefundModal(false);
+              setSaleRefundItem(null);
+              loadSalesHistory();
+              if (showSaleDetail && selectedSaleId) {
+                setShowSaleDetail(false);
+                setSelectedSaleId(null);
+                setSaleDetailUsesAgentApi(false);
+              }
+            }}
           />,
         )}
       {showOwnerReturnsModal &&

@@ -38,6 +38,7 @@ const ProductionRefundPurchase = ({ onClose, onChanged, item, useGlobalAccess })
   const [saleData, setSaleData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantities, setQuantities] = useState({});
+  const [isDefect, setIsDefect] = useState(false);
 
   const isAgent = String(profile?.role || "")
     .trim()
@@ -45,6 +46,7 @@ const ProductionRefundPurchase = ({ onClose, onChanged, item, useGlobalAccess })
 
   useEffect(() => {
     setQuantities({});
+    setIsDefect(false);
     setError("");
   }, [item?.id]);
 
@@ -159,10 +161,13 @@ const ProductionRefundPurchase = ({ onClose, onChanged, item, useGlobalAccess })
       setError("");
       setSubmitting(true);
       try {
-        const payload =
-          Array.isArray(itemsForReturn) && itemsForReturn.length > 0
-            ? { items: itemsForReturn }
-            : {};
+        const payload = {};
+        if (Array.isArray(itemsForReturn) && itemsForReturn.length > 0) {
+          payload.items = itemsForReturn;
+        }
+        if (isDefect) {
+          payload.is_defect = true;
+        }
         const returnedSale = useGlobalAccess
           ? await getAllProductionSaleReturn(currentItem.id, payload)
           : await agentSaleReturn(currentItem.id, payload);
@@ -174,7 +179,7 @@ const ProductionRefundPurchase = ({ onClose, onChanged, item, useGlobalAccess })
         setSubmitting(false);
       }
     },
-    [currentItem?.id, onChanged, onClose, useGlobalAccess],
+    [currentItem?.id, isDefect, onChanged, onClose, useGlobalAccess],
   );
 
   const onConfirmFull = useCallback(async () => {
@@ -236,6 +241,38 @@ const ProductionRefundPurchase = ({ onClose, onChanged, item, useGlobalAccess })
                 Для полной отмены нажмите <b>Вернуть весь чек</b>. Если нужен
                 частичный возврат, укажите количество только в нужных позициях.
               </p>
+
+              <div className="sellReturn__type" style={{ marginBottom: 16 }}>
+                <div className="sellReturn__type-label" style={{ marginBottom: 8, fontWeight: 600 }}>
+                  Тип операции
+                </div>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8 }}>
+                  <input
+                    type="radio"
+                    name="return-type"
+                    checked={!isDefect}
+                    onChange={() => setIsDefect(false)}
+                  />
+                  <span>
+                    <b>Обычный возврат</b> — товар возвращается на склад
+                    {isAgent ? " агента" : ""}.
+                  </span>
+                </label>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <input
+                    type="radio"
+                    name="return-type"
+                    checked={isDefect}
+                    onChange={() => setIsDefect(true)}
+                  />
+                  <span>
+                    <b>Брак</b> — товар списывается, на склад не возвращается.
+                    {isAgent
+                      ? " Учитывается в аналитике брака."
+                      : " Для кассовых чеков влияет только на склад."}
+                  </span>
+                </label>
+              </div>
 
               <div className="sellReturn__summary">
                 <div className="sellReturn__summaryMain">

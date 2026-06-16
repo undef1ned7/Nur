@@ -183,6 +183,7 @@ const AddWarehouseProductPage = () => {
     category: "",
     product_group: "",
     price: "",
+    wholesale_price: "",
     quantity: "",
     client: "",
     purchase_price: "",
@@ -419,6 +420,7 @@ const AddWarehouseProductPage = () => {
             quantity: product.quantity || "",
             client: product.client || "",
             purchase_price: product.purchase_price || "",
+            wholesale_price: product.wholesale_price || "",
             plu: product.plu || "",
             scale_type: product.scale_type || "",
           });
@@ -519,6 +521,7 @@ const AddWarehouseProductPage = () => {
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
         purchase_price: product.purchase_price || "",
+        wholesale_price: product.wholesale_price || "",
         plu: product.plu || "",
         scale_type: product.scale_type || "",
       });
@@ -822,6 +825,11 @@ const AddWarehouseProductPage = () => {
       unit: marketData.unit || "шт",
       is_weight: isWeight,
       price: finalPrice,
+      wholesale_price:
+        newItemData.wholesale_price &&
+        String(newItemData.wholesale_price).trim() !== ""
+          ? String(newItemData.wholesale_price)
+          : "0",
       discount_percent: (marketData.discount || "0").toString(),
       country: marketData.country || "",
       expiration_date: marketData.expiryDate || null,
@@ -3209,6 +3217,22 @@ const MarketProductForm = ({
                 )}
               </div>
               <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Оптовая цена
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="text"
+                    name="wholesale_price"
+                    className="market-product-form__input"
+                    value={newItemData.wholesale_price || ""}
+                    onChange={handleChange}
+                    placeholder="0"
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
                 <label className="market-product-form__label">Скидка</label>
                 <div className="market-product-form__price-input">
                   <input
@@ -3543,6 +3567,22 @@ const MarketProductForm = ({
                 </div>
               </div>
               <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Оптовая цена
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="text"
+                    name="wholesale_price"
+                    className="market-product-form__input"
+                    value={newItemData.wholesale_price || ""}
+                    onChange={handleChange}
+                    placeholder="0"
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
                 <label className="market-product-form__label">Скидка</label>
                 <div className="market-product-form__price-input">
                   <input
@@ -3684,6 +3724,22 @@ const MarketProductForm = ({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Оптовая цена
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="text"
+                    name="wholesale_price"
+                    className="market-product-form__input"
+                    value={newItemData.wholesale_price || ""}
+                    onChange={handleChange}
+                    placeholder="0"
+                  />
+                  <span className="market-product-form__currency">COM</span>
                 </div>
               </div>
               <div className="market-product-form__form-group">

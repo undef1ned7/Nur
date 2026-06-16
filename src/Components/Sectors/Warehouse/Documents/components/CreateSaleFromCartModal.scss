@@ -85,3 +85,27 @@
     background: #f9fafb;
   }
 }
+
+.create-sale-cart-modal__wholesale {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.create-sale-cart-modal__wholesale-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &--active {
+    background: #f7d617;
+    border-color: #e5c100;
+    color: #111827;
+    font-weight: 600;
+  }
+}

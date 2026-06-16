@@ -2071,3 +2071,30 @@ $due-red: #dc2626;
     }
   }
 }
+
+.create-sale-document {
+  &__wholesale-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-right: 4px;
+  }
+
+  &__wholesale-btn {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+
+    &--active {
+      background: #f7d617;
+      border-color: #e5c100;
+      color: #111827;
+      font-weight: 600;
+    }
+  }
+}

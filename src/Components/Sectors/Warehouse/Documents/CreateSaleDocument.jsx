@@ -83,6 +83,31 @@ const resolveEntityId = (value) => {
   return String(value);
 };
 
+const getProductRetailPrice = (product) =>
+  Number(product?.price ?? product?.product_price ?? 0);
+
+const getProductWholesalePrice = (product) =>
+  Number(product?.wholesale_price ?? product?.product_wholesale_price ?? 0);
+
+const resolveProductSalePrice = (product, isWholesale) => {
+  const retail = getProductRetailPrice(product);
+  if (!isWholesale) return retail;
+  const wholesale = getProductWholesalePrice(product);
+  return wholesale > 0 ? wholesale : retail;
+};
+
+const applyWholesaleModeToCartItem = (item, isWholesale) => {
+  if (!item?.priceAuto) return item;
+  const retail = Number(item.productRetailPrice ?? item.price ?? 0);
+  const wholesale = Number(item.productWholesalePrice ?? 0);
+  const nextPrice = isWholesale
+    ? wholesale > 0
+      ? wholesale
+      : retail
+    : retail;
+  return { ...item, price: nextPrice, unit_price: nextPrice };
+};
+
 const getProductWarehouseId = (product) =>
   resolveEntityId(product?.warehouse);
 
@@ -428,6 +453,8 @@ const CreateSaleDocument = () => {
   const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
   const [paymentMethod, setPaymentMethod] = useState("cash"); // cash | cashless — наличные / безналичные
   const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
+  const [isWholesale, setIsWholesale] = useState(false);
+  const [agentCanSellWholesale, setAgentCanSellWholesale] = useState(false);
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
   const [showCreateCounterpartyModal, setShowCreateCounterpartyModal] =
@@ -1646,6 +1673,7 @@ const CreateSaleDocument = () => {
             ? String(doc.prepayment_amount)
             : "",
         );
+        setIsWholesale(Boolean(doc.is_wholesale));
         if (doc.date) {
           const d =
             typeof doc.date === "string" && doc.date.includes("T")
@@ -1716,6 +1744,19 @@ const CreateSaleDocument = () => {
                 warehouseName,
                 price,
                 unit_price: price,
+                productRetailPrice: Number(
+                  it.product_price ??
+                    productObject?.price ??
+                    it.price ??
+                    it.unit_price ??
+                    0,
+                ),
+                productWholesalePrice: Number(
+                  it.product_wholesale_price ??
+                    productObject?.wholesale_price ??
+                    0,
+                ),
+                priceAuto: false,
                 quantity: qty,
                 stock: it.stock ?? 0,
                 unit: unit && String(unit).trim() ? String(unit) : "шт",
@@ -1770,11 +1811,13 @@ const CreateSaleDocument = () => {
     const usePurchasePrice = ["PURCHASE", "PURCHASE_RETURN", "RECEIPT"].includes(
       docType,
     );
-    return Number(
-      usePurchasePrice
-        ? (product.purchase_price ?? product.price ?? 0)
-        : (product.price ?? 0),
-    );
+    if (usePurchasePrice) {
+      return Number(product.purchase_price ?? product.price ?? 0);
+    }
+    if (docType === "SALE") {
+      return resolveProductSalePrice(product, isWholesale);
+    }
+    return Number(product.price ?? 0);
   };
 
   // Ограничение по остатку только для операций отгрузки (продажа, возврат поставщику, списание, перемещение).
@@ -1967,6 +2010,42 @@ const CreateSaleDocument = () => {
   }, [agentId, isAgentFilterRelevant, startPlan]);
   const isOwnerOrAdmin =
     userProfile?.role === "owner" || userProfile?.role === "admin";
+  const showWholesaleToggle =
+    docType === "SALE" && (isOwnerOrAdmin || agentCanSellWholesale);
+
+  useEffect(() => {
+    if (isOwnerOrAdmin) return;
+    const userId = userProfile?.id;
+    if (!userId) {
+      setAgentCanSellWholesale(false);
+      return;
+    }
+    warehouseAPI
+      .listCompanyAgentRequests({ status: "active" })
+      .then((data) => {
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        const mine = list.find((row) => String(row.user) === String(userId));
+        setAgentCanSellWholesale(Boolean(mine?.can_sell_wholesale));
+      })
+      .catch(() => setAgentCanSellWholesale(false));
+  }, [isOwnerOrAdmin, userProfile?.id]);
+
+  useEffect(() => {
+    if (!showWholesaleToggle && isWholesale) {
+      setIsWholesale(false);
+    }
+  }, [showWholesaleToggle, isWholesale]);
+
+  const handleWholesaleModeChange = (nextWholesale) => {
+    setIsWholesale(nextWholesale);
+    setCartItems((prev) =>
+      prev.map((item) => applyWholesaleModeToCartItem(item, nextWholesale)),
+    );
+  };
   const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
 
   const getCounterpartyAgentId = (cp) => {
@@ -2307,6 +2386,8 @@ const CreateSaleDocument = () => {
           return false;
         }
         const priceForDoc = getProductPriceForDocument(product);
+        const retailPrice = getProductRetailPrice(product);
+        const wholesalePrice = getProductWholesalePrice(product);
         const warehouseId = getProductWarehouseId(product);
         const warehouseName = resolveWarehouseName(
           warehouseId,
@@ -2322,6 +2403,9 @@ const CreateSaleDocument = () => {
           warehouseName,
           price: priceForDoc,
           unit_price: priceForDoc,
+          productRetailPrice: retailPrice,
+          productWholesalePrice: wholesalePrice,
+          priceAuto: true,
           quantity: qtyToAdd,
           stock,
           unit: product.unit || "шт",
@@ -2453,7 +2537,9 @@ const CreateSaleDocument = () => {
     if (isNaN(num) || num < 0) return;
     setCartItems((prev) =>
       prev.map((item) =>
-        item.id === itemId ? { ...item, price: num, unit_price: num } : item,
+        item.id === itemId
+          ? { ...item, price: num, unit_price: num, priceAuto: false }
+          : item,
       ),
     );
   };
@@ -2617,7 +2703,6 @@ const CreateSaleDocument = () => {
     return error.detail || error.message || "Ошибка при сохранении документа";
   };
 
-  /** Тело для КП: обязательные поля API + без лишних полей (payment_kind, agent, line_total…). */
   const toCommercialOfferPayload = (data) => ({
     doc_type: "COMMERCIAL_OFFER",
     warehouse_from: data.warehouse_from,
@@ -2633,6 +2718,33 @@ const CreateSaleDocument = () => {
       discount_amount: it.discount_amount,
     })),
   });
+
+  const buildDocumentLineItems = (items) =>
+    items.map((item) => {
+      const unit = item.unit || "шт";
+      const isPiece =
+        unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
+      const qty = Number(item.quantity || 1);
+      const finalQty = isPiece ? Math.floor(qty) : qty;
+      const price = Number(item.price || item.unit_price || 0);
+      const itemDiscPct = Math.max(
+        0,
+        Math.min(100, Number(item.discount_percent || item.discount || 0)),
+      );
+      const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
+      const lineTotal = price * finalQty - itemDiscAmount;
+      const line = {
+        product: item.productId,
+        qty: String(finalQty),
+        discount_percent: String(itemDiscPct.toFixed(2)),
+        discount_amount: String(itemDiscAmount.toFixed(2)),
+        line_total: String(lineTotal.toFixed(2)),
+      };
+      if (!(docType === "SALE" && item.priceAuto)) {
+        line.price = String(price.toFixed(2));
+      }
+      return line;
+    });
 
   // Вспомогательный хелпер: выбор правильного эндпоинта для создания документа по типу
   const createDocumentByType = async (payload) => {
@@ -2713,29 +2825,8 @@ const CreateSaleDocument = () => {
         comment: resolvedComment,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
-        items: cartItems.map((item) => {
-          const unit = item.unit || "шт";
-          const isPiece =
-            unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
-          const qty = Number(item.quantity || 1);
-          const finalQty = isPiece ? Math.floor(qty) : qty;
-          const price = Number(item.price || item.unit_price || 0);
-          const itemDiscPct = Math.max(
-            0,
-            Math.min(100, Number(item.discount_percent || item.discount || 0)),
-          );
-          const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
-          const lineTotal = price * finalQty - itemDiscAmount;
-
-          return {
-            product: item.productId,
-            qty: String(finalQty),
-            price: String(price.toFixed(2)),
-            discount_percent: String(itemDiscPct.toFixed(2)),
-            discount_amount: String(itemDiscAmount.toFixed(2)),
-            line_total: String(lineTotal.toFixed(2)),
-          };
-        }),
+        ...(docType === "SALE" && { is_wholesale: Boolean(isWholesale) }),
+        items: buildDocumentLineItems(cartItems),
       };
 
       let createdDocument;
@@ -2909,29 +3000,8 @@ const CreateSaleDocument = () => {
         comment: resolvedCommentPrint,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
-        items: cartItems.map((item) => {
-          const unit = item.unit || "шт";
-          const isPiece =
-            unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
-          const qty = Number(item.quantity || 1);
-          const finalQty = isPiece ? Math.floor(qty) : qty;
-          const price = Number(item.price || item.unit_price || 0);
-          const itemDiscPct = Math.max(
-            0,
-            Math.min(100, Number(item.discount_percent || item.discount || 0)),
-          );
-          const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
-          const lineTotal = price * finalQty - itemDiscAmount;
-
-          return {
-            product: item.productId,
-            qty: String(finalQty),
-            price: String(price.toFixed(2)),
-            discount_percent: String(itemDiscPct.toFixed(2)),
-            discount_amount: String(itemDiscAmount.toFixed(2)),
-            line_total: String(lineTotal.toFixed(2)),
-          };
-        }),
+        ...(docType === "SALE" && { is_wholesale: Boolean(isWholesale) }),
+        items: buildDocumentLineItems(cartItems),
       };
 
       // При редактировании — обновляем документ, иначе создаём через типовой эндпоинт
@@ -3699,6 +3769,35 @@ const CreateSaleDocument = () => {
                       Документ проведён
                     </span>
                   </label>
+                )}
+                {showWholesaleToggle && (
+                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                    <span className="create-sale-document__wholesale-label">
+                      Цены:
+                    </span>
+                    <button
+                      type="button"
+                      className={`create-sale-document__wholesale-btn ${
+                        !isWholesale
+                          ? "create-sale-document__wholesale-btn--active"
+                          : ""
+                      }`}
+                      onClick={() => handleWholesaleModeChange(false)}
+                    >
+                      Розница
+                    </button>
+                    <button
+                      type="button"
+                      className={`create-sale-document__wholesale-btn ${
+                        isWholesale
+                          ? "create-sale-document__wholesale-btn--active"
+                          : ""
+                      }`}
+                      onClick={() => handleWholesaleModeChange(true)}
+                    >
+                      Опт
+                    </button>
+                  </div>
                 )}
                 {isPaymentKindRelevant && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">

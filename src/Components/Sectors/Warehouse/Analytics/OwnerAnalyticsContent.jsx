@@ -26,7 +26,15 @@ import {
 } from "./warehouseAnalyticsShared";
 import { AccordionItem, KpiCard, PaginatedTable } from "./warehouseAnalyticsUi";
 
-const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix = "wa" }) => {
+const OwnerAnalyticsContent = ({
+  data,
+  showAgentSalesAnalytics = true,
+  showMoneyAnalytics = true,
+  showDetailsAccordions = true,
+  salesCountLabel = "Количество продаж агентов",
+  salesAmountLabel = "Сумма продаж агентов",
+  idPrefix = "wa",
+}) => {
   const summary = data?.summary || {};
   const charts = data?.charts || {};
   const topAgents = data?.top_agents || {};
@@ -126,6 +134,9 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
     debtReceipt: Number(d.money_debt_receipt_amount ?? 0),
     debtExpense: Number(d.money_debt_expense_amount ?? 0),
     debtNet: Number(d.money_debt_net_amount ?? 0),
+    counterpartyReceipt: Number(d.money_counterparty_receipt_amount ?? 0),
+    counterpartyExpense: Number(d.money_counterparty_expense_amount ?? 0),
+    counterpartyNet: Number(d.money_counterparty_net_amount ?? 0),
   }));
 
   const requestsApproved = Number(summary.requests_approved ?? 0);
@@ -149,6 +160,17 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
     moneyDebtNetRaw != null && moneyDebtNetRaw !== ""
       ? Number(moneyDebtNetRaw)
       : moneyDebtReceiptAmount - moneyDebtExpenseAmount;
+  const moneyCounterpartyReceiptAmount = Number(
+    summary.money_counterparty_receipt_amount ?? 0,
+  );
+  const moneyCounterpartyExpenseAmount = Number(
+    summary.money_counterparty_expense_amount ?? 0,
+  );
+  const moneyCounterpartyNetRaw = summary.money_counterparty_net_amount;
+  const moneyCounterpartyNetAmount =
+    moneyCounterpartyNetRaw != null && moneyCounterpartyNetRaw !== ""
+      ? Number(moneyCounterpartyNetRaw)
+      : moneyCounterpartyReceiptAmount - moneyCounterpartyExpenseAmount;
 
   const areaFillId = `${idPrefix}AreaFill`;
 
@@ -170,60 +192,82 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
         {showAgentSalesAnalytics && (
           <>
             <KpiCard
-              label="Количество продаж агентов"
+              label={salesCountLabel}
               value={formatNum(salesCount)}
               description="За период"
               icon={ShoppingCart}
             />
             <KpiCard
-              label="Сумма продаж агентов"
+              label={salesAmountLabel}
               value={`${formatNum(salesAmount)} сом`}
               icon={ShoppingCart}
             />
           </>
         )}
-        <KpiCard
-          label="Документов по кассе"
-          value={formatNum(moneyDocsCount)}
-          description="Проведённые за период"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Приход по кассе"
-          value={`${formatNum(moneyReceiptAmount)} сом`}
-          description="За период"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Расход по кассе"
-          value={`${formatNum(moneyExpenseAmount)} сом`}
-          description="За период"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Сальдо"
-          value={`${formatNum(moneyNetAmount)} сом`}
-          description="Приход − расход (без долгов)"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Погашение долга"
-          value={`${formatNum(moneyDebtReceiptAmount)} сом`}
-          description="Поступления в счёт долга"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Выплаты по долгу"
-          value={`${formatNum(moneyDebtExpenseAmount)} сом`}
-          description="Отдельная графа долга"
-          icon={Wallet}
-        />
-        <KpiCard
-          label="Нетто по долгам"
-          value={`${formatNum(moneyDebtNetAmount)} сом`}
-          description="Погашение − выплаты"
-          icon={Wallet}
-        />
+        {showMoneyAnalytics && (
+          <>
+            <KpiCard
+              label="Документов по кассе"
+              value={formatNum(moneyDocsCount)}
+              description="Проведённые за период"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Приход по кассе"
+              value={`${formatNum(moneyReceiptAmount)} сом`}
+              description="Без долгов и контрагентов"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Расход по кассе"
+              value={`${formatNum(moneyExpenseAmount)} сом`}
+              description="Без долгов и контрагентов"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Сальдо"
+              value={`${formatNum(moneyNetAmount)} сом`}
+              description="Приход − расход (без долгов и контрагентов)"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Погашение долга"
+              value={`${formatNum(moneyDebtReceiptAmount)} сом`}
+              description="Поступления в счёт долга"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Выплаты по долгу"
+              value={`${formatNum(moneyDebtExpenseAmount)} сом`}
+              description="Отдельная графа долга"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Нетто по долгам"
+              value={`${formatNum(moneyDebtNetAmount)} сом`}
+              description="Погашение − выплаты"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Приход от контрагентов"
+              value={`${formatNum(moneyCounterpartyReceiptAmount)} сом`}
+              description="Операции с контрагентами"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Расход контрагентам"
+              value={`${formatNum(moneyCounterpartyExpenseAmount)} сом`}
+              description="Операции с контрагентами"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Нетто по контрагентам"
+              value={`${formatNum(moneyCounterpartyNetAmount)} сом`}
+              description="Приход − расход по контрагентам"
+              icon={Wallet}
+            />
+          </>
+        )}
         <KpiCard
           label="Остаток на руках, шт"
           value={formatNum(onHandQty)}
@@ -236,6 +280,7 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
         />
       </div>
 
+      {(showAgentSalesAnalytics || showMoneyAnalytics) && (
       <div className="warehouse-analytics__chartsRow">
         {showAgentSalesAnalytics && (
           <div className="warehouse-analytics__card warehouse-analytics__card--chart">
@@ -310,6 +355,7 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
           </div>
         )}
 
+        {showMoneyAnalytics && (
         <div className="warehouse-analytics__card warehouse-analytics__card--chart">
           <div className="warehouse-analytics__cardTitle">
             Движение денег по датам (касса)
@@ -380,6 +426,14 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                     strokeWidth={2}
                     dot={false}
                   />
+                  <Line
+                    type="monotone"
+                    dataKey="counterpartyNet"
+                    name="Нетто по контрагентам"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -389,8 +443,11 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
             )}
           </div>
         </div>
+        )}
       </div>
+      )}
 
+      {showDetailsAccordions && (
       <div className="warehouse-analytics__accordion">
         {showAgentSalesAnalytics && (
           <>
@@ -499,6 +556,9 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                   "Долг +, сом",
                   "Долг −, сом",
                   "Нетто долг, сом",
+                  "Контр. +, сом",
+                  "Контр. −, сом",
+                  "Нетто контр., сом",
                   "Документов",
                 ]}
                 rows={cashByRegister.map((r) => {
@@ -511,11 +571,14 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
                     formatNum(amounts.debtReceipt),
                     formatNum(amounts.debtExpense),
                     formatNum(amounts.debtNet),
+                    formatNum(amounts.counterpartyReceipt),
+                    formatNum(amounts.counterpartyExpense),
+                    formatNum(amounts.counterpartyNet),
                     formatNum(r.docs_count ?? 0),
                   ];
                 })}
-                colTemplate="1.2fr 100px 100px 100px 100px 100px 100px 90px"
-                numeric={[1, 2, 3, 4, 5, 6, 7]}
+                colTemplate="1.2fr 90px 90px 90px 90px 90px 90px 90px 90px 90px 80px"
+                numeric={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
               />
             ) : (
               <div className="warehouse-analytics-table__empty">
@@ -642,6 +705,7 @@ const OwnerAnalyticsContent = ({ data, showAgentSalesAnalytics = true, idPrefix 
           </div>
         </AccordionItem>
       </div>
+      )}
     </>
   );
 };
