@@ -2895,8 +2895,7 @@ const CashierPage = () => {
       .filter(
         (product) =>
           isMarketWarehouseServiceProduct(product) ||
-          !!product.quantity ||
-          product.isCart,
+          normalizeQuantity(product.quantity) > 0,
       )
       .sort((a, b) => {
         const favDelta =
