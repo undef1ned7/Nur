@@ -1,0 +1,135 @@
+@use "../../Deposits/Sklad/addModalBase" as *;
+
+.sellDetail.add-modal {
+  .add-modal__overlay {
+    z-index: 10050;
+  }
+
+  .add-modal__content {
+    width: min(700px, 96vw);
+    max-height: 80vh;
+    max-height: 80dvh;
+    overflow-y: auto;
+    background: #fff;
+    padding: 20px 12px;
+    border-radius: 8px;
+    z-index: 10051;
+  }
+
+  .add-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #000;
+    }
+  }
+
+  .add-modal__close-icon {
+    cursor: pointer;
+    color: #999;
+    flex-shrink: 0;
+  }
+}
+
+.sellDetail__content {
+  .sell__box {
+    margin-bottom: 8px;
+  }
+
+  .receipt {
+    padding: 20px 30px;
+
+    &__title {
+      margin-bottom: 20px;
+    }
+
+    &__item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+
+      div {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+    }
+
+    &__item-name {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    &__item-price {
+      margin: 0;
+    }
+
+    &__total {
+      border-top: 2px dotted #000;
+      padding-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+
+      p {
+        margin: 0;
+      }
+    }
+
+    &__row {
+      display: flex;
+      align-items: center;
+      column-gap: 15px;
+      margin-top: 40px;
+
+      &-btn {
+        width: 50%;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 0;
+        background-color: #ffd400;
+        color: #000;
+        cursor: pointer;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 560px) {
+  .sellDetail__content .receipt {
+    padding: 16px 12px;
+
+    &__item {
+      flex-wrap: wrap;
+      justify-content: center !important;
+
+      div {
+        flex-wrap: wrap;
+      }
+    }
+
+    &__total {
+      flex-wrap: wrap;
+      row-gap: 15px;
+    }
+
+    &__row {
+      flex-wrap: wrap;
+      row-gap: 15px;
+
+      &-btn {
+        width: 100%;
+      }
+    }
+  }
+}
