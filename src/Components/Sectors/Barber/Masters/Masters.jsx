@@ -28,6 +28,10 @@ import {
   resolveEmployeeRoleLabel,
   ruLabelSys,
 } from "./resolveEmployeeRoleLabel";
+import {
+  canAddEmployeeOnMarketStart,
+  MARKET_START_EMPLOYEE_LIMIT_MESSAGE,
+} from "../../../../utils/subscriptionPlan";
 
 /* ===================== API endpoints ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
@@ -304,6 +308,15 @@ const Masters = () => {
   const sectorName = String(company?.sector?.name || "").trim();
   const isCafeSector = sectorName === "Кафе";
   const isSalePayrollSector = isSaleEmployeePayrollSector(sectorName);
+  const canAddEmployeeByStartPlan = useMemo(
+    () =>
+      canAddEmployeeOnMarketStart({
+        tariffName: tariff || company?.subscription_plan?.name,
+        sectorName,
+        employees,
+      }),
+    [tariff, company?.subscription_plan?.name, sectorName, employees],
+  );
 
   const copyToClipboard = async (text, key) => {
     if (!text) return;
@@ -614,6 +627,10 @@ const Masters = () => {
 
   /* ========= Employees CRUD ========= */
   const openEmpCreate = () => {
+    if (!canAddEmployeeByStartPlan) {
+      setPageNotice(MARKET_START_EMPLOYEE_LIMIT_MESSAGE);
+      return;
+    }
     setEmpAlerts([]);
     setEmpFieldErrors({});
     setEmpForm(emptyEmp);
@@ -628,6 +645,10 @@ const Masters = () => {
 
   const submitEmployeeCreate = async (e) => {
     e.preventDefault();
+    if (!canAddEmployeeByStartPlan) {
+      setEmpAlerts([MARKET_START_EMPLOYEE_LIMIT_MESSAGE]);
+      return;
+    }
     const { errs, alerts } = validateEmployee(empForm, false, null);
     if (alerts.length) {
       setEmpFieldErrors(errs);
@@ -1036,6 +1057,12 @@ const Masters = () => {
               type="button"
               className="barbermasters__btn barbermasters__btn--primary"
               onClick={openEmpCreate}
+              disabled={!canAddEmployeeByStartPlan}
+              title={
+                !canAddEmployeeByStartPlan
+                  ? MARKET_START_EMPLOYEE_LIMIT_MESSAGE
+                  : "Добавить сотрудника"
+              }
             >
               <FaPlus />
             </button>

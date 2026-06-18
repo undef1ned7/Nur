@@ -13,6 +13,7 @@ import { useDispatch, useStore } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
 import { useDebounce, useDebounceByKey } from "../../../../hooks/useDebounce";
+import { useCashierQtyScanGuard } from "../../../../hooks/useCashierQtyScanGuard";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import {
@@ -708,8 +709,6 @@ const CashierPage = () => {
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
   const productsGridRef = React.useRef(null);
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
-  const qtyInputScanGuardRef = React.useRef({ count: 0, lastTime: 0 });
-  const qtyBeforeBurstRef = React.useRef("");
   const qtyInputFocusRef = React.useRef({ itemId: null, prevValue: "" });
   const suppressQtyBlurUpdateRef = React.useRef({});
   const commitFocusedQuantityInputRef = React.useRef(null);
@@ -1432,6 +1431,15 @@ const CashierPage = () => {
     cartRef.current = cart;
   }, [cart]);
 
+  useCashierQtyScanGuard({
+    searchInputRef,
+    cartRef,
+    setCartQuantities,
+    commitQuantityRef: commitFocusedQuantityInputRef,
+    pendingQtyLineInputRef,
+    suppressQtyBlurUpdateRef,
+  });
+
   // Инициализация данных при первой загрузке
   useEffect(() => {
     dispatch(fetchClientsAsync());
@@ -1870,65 +1878,6 @@ const CashierPage = () => {
   }, [searchTerm]);
 
   // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
-  useEffect(() => {
-    // Если сканер начинает "печатать" в инпут количества, сначала снимаем фокус с инпута,
-    // чтобы символы скана не попали в поле количества (например "10").
-    const blurQtyInputBeforeScan = (e) => {
-      const active = document.activeElement;
-      if (!(active instanceof HTMLInputElement)) return;
-      if (!active.classList.contains("cashier-page__cart-item-quantity-input")) {
-        qtyInputScanGuardRef.current.count = 0;
-        return;
-      }
-
-      const key = e.key || "";
-      const isChar = key.length === 1 && /^[0-9A-Za-z]$/.test(key);
-      const isScanTerminator = key === "Enter" || key === "Tab";
-      if (!isChar && !isScanTerminator) return;
-
-      const now = Date.now();
-      const dt = now - qtyInputScanGuardRef.current.lastTime;
-      qtyInputScanGuardRef.current.lastTime = now;
-
-      // Для ручного ввода (в т.ч. дробных значений) guard НЕ должен срабатывать.
-      // Считаем сканером только очень быстрый поток символов.
-      if (dt < 40) {
-        qtyInputScanGuardRef.current.count += 1;
-      } else {
-        qtyInputScanGuardRef.current.count = 1;
-        qtyBeforeBurstRef.current = active.value;
-      }
-
-      // Блокируем ввод в количество только при явном паттерне сканера
-      // (несколько символов подряд с очень маленьким интервалом).
-      if (qtyInputScanGuardRef.current.count >= 3) {
-        e.preventDefault();
-        const focusedItemId = active.dataset?.cartItemId;
-        if (focusedItemId) {
-          suppressQtyBlurUpdateRef.current[focusedItemId] = true;
-          const item = cartRef.current.find(
-            (c) => String(c.id) === String(focusedItemId),
-          );
-          const commitValue =
-            pendingQtyLineInputRef.current.get(String(focusedItemId)) ??
-            (qtyBeforeBurstRef.current || active.value);
-          if (item) {
-            void commitFocusedQuantityInputRef.current?.(item, commitValue);
-          }
-        }
-        active.blur();
-        searchInputRef.current?.focus();
-        qtyInputScanGuardRef.current.count = 0;
-        qtyBeforeBurstRef.current = "";
-      }
-    };
-
-    window.addEventListener("keydown", blurQtyInputBeforeScan, true);
-    return () => {
-      window.removeEventListener("keydown", blurQtyInputBeforeScan, true);
-    };
-  }, []);
-
   useEffect(() => {
     const handleGlobalEnter = (e) => {
       const now = Date.now();
@@ -3840,6 +3789,7 @@ const CashierPage = () => {
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
                           data-cart-item-id={item.id}
+                          data-is-weight={item.isWeight ? "1" : "0"}
                           value={
                             cartQuantities[item.id] ??
                             formatQuantity(item.quantity || 0)
