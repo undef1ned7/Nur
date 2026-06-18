@@ -17,6 +17,10 @@ import {
 import { clearEmployees } from "../../../store/slices/employeeSlice";
 import "./Employ.scss";
 import { useUser } from "../../../store/slices/userSlice";
+import {
+  canAddEmployeeOnMarketStart,
+  MARKET_START_EMPLOYEE_LIMIT_MESSAGE,
+} from "../../../utils/subscriptionPlan";
 import AccessList from "../../DepartmentDetails/AccessList";
 import { ALL_ACCESS_TYPES_MAPPING } from "../../DepartmentDetails/DepartmentDetails";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
@@ -587,22 +591,11 @@ export default function EmployeeTable() {
     },
   ];
 
-  const isStartTariff = String(tariff || company?.subscription_plan?.name || "")
-    .trim()
-    .toLowerCase() === "старт";
-  const isMarketSector = (() => {
-    const sectorName = String(sector || company?.sector?.name || "")
-      .trim()
-      .toLowerCase();
-    return sectorName === "магазин" || sectorName === "цветочный магазин";
-  })();
-  const hasOwnerInList = employees.some((employee) => employee.role === "owner");
-  const totalEmployeesWithOwner = employees.length + (hasOwnerInList ? 0 : 1);
-  const canAddEmployeeByStartPlan = !(
-    isStartTariff &&
-    isMarketSector &&
-    totalEmployeesWithOwner >= 3
-  );
+  const canAddEmployeeByStartPlan = canAddEmployeeOnMarketStart({
+    tariffName: tariff || company?.subscription_plan?.name,
+    sectorName: sector || company?.sector?.name,
+    employees,
+  });
 
   useEffect(() => {
     const params = {
@@ -805,10 +798,7 @@ export default function EmployeeTable() {
             className="employee__add"
             onClick={() => {
               if (!canAddEmployeeByStartPlan) {
-                alert(
-                  "На тарифе Старт для Маркета можно иметь максимум 3 сотрудников, включая владельца.",
-                  true,
-                );
+                alert(MARKET_START_EMPLOYEE_LIMIT_MESSAGE, true);
                 return;
               }
               setShowAddModal(true);
