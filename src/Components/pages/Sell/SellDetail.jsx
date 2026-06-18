@@ -1,8 +1,9 @@
 import { X } from "lucide-react";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
+import { useNavigate, useParams } from "react-router-dom";
 import { pdf } from "@react-pdf/renderer";
-// import "./Sklad.scss";
 
 import {
   getProductCheckout,
@@ -13,8 +14,8 @@ import {
 import { useSale } from "../../../store/slices/saleSlice";
 import { useUser } from "../../../store/slices/userSlice";
 import InvoicePdfDocument from "../../Sectors/Market/Documents/components/InvoicePdfDocument";
-import { de } from "date-fns/locale";
 import { handleCheckoutResponseForPrinting as printViaSharedService } from "./services/printService";
+import "./SellDetailModal.scss";
 
 /* ============================================================
    A) WebUSB + ESC/POS helpers (автоподключение + печать PDF)
@@ -540,8 +541,18 @@ async function printCyrPagesTest() {
    B) Компонент SellDetail
    ============================================================ */
 
-const SellDetail = ({ onClose, id }) => {
+const SellDetail = ({ onClose, id: idProp }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { id: routeId } = useParams();
+  const id = idProp || routeId;
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    navigate(-1);
+  }, [navigate, onClose]);
   const { historyDetail: item, historyObjectDetail } = useSale();
   const { company } = useUser();
 
@@ -563,9 +574,12 @@ const SellDetail = ({ onClose, id }) => {
     : item;
 
   useEffect(() => {
+    if (!id) return;
     dispatch(historySellProductDetail(id));
-    dispatch(historySellObjectDetail(id));
-  }, [id, dispatch]);
+    if (isBuildingCompany) {
+      dispatch(historySellObjectDetail(id));
+    }
+  }, [id, dispatch, isBuildingCompany]);
 
   // Автоподключение USB при монтировании
   useEffect(() => {
@@ -632,13 +646,15 @@ const SellDetail = ({ onClose, id }) => {
     }
   };
 
-  return (
+  if (!id) return null;
+
+  return createPortal(
     <div className="sellDetail add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ width: "700px" }}>
+      <div className="add-modal__overlay" onClick={handleClose} />
+      <div className="add-modal__content">
         <div className="add-modal__header">
           <h3>Детали продажи</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          <X className="add-modal__close-icon" size={20} onClick={handleClose} />
         </div>
         <div className="sellDetail__content">
           <div className="sell__box">
@@ -706,7 +722,8 @@ const SellDetail = ({ onClose, id }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

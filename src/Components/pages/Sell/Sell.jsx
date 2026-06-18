@@ -1162,8 +1162,14 @@ const Sell = () => {
       {showBuilding && (
         <SellBuildingModal onClose={() => setShowBuilding(false)} />
       )}
-      {showDetailSell && (
-        <SellDetail onClose={() => setShowDetailSell(false)} id={sellId} />
+      {showDetailSell && sellId && (
+        <SellDetail
+          onClose={() => {
+            setShowDetailSell(false);
+            setSellId("");
+          }}
+          id={sellId}
+        />
       )}
       {isMarketCompany && showFiltersModal && (
         <Modal
