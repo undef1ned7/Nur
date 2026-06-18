@@ -8,7 +8,7 @@ export function isStartPlan(tariffName) {
   return t === "старт" || t === "start";
 }
 
-const isMarketSectorName = (sectorName) => {
+export function isMarketSectorName(sectorName) {
   const sector = String(sectorName || "")
     .trim()
     .toLowerCase();
@@ -17,7 +17,7 @@ const isMarketSectorName = (sectorName) => {
     sector === "цветочный магазин" ||
     sector.includes("магазин")
   );
-};
+}
 
 export const MARKET_START_EMPLOYEE_LIMIT = 3;
 
