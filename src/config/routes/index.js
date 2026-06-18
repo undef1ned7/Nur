@@ -11,8 +11,8 @@ import { consultingRoutes } from "./consultingRoutes";
 import { logisticsRoutes } from "./logisticsRoutes";
 import { piloramaRoutes } from "./piloramaRoutes";
 
-export const crmRoutes = (profile) => [
-  ...commonRoutes(profile),
+export const crmRoutes = (profile, sector = "") => [
+  ...commonRoutes(profile, sector),
   ...barberRoutes(profile),
   ...hostelRoutes(profile),
   ...schoolRoutes(profile),
