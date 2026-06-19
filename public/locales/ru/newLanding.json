@@ -8,6 +8,10 @@
     "knowledgeBase": "База знаний",
     "faq": "FAQ"
   },
+  "supportPhone": {
+    "label": "Тех. поддержка",
+    "number": "+996 (551) 900 556"
+  },
   "header": {
     "logoAlt": "NurCRM",
     "login": "Логин",
