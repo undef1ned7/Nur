@@ -5,7 +5,9 @@ import { FaEdit, FaLock, FaPlus, FaSearch, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import {
   createCompanyMembership,
+  listCompanyAgentRequests,
   listWarehouses,
+  patchCompanyAgentCommonAccess,
 } from "../../../../api/warehouse";
 import { useUser } from "../../../../store/slices/userSlice";
 import RoleCreateModal from "./modals/RoleCreateModal";
@@ -289,6 +291,14 @@ const Masters = () => {
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalEmployee, setAccessModalEmployee] = useState(null);
   const [accessModalAccesses, setAccessModalAccesses] = useState([]);
+  const [accessModalCanSellWholesale, setAccessModalCanSellWholesale] =
+    useState(false);
+  const [accessModalWarehouseMembership, setAccessModalWarehouseMembership] =
+    useState(null);
+  const [
+    accessModalWarehouseMembershipLoading,
+    setAccessModalWarehouseMembershipLoading,
+  ] = useState(false);
 
   // Назначение агента склада (Warehouse Agents)
   const [warehouseAgentModalOpen, setWarehouseAgentModalOpen] = useState(false);
@@ -299,6 +309,8 @@ const Masters = () => {
     useState("");
   const [warehouseAgentCommonWarehouse, setWarehouseAgentCommonWarehouse] =
     useState("");
+  const [warehouseAgentCanSellWholesale, setWarehouseAgentCanSellWholesale] =
+    useState(false);
   const [warehouseAgentSaving, setWarehouseAgentSaving] = useState(false);
   const [warehouseAgentError, setWarehouseAgentError] = useState("");
   const [warehouseAgentWarehouses, setWarehouseAgentWarehouses] = useState([]);
@@ -306,6 +318,9 @@ const Masters = () => {
     useState(false);
 
   const sectorName = String(company?.sector?.name || "").trim();
+  const isWarehouseSector = sectorName === "Склад";
+  const isOwnerOrAdmin =
+    profile?.role === "owner" || profile?.role === "admin";
   const isCafeSector = sectorName === "Кафе";
   const isSalePayrollSector = isSaleEmployeePayrollSector(sectorName);
   const canAddEmployeeByStartPlan = useMemo(
@@ -801,6 +816,31 @@ const Masters = () => {
     [company?.sector?.name],
   );
 
+  const loadWarehouseMembershipForEmployee = useCallback(async (employeeId) => {
+    if (!employeeId || !isWarehouseSector || !isOwnerOrAdmin) {
+      setAccessModalWarehouseMembership(null);
+      setAccessModalCanSellWholesale(false);
+      setAccessModalWarehouseMembershipLoading(false);
+      return;
+    }
+
+    setAccessModalWarehouseMembershipLoading(true);
+    try {
+      const data = await listCompanyAgentRequests({ status: "active" });
+      const list = asArray(data);
+      const membership =
+        list.find((item) => String(item.user) === String(employeeId)) || null;
+      setAccessModalWarehouseMembership(membership);
+      setAccessModalCanSellWholesale(Boolean(membership?.can_sell_wholesale));
+    } catch (err) {
+      console.error("Не удалось загрузить данные агента склада:", err);
+      setAccessModalWarehouseMembership(null);
+      setAccessModalCanSellWholesale(false);
+    } finally {
+      setAccessModalWarehouseMembershipLoading(false);
+    }
+  }, [isOwnerOrAdmin, isWarehouseSector]);
+
   const openAccessModal = async (employee) => {
     try {
       // Загружаем полные данные сотрудника с доступами
@@ -811,6 +851,7 @@ const Masters = () => {
       setAccessModalEmployee(fullEmployee);
       setAccessModalAccesses(accesses);
       setAccessModalOpen(true);
+      await loadWarehouseMembershipForEmployee(fullEmployee.id);
     } catch (err) {
       console.error("Ошибка при открытии модального окна доступов:", err);
       setPageNotice(
@@ -828,10 +869,25 @@ const Masters = () => {
         EMPLOYEE_ITEM_URL(accessModalEmployee.id),
         newAccessesPayload,
       );
+
+      if (
+        isWarehouseSector &&
+        isOwnerOrAdmin &&
+        accessModalWarehouseMembership?.id &&
+        Boolean(accessModalWarehouseMembership.can_sell_wholesale) !==
+          Boolean(accessModalCanSellWholesale)
+      ) {
+        await patchCompanyAgentCommonAccess(accessModalWarehouseMembership.id, {
+          can_sell_wholesale: Boolean(accessModalCanSellWholesale),
+        });
+      }
+
       await fetchEmployees();
       setAccessModalOpen(false);
       setAccessModalEmployee(null);
       setAccessModalAccesses([]);
+      setAccessModalCanSellWholesale(false);
+      setAccessModalWarehouseMembership(null);
     } catch (err) {
       setPageNotice(
         pickApiError(err, "Не удалось обновить доступы сотрудника."),
@@ -848,11 +904,12 @@ const Masters = () => {
     setWarehouseAgentCommonEnabled(false);
     setWarehouseAgentAssignedWarehouse("");
     setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
     setWarehouseAgentModalOpen(true);
 
     if (
-      company?.sector?.name === "Склад" &&
+      isWarehouseSector &&
       !warehouseAgentWarehousesLoading &&
       warehouseAgentWarehouses.length === 0
     ) {
@@ -881,6 +938,7 @@ const Masters = () => {
     setWarehouseAgentCommonEnabled(false);
     setWarehouseAgentAssignedWarehouse("");
     setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
   };
 
@@ -905,6 +963,9 @@ const Masters = () => {
       if (warehouseAgentCommonEnabled) {
         payload.common_access_enabled = true;
         payload.common_warehouse = commonWarehouse;
+      }
+      if (warehouseAgentCanSellWholesale) {
+        payload.can_sell_wholesale = true;
       }
       await createCompanyMembership(payload);
       setPageNotice("Сотрудник назначен агентом склада.");
@@ -1385,6 +1446,12 @@ const Masters = () => {
         tariff={tariff}
         company={company}
         empSaving={empSaving}
+        isWarehouseSector={isWarehouseSector}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        warehouseMembership={accessModalWarehouseMembership}
+        warehouseMembershipLoading={accessModalWarehouseMembershipLoading}
+        canSellWholesale={accessModalCanSellWholesale}
+        onCanSellWholesaleChange={setAccessModalCanSellWholesale}
       />
 
       {warehouseAgentModalOpen && warehouseAgentEmployee && (
@@ -1523,6 +1590,37 @@ const Masters = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="barbermasters__field barbermasters__field--full">
+                  <label className="barbermasters__label">
+                    Оптовые продажи
+                  </label>
+                  <div className="barbermasters__seg">
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        !warehouseAgentCanSellWholesale ? "is-active" : ""
+                      }`}
+                      onClick={() => setWarehouseAgentCanSellWholesale(false)}
+                      disabled={warehouseAgentSaving}
+                    >
+                      Только розница
+                    </button>
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        warehouseAgentCanSellWholesale ? "is-active" : ""
+                      }`}
+                      onClick={() => setWarehouseAgentCanSellWholesale(true)}
+                      disabled={warehouseAgentSaving}
+                    >
+                      Разрешить опт
+                    </button>
+                  </div>
+                  <div className="barbermasters__help">
+                    Агент сможет создавать продажи с переключателем «Опт».
+                  </div>
+                </div>
 
                 {warehouseAgentError && (
                   <div className="barbermasters__alert barbermasters__alert--inModal">

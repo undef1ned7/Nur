@@ -4240,12 +4240,12 @@ const Agents = () => {
     }
   };
 
-  const handleCompanyWholesaleChange = async (request, enabled) => {
+  const handleCompanyWholesaleChange = async (request, nextValue) => {
     if (!request?.id || companyActionBusyId) return;
     setCompanyActionBusyId(request.id);
     try {
       await patchCompanyAgentCommonAccess(request.id, {
-        can_sell_wholesale: Boolean(enabled),
+        can_sell_wholesale: Boolean(nextValue),
       });
       await loadCompanyRequests();
     } catch (e) {
@@ -4279,6 +4279,9 @@ const Agents = () => {
       if (newMembershipCommonEnabled) {
         payload.common_access_enabled = true;
         payload.common_warehouse = commonWarehouse;
+      }
+      if (newMembershipCanSellWholesale) {
+        payload.can_sell_wholesale = true;
       }
       await createCompanyMembership(payload);
       setNewMembershipUserId("");
@@ -5465,6 +5468,17 @@ const Agents = () => {
                         />
                         Общий прайс
                       </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newMembershipCanSellWholesale}
+                          onChange={(e) =>
+                            setNewMembershipCanSellWholesale(e.target.checked)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        Разрешить опт
+                      </label>
                       <select
                         className="warehouse-search__input"
                         style={{ minWidth: 220 }}
@@ -5489,17 +5503,6 @@ const Agents = () => {
                           </option>
                         ))}
                       </select>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newMembershipCanSellWholesale}
-                          onChange={(e) =>
-                            setNewMembershipCanSellWholesale(e.target.checked)
-                          }
-                          disabled={newMembershipBusy}
-                        />
-                        Оптовые продажи
-                      </label>
                       <button
                         type="button"
                         className="agents-action-btn agents-action-btn--approve"
@@ -5529,7 +5532,7 @@ const Agents = () => {
                             <th>Email</th>
                             <th>Склад</th>
                             <th>Общий прайс</th>
-                            <th>Опт</th>
+                            <th>Оптовые продажи</th>
                             <th>Склад общего прайса</th>
                             <th>Создан</th>
                             <th>Обновлён</th>
@@ -5581,7 +5584,7 @@ const Agents = () => {
                                   </span>
                                 </td>
                                 <td>
-                                  <label className="flex items-center justify-center gap-2">
+                                  <label className="flex items-center gap-2 text-sm text-slate-700">
                                     <input
                                       type="checkbox"
                                       checked={Boolean(r.can_sell_wholesale)}
@@ -5593,9 +5596,9 @@ const Agents = () => {
                                       }
                                       disabled={companyActionBusyId === r.id}
                                     />
-                                    <span className="text-sm text-slate-600">
-                                      {r.can_sell_wholesale ? "Да" : "Нет"}
-                                    </span>
+                                    {r.can_sell_wholesale
+                                      ? "Разрешено"
+                                      : "Запрещено"}
                                   </label>
                                 </td>
                                 <td>

@@ -112,6 +112,12 @@ const WarehouseProductDetail = () => {
 
   const formatPrice = (price) => parseFloat(price || 0).toFixed(3);
 
+  const formatWholesalePrice = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num) || num <= 0) return "—";
+    return `${formatPrice(num)} сом`;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "—";
     const date = new Date(dateString);
@@ -279,6 +285,22 @@ const WarehouseProductDetail = () => {
                   {product.code || "—"}
                 </span>
               </div>
+              <div className="product-detail__detail-item">
+                <span className="product-detail__detail-label">
+                  Цена продажи:
+                </span>
+                <span className="product-detail__detail-value">
+                  {formatPrice(product.price)} сом
+                </span>
+              </div>
+              <div className="product-detail__detail-item">
+                <span className="product-detail__detail-label">
+                  Оптовая цена:
+                </span>
+                <span className="product-detail__detail-value">
+                  {formatWholesalePrice(product.wholesale_price)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -360,7 +382,7 @@ const WarehouseProductDetail = () => {
                 <tbody>
                   <tr>
                     <td>{formatPrice(product.price)} сом</td>
-                    <td>{formatPrice(product.wholesale_price)} сом</td>
+                    <td>{formatWholesalePrice(product.wholesale_price)}</td>
                     <td>{formatPrice(product.purchase_price)} сом</td>
                     <td>{product.markup_percent ?? "—"}%</td>
                   </tr>
