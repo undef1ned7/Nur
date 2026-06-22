@@ -305,6 +305,21 @@ const SECTOR_ACCESS_TYPES = {
     { value: "Зарплата", label: "Зарплата", backendKey: "can_view_salary" },
     { value: "Продажи", label: "Продажи", backendKey: "can_view_sale" },
     { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
+    {
+      value: "Воронка продаж",
+      label: "Воронка продаж",
+      backendKey: "can_view_funnel",
+    },
+    {
+      value: "Управление лидами воронки",
+      label: "Управление лидами воронки",
+      backendKey: "can_manage_funnel_leads",
+    },
+    {
+      value: "Управление стадиями воронки",
+      label: "Управление стадиями воронки",
+      backendKey: "can_manage_funnel_stages",
+    },
   ],
   Производство: [
     { value: "Передача", label: "Передача", backendKey: "can_view_agent" },
@@ -336,6 +351,12 @@ const SECTOR_ACCESS_TYPES = {
 };
 
 // Функция для получения всех доступных permissions на основе сектора
+const mergeAccessTypesWithoutDuplicates = (basicAccess, sectorAccess) => {
+  const sectorKeys = new Set(sectorAccess.map((a) => a.backendKey));
+  const uniqueBasic = basicAccess.filter((a) => !sectorKeys.has(a.backendKey));
+  return [...uniqueBasic, ...sectorAccess];
+};
+
 const getAllAccessTypes = (sectorName, tariff = null) => {
   const basicAccess = [...BASIC_ACCESS_TYPES];
   const normalizedSectorName =
@@ -349,13 +370,13 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
       const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
         (a) => a.backendKey !== "can_view_cafe_cook",
       );
-      return [...basicAccess, ...cafeNoCook];
+      return mergeAccessTypesWithoutDuplicates(basicAccess, cafeNoCook);
     }
     return basicAccess;
   }
 
   const sectorAccess = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
-  return [...basicAccess, ...sectorAccess];
+  return mergeAccessTypesWithoutDuplicates(basicAccess, sectorAccess);
 };
 
 // Для обратной совместимости
@@ -562,6 +583,9 @@ const AccessList = ({
       } else if (String(sectorName || "").trim() === "Кафе") {
         allMenuPermissions.add("can_view_cafe_order_pay");
         allMenuPermissions.add("can_view_cafe_order_return");
+      } else if (String(sectorName || "").trim() === "Консалтинг") {
+        allMenuPermissions.add("can_manage_funnel_leads");
+        allMenuPermissions.add("can_manage_funnel_stages");
       }
     }
 
@@ -646,9 +670,18 @@ const AccessList = ({
 
     // Маппим permissions обратно в доступы из BASIC_ACCESS_TYPES и SECTOR_ACCESS_TYPES
     const result = [];
+    const normalizedSectorName =
+      sectorName === "Услуги" || sectorName === "Стоматология"
+        ? "Барбершоп"
+        : sectorName;
+    const sectorAccessList = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
+    const sectorBackendKeys = new Set(
+      sectorAccessList.map((accessType) => accessType.backendKey),
+    );
 
-    // Базовые доступы
+    // Базовые доступы (секторные ключи пропускаем — у них свои подписи)
     BASIC_ACCESS_TYPES.forEach((accessType) => {
+      if (sectorBackendKeys.has(accessType.backendKey)) return;
       // "Филиалы" должны отображаться только если у компании есть активная доп. услуга
       if (accessType.backendKey === "can_view_branch") {
         // Проверяем, есть ли активная доп. услуга у компании
@@ -664,9 +697,11 @@ const AccessList = ({
     });
 
     // Секторные доступы
-    const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
-    sectorAccess.forEach((accessType) => {
-      if (allMenuPermissions.has(accessType.backendKey)) {
+    sectorAccessList.forEach((accessType) => {
+      if (
+        allMenuPermissions.has(accessType.backendKey) &&
+        !result.some((r) => r.backendKey === accessType.backendKey)
+      ) {
         result.push(accessType);
       }
     });

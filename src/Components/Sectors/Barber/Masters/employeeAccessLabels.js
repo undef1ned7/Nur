@@ -1,4 +1,7 @@
 // Shared: метки доступов для AccessList (Masters, карточка сотрудника кафе)
+const isAccessFlagOn = (value) =>
+  value === true || value === 1 || value === "true";
+
 export function convertEmployeeAccessesToLabels(employee, sectorName) {
   const labelsArray = [];
   // Используем те же константы, что и в DepartmentDetails
@@ -344,6 +347,21 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
       },
       { value: "Продажи", label: "Продажи", backendKey: "can_view_sale" },
       { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
+      {
+        value: "Воронка продаж",
+        label: "Воронка продаж",
+        backendKey: "can_view_funnel",
+      },
+      {
+        value: "Управление лидами воронки",
+        label: "Управление лидами воронки",
+        backendKey: "can_manage_funnel_leads",
+      },
+      {
+        value: "Управление стадиями воронки",
+        label: "Управление стадиями воронки",
+        backendKey: "can_manage_funnel_stages",
+      },
     ],
     Склад: [
       {
@@ -402,7 +420,9 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         ? "Барбершоп"
         : sectorName;
     const sectorAccess = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
-    return [...basicAccess, ...sectorAccess];
+    const sectorKeys = new Set(sectorAccess.map((a) => a.backendKey));
+    const uniqueBasic = basicAccess.filter((a) => !sectorKeys.has(a.backendKey));
+    return [...uniqueBasic, ...sectorAccess];
   };
   
   const availableAccessTypes = sectorName
@@ -410,7 +430,7 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
     : BASIC_ACCESS_TYPES;
   
   availableAccessTypes.forEach((type) => {
-    if (employee && employee[type.backendKey] === true) {
+    if (employee && isAccessFlagOn(employee[type.backendKey])) {
       labelsArray.push(type.value);
     }
   });

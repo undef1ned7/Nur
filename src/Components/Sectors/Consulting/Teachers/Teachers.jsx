@@ -1,5 +1,6 @@
 // src/components/Education/Teachers.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useDispatch } from "react-redux";
 import {
   FaPlus,
   FaSearch,
@@ -8,16 +9,25 @@ import {
   FaTrash,
   FaChevronLeft,
   FaChevronRight,
+  FaCheck,
+  FaCopy,
+  FaLock,
 } from "react-icons/fa";
 import "./Teachers.scss";
 import api from "../../../../api";
-import { useUser } from "../../../../store/slices/userSlice";
+import { useUser, getProfile } from "../../../../store/slices/userSlice";
 import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
+import { provisionFunnelForCustomRole } from "../../../../utils/consultingFunnelDefaults";
+import { convertEmployeeAccessesToLabels } from "../../Barber/Masters/employeeAccessLabels";
+import EmployeeAccessModal from "./modals/EmployeeAccessModal";
+
+import { normalizeFunnelGrants } from "../../../../utils/consultingFunnelAccess";
 
 /* ===== API ===== */
 const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
 const EMPLOYEES_CREATE_URL = "/users/employees/create/"; // POST
 const EMPLOYEE_ITEM_URL = (id) => `/users/employees/${id}/`; // PUT / DELETE
+const FUNNELS_LIST_URL = "/consalting/funnels/";
 const ROLES_LIST_URL = "/users/roles/"; // GET (кастомные роли)
 const ROLE_CREATE_URL = "/users/roles/custom/"; // POST
 const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`; // PUT / DELETE
@@ -155,7 +165,8 @@ const S_PER_PAGE = 10;
 const SL_PER_PAGE = 10;
 
 function ConsultingSchoolTeachers() {
-  const { company } = useUser();
+  const dispatch = useDispatch();
+  const { company, profile, tariff } = useUser();
   /* ===== tabs ===== */
   const [tab, setTab] = useState("employees"); // 'employees' | 'roles'
 
@@ -194,6 +205,16 @@ function ConsultingSchoolTeachers() {
     commission_percent: "",
   };
   const [empForm, setEmpForm] = useState(emptyEmp);
+  const [openLogin, setOpenLogin] = useState(false);
+  const [employData, setEmployData] = useState(null);
+  const [copied, setCopied] = useState(null);
+
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [accessModalEmployee, setAccessModalEmployee] = useState(null);
+  const [accessModalAccesses, setAccessModalAccesses] = useState([]);
+  const [accessFunnels, setAccessFunnels] = useState([]);
+  const [funnelGrantsDraft, setFunnelGrantsDraft] = useState([]);
+  const [pageNotice, setPageNotice] = useState("");
 
   /* ===== employee: edit/delete ===== */
   const [empEditOpen, setEmpEditOpen] = useState(false);
@@ -414,6 +435,79 @@ function ConsultingSchoolTeachers() {
     setRoles(asArray(res.data).map((r) => ({ id: r.id, name: r.name || "" })));
   }, []);
 
+  const copyToClipboard = async (text, key) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const openAccessModal = async (employee) => {
+    try {
+      const [empRes, funnelsRes] = await Promise.all([
+        api.get(EMPLOYEE_ITEM_URL(employee.id)),
+        api.get(FUNNELS_LIST_URL),
+      ]);
+      const fullEmployee = empRes.data;
+      const accesses = convertEmployeeAccessesToLabels(
+        fullEmployee,
+        company?.sector?.name,
+      );
+      const funnelList = Array.isArray(funnelsRes.data)
+        ? funnelsRes.data
+        : funnelsRes.data?.results || [];
+      setAccessModalEmployee(fullEmployee);
+      setAccessModalAccesses(accesses);
+      setAccessFunnels(funnelList);
+      setFunnelGrantsDraft(normalizeFunnelGrants(fullEmployee.funnel_grants));
+      setAccessModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      setPageNotice(
+        pickApiError(err, "Не удалось загрузить доступы сотрудника."),
+      );
+    }
+  };
+
+  const handleSaveEmployeeAccesses = async (accessPayload = {}) => {
+    if (!accessModalEmployee) return;
+    setEmpSaving(true);
+    setPageNotice("");
+    try {
+      await api.patch(EMPLOYEE_ITEM_URL(accessModalEmployee.id), {
+        ...accessPayload,
+        funnel_grants: funnelGrantsDraft,
+      });
+      await fetchEmployees();
+      const savedEmployeeId = String(accessModalEmployee.id);
+      const profileIds = [
+        profile?.id,
+        profile?.employee_id,
+        profile?.employee,
+      ]
+        .filter(Boolean)
+        .map(String);
+      if (profileIds.includes(savedEmployeeId)) {
+        dispatch(getProfile());
+      }
+      setAccessModalOpen(false);
+      setAccessModalEmployee(null);
+      setAccessModalAccesses([]);
+      setAccessFunnels([]);
+      setFunnelGrantsDraft([]);
+    } catch (err) {
+      setPageNotice(
+        pickApiError(err, "Не удалось обновить доступы сотрудника."),
+      );
+    } finally {
+      setEmpSaving(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -541,7 +635,18 @@ function ConsultingSchoolTeachers() {
     setRoleCreateSaving(true);
     setRoleCreateErr("");
     try {
-      await api.post(ROLE_CREATE_URL, { name });
+      const { data: role } = await api.post(ROLE_CREATE_URL, { name });
+      try {
+        await provisionFunnelForCustomRole(role?.id, name);
+      } catch (funnelErr) {
+        console.error(funnelErr);
+        setPageNotice(
+          pickApiError(
+            funnelErr,
+            "Роль создана, но воронку не удалось создать автоматически.",
+          ),
+        );
+      }
       await fetchRoles();
     } catch (err) {
       console.error(err);
@@ -676,13 +781,15 @@ function ConsultingSchoolTeachers() {
         }
       }
       await fetchEmployees();
+      setEmployData(data);
+      setOpenLogin(true);
+      setEmpCreateOpen(false);
+      setEmpForm(emptyEmp);
     } catch (err) {
       console.error(err);
       setEmpErr(pickApiError(err, "Не удалось создать сотрудника"));
     } finally {
       setEmpSaving(false);
-      setEmpCreateOpen(false);
-      setEmpForm(emptyEmp);
     }
   };
 
@@ -856,6 +963,9 @@ function ConsultingSchoolTeachers() {
 
       {loading && <div className="Schoolteachers__alert">Загрузка…</div>}
       {!!error && <div className="Schoolteachers__alert">{error}</div>}
+      {!!pageNotice && (
+        <div className="Schoolteachers__notice">{pageNotice}</div>
+      )}
 
       {/* ===== ROLES TAB ===== */}
       {!loading && tab === "roles" && (
@@ -991,6 +1101,14 @@ function ConsultingSchoolTeachers() {
                     title="История сотрудника"
                   >
                     История
+                  </button>
+                  <button
+                    type="button"
+                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                    onClick={() => openAccessModal(u)}
+                    title="Доступы сотрудника"
+                  >
+                    <FaLock /> Доступы
                   </button>
                   <button
                     type="button"
@@ -1816,6 +1934,78 @@ function ConsultingSchoolTeachers() {
           </div>
         </div>
       )}
+
+      {openLogin && (
+        <div
+          className="Schoolteachers__modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setOpenLogin(false)}
+        >
+          <div
+            className="Schoolteachers__modal Schoolteachers__modal--narrow"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="Schoolteachers__modalHeader">
+              <h3 className="Schoolteachers__modalTitle">Данные для входа</h3>
+              <button
+                type="button"
+                className="Schoolteachers__iconBtn"
+                onClick={() => setOpenLogin(false)}
+                aria-label="Закрыть"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="Schoolteachers__credentials">
+              <p className="Schoolteachers__credRow">
+                <b>Логин: {employData?.email}</b>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
+                  onClick={() => copyToClipboard(employData?.email || "", "email")}
+                  aria-label="Скопировать логин"
+                  title={copied === "email" ? "Скопировано!" : "Скопировать"}
+                >
+                  {copied === "email" ? <FaCheck /> : <FaCopy />}
+                </button>
+              </p>
+              <p className="Schoolteachers__credRow">
+                <b>Пароль: {employData?.generated_password}</b>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
+                  onClick={() =>
+                    copyToClipboard(employData?.generated_password || "", "password")
+                  }
+                  aria-label="Скопировать пароль"
+                  title={copied === "password" ? "Скопировано!" : "Скопировать"}
+                >
+                  {copied === "password" ? <FaCheck /> : <FaCopy />}
+                </button>
+              </p>
+              <p className="Schoolteachers__credHint">
+                Сохраните пароль — повторно он не отображается.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <EmployeeAccessModal
+        accessModalOpen={accessModalOpen}
+        setAccessModalOpen={setAccessModalOpen}
+        accessModalEmployee={accessModalEmployee}
+        accessModalAccesses={accessModalAccesses}
+        handleSaveEmployeeAccesses={handleSaveEmployeeAccesses}
+        profile={profile}
+        tariff={tariff}
+        company={company}
+        empSaving={empSaving}
+        funnels={accessFunnels}
+        funnelGrants={funnelGrantsDraft}
+        onFunnelGrantsChange={setFunnelGrantsDraft}
+      />
     </div>
   );
 }

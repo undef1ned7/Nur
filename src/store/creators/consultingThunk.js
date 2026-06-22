@@ -6,7 +6,7 @@ export const getConsultingServices = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const { data } = await api.get("/consalting/services/");
-      return data.results;
+      return Array.isArray(data) ? data : data.results || [];
     } catch (e) {
       return rejectWithValue(e);
     }
@@ -18,7 +18,7 @@ export const getConsultingRows = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const { data } = await api.get("/consalting/sales/");
-      return data.results;
+      return Array.isArray(data) ? data : data.results || [];
     } catch (e) {
       return rejectWithValue(e);
     }

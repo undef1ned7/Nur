@@ -18,6 +18,10 @@ export const useMenuPermissions = () => {
       if (!profile || !permission) {
         return false;
       }
+      if (permission === "can_view_funnel") {
+        if (profile.can_view_funnel === true) return true;
+        return profile.can_view_sale === true;
+      }
       return profile[permission] === true;
     },
     [profile]
