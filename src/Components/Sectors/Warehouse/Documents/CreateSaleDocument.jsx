@@ -97,20 +97,24 @@ const resolveProductSalePrice = (product, isWholesale) => {
   return wholesale > 0 ? wholesale : retail;
 };
 
+const formatDocumentPrice = (price) =>
+  Number(price || 0).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const getSalePriceModeLabel = (isWholesale) =>
+  isWholesale ? "Опт" : "Розница";
+
 const applyWholesaleModeToCartItem = (item, isWholesale) => {
   if (!item?.priceAuto) return item;
   const retail = Number(item.productRetailPrice ?? item.price ?? 0);
   const wholesale = Number(item.productWholesalePrice ?? 0);
-  const nextPrice = isWholesale
-    ? wholesale > 0
-      ? wholesale
-      : retail
-    : retail;
+  const nextPrice = isWholesale ? (wholesale > 0 ? wholesale : retail) : retail;
   return { ...item, price: nextPrice, unit_price: nextPrice };
 };
 
-const getProductWarehouseId = (product) =>
-  resolveEntityId(product?.warehouse);
+const getProductWarehouseId = (product) => resolveEntityId(product?.warehouse);
 
 const resolveWarehouseName = (warehouseId, warehouses, fallback = "") => {
   if (fallback) return String(fallback);
@@ -1081,9 +1085,7 @@ const CreateSaleDocument = () => {
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             const nextIndex =
-              currentIndex <= 0
-                ? visibleProducts.length - 1
-                : currentIndex - 1;
+              currentIndex <= 0 ? visibleProducts.length - 1 : currentIndex - 1;
             setActiveGroupKeyForKeyboard(gKey);
             setGroupKeyboardIndexMap((prev) => ({
               ...(prev || {}),
@@ -1159,7 +1161,12 @@ const CreateSaleDocument = () => {
                     </span>
                   ) : null}
                   <span className="create-sale-document__group-product-price">
-                    {formatPrice(getProductPriceForDocument(product))} сом
+                    {docType === "SALE" && !isOwnerOrAdmin ? (
+                      <span className="create-sale-document__group-product-price-mode">
+                        {getSalePriceModeLabel(isWholesale)}
+                      </span>
+                    ) : null}
+                    {formatDocumentPrice(getProductPriceForDocument(product))} сом
                   </span>
                   <span className="create-sale-document__group-product-stock">
                     {product.quantity ?? 0}
@@ -1247,7 +1254,8 @@ const CreateSaleDocument = () => {
           }
         }
 
-        if (!isGlobalSearch && warehouseRef.current !== requestWarehouse) return;
+        if (!isGlobalSearch && warehouseRef.current !== requestWarehouse)
+          return;
 
         setGroupProducts((prev) => ({
           ...(prev || {}),
@@ -1318,7 +1326,13 @@ const CreateSaleDocument = () => {
       loadProductsForGroup(key, key === "all" ? null : key);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warehouse, expandedGroupIds, debouncedProductSearch, loadProductsForGroup, isProductSearchActive]);
+  }, [
+    warehouse,
+    expandedGroupIds,
+    debouncedProductSearch,
+    loadProductsForGroup,
+    isProductSearchActive,
+  ]);
 
   const renderGroupTree = (parentId, depth = 0) => {
     const key = parentId == null ? "root" : String(parentId);
@@ -1528,7 +1542,12 @@ const CreateSaleDocument = () => {
                                 </FullNamePopover>
                                 <div className="create-sale-document__group-product-meta">
                                   <span className="create-sale-document__group-product-price">
-                                    {formatPrice(
+                                    {docType === "SALE" && !isOwnerOrAdmin ? (
+                                      <span className="create-sale-document__group-product-price-mode">
+                                        {getSalePriceModeLabel(isWholesale)}
+                                      </span>
+                                    ) : null}
+                                    {formatDocumentPrice(
                                       getProductPriceForDocument(product),
                                     )}{" "}
                                     сом
@@ -1667,7 +1686,9 @@ const CreateSaleDocument = () => {
         );
         const rawPm = String(doc.payment_method || "cash").toLowerCase();
         setPaymentMethod(
-          rawPm === "cashless" || rawPm.includes("безнал") ? "cashless" : "cash",
+          rawPm === "cashless" || rawPm.includes("безнал")
+            ? "cashless"
+            : "cash",
         );
         setPrepaymentAmount(
           doc.prepayment_amount != null && doc.prepayment_amount !== ""
@@ -1709,7 +1730,9 @@ const CreateSaleDocument = () => {
                 it.product_price ?? productObject?.price ?? price,
               );
               const productWholesalePrice = Number(
-                it.product_wholesale_price ?? productObject?.wholesale_price ?? 0,
+                it.product_wholesale_price ??
+                  productObject?.wholesale_price ??
+                  0,
               );
               const qty = Number(it.qty ?? it.quantity ?? 1);
               const discountPct = Number(
@@ -1871,8 +1894,7 @@ const CreateSaleDocument = () => {
           const stock =
             p != null ? Number(p?.quantity ?? 0) : Number(item.stock ?? 0);
           const qty = Number(item.quantity ?? 0);
-          const capByStock =
-            isStockLimitRequired && stock > 0 && qty > stock;
+          const capByStock = isStockLimitRequired && stock > 0 && qty > stock;
           return {
             ...item,
             stock,
@@ -2052,12 +2074,7 @@ const CreateSaleDocument = () => {
         applyWholesaleModeToCartItem(item, agentCanSellWholesale),
       ),
     );
-  }, [
-    editDocumentId,
-    docType,
-    isOwnerOrAdmin,
-    agentCanSellWholesale,
-  ]);
+  }, [editDocumentId, docType, isOwnerOrAdmin, agentCanSellWholesale]);
 
   const handleWholesaleModeChange = (nextWholesale) => {
     setIsWholesale(nextWholesale);
@@ -2605,12 +2622,7 @@ const CreateSaleDocument = () => {
       return warehouse ? { warehouse_from: warehouse } : {};
     }
     return { warehouse_from: warehouse };
-  }, [
-    isWarehouseToRequired,
-    isMultiWarehouseOwnerDoc,
-    warehouse,
-    warehouseTo,
-  ]);
+  }, [isWarehouseToRequired, isMultiWarehouseOwnerDoc, warehouse, warehouseTo]);
 
   // Валидация данных документа перед отправкой
   const validateDocumentData = () => {
@@ -3260,67 +3272,67 @@ const CreateSaleDocument = () => {
         doc.counterparty_display_name ?? selectedCounterparty?.name ?? "";
 
       const invoiceData = {
+        doc_type: doc.doc_type || docType,
+        document: {
+          type: "sale_invoice",
           doc_type: doc.doc_type || docType,
-          document: {
-            type: "sale_invoice",
-            doc_type: doc.doc_type || docType,
-            title: "Накладная",
-            id: doc.id,
-            number: docNumber,
-            date: currentDate.toISOString().split("T")[0],
-            datetime: doc.date || currentDate.toISOString(),
-            created_at: doc.created_at || currentDate.toISOString(),
-            discount_percent: docDiscountPercent,
-            discount_amount: docDiscountCombined,
-            discount_total: docDiscountCombined,
-            comment: doc.comment ?? "",
-          },
-          seller: {
-            id: company?.id || "",
-            name: company?.name || "",
-            inn: company?.inn || "",
-            okpo: company?.okpo || "",
-            score: company?.score || "",
-            bik: company?.bik || "",
-            address: company?.address || "",
-            phone: company?.phone || null,
-            email: company?.email || null,
-          },
-          buyer: selectedCounterparty
+          title: "Накладная",
+          id: doc.id,
+          number: docNumber,
+          date: currentDate.toISOString().split("T")[0],
+          datetime: doc.date || currentDate.toISOString(),
+          created_at: doc.created_at || currentDate.toISOString(),
+          discount_percent: docDiscountPercent,
+          discount_amount: docDiscountCombined,
+          discount_total: docDiscountCombined,
+          comment: doc.comment ?? "",
+        },
+        seller: {
+          id: company?.id || "",
+          name: company?.name || "",
+          inn: company?.inn || "",
+          okpo: company?.okpo || "",
+          score: company?.score || "",
+          bik: company?.bik || "",
+          address: company?.address || "",
+          phone: company?.phone || null,
+          email: company?.email || null,
+        },
+        buyer: selectedCounterparty
+          ? {
+              id: selectedCounterparty.id,
+              name: selectedCounterparty.name || buyerName || "",
+              inn: selectedCounterparty.inn || "",
+              okpo: selectedCounterparty.okpo || "",
+              score: selectedCounterparty.score || "",
+              bik: selectedCounterparty.bik || "",
+              address: selectedCounterparty.address || "",
+              phone: selectedCounterparty.phone || null,
+              email: selectedCounterparty.email || null,
+            }
+          : buyerName
             ? {
-                id: selectedCounterparty.id,
-                name: selectedCounterparty.name || buyerName || "",
-                inn: selectedCounterparty.inn || "",
-                okpo: selectedCounterparty.okpo || "",
-                score: selectedCounterparty.score || "",
-                bik: selectedCounterparty.bik || "",
-                address: selectedCounterparty.address || "",
-                phone: selectedCounterparty.phone || null,
-                email: selectedCounterparty.email || null,
+                id: "",
+                name: buyerName,
+                inn: "",
+                okpo: "",
+                score: "",
+                bik: "",
+                address: "",
+                phone: null,
+                email: null,
               }
-            : buyerName
-              ? {
-                  id: "",
-                  name: buyerName,
-                  inn: "",
-                  okpo: "",
-                  score: "",
-                  bik: "",
-                  address: "",
-                  phone: null,
-                  email: null,
-                }
-              : null,
-          items,
-          totals: {
-            subtotal: String(subtotal.toFixed(2)),
-            discount_total: String(totalDiscount.toFixed(2)),
-            tax_total: "0.00",
-            total: String(total.toFixed(2)),
-          },
-          warehouse: warehouseName,
-          warehouse_to: warehouseToName,
-        };
+            : null,
+        items,
+        totals: {
+          subtotal: String(subtotal.toFixed(2)),
+          discount_total: String(totalDiscount.toFixed(2)),
+          tax_total: "0.00",
+          total: String(total.toFixed(2)),
+        },
+        warehouse: warehouseName,
+        warehouse_to: warehouseToName,
+      };
 
       if (printType === "invoice") {
         const blob = await pdf(
@@ -3573,6 +3585,12 @@ const CreateSaleDocument = () => {
               </span>
             )}
           </h2>
+          {docType === "SALE" && !isOwnerOrAdmin && (
+            <p className="create-sale-document__sidebar-price-hint">
+              Цены в каталоге:{" "}
+              <strong>{getSalePriceModeLabel(isWholesale)}</strong>
+            </p>
+          )}
           <div className="create-sale-document__search-wrapper">
             <div className="create-sale-document__search">
               <Search size={18} className="create-sale-document__search-icon" />
@@ -3613,91 +3631,91 @@ const CreateSaleDocument = () => {
               </div>
             ) : (
               <>
-            <div className="create-sale-document__group-tree">
-              {(() => {
-                const key = "all";
-                const isExpanded = expandedGroupIds.has(key);
-                const entry = groupProducts?.[key];
-                const isStale =
-                  (entry?.search || "") !== (debouncedProductSearch || "");
-                const notLoaded = !Array.isArray(entry?.items);
-                return (
-                  <div className="create-sale-document__group-node">
-                    <div
-                      className={`create-sale-document__group-item ${
-                        isExpanded ? "is-open" : ""
-                      }`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        setActiveGroupKeyForKeyboard(key);
-                        toggleGroupExpand(key);
-                        if (!isExpanded && (notLoaded || isStale)) {
-                          loadProductsForGroup(key, null);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setActiveGroupKeyForKeyboard(key);
-                          toggleGroupExpand(key);
-                          if (!isExpanded && (notLoaded || isStale)) {
-                            loadProductsForGroup(key, null);
-                          }
-                        }
-                      }}
-                      title="Товары без группы"
-                    >
-                      <span className="create-sale-document__group-expander">
-                        <ChevronDown
-                          size={14}
-                          style={{
-                            transform: isExpanded
-                              ? "rotate(0deg)"
-                              : "rotate(-90deg)",
+                <div className="create-sale-document__group-tree">
+                  {(() => {
+                    const key = "all";
+                    const isExpanded = expandedGroupIds.has(key);
+                    const entry = groupProducts?.[key];
+                    const isStale =
+                      (entry?.search || "") !== (debouncedProductSearch || "");
+                    const notLoaded = !Array.isArray(entry?.items);
+                    return (
+                      <div className="create-sale-document__group-node">
+                        <div
+                          className={`create-sale-document__group-item ${
+                            isExpanded ? "is-open" : ""
+                          }`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setActiveGroupKeyForKeyboard(key);
+                            toggleGroupExpand(key);
+                            if (!isExpanded && (notLoaded || isStale)) {
+                              loadProductsForGroup(key, null);
+                            }
                           }}
-                        />
-                      </span>
-                      <span className="create-sale-document__group-icon">
-                        {isExpanded ? (
-                          <FolderOpen size={16} />
-                        ) : (
-                          <Folder size={16} />
-                        )}
-                      </span>
-                      <span className="create-sale-document__group-name">
-                        Все товары
-                      </span>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="create-sale-document__group-body">
-                        <div className="create-sale-document__group-products">
-                          {renderGroupProductsList(key, entry)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              setActiveGroupKeyForKeyboard(key);
+                              toggleGroupExpand(key);
+                              if (!isExpanded && (notLoaded || isStale)) {
+                                loadProductsForGroup(key, null);
+                              }
+                            }
+                          }}
+                          title="Товары без группы"
+                        >
+                          <span className="create-sale-document__group-expander">
+                            <ChevronDown
+                              size={14}
+                              style={{
+                                transform: isExpanded
+                                  ? "rotate(0deg)"
+                                  : "rotate(-90deg)",
+                              }}
+                            />
+                          </span>
+                          <span className="create-sale-document__group-icon">
+                            {isExpanded ? (
+                              <FolderOpen size={16} />
+                            ) : (
+                              <Folder size={16} />
+                            )}
+                          </span>
+                          <span className="create-sale-document__group-name">
+                            Все товары
+                          </span>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
 
-            {groupsLoading ? (
-              <div className="create-sale-document__groups-empty">
-                Загрузка…
-              </div>
-            ) : groupsError ? (
-              <div className="create-sale-document__groups-empty">
-                Не удалось загрузить группы
-              </div>
-            ) : groups.length === 0 ? (
-              <div className="create-sale-document__groups-empty">
-                Групп нет
-              </div>
-            ) : (
-              <div className="create-sale-document__group-tree">
-                {renderGroupTree(null, 0)}
-              </div>
-            )}
+                        {isExpanded && (
+                          <div className="create-sale-document__group-body">
+                            <div className="create-sale-document__group-products">
+                              {renderGroupProductsList(key, entry)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {groupsLoading ? (
+                  <div className="create-sale-document__groups-empty">
+                    Загрузка…
+                  </div>
+                ) : groupsError ? (
+                  <div className="create-sale-document__groups-empty">
+                    Не удалось загрузить группы
+                  </div>
+                ) : groups.length === 0 ? (
+                  <div className="create-sale-document__groups-empty">
+                    Групп нет
+                  </div>
+                ) : (
+                  <div className="create-sale-document__group-tree">
+                    {renderGroupTree(null, 0)}
+                  </div>
+                )}
               </>
             )}
           </div>
