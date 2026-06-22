@@ -65,6 +65,19 @@
     color: var(--muted);
     font-size: 13px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  &__live {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    letter-spacing: 0.02em;
+    &--on {
+      color: #16a34a;
+    }
   }
   &__actions {
     display: flex;
@@ -153,6 +166,12 @@
         background: #ddf8e7;
       }
     }
+    &--sm {
+      height: 34px;
+      padding: 0 12px;
+      font-size: 12.5px;
+      border-radius: 10px;
+    }
   }
 
   &__error {
@@ -164,6 +183,16 @@
     font-size: 13px;
     font-weight: 600;
     white-space: pre-line;
+  }
+
+  &__notice {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
   }
 
   /* ---------------- toolbar / фильтры ---------------- */
@@ -230,6 +259,11 @@
     min-width: 150px;
     font-size: 13px;
   }
+  &__select--inline {
+    height: 42px;
+    min-width: 160px;
+    font-size: 13px;
+  }
   &__gradeBtn {
     width: 42px;
     height: 42px;
@@ -294,6 +328,115 @@
     background: var(--surface);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius);
+    &--sm {
+      padding: 28px 16px;
+      font-size: 13px;
+    }
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    margin-top: 8px;
+  }
+
+  &__row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    &--collapsed {
+      padding-bottom: 14px;
+    }
+  }
+
+  &__rowToggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__rowChevron {
+    flex: 0 0 auto;
+    font-size: 14px;
+    color: var(--muted);
+    width: 16px;
+  }
+
+  &__rowMeta--inline {
+    margin: 0 0 0 8px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  &__rowHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__rowTitle {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__rowTag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+
+  &__rowMeta {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  &__rowActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__transferLead {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  &__transferHint {
+    margin: 0 0 16px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--muted);
   }
 
   /* ---------------- board ---------------- */
@@ -307,6 +450,13 @@
     flex: 1;
     scrollbar-width: thin;
     scrollbar-color: #cfd4e0 transparent;
+    &--row {
+      max-height: none;
+      padding-bottom: 8px;
+      .funnel__col {
+        max-height: min(520px, calc(100dvh - 320px));
+      }
+    }
     &::-webkit-scrollbar {
       height: 10px;
     }
@@ -342,6 +492,15 @@
     &--blocked {
       opacity: 0.5;
     }
+    &--system {
+      background: #fafbfc;
+    }
+  }
+  &__colLock {
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.7;
+    flex-shrink: 0;
   }
   &__colBar {
     height: 4px;
@@ -384,6 +543,35 @@
     color: var(--muted);
     padding: 1px 9px;
     flex: 0 0 auto;
+  }
+  &__colStageActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+  &__colStageBtn {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 12px;
+    line-height: 1;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--muted);
+    &:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    &--danger:hover {
+      color: #b42318;
+      border-color: #fbd5d1;
+      background: #fff5f4;
+    }
   }
   &__colSum {
     font-size: 12px;
@@ -495,6 +683,74 @@
     &--risk::before {
       background: var(--danger);
       opacity: 1;
+    }
+    &--pool {
+      border-style: dashed;
+      background: #fffef8;
+    }
+    &--readonly {
+      cursor: pointer;
+    }
+    &--completed {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      &::before {
+        background: #16a34a;
+      }
+    }
+  }
+  &__cardTopRight {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  &__poolBadge {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #92400e;
+    background: #fef3c7;
+    border-radius: 6px;
+    padding: 2px 6px;
+    line-height: 1.3;
+  }
+  &__cardClaim {
+    margin-left: auto;
+    border: none;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--primary);
+    color: var(--primary-ink);
+    &:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+  &__cardTransfer {
+    flex: 0 0 auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--surface-2);
+    color: var(--text);
+    &:hover {
+      background: var(--surface);
+      border-color: #d6dae4;
     }
   }
   &__cardTop {
@@ -849,6 +1105,15 @@
     margin: 0;
     line-height: 1.4;
   }
+  &__fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: inherit;
+  }
   &__sectionTitle {
     font-size: 12px;
     font-weight: 800;
@@ -916,6 +1181,20 @@
       background: #fff5f4;
       color: #b42318;
       border-color: #fbd5d1;
+    }
+    &--pool {
+      background: #fffbeb;
+      color: #92400e;
+      border-color: #fde68a;
+    }
+    &--client {
+      background: #ecfdf5;
+      color: #047857;
+      border-color: #a7f3d0;
+      text-decoration: none;
+      &:hover {
+        background: #d1fae5;
+      }
     }
   }
   &__loseBox {
@@ -1157,6 +1436,165 @@
         font-weight: 800;
       }
     }
+  }
+
+  &__empPick {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+  &__empPickItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  &__error--inline {
+    margin: 0;
+    padding: 8px 10px;
+  }
+  &__hint--lock {
+    margin-top: 8px;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+
+  &__archiveBody {
+    padding: 20px 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__archive {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  &__archiveGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__archiveGroupTitle {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  &__archiveTableWrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  &__archiveTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    th,
+    td {
+      padding: 10px 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &__archiveRow {
+    cursor: pointer;
+    transition: background 0.12s;
+    &:hover td {
+      background: #f5f7ff;
+    }
+  }
+
+  // direct-child modal errors (e.g. LeadDetail error above tabs)
+  &__modal > .funnel__error {
+    margin: 0 22px 14px;
+  }
+
+  // ---------------- drag handles ----------------
+  &__rowDragHandle,
+  &__colDragHandle {
+    cursor: grab;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    opacity: 0.25;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+    padding: 3px 5px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    user-select: none;
+    // pointer-drag: чтобы тач не уводил в скролл и работал на всех браузерах
+    touch-action: none;
+    -webkit-user-select: none;
+    &:hover {
+      color: var(--text);
+      background: var(--border);
+      opacity: 1 !important;
+    }
+    &:active {
+      cursor: grabbing;
+    }
+  }
+  &__row:hover &__rowDragHandle {
+    opacity: 0.6;
+  }
+  &__col:hover &__colDragHandle {
+    opacity: 0.6;
+  }
+
+  // funnel row drag states
+  &__row--dragging {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  &__row--dragOver {
+    box-shadow: 0 -3px 0 0 var(--primary-dark), var(--shadow-md);
+    border-color: var(--primary-dark);
+  }
+
+  // stage column drag states
+  &__col--stageDragging {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  &__col--stageDragOver {
+    border-left: 3px solid var(--primary-dark) !important;
+    box-shadow: -2px 0 8px rgba(247, 215, 79, 0.35), var(--shadow-sm);
   }
 }
 

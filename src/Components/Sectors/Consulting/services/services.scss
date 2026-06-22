@@ -11,17 +11,40 @@
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 20px;
-  margin: 16px;
-  max-width: 1200px;
+  padding: 20px 24px;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 
   &__header {
-    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
   }
   &__title { font-size: 20px; font-weight: 800; margin: 0; color: var(--text); }
   &__subtitle { margin: 4px 0 0; color: var(--muted); }
 
-  &__toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  &__toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
 
   &__search { position: relative; }
   &__mutedIcon {
@@ -93,5 +116,183 @@
     &__search .services__input { width: 100%; }
     &__formGrid { grid-template-columns: 1fr; }
     &__ellipsis { max-width: 220px; }
+  }
+
+  &__tariffs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+  }
+  &__tariffsHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  &__tariffRow {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 72px 36px;
+    gap: 8px;
+    align-items: center;
+  }
+  &__input--sub {
+    min-width: 0;
+  }
+  &__input--subPeriod {
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  &__hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  &__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 4px;
+  }
+
+  &__cardsEmpty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--muted);
+    padding: 32px 16px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: #fafafa;
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    transition: box-shadow 0.15s, border-color 0.15s;
+
+    &:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+  }
+
+  &__cardTitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  // Блок-группа услуг одной роли
+  &__group {
+    margin-top: 18px;
+    &:first-of-type {
+      margin-top: 8px;
+    }
+  }
+
+  &__groupTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text);
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--border, #e5e7eb);
+  }
+
+  &__groupCount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  // Бейдж роли, к которой привязана услуга
+  &__roleBadge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #4338ca;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  &__cardMeta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 14px;
+    margin: 0;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    dt {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text);
+      word-break: break-word;
+    }
+  }
+
+  &__cardMetaRow--full {
+    grid-column: 1 / -1;
+  }
+
+  &__tariffList {
+    margin: 0;
+    padding-left: 18px;
+
+    li {
+      margin: 2px 0;
+    }
+  }
+
+  &__cardActions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
   }
 }

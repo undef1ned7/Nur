@@ -205,6 +205,48 @@ export const cancellationOfPayment = createAsyncThunk(
   }
 );
 
+export const getClientSubscriptionSchedule = createAsyncThunk(
+  "client/subscriptionSchedule",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(
+        `/main/clients/${clientId}/subscription-schedule/`,
+      );
+      return Array.isArray(data) ? data : data.items || data.results || [];
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 501) {
+        try {
+          const { data } = await api.get(`/main/clients/${clientId}/deals/`);
+          const deals = Array.isArray(data) ? data : data.results || [];
+          return deals
+            .filter(
+              (d) =>
+                d.kind === "subscription" ||
+                d.subscription_amount ||
+                String(d.title || "")
+                  .toLowerCase()
+                  .includes("абон"),
+            )
+            .map((d, i) => ({
+              period_label:
+                d.first_due_date?.slice(0, 7) ||
+                d.created_at?.slice(0, 7) ||
+                `Период ${i + 1}`,
+              amount: Number(d.subscription_amount || d.amount || 0),
+              status:
+                Number(d.remaining_debt || 0) > 0 ? "planned" : "paid",
+              paid: !(Number(d.remaining_debt || 0) > 0),
+              active: i === 0,
+            }));
+        } catch {
+          return [];
+        }
+      }
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  },
+);
+
 export const deleteDebt = createAsyncThunk(
   "client/deleteDebt",
   async (arg, { rejectWithValue }) => {

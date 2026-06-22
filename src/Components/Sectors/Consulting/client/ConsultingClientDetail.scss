@@ -1,0 +1,293 @@
+.clientDetail {
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  font-family: "Montserrat", system-ui, sans-serif;
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 16px;
+  max-width: 1100px;
+  box-shadow: var(--shadow);
+  color: #0f172a;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  &__back {
+    display: inline-block;
+    margin-bottom: 8px;
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 13px;
+    &:hover {
+      color: #0f172a;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  &__subtitle {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  &__subBadge {
+    background: #fef9c3;
+    border: 1px solid #f7d74f;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__card {
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  &__cardTitle {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  // ---- Календарь абонентских платежей ----
+  &__calendar {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+  }
+
+  &__calCell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    text-align: center;
+    font-family: inherit;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+
+    &--paid {
+      background: #ecfdf5;
+      border-color: #6ee7b7;
+    }
+    &--planned {
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+
+    // не оплачиваемые плитки (оплачено / нет dealId) — обычные, не кликабельны
+    &:disabled {
+      cursor: default;
+    }
+
+    // оплачиваемые — кликабельны, подсвечиваются при наведении
+    &--payable {
+      cursor: pointer;
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #f59e0b;
+      }
+    }
+  }
+
+  &__calMonth {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: capitalize;
+    line-height: 1.1;
+  }
+
+  &__calYear {
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  &__calAmount {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  &__calStatus {
+    font-size: 11px;
+    font-weight: 600;
+    .clientDetail__calCell--paid & {
+      color: #059669;
+    }
+    .clientDetail__calCell--planned & {
+      color: #d97706;
+    }
+  }
+
+  &__tableWrap {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    th,
+    td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    th {
+      color: #6b7280;
+      font-weight: 600;
+    }
+  }
+
+  &__muted {
+    color: #6b7280;
+    font-size: 13px;
+    margin: 0;
+  }
+
+  &__error {
+    background: #fef2f2;
+    color: #b91c1c;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+
+  &__hint {
+    margin-top: 16px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  &__btn {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &--primary {
+      background: #f7d74f;
+      border-color: #f7d74f;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  // ---- Модалка оплаты абонентки ----
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 1000;
+  }
+
+  &__modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+
+  &__modalHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  &__modalTitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__modalClose {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #6b7280;
+    &:hover {
+      color: #0f172a;
+    }
+  }
+
+  &__modalForm {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__modalField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 13px;
+    color: #374151;
+
+    input,
+    select {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      &:focus {
+        border-color: #f7d74f;
+      }
+    }
+  }
+
+  &__modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
+  }
+}

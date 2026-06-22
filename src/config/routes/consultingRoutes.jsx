@@ -1,6 +1,7 @@
 import { createProtectedRoute } from "./helpers";
 import { lazy } from "react";
 const ConsultingClients = lazy(() => import("../../Components/Sectors/Consulting/client/client"));
+const ConsultingClientDetail = lazy(() => import("../../Components/Sectors/Consulting/client/ConsultingClientDetail"));
 const ConsultingClientRequests = lazy(() => import("../../Components/Sectors/Consulting/client-requests/client-requests"));
 const ConsultingCafeKassa = lazy(() => import("../../Components/Sectors/Consulting/Kassa/Kassa"));
 const ConsultingSchoolTeachers = lazy(() => import("../../Components/Sectors/Consulting/Teachers/Teachers"));
@@ -13,6 +14,7 @@ const ConsultingFunnel = lazy(() => import("../../Components/Sectors/Consulting/
 
 export const consultingRoutes = () => [
   createProtectedRoute("consulting/client", ConsultingClients),
+  createProtectedRoute("consulting/client/:id", ConsultingClientDetail),
   createProtectedRoute("consulting/client-requests", ConsultingClientRequests),
   createProtectedRoute("consulting/kassa/*", ConsultingCafeKassa),
   createProtectedRoute("consulting/teachers", ConsultingSchoolTeachers),

@@ -1,191 +1,665 @@
-/* src/components/Analytics/Analytics.scss */
-:root {
-  /* только цвета */
-  --primary:#f7d74f;
-  --text:#0f172a;
-  --muted:#6b7280;
-  --border:#e5e7eb;
-  --surface:#fff;
-  --blue:#3b82f6;
-  --green:#10b981;
-  --danger:#ef4444;
-  --danger-600:#dc2626;
+.consulting-analytics {
+  --ca-primary: #f7d617;
+  --ca-primary-dark: #e6c200;
+  --ca-text: #111827;
+  --ca-muted: #6b7280;
+  --ca-border: #e5e7eb;
+  --ca-surface: #ffffff;
+  --ca-page-bg: #f9fafb;
+  --ca-blue: #3b82f6;
+  --ca-green: #10b981;
+  --ca-danger: #ef4444;
+  --ca-violet: #8b5cf6;
 }
 
-.an,
-.an * { box-sizing: border-box; }
+.consulting-analytics,
+.consulting-analytics * {
+  box-sizing: border-box;
+}
 
-.an {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  color: var(--text);
+.consulting-analytics {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--ca-text);
+  font-variant-numeric: tabular-nums;
+  padding: 4px 0 24px;
+}
+
+.consulting-analytics__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.consulting-analytics__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.consulting-analytics__subtitle {
+  margin: 4px 0 0;
+  color: var(--ca-muted);
+  font-size: 14px;
+}
+
+.consulting-analytics__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.consulting-analytics__seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.consulting-analytics__segBtn {
+  padding: 8px 14px;
+  border: 1px solid var(--ca-border);
+  border-radius: 8px;
+  background: var(--ca-surface);
+  cursor: pointer;
+  font-weight: 600;
   font-size: 13px;
-  line-height: 1.35;
+  color: var(--ca-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    border-color: #d1d5db;
+  }
+
+  &.is-active {
+    background: var(--ca-primary);
+    border-color: var(--ca-primary);
+    color: #111827;
+  }
+}
+
+.consulting-analytics__segBtn--custom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 120px;
+  text-align: left;
+
+  &.is-active {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+.consulting-analytics__segBtnTitle {
+  line-height: 1.2;
+}
+
+.consulting-analytics__segBtnRange {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(17, 24, 39, 0.72);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.consulting-analytics__range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ca-muted);
+  }
+}
+
+.consulting-analytics__input {
+  border: 1px solid var(--ca-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--ca-surface);
+  color: var(--ca-text);
+  min-height: 36px;
+
+  &.is-invalid {
+    border-color: var(--ca-danger);
+  }
+}
+
+.consulting-analytics__btnGhost {
+  border: 1px solid var(--ca-border);
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ca-muted);
+
+  &:hover {
+    color: var(--ca-text);
+    border-color: #d1d5db;
+  }
+}
+
+.consulting-analytics__alert {
+  color: var(--ca-danger);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.consulting-analytics__filters {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 12px;
+  align-items: stretch;
+}
+
+.consulting-analytics__filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+}
+
+.consulting-analytics__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ca-muted);
+  line-height: 1.2;
+}
+
+.consulting-analytics__chipsSlot {
+  flex: 1;
+  min-height: 34px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.consulting-analytics__chipsEmpty {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 2px;
+  font-size: 12px;
+  color: var(--ca-muted);
+}
+
+.consulting-analytics__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.consulting-analytics__chipSoft {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  border: 1px solid var(--ca-border);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.consulting-analytics__chipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consulting-analytics__chipClose {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--ca-muted);
+
+  &:hover {
+    color: var(--ca-text);
+  }
+}
+
+.consulting-analytics__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
-/* ===== Header & filters ===== */
-.an__header{
-  display:grid;
-  grid-template-columns:1fr auto;
-  gap:10px;
-  align-items:center;
-}
-.an__title{ font-size:16px; font-weight:700; }
-.an__subtitle{ color:var(--muted); }
-
-.an__preset{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.an__chip{
-  border:1px solid var(--border);
-  background:#fafafa;
-  padding:6px 10px;
-  border-radius:999px;
-  font-weight:600;
-  cursor:pointer;
-  transition:transform .05s ease;
-}
-.an__chip:active{ transform:scale(.98); }
-.an__chip.is-active{ background:var(--primary); border-color:var(--primary); }
-
-.an__btn{ border:1px solid var(--border); background:#fafafa; padding:6px 10px; border-radius:8px; }
-.an__btn--ghost{ background:transparent; }
-
-.an__filters{ display:grid; gap:10px; }
-.an__row{
-  display:grid;
-  grid-template-columns: 160px 160px 1fr 1fr;
-  gap:10px;
-  align-items:start;
-}
-.an__field{ display:grid; gap:6px; }
-.an__field--grow{ min-width: 240px; }
-.an__label{ color:var(--muted); font-size:12px; }
-.an__input{
-  border:1px solid var(--border);
-  background:var(--surface);
-  border-radius:8px;
-  padding:8px 10px;
-  height:34px;
-}
-.an__input.is-invalid{ border-color:var(--danger); }
-.an__alert{ color:var(--danger-600); font-weight:600; }
-
-/* ===== Combo ===== */
-.an__combo{ position:relative; }
-.an__comboControl{
-  border:1px solid var(--border);
-  background:var(--surface);
-  border-radius:8px;
-  display:flex;
-  align-items:center;
-  padding:0 8px;
-  height:34px;
-}
-.an__comboControl.is-disabled{ opacity:.6; }
-.an__comboIcon{ margin-right:6px; color:var(--muted); }
-.an__comboInput{
-  flex:1;
-  border:0;
-  outline:0;
-  height:100%;
-  min-width:0;
-}
-.an__comboToggle{
-  border:0; background:transparent; cursor:pointer;
-  padding:0 4px; height:100%;
-}
-.an__comboDrop{
-  position:absolute; top:100%; left:0; right:0;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:10px;
-  margin-top:6px;
-  padding:6px;
-  box-shadow:0 10px 30px rgba(0,0,0,.08);
-  z-index:10;
-}
-.an__comboList{ list-style:none; margin:0; padding:0; max-height:220px; overflow:auto; }
-.an__comboItem{
-  width:100%; text-align:left;
-  padding:8px 10px; border-radius:8px; border:1px solid transparent;
-  background:transparent; cursor:pointer;
-}
-.an__comboItem:hover{ background:#fafafa; }
-.an__comboItem.is-active{ color:var(--muted); cursor:not-allowed; }
-.an__comboEmpty{ padding:10px; color:var(--muted); text-align:center; }
-.an__comboPager{
-  display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 2px 2px;
-}
-.an__pageBtn{ border:1px solid var(--border); background:#fafafa; padding:6px 10px; border-radius:8px; }
-.an__page{ color:var(--muted); }
-
-.an__chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
-.an__chip--soft{
-  background:#fafafa; border:1px solid var(--border);
-}
-.an__chipClose{
-  border:0; background:transparent; padding:0 4px; cursor:pointer; display:inline-flex; align-items:center;
-}
-.an__tag{
-  margin-left:8px; background:#f1f5f9; color:#334155; font-size:11px; border-radius:999px; padding:2px 6px;
+.consulting-analytics__kpi {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* ===== KPI ===== */
-.an__kpi{
-  display:grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap:10px;
-}
-.an__card{
-  border:1px solid var(--border); border-radius:12px; padding:12px; display:grid; gap:6px;
-}
-.an__cardTitle{ color:var(--muted); }
-.an__cardValue{ font-size:18px; font-weight:800; }
-.an__muted{ color:var(--muted); }
-
-.an__spark{ width:100%; height:48px; color:var(--blue); }
-
-.an__card--donut{ align-items:center; text-align:center; }
-.an__donut{
-  width:84px; height:84px; border-radius:50%;
-  margin:4px auto;
-  background:conic-gradient(var(--blue) 0 25%, var(--primary) 25% 60%, var(--green) 60% 90%, var(--danger) 90% 100%);
-}
-.an__legend{
-  display:grid; gap:4px; justify-content:center; padding:0; margin:0; list-style:none; font-size:12px;
-}
-.an__legend i{
-  display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle;
-}
-.c--blue{ background:var(--blue); }
-.c--primary{ background:var(--primary); }
-.c--green{ background:var(--green); }
-.c--danger{ background:var(--danger); }
-
-/* ===== Body (scroll) ===== */
-.an__body{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:10px;
-  max-height: 60vh;   /* скролл */
-  overflow:auto;      /* скролл */
-  padding-right:2px;  /* чтобы полоса не перекрывала контент */
+.consulting-analytics__kpiIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(247, 214, 23, 0.2);
+  color: #92400e;
+  flex-shrink: 0;
 }
 
-.an__section{ border:1px solid var(--border); border-radius:12px; padding:12px; display:grid; gap:10px; }
-.an__sectionTitle{ font-weight:700; }
+.consulting-analytics__kpiBody {
+  min-width: 0;
+}
 
-.an__list{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
-.an__row{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
-.an__rowMain{ display:grid; gap:6px; }
-.an__rowTitle{ font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.an__barWrap{ width:100%; height:8px; background:#f3f4f6; border-radius:999px; overflow:hidden; }
-.an__bar{ height:100%; background:var(--primary); border-radius:999px; }
+.consulting-analytics__kpiLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ca-muted);
+}
 
-.an__rowMeta{ white-space:nowrap; }
+.consulting-analytics__kpiValue {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
 
-/* ===== Empty ===== */
-.an__empty{ text-align:center; color:var(--muted); }
+.consulting-analytics__kpiDesc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ca-muted);
+}
+
+.consulting-analytics__chartsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.consulting-analytics__card {
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.consulting-analytics__cardTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.consulting-analytics__chartWrap {
+  width: 100%;
+  height: 280px;
+  min-height: 220px;
+}
+
+.consulting-analytics__chartWrap--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: var(--ca-muted);
+  font-size: 14px;
+  background: var(--ca-page-bg);
+  border-radius: 10px;
+  border: 1px dashed var(--ca-border);
+}
+
+.consulting-analytics__legend {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.consulting-analytics__legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.consulting-analytics__legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.consulting-analytics__rankList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.consulting-analytics__rankRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.consulting-analytics__rankMain {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.consulting-analytics__rankTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consulting-analytics__barWrap {
+  width: 100%;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.consulting-analytics__bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ca-primary), #fde047);
+  border-radius: 999px;
+}
+
+.consulting-analytics__rankMeta {
+  white-space: nowrap;
+  font-size: 13px;
+  text-align: right;
+}
+
+.consulting-analytics__empty {
+  text-align: center;
+  color: var(--ca-muted);
+  padding: 24px 12px;
+}
+
+/* Combo (filters) */
+.consulting-analytics__combo {
+  position: relative;
+  width: 100%;
+}
+
+.consulting-analytics__comboControl {
+  width: 100%;
+  border: 1px solid var(--ca-border);
+  background: var(--ca-surface);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 40px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.consulting-analytics__comboControl.is-disabled {
+  opacity: 0.6;
+}
+
+.consulting-analytics__comboIcon {
+  margin-right: 6px;
+  color: var(--ca-muted);
+}
+
+.consulting-analytics__comboInput {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  height: 100%;
+  min-width: 0;
+  font-size: 13px;
+  background: transparent;
+  color: var(--ca-text);
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.consulting-analytics__comboToggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 4px;
+  height: 100%;
+  flex-shrink: 0;
+  color: var(--ca-muted);
+  font-size: 12px;
+}
+
+.consulting-analytics__comboDrop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 10px;
+  margin-top: 6px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.consulting-analytics__comboList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+
+  li + li {
+    margin-top: 2px;
+  }
+}
+
+.consulting-analytics__comboItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--ca-text);
+
+  &:hover:not(:disabled) {
+    background: #f9fafb;
+  }
+
+  &.is-active {
+    background: #f9fafb;
+    color: var(--ca-muted);
+    cursor: not-allowed;
+  }
+}
+
+.consulting-analytics__comboItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.consulting-analytics__comboEmpty {
+  padding: 10px;
+  color: var(--ca-muted);
+  text-align: center;
+}
+
+.consulting-analytics__comboPager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px 2px;
+}
+
+.consulting-analytics__pageBtn {
+  border: 1px solid var(--ca-border);
+  background: #fafafa;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.consulting-analytics__page {
+  color: var(--ca-muted);
+  font-size: 12px;
+}
+
+.consulting-analytics__tag {
+  flex-shrink: 0;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+  line-height: 1.3;
+}
+
+@media (max-width: 1100px) {
+  .consulting-analytics__kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .consulting-analytics__chartsRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .consulting-analytics__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .consulting-analytics__kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .consulting-analytics__toolbar {
+    width: 100%;
+  }
+
+  .consulting-analytics__range {
+    width: 100%;
+  }
+
+  .consulting-analytics__range label {
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .consulting-analytics__input {
+    width: 100%;
+  }
+
+  .consulting-analytics__segBtn--custom {
+    width: 100%;
+  }
+}
+
+.common-modal-overlay:has(.consulting-analytics-periodModal) {
+  z-index: 10050;
+}
+
+.consulting-analytics-periodModal {
+  width: min(420px, calc(100vw - 32px));
+  max-width: 420px;
+  border-radius: 14px;
+}
+
+.consulting-analytics-periodModal__content {
+  padding: 4px 20px 20px;
+}
+
+.consulting-analytics-periodModal__hint {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ca-muted);
+}
+
+.consulting-analytics-periodModal__range {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.consulting-analytics-periodModal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.consulting-analytics-periodModal__apply {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--ca-primary);
+  color: #111827;
+
+  &:hover {
+    background: var(--ca-primary-dark);
+  }
+}

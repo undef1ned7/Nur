@@ -138,7 +138,7 @@ export default function ConsultingClients() {
                 return (
                   <tr
                     key={c.id}
-                    onClick={() => navigate(`/crm/clients/${c.id}`)}
+                    onClick={() => navigate(`/crm/consulting/client/${c.id}`)}
                   >
                     <td className="clients__ellipsis" title={c.full_name}>
                       {c.full_name || "—"}

@@ -2,7 +2,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./Analytics.scss";
 import { FaChevronLeft, FaChevronRight, FaSearch, FaTimes } from "react-icons/fa";
+import { Banknote, FileText, ShoppingBag, TrendingUp } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   getConsultingRows,
   getConsultingServices,
@@ -11,11 +27,11 @@ import {
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
 import api from "../../../../api";
+import Modal from "../../../common/Modal/Modal";
 
-/* ===================== API ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
+const BEM = "consulting-analytics";
 
-/* ===================== Helpers ===================== */
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
@@ -27,26 +43,40 @@ const money = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString("ru-RU") + " с" : "—";
 };
+
 const pct = (num, den) => {
   const a = Number(num) || 0;
   const b = Number(den) || 0;
   if (!b) return "0%";
   return `${Math.round((a * 100) / b)}%`;
 };
+
 const clean = (s) => String(s || "").trim();
 const uniq = (arr) => Array.from(new Set(arr));
 
-/* ===================== Generic Combo with typeahead & paging ===================== */
+const formatDateRu = (iso) => {
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}.${m}.${y}`;
+};
+
+const formatChartDate = (iso) => {
+  if (!iso) return "";
+  const parts = String(iso).split("-");
+  if (parts.length >= 3) return `${parts[2]}.${parts[1]}`;
+  return iso;
+};
+
 const PAGE = 8;
 
 const Combo = ({
   title = "Выбор",
-  items = [], // [{id, label}]
-  selected = [], // array of ids (string)
-  onPick, // (id) => void
+  items = [],
+  selected = [],
+  onPick,
   placeholder = "Поиск…",
   disabled = false,
-  bem = "an", // BEM namespace
 }) => {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -79,12 +109,12 @@ const Combo = ({
   const rows = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
 
   return (
-    <div className={`${bem}__combo`} ref={ref}>
-      <div className={`${bem}__comboControl${disabled ? " is-disabled" : ""}`}>
-        <FaSearch className={`${bem}__comboIcon`} />
+    <div className={`${BEM}__combo`} ref={ref}>
+      <div className={`${BEM}__comboControl${disabled ? " is-disabled" : ""}`}>
+        <FaSearch className={`${BEM}__comboIcon`} />
         <input
           ref={inputRef}
-          className={`${bem}__comboInput`}
+          className={`${BEM}__comboInput`}
           placeholder={placeholder}
           value={q}
           onFocus={() => {
@@ -100,7 +130,7 @@ const Combo = ({
         />
         <button
           type="button"
-          className={`${bem}__comboToggle`}
+          className={`${BEM}__comboToggle`}
           onClick={() => {
             if (disabled) return;
             setOpen((o) => !o);
@@ -114,19 +144,19 @@ const Combo = ({
       </div>
 
       {open && (
-        <div className={`${bem}__comboDrop`} role="listbox">
+        <div className={`${BEM}__comboDrop`} role="listbox">
           {rows.length === 0 ? (
-            <div className={`${bem}__comboEmpty`}>Ничего не найдено</div>
+            <div className={`${BEM}__comboEmpty`}>Ничего не найдено</div>
           ) : (
             <>
-              <ul className={`${bem}__comboList`}>
+              <ul className={`${BEM}__comboList`}>
                 {rows.map((it) => {
                   const isPicked = selected.includes(String(it.id));
                   return (
                     <li key={it.id}>
                       <button
                         type="button"
-                        className={`${bem}__comboItem${
+                        className={`${BEM}__comboItem${
                           isPicked ? " is-active" : ""
                         }`}
                         onClick={() => {
@@ -135,8 +165,12 @@ const Combo = ({
                         disabled={isPicked}
                         title={isPicked ? "Уже выбрано" : `Добавить «${it.label}»`}
                       >
-                        {it.label}
-                        {isPicked && <span className={`${bem}__tag`}>Добавлено</span>}
+                        <span className={`${BEM}__comboItemLabel`}>
+                          {it.label}
+                        </span>
+                        {isPicked && (
+                          <span className={`${BEM}__tag`}>Добавлено</span>
+                        )}
                       </button>
                     </li>
                   );
@@ -144,21 +178,21 @@ const Combo = ({
               </ul>
 
               {filtered.length > PAGE && (
-                <div className={`${bem}__comboPager`}>
+                <div className={`${BEM}__comboPager`}>
                   <button
                     type="button"
-                    className={`${bem}__pageBtn`}
+                    className={`${BEM}__pageBtn`}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={safePage === 1}
                   >
                     <FaChevronLeft /> Назад
                   </button>
-                  <span className={`${bem}__page`}>
+                  <span className={`${BEM}__page`}>
                     Стр. {safePage} из {total}
                   </span>
                   <button
                     type="button"
-                    className={`${bem}__pageBtn`}
+                    className={`${BEM}__pageBtn`}
                     onClick={() => setPage((p) => Math.min(total, p + 1))}
                     disabled={safePage === total}
                   >
@@ -174,49 +208,114 @@ const Combo = ({
   );
 };
 
-/* ===================== Sparkline (pure SVG) ===================== */
-const Sparkline = ({ data = [] /* numbers */, bem = "an" }) => {
-  const w = 180;
-  const h = 48;
-  const p = 4;
-  const min = Math.min(...data, 0);
-  const max = Math.max(...data, 1);
-  const span = Math.max(1, max - min);
-  const step = data.length > 1 ? (w - p * 2) / (data.length - 1) : 0;
+const FilterField = ({
+  label,
+  emptyHint,
+  items,
+  selectedIds,
+  onRemove,
+  comboProps,
+}) => (
+  <div className={`${BEM}__filterField`}>
+    <label className={`${BEM}__label`}>{label}</label>
+    <Combo {...comboProps} selected={selectedIds} />
+    <div className={`${BEM}__chipsSlot`}>
+      {selectedIds.length > 0 ? (
+        <div className={`${BEM}__chips`}>
+          {selectedIds.map((id) => {
+            const item = items.find((x) => String(x.id) === String(id));
+            return (
+              <span key={id} className={`${BEM}__chipSoft`}>
+                <span className={`${BEM}__chipText`} title={item?.label || id}>
+                  {item?.label || id}
+                </span>
+                <button
+                  type="button"
+                  className={`${BEM}__chipClose`}
+                  aria-label="Убрать"
+                  onClick={() => onRemove(id)}
+                >
+                  <FaTimes />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        <span className={`${BEM}__chipsEmpty`}>{emptyHint}</span>
+      )}
+    </div>
+  </div>
+);
 
-  const pts = data.map((v, i) => {
-    const x = p + i * step;
-    const y = h - p - ((v - min) / span) * (h - p * 2);
-    return `${x},${y}`;
-  });
+const KpiCard = ({ label, value, description, icon: Icon }) => (
+  <div className={`${BEM}__kpi`}>
+    {Icon && (
+      <div className={`${BEM}__kpiIcon`}>
+        <Icon size={20} strokeWidth={2.2} />
+      </div>
+    )}
+    <div className={`${BEM}__kpiBody`}>
+      <div className={`${BEM}__kpiLabel`}>{label}</div>
+      <div className={`${BEM}__kpiValue`}>{value}</div>
+      {description ? (
+        <div className={`${BEM}__kpiDesc`}>{description}</div>
+      ) : null}
+    </div>
+  </div>
+);
+
+const RankList = ({ items, emptyText = "Нет данных" }) => {
+  if (!items.length) {
+    return <div className={`${BEM}__empty`}>{emptyText}</div>;
+  }
+
+  const maxSum = items[0]?.sum || 1;
 
   return (
-    <svg className={`${bem}__spark`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      <polyline points={pts.join(" ")} fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
+    <ul className={`${BEM}__rankList`}>
+      {items.map((item) => (
+        <li key={item.name} className={`${BEM}__rankRow`}>
+          <div className={`${BEM}__rankMain`}>
+            <div className={`${BEM}__rankTitle`} title={item.name}>
+              {item.name}
+            </div>
+            <div className={`${BEM}__barWrap`} aria-hidden>
+              <div
+                className={`${BEM}__bar`}
+                style={{
+                  width: `${Math.min(100, (item.sum / maxSum) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+          <div className={`${BEM}__rankMeta`}>
+            <b>{money(item.sum)}</b>
+            <span> · {item.count} шт.</span>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 };
 
-/* ===================== Main ===================== */
 const ConsultingAnalytics = () => {
   const dispatch = useDispatch();
-
-  // consulting slices
   const { rows = [], services = [] } = useConsulting();
   const requests = useSelector((s) => s.consulting?.requests || []);
   const loadingConsulting = useSelector((s) => s.consulting?.loading) || false;
 
-  // employees for filters
   const [employees, setEmployees] = useState([]);
   const fetchEmployees = useCallback(async () => {
     try {
       const res = await api.get(EMPLOYEES_LIST_URL);
       const list = asArray(res.data).map((e) => ({
         id: String(e.id),
-        label: [e?.last_name || "", e?.first_name || ""]
-          .filter(Boolean)
-          .join(" ")
-          .trim() || e?.email || "—",
+        label:
+          [e?.last_name || "", e?.first_name || ""]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || e?.email || "—",
       }));
       setEmployees(list);
     } catch (e) {
@@ -224,7 +323,6 @@ const ConsultingAnalytics = () => {
     }
   }, []);
 
-  // load data
   useEffect(() => {
     dispatch(getConsultingRows());
     dispatch(getConsultingServices());
@@ -233,51 +331,78 @@ const ConsultingAnalytics = () => {
     fetchEmployees();
   }, [dispatch, fetchEmployees]);
 
-  // services options
   const serviceOpts = useMemo(
     () =>
       (services || []).map((s) => ({
         id: String(s.id),
         label: String(s.name ?? s.title ?? "—"),
       })),
-    [services]
+    [services],
   );
 
-  /* ===== Filters ===== */
   const today = new Date();
-  const [preset, setPreset] = useState("30"); // '7' | '30' | '90' | 'custom'
-  const [from, setFrom] = useState(ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)));
-  const [to, setTo] = useState(ymd(today));
-  const [empSel, setEmpSel] = useState([]); // ids[]
-  const [srvSel, setSrvSel] = useState([]); // ids[]
+  const todayIso = ymd(today);
+  const [preset, setPreset] = useState("30");
+  const [from, setFrom] = useState(
+    ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)),
+  );
+  const [to, setTo] = useState(todayIso);
+  const [empSel, setEmpSel] = useState([]);
+  const [srvSel, setSrvSel] = useState([]);
   const [err, setErr] = useState("");
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
+  const [draftErr, setDraftErr] = useState("");
 
   const applyPreset = (p) => {
+    setShowPeriodModal(false);
     setPreset(p);
     const n = Number(p);
     if (Number.isFinite(n)) {
       const start = new Date(today);
       start.setDate(today.getDate() - (n - 1));
       setFrom(ymd(start));
-      setTo(ymd(today));
+      setTo(todayIso);
     }
+  };
+
+  const openPeriodModal = () => {
+    setDraftFrom(from);
+    setDraftTo(to);
+    setDraftErr("");
+    setShowPeriodModal(true);
+  };
+
+  const applyCustomPeriod = () => {
+    if (new Date(draftFrom) > new Date(draftTo)) {
+      setDraftErr("Начальная дата позже конечной.");
+      return;
+    }
+    setFrom(draftFrom);
+    setTo(draftTo);
+    setPreset("custom");
+    setErr("");
+    setShowPeriodModal(false);
   };
 
   const onPickEmp = (id) =>
     setEmpSel((prev) => uniq([...prev, String(id)]));
   const onPickSrv = (id) =>
     setSrvSel((prev) => uniq([...prev, String(id)]));
+  const removeEmp = (id) =>
+    setEmpSel((prev) => prev.filter((x) => x !== String(id)));
+  const removeSrv = (id) =>
+    setSrvSel((prev) => prev.filter((x) => x !== String(id)));
 
-  const removeEmp = (id) => setEmpSel((prev) => prev.filter((x) => x !== String(id)));
-  const removeSrv = (id) => setSrvSel((prev) => prev.filter((x) => x !== String(id)));
-
-  // validation for dates
   useEffect(() => {
-    if (new Date(from) > new Date(to)) setErr("Начальная дата позже конечной.");
-    else setErr("");
+    if (new Date(from) > new Date(to)) {
+      setErr("Начальная дата позже конечной.");
+    } else {
+      setErr("");
+    }
   }, [from, to]);
 
-  /* ===== Filtering ===== */
   const empNameById = useMemo(() => {
     const m = new Map();
     employees.forEach((e) => m.set(String(e.id), e.label));
@@ -294,44 +419,44 @@ const ConsultingAnalytics = () => {
     if (!iso) return false;
     const d = new Date(iso);
     return d >= new Date(from) && d <= new Date(to);
-    // inclusive
   };
 
-  // sales filter
   const sales = useMemo(() => {
     let base = (rows || []).filter((r) => inRange(r.created_at || r.date));
     if (empSel.length) {
-      const empNames = empSel.map((id) => empNameById.get(String(id))).filter(Boolean);
-      base = base.filter((r) => (r.user_display ? empNames.includes(String(r.user_display)) : true));
+      const empNames = empSel
+        .map((id) => empNameById.get(String(id)))
+        .filter(Boolean);
+      base = base.filter((r) =>
+        r.user_display ? empNames.includes(String(r.user_display)) : true,
+      );
     }
     if (srvSel.length) {
-      const srvNames = srvSel.map((id) => srvNameById.get(String(id))).filter(Boolean);
-      base = base.filter((r) => (r.service_display ? srvNames.includes(String(r.service_display)) : true));
+      const srvNames = srvSel
+        .map((id) => srvNameById.get(String(id)))
+        .filter(Boolean);
+      base = base.filter((r) =>
+        r.service_display ? srvNames.includes(String(r.service_display)) : true,
+      );
     }
     return base;
   }, [rows, from, to, empSel, srvSel, empNameById, srvNameById]);
 
-  // requests filter
-  const reqs = useMemo(() => {
-    let base = (requests || []).filter((r) => inRange(r.created_at));
-    if (empSel.length) {
-      // часто заявке не мапят менеджера — пропускаем фильтр по сотруднику, если нет поля
-      base = base;
-    }
-    return base;
-  }, [requests, from, to, empSel]);
+  const reqs = useMemo(
+    () => (requests || []).filter((r) => inRange(r.created_at)),
+    [requests, from, to],
+  );
 
-  /* ===== Metrics ===== */
   const revenue = useMemo(
     () => sales.reduce((sum, r) => sum + (Number(r.service_price) || 0), 0),
-    [sales]
+    [sales],
   );
   const salesCount = sales.length;
   const reqCount = reqs.length;
   const avgCheck = salesCount ? revenue / salesCount : 0;
 
   const byService = useMemo(() => {
-    const m = new Map(); // name => {count, sum}
+    const m = new Map();
     sales.forEach((r) => {
       const key = String(r.service_display || "—");
       const sum = Number(r.service_price) || 0;
@@ -344,7 +469,7 @@ const ConsultingAnalytics = () => {
   }, [sales]);
 
   const byEmployee = useMemo(() => {
-    const m = new Map(); // name => {count, sum}
+    const m = new Map();
     sales.forEach((r) => {
       const key = String(r.user_display || "—");
       const sum = Number(r.service_price) || 0;
@@ -356,7 +481,6 @@ const ConsultingAnalytics = () => {
       .slice(0, 8);
   }, [sales]);
 
-  // status donut
   const statusCounts = useMemo(() => {
     const m = { new: 0, in_work: 0, done: 0, canceled: 0, other: 0 };
     reqs.forEach((r) => {
@@ -364,265 +488,412 @@ const ConsultingAnalytics = () => {
       if (k in m) m[k] += 1;
       else m.other += 1;
     });
-    const total = Object.values(m).reduce((a, b) => a + b, 0) || 1;
-    // build conic-gradient stops
-    const segs = [];
-    let acc = 0;
-    const add = (key, varName) => {
-      const part = (m[key] * 100) / total;
-      segs.push(`var(${varName}) ${acc}% ${acc + part}%`);
-      acc += part;
-    };
-    add("new", "--blue");
-    add("in_work", "--primary");
-    add("done", "--green");
-    add("canceled", "--danger");
-    add("other", "--muted");
-    return { m, seg: segs.join(", ") };
+    return m;
   }, [reqs]);
 
-  // sparkline (daily sales)
-  const sparkData = useMemo(() => {
-    // build day buckets from 'from' to 'to'
+  const statusPieData = useMemo(
+    () =>
+      [
+        { name: "Новые", value: statusCounts.new, color: "#3b82f6" },
+        { name: "В работе", value: statusCounts.in_work, color: "#f7d617" },
+        { name: "Завершены", value: statusCounts.done, color: "#10b981" },
+        { name: "Отменены", value: statusCounts.canceled, color: "#ef4444" },
+        { name: "Прочие", value: statusCounts.other, color: "#9ca3af" },
+      ].filter((item) => item.value > 0),
+    [statusCounts],
+  );
+
+  const dailyChartData = useMemo(() => {
     const start = new Date(from);
     const end = new Date(to);
     const days = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       days.push(ymd(d));
     }
-    const counts = days.map((iso) =>
-      sales.reduce((n, r) => (ymd(new Date(r.created_at || r.date)) === iso ? n + 1 : n), 0)
-    );
-    return counts;
-  }, [sales, from, to]);
+    return days.map((iso) => {
+      const daySales = sales.filter(
+        (r) => ymd(new Date(r.created_at || r.date)) === iso,
+      );
+      const dayReqs = reqs.filter(
+        (r) => ymd(new Date(r.created_at)) === iso,
+      );
+      return {
+        date: iso,
+        label: formatChartDate(iso),
+        revenue: daySales.reduce(
+          (sum, r) => sum + (Number(r.service_price) || 0),
+          0,
+        ),
+        sales: daySales.length,
+        requests: dayReqs.length,
+      };
+    });
+  }, [sales, reqs, from, to]);
+
+  const serviceBarData = useMemo(
+    () =>
+      byService.map((item) => ({
+        name:
+          item.name.length > 22
+            ? `${item.name.slice(0, 22)}…`
+            : item.name,
+        fullName: item.name,
+        sum: item.sum,
+        count: item.count,
+      })),
+    [byService],
+  );
+
+  const employeeBarData = useMemo(
+    () =>
+      byEmployee.map((item) => ({
+        name:
+          item.name.length > 22
+            ? `${item.name.slice(0, 22)}…`
+            : item.name,
+        fullName: item.name,
+        sum: item.sum,
+        count: item.count,
+      })),
+    [byEmployee],
+  );
 
   const resetFilters = () => {
-    setPreset("30");
+    setShowPeriodModal(false);
     applyPreset("30");
     setEmpSel([]);
     setSrvSel([]);
   };
 
-  /* ===================== Render ===================== */
   return (
-    <section className="an">
-      <header className="an__header">
+    <section className={BEM}>
+      <header className={`${BEM}__header`}>
         <div>
-          <h2 className="an__title">Аналитика</h2>
-          <p className="an__subtitle">
+          <h2 className={`${BEM}__title`}>Аналитика</h2>
+          <p className={`${BEM}__subtitle`}>
             Срез по продажам, заявкам и сотрудникам
             {loadingConsulting ? " · загрузка…" : ""}
           </p>
         </div>
 
-        <div className="an__preset">
-          {["7", "30", "90"].map((p) => (
+        <div className={`${BEM}__toolbar`}>
+          <div className={`${BEM}__seg`} role="tablist" aria-label="Период">
+            {[
+              { value: "7", label: "7 дней" },
+              { value: "30", label: "30 дней" },
+              { value: "90", label: "90 дней" },
+            ].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={preset === item.value}
+                className={`${BEM}__segBtn ${
+                  preset === item.value ? "is-active" : ""
+                }`}
+                onClick={() => applyPreset(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
             <button
-              key={p}
-              className={`an__chip ${preset === p ? "is-active" : ""}`}
-              onClick={() => applyPreset(p)}
               type="button"
-              aria-pressed={preset === p}
+              role="tab"
+              aria-selected={preset === "custom"}
+              className={`${BEM}__segBtn ${BEM}__segBtn--custom ${
+                preset === "custom" ? "is-active" : ""
+              }`}
+              onClick={openPeriodModal}
             >
-              {p} дней
+              <span className={`${BEM}__segBtnTitle`}>Свой период</span>
+              {preset === "custom" && (
+                <span className={`${BEM}__segBtnRange`}>
+                  {formatDateRu(from)} — {formatDateRu(to)}
+                </span>
+              )}
             </button>
-          ))}
+          </div>
+
           <button
-            className={`an__chip ${preset === "custom" ? "is-active" : ""}`}
-            onClick={() => setPreset("custom")}
             type="button"
-            aria-pressed={preset === "custom"}
+            className={`${BEM}__btnGhost`}
+            onClick={resetFilters}
           >
-            Свой период
-          </button>
-          <button className="an__btn an__btn--ghost" onClick={resetFilters} type="button">
             Сброс
           </button>
         </div>
       </header>
 
-      <div className="an__filters">
-        <div className="an__row">
-          <div className="an__field">
-            <label className="an__label">С даты</label>
+      {!!err && <div className={`${BEM}__alert`}>{err}</div>}
+
+      <div className={`${BEM}__filters`}>
+        <FilterField
+          label="Сотрудники"
+          emptyHint="Все сотрудники"
+          items={employees}
+          selectedIds={empSel}
+          onRemove={removeEmp}
+          comboProps={{
+            title: "Сотрудники",
+            items: employees,
+            onPick: onPickEmp,
+            placeholder: "Найти сотрудника…",
+          }}
+        />
+        <FilterField
+          label="Услуги"
+          emptyHint="Все услуги"
+          items={serviceOpts}
+          selectedIds={srvSel}
+          onRemove={removeSrv}
+          comboProps={{
+            title: "Услуги",
+            items: serviceOpts,
+            onPick: onPickSrv,
+            placeholder: "Найти услугу…",
+          }}
+        />
+      </div>
+
+      <div className={`${BEM}__kpis`}>
+        <KpiCard
+          label="Выручка"
+          value={money(revenue)}
+          description="За выбранный период"
+          icon={Banknote}
+        />
+        <KpiCard
+          label="Продаж"
+          value={salesCount}
+          description={`Средний чек: ${money(avgCheck)}`}
+          icon={ShoppingBag}
+        />
+        <KpiCard
+          label="Заявок"
+          value={reqCount}
+          description={`Конверсия: ${pct(salesCount, reqCount)}`}
+          icon={FileText}
+        />
+        <KpiCard
+          label="Средний чек"
+          value={money(avgCheck)}
+          description={`${salesCount} продаж за период`}
+          icon={TrendingUp}
+        />
+      </div>
+
+      <div className={`${BEM}__chartsRow`}>
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>Динамика выручки</div>
+          <div className={`${BEM}__chartWrap`}>
+            {dailyChartData.some((d) => d.revenue > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={dailyChartData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="consultingRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f7d617" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="#f7d617" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => money(v)} width={72} />
+                  <Tooltip
+                    formatter={(value) => [money(value), "Выручка"]}
+                    labelFormatter={(_, payload) =>
+                      payload?.[0]?.payload?.date
+                        ? `Дата: ${formatChartDate(payload[0].payload.date)}`
+                        : ""
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#ca8a04"
+                    strokeWidth={2}
+                    fill="url(#consultingRevenueFill)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={`${BEM}__chartWrap--empty`}>Нет данных за период</div>
+            )}
+          </div>
+        </div>
+
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>Динамика продаж и заявок</div>
+          <div className={`${BEM}__chartWrap`}>
+            {dailyChartData.some((d) => d.sales > 0 || d.requests > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={dailyChartData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={36} />
+                  <Tooltip
+                    labelFormatter={(_, payload) =>
+                      payload?.[0]?.payload?.date
+                        ? `Дата: ${formatChartDate(payload[0].payload.date)}`
+                        : ""
+                    }
+                  />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="sales" name="Продажи" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="requests" name="Заявки" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={`${BEM}__chartWrap--empty`}>Нет данных за период</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={`${BEM}__chartsRow`}>
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>Статусы заявок</div>
+          <div className={`${BEM}__chartWrap`}>
+            {statusPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusPieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={58}
+                    outerRadius={92}
+                    paddingAngle={2}
+                  >
+                    {statusPieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [`${value} шт.`, name]} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={`${BEM}__chartWrap--empty`}>Нет заявок за период</div>
+            )}
+          </div>
+        </div>
+
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>ТОП услуг по выручке</div>
+          <div className={`${BEM}__chartWrap`}>
+            {serviceBarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={serviceBarData}
+                  layout="vertical"
+                  margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => money(v)} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={110}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip
+                    formatter={(value) => [money(value), "Выручка"]}
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ""}
+                  />
+                  <Bar dataKey="sum" name="Выручка" fill="#f7d617" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={`${BEM}__chartWrap--empty`}>Нет данных</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={`${BEM}__chartsRow`}>
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>ТОП сотрудников по выручке</div>
+          <RankList items={byEmployee} />
+        </div>
+
+        <div className={`${BEM}__card`}>
+          <div className={`${BEM}__cardTitle`}>ТОП услуг (список)</div>
+          <RankList items={byService} />
+        </div>
+      </div>
+
+      <Modal
+        open={showPeriodModal}
+        onClose={() => setShowPeriodModal(false)}
+        title="Свой период"
+        className="consulting-analytics-periodModal"
+        contentClassName="consulting-analytics-periodModal__content"
+        wrapperId="consulting-analytics-period-modal"
+      >
+        <p className="consulting-analytics-periodModal__hint">
+          Выберите начальную и конечную дату отчёта.
+        </p>
+        <div className="consulting-analytics__range consulting-analytics-periodModal__range">
+          <label>
+            С
             <input
               type="date"
-              className={`an__input ${err ? "is-invalid" : ""}`}
-              value={from}
+              className={`consulting-analytics__input ${
+                draftErr ? "is-invalid" : ""
+              }`}
+              value={draftFrom}
+              max={draftTo || todayIso}
               onChange={(e) => {
-                setPreset("custom");
-                setFrom(e.target.value);
+                setDraftFrom(e.target.value);
+                setDraftErr("");
               }}
             />
-          </div>
-          <div className="an__field">
-            <label className="an__label">По дату</label>
+          </label>
+          <label>
+            По
             <input
               type="date"
-              className={`an__input ${err ? "is-invalid" : ""}`}
-              value={to}
+              className={`consulting-analytics__input ${
+                draftErr ? "is-invalid" : ""
+              }`}
+              value={draftTo}
+              min={draftFrom}
+              max={todayIso}
               onChange={(e) => {
-                setPreset("custom");
-                setTo(e.target.value);
+                setDraftTo(e.target.value);
+                setDraftErr("");
               }}
             />
-          </div>
-
-          <div className="an__field an__field--grow">
-            <label className="an__label">Сотрудники</label>
-            <Combo
-              title="Сотрудники"
-              items={employees}
-              selected={empSel}
-              onPick={onPickEmp}
-              placeholder="Найти сотрудника…"
-              bem="an"
-            />
-            {!!empSel.length && (
-              <div className="an__chips">
-                {empSel.map((id) => (
-                  <span key={id} className="an__chip an__chip--soft">
-                    {employees.find((e) => String(e.id) === String(id))?.label || id}
-                    <button
-                      type="button"
-                      className="an__chipClose"
-                      aria-label="Убрать"
-                      onClick={() => removeEmp(id)}
-                    >
-                      <FaTimes />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="an__field an__field--grow">
-            <label className="an__label">Услуги</label>
-            <Combo
-              title="Услуги"
-              items={serviceOpts}
-              selected={srvSel}
-              onPick={onPickSrv}
-              placeholder="Найти услугу…"
-              bem="an"
-            />
-            {!!srvSel.length && (
-              <div className="an__chips">
-                {srvSel.map((id) => (
-                  <span key={id} className="an__chip an__chip--soft">
-                    {serviceOpts.find((s) => String(s.id) === String(id))?.label || id}
-                    <button
-                      type="button"
-                      className="an__chipClose"
-                      aria-label="Убрать"
-                      onClick={() => removeSrv(id)}
-                    >
-                      <FaTimes />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          </label>
         </div>
-
-        {!!err && <div className="an__alert">{err}</div>}
-      </div>
-
-      {/* KPIs */}
-      <div className="an__kpi">
-        <div className="an__card">
-          <div className="an__cardTitle">Выручка</div>
-          <div className="an__cardValue">{money(revenue)}</div>
-          <Sparkline data={sparkData} bem="an" />
+        {draftErr && (
+          <p className="consulting-analytics__alert">{draftErr}</p>
+        )}
+        <div className="consulting-analytics-periodModal__actions">
+          <button
+            type="button"
+            className="consulting-analytics__btnGhost"
+            onClick={() => setShowPeriodModal(false)}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="consulting-analytics-periodModal__apply"
+            onClick={applyCustomPeriod}
+          >
+            Применить
+          </button>
         </div>
-        <div className="an__card">
-          <div className="an__cardTitle">Продаж</div>
-          <div className="an__cardValue">{salesCount}</div>
-          <div className="an__muted">средний чек: {money(avgCheck)}</div>
-        </div>
-        <div className="an__card">
-          <div className="an__cardTitle">Заявок</div>
-          <div className="an__cardValue">{reqCount}</div>
-          <div className="an__muted">конверсия: {pct(salesCount, reqCount)}</div>
-        </div>
-        <div className="an__card an__card--donut">
-          <div className="an__cardTitle">Статусы заявок</div>
-          <div
-            className="an__donut"
-            style={{ backgroundImage: `conic-gradient(${statusCounts.seg})` }}
-            aria-label="Диаграмма статусов"
-          />
-          <ul className="an__legend">
-            <li><i className="c--blue" /> Новые — {statusCounts.m.new}</li>
-            <li><i className="c--primary" /> В работе — {statusCounts.m.in_work}</li>
-            <li><i className="c--green" /> Завершены — {statusCounts.m.done}</li>
-            <li><i className="c--danger" /> Отменены — {statusCounts.m.canceled}</li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Scrollable detail */}
-      <div className="an__body">
-        <section className="an__section">
-          <h3 className="an__sectionTitle">ТОП услуг (по выручке)</h3>
-          <ul className="an__list">
-            {byService.length ? (
-              byService.map((s) => (
-                <li key={s.name} className="an__row">
-                  <div className="an__rowMain">
-                    <div className="an__rowTitle" title={s.name}>{s.name}</div>
-                    <div className="an__barWrap" aria-hidden>
-                      <div
-                        className="an__bar"
-                        style={{
-                          width: `${Math.min(100, (s.sum / (byService[0]?.sum || 1)) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="an__rowMeta">
-                    <b>{money(s.sum)}</b>
-                    <span className="an__muted"> · {s.count} шт.</span>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="an__empty">Нет данных</li>
-            )}
-          </ul>
-        </section>
-
-        <section className="an__section">
-          <h3 className="an__sectionTitle">ТОП сотрудников (по выручке)</h3>
-          <ul className="an__list">
-            {byEmployee.length ? (
-              byEmployee.map((e) => (
-                <li key={e.name} className="an__row">
-                  <div className="an__rowMain">
-                    <div className="an__rowTitle" title={e.name}>{e.name}</div>
-                    <div className="an__barWrap" aria-hidden>
-                      <div
-                        className="an__bar"
-                        style={{
-                          width: `${Math.min(100, (e.sum / (byEmployee[0]?.sum || 1)) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="an__rowMeta">
-                    <b>{money(e.sum)}</b>
-                    <span className="an__muted"> · {e.count} шт.</span>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="an__empty">Нет данных</li>
-            )}
-          </ul>
-        </section>
-      </div>
+      </Modal>
     </section>
   );
 };

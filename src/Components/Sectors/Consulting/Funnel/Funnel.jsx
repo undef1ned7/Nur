@@ -1,12 +1,15 @@
 // src/Components/Sectors/Consulting/Funnel/Funnel.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./Funnel.scss";
 import { useDispatch } from "react-redux";
 import {
   getFunnels,
   createFunnel,
-  getFunnelBoard,
+  updateFunnel,
+  deleteFunnel,
   createStage,
+  updateStage,
+  deleteStage,
   createLead,
   updateLead,
   deleteLead,
@@ -23,12 +26,59 @@ import {
   deleteLeadTask,
   getLossReasons,
   getFunnelAnalytics,
+  claimLead,
+  releaseLead,
+  assignLead,
+  archiveLead,
+  setLeadParticipants,
+  getFunnelOrder,
+  saveFunnelOrder,
 } from "../../../../store/creators/funnelThunk";
+import { getConsultingServices } from "../../../../store/creators/consultingThunk";
 import {
   useFunnel,
-  moveLeadLocally,
   clearLeadDetail,
 } from "../../../../store/slices/funnelSlice";
+import { useFunnelBoardWebSocket } from "../../../../hooks/useFunnelBoardWebSocket";
+import api from "../../../../api";
+import { useUser } from "../../../../store/slices/userSlice";
+import {
+  canManageLeadsInFunnel,
+  canViewConsultingFunnel,
+  filterFunnelsForUser,
+  isConsultingFunnelManager,
+} from "../../../../utils/consultingFunnelAccess";
+import {
+  getFunnelDisplayName,
+  isProtectedFunnel,
+  isSystemStage,
+  isCompletedStage,
+} from "../../../../utils/consultingFunnelDefaults";
+import {
+  canDragLead,
+  findStageInBoard,
+  isLeadLockedForEmployee,
+  isLeadOnCompletedStage,
+} from "../../../../utils/consultingFunnelLeadUtils";
+import { calcConsultingSaleTotal, formatTariffSubscription } from "../../../../utils/consultingSalePricing";
+import LeadCreateClientModal from "./LeadCreateClientModal";
+import LeadPaymentModal from "./LeadPaymentModal";
+import { Link } from "react-router-dom";
+import FunnelBoardRow from "./FunnelBoardRow";
+import LeadTransferModal from "./LeadTransferModal";
+import FunnelEmployeesPicker from "./FunnelEmployeesPicker";
+import FunnelArchiveModal from "./FunnelArchiveModal";
+import {
+  moveLeadOnBoard,
+  removeLeadFromBoard as removeLeadFromBoardMap,
+  upsertLeadOnBoard as upsertLeadOnBoardMap,
+} from "../../../../utils/funnelBoardUtils";
+import {
+  fetchAccessibleFunnelBoards,
+  fetchFunnelBoard,
+} from "../../../../utils/funnelBoardFetch";
+import { useConfirm } from "../../../../hooks/useDialog";
+import { usePointerReorder } from "../../../../hooks/usePointerReorder";
 
 /**
  * Расширенные возможности «Воронка 2.0» (скоринг, лента, задачи, win/lose,
@@ -143,54 +193,310 @@ const errToText = (err, fallback = "Что-то пошло не так.") => {
 /* ===================== главный экран ===================== */
 export default function ConsultingFunnel() {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const { profile } = useUser();
+  const isManager = isConsultingFunnelManager(profile);
+  const canViewFunnel = canViewConsultingFunnel(profile);
+
   const {
     funnels = [],
-    board,
     loading,
-    boardLoading,
     error,
     allowedTransitions,
   } = useFunnel();
 
-  const [selectedId, setSelectedId] = useState(null);
-  const [dragLeadId, setDragLeadId] = useState(null);
-  const [dragOverStage, setDragOverStage] = useState(null);
+  const visibleFunnels = useMemo(
+    () => filterFunnelsForUser(funnels, profile),
+    [funnels, profile]
+  );
 
-  // фильтры доски
+  const visibleFunnelIdsKey = useMemo(
+    () =>
+      visibleFunnels
+        .map((f) => String(f.id))
+        .sort()
+        .join(","),
+    [visibleFunnels],
+  );
+
+  const [boardsMap, setBoardsMap] = useState({});
+  const [boardsLoading, setBoardsLoading] = useState(false);
+  const lastLoadedBoardsKeyRef = useRef("");
+  const boardsLoadGenRef = useRef(0);
+  const [dragState, setDragState] = useState(null);
+
+  // фильтры доски (общие для всех воронок)
   const [query, setQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [riskOnly, setRiskOnly] = useState(false);
   const [gradeFilter, setGradeFilter] = useState("");
 
   const [funnelFormOpen, setFunnelFormOpen] = useState(false);
-  const [stageFormOpen, setStageFormOpen] = useState(false);
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
-  const [leadModal, setLeadModal] = useState(null); // { create, stageId } | { leadId }
+  const [funnelEditTarget, setFunnelEditTarget] = useState(null);
+  const [stageFormFunnelId, setStageFormFunnelId] = useState(null);
+  const [stageEditTarget, setStageEditTarget] = useState(null);
+  const [analyticsFunnelId, setAnalyticsFunnelId] = useState(null);
+  const [leadModal, setLeadModal] = useState(null);
+  const [transferModal, setTransferModal] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [claimBusyId, setClaimBusyId] = useState(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
-  const funnelId = selectedId || funnels[0]?.id || null;
+  // Порядок воронок per-user. Источник истины — сервер (user-preferences),
+  // localStorage используется как кэш и fallback при отсутствии эндпоинта (404).
+  const [funnelOrderIds, setFunnelOrderIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("consulting_funnel_order_v1") || "[]"); }
+    catch { return []; }
+  });
+
+  // При загрузке тянем серверный порядок; пустой ответ/404 — оставляем localStorage.
+  useEffect(() => {
+    dispatch(getFunnelOrder())
+      .unwrap()
+      .then((order) => {
+        if (Array.isArray(order) && order.length) {
+          setFunnelOrderIds(order.map(String));
+          try {
+            localStorage.setItem(
+              "consulting_funnel_order_v1",
+              JSON.stringify(order.map(String)),
+            );
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [dispatch]);
+
+  const loadBoards = useCallback(async (ids) => {
+    if (!ids.length) return {};
+    return fetchAccessibleFunnelBoards({ funnelIds: ids });
+  }, []);
+
+  const refreshBoard = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      const data = await fetchFunnelBoard(id);
+      setBoardsMap((prev) => ({ ...prev, [String(id)]: data }));
+    } catch {
+      /* ignore single board errors */
+    }
+  }, []);
+
+  const refreshAllBoards = useCallback(async () => {
+    const ids = visibleFunnelIdsKey ? visibleFunnelIdsKey.split(",") : [];
+    if (!ids.length) {
+      setBoardsMap({});
+      return;
+    }
+    setBoardsLoading(true);
+    try {
+      const map = await loadBoards(ids);
+      setBoardsMap(map);
+    } catch {
+      setNotice("Не удалось загрузить доски воронок.");
+    } finally {
+      setBoardsLoading(false);
+    }
+  }, [visibleFunnelIdsKey, loadBoards]);
+
+  const onDeleteStage = (funnelId, stage) => {
+    if (!stage?.id || isSystemStage(stage)) return;
+    confirm(
+      `Удалить стадию «${stage.name || "без названия"}»? Лиды останутся без этой стадии.`,
+      async (result) => {
+        if (!result) return;
+        try {
+          await dispatch(deleteStage(stage.id)).unwrap();
+          setNotice("Стадия удалена.");
+          refreshBoard(funnelId);
+        } catch (e) {
+          setNotice(errToText(e, "Не удалось удалить стадию."));
+        }
+      },
+    );
+  };
+
+  const onDeleteFunnel = (funnel) => {
+    if (!funnel || isProtectedFunnel(funnel)) return;
+    confirm(
+      `Удалить воронку «${getFunnelDisplayName(funnel)}»? Это действие необратимо.`,
+      async (result) => {
+        if (!result) return;
+        try {
+          await dispatch(deleteFunnel(funnel.id)).unwrap();
+          setBoardsMap((prev) => {
+            const next = { ...prev };
+            delete next[funnel.id];
+            return next;
+          });
+          setNotice("Воронка удалена.");
+        } catch (e) {
+          setNotice(errToText(e, "Не удалось удалить воронку."));
+        }
+      },
+    );
+  };
+
+  const { isConnected, userId: wsUserId, isManager: wsIsManager } =
+    useFunnelBoardWebSocket({
+      funnelIdsKey: visibleFunnelIdsKey,
+      enabled: !!visibleFunnelIdsKey,
+      onUpsert: (lead) => {
+        if (!lead?.funnel) return;
+        setBoardsMap((prev) => ({
+          ...prev,
+          [lead.funnel]: upsertLeadOnBoardMap(prev[lead.funnel], lead),
+        }));
+      },
+      onRemove: (data) => {
+        const fid = data?.funnel || data?.funnel_id;
+        const lid = data?.id;
+        if (!lid) return;
+        if (fid) {
+          setBoardsMap((prev) => ({
+            ...prev,
+            [fid]: removeLeadFromBoardMap(prev[fid], lid),
+          }));
+          return;
+        }
+        setBoardsMap((prev) => {
+          const next = { ...prev };
+          for (const key of Object.keys(next)) {
+            next[key] = removeLeadFromBoardMap(next[key], lid);
+          }
+          return next;
+        });
+      },
+      onAssigned: (lead) =>
+        setNotice(`Вам назначен лид: ${lead?.title || "без названия"}`),
+      onReconnect: refreshAllBoards,
+    });
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     dispatch(getFunnels());
     if (FUNNEL_V2) dispatch(getLossReasons());
   }, [dispatch]);
 
+  // Доски — один раз на набор видимых воронок
   useEffect(() => {
-    if (funnelId) dispatch(getFunnelBoard(funnelId));
-  }, [dispatch, funnelId]);
+    if (loading || !profile) return;
 
-  const rawColumns = useMemo(() => board?.columns || [], [board]);
-  const rawUnassigned = useMemo(() => board?.unassigned || [], [board]);
-  const totalLeads = board?.funnel?.leads_count ?? 0;
+    if (!visibleFunnelIdsKey) {
+      lastLoadedBoardsKeyRef.current = "";
+      setBoardsMap({});
+      setBoardsLoading(false);
+      return;
+    }
 
-  // список владельцев для фильтра — собираем из карточек доски
+    if (lastLoadedBoardsKeyRef.current === visibleFunnelIdsKey) {
+      return;
+    }
+
+    lastLoadedBoardsKeyRef.current = visibleFunnelIdsKey;
+
+    const ids = visibleFunnelIdsKey.split(",");
+    const gen = ++boardsLoadGenRef.current;
+    setBoardsLoading(true);
+
+    fetchAccessibleFunnelBoards({ funnelIds: ids })
+      .then((map) => {
+        if (gen === boardsLoadGenRef.current) {
+          setBoardsMap(map);
+        }
+      })
+      .catch(() => {
+        if (gen === boardsLoadGenRef.current) {
+          setNotice("Не удалось загрузить доски воронок.");
+        }
+      })
+      .finally(() => {
+        if (gen === boardsLoadGenRef.current) {
+          setBoardsLoading(false);
+        }
+      });
+
+    return () => {
+      // Strict Mode: сброс, чтобы remount снова загрузил доски
+      lastLoadedBoardsKeyRef.current = "";
+      boardsLoadGenRef.current += 1;
+    };
+  }, [loading, profile, visibleFunnelIdsKey]);
+
+  // sync funnel order when visible funnels change (add new, remove deleted)
+  useEffect(() => {
+    setFunnelOrderIds((prev) => {
+      const currentIds = visibleFunnels.map((f) => String(f.id));
+      const kept = prev.filter((id) => currentIds.includes(id));
+      const added = currentIds.filter((id) => !kept.includes(id));
+      const next = [...kept, ...added];
+      try { localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [visibleFunnels]);
+
+  const sortedFunnels = useMemo(() => {
+    if (!funnelOrderIds.length) return visibleFunnels;
+    return funnelOrderIds
+      .map((id) => visibleFunnels.find((f) => String(f.id) === id))
+      .filter(Boolean);
+  }, [funnelOrderIds, visibleFunnels]);
+
+  // Переупорядочивание воронок — на pointer-событиях (см. usePointerReorder).
+  // Порядок засеивается из текущего видимого порядка (sortedFunnels), иначе при
+  // пустом localStorage indexOf вернул бы -1 и перестановка не применилась бы.
+  const handleFunnelReorder = useCallback(
+    (dragId, targetId) => {
+      if (!dragId || dragId === targetId) return;
+      setFunnelOrderIds(() => {
+        const ids = sortedFunnels.map((f) => String(f.id));
+        const from = ids.indexOf(String(dragId));
+        const to = ids.indexOf(String(targetId));
+        if (from === -1 || to === -1) return ids;
+        ids.splice(from, 1);
+        ids.splice(to, 0, String(dragId));
+        try {
+          localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(ids));
+        } catch { /* localStorage недоступен — порядок не сохранится, не критично */ }
+        // Сохраняем на сервер (per-user). Ошибку/404 игнорируем — localStorage кэш.
+        dispatch(saveFunnelOrder(ids));
+        return ids;
+      });
+    },
+    [sortedFunnels, dispatch]
+  );
+
+  const {
+    dragId: funnelDragId,
+    overId: funnelDragOverId,
+    onHandlePointerDown: onFunnelHandlePointerDown,
+  } = usePointerReorder({
+    itemSelector: ".funnel__row",
+    idAttr: "data-funnel-id",
+    onReorder: handleFunnelReorder,
+  });
+
+  // владельцы для фильтра — из всех досок
   const owners = useMemo(() => {
     const map = new Map();
-    const all = [...rawColumns.flatMap((c) => c.leads || []), ...rawUnassigned];
-    for (const l of all)
-      if (l.owner && !map.has(l.owner))
-        map.set(l.owner, l.owner_display || "Без имени");
+    Object.values(boardsMap).forEach((board) => {
+      const all = [
+        ...(board?.columns || []).flatMap((c) => c.leads || []),
+        ...(board?.unassigned || []),
+      ];
+      for (const l of all) {
+        if (l.owner && !map.has(l.owner)) {
+          map.set(l.owner, l.owner_display || "Без имени");
+        }
+      }
+    });
     return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [rawColumns, rawUnassigned]);
+  }, [boardsMap]);
 
   // предикат фильтрации одной карточки
   const matchLead = useMemo(() => {
@@ -212,27 +518,6 @@ export default function ConsultingFunnel() {
 
   const hasFilters = !!(query.trim() || ownerFilter || riskOnly || gradeFilter);
 
-  // применяем фильтр (колонки сохраняем все — чтобы можно было перетащить)
-  const columns = useMemo(
-    () =>
-      rawColumns.map((c) => ({
-        ...c,
-        leads: hasFilters ? (c.leads || []).filter(matchLead) : c.leads || [],
-      })),
-    [rawColumns, hasFilters, matchLead]
-  );
-  const unassigned = useMemo(
-    () => (hasFilters ? rawUnassigned.filter(matchLead) : rawUnassigned),
-    [rawUnassigned, hasFilters, matchLead]
-  );
-
-  const shownLeads = useMemo(
-    () =>
-      columns.reduce((n, c) => n + (c.leads?.length || 0), 0) +
-      unassigned.length,
-    [columns, unassigned]
-  );
-
   const resetFilters = () => {
     setQuery("");
     setOwnerFilter("");
@@ -240,87 +525,84 @@ export default function ConsultingFunnel() {
     setGradeFilter("");
   };
 
-  // множество разрешённых стадий для текущего перетаскивания
-  const allowedStageIds = useMemo(() => {
-    if (!dragLeadId || !allowedTransitions) return null;
-    return new Set((allowedTransitions.allowed || []).map((s) => s.id));
-  }, [dragLeadId, allowedTransitions]);
+  const onDropToStage = async (funnelId, leadId, stageId) => {
+    const board = boardsMap[funnelId];
+    const funnel = visibleFunnels.find((f) => f.id === funnelId);
+    if (!board || !funnel || !canManageLeadsInFunnel(profile, funnel)) return;
 
-  /* ---------- авто-скролл доски при перетаскивании к краям ---------- */
-  const boardRef = useRef(null);
-  const scrollDir = useRef(0);
-  const scrollRAF = useRef(0);
-
-  const stepAutoScroll = () => {
-    const el = boardRef.current;
-    if (el && scrollDir.current) {
-      el.scrollLeft += scrollDir.current * 18;
-      scrollRAF.current = requestAnimationFrame(stepAutoScroll);
-    } else {
-      scrollRAF.current = 0;
+    const lead =
+      [...(board.columns || []).flatMap((c) => c.leads || []), ...(board.unassigned || [])].find(
+        (l) => l.id === leadId,
+      );
+    if (lead && !canDragLead(lead, board, profile, true)) {
+      setNotice("Завершённые лиды может перемещать только администратор.");
+      setDragState(null);
+      return;
     }
-  };
-  const stopAutoScroll = () => {
-    if (scrollRAF.current) cancelAnimationFrame(scrollRAF.current);
-    scrollRAF.current = 0;
-    scrollDir.current = 0;
-  };
-  const onBoardDragOver = (e) => {
-    const el = boardRef.current;
-    if (!el || !dragLeadId) return;
-    const r = el.getBoundingClientRect();
-    const edge = 100;
-    let dir = 0;
-    if (e.clientX < r.left + edge) dir = -1;
-    else if (e.clientX > r.right - edge) dir = 1;
-    scrollDir.current = dir;
-    if (dir && !scrollRAF.current)
-      scrollRAF.current = requestAnimationFrame(stepAutoScroll);
-  };
-  useEffect(() => () => stopAutoScroll(), []);
 
-  /* ---------- drag & drop ---------- */
-  const onDragStart = (leadId) => {
-    setDragLeadId(leadId);
-    if (FUNNEL_V2) dispatch(getAllowedTransitions(leadId));
-  };
-  const onDragEnd = () => {
-    setDragLeadId(null);
-    setDragOverStage(null);
-    stopAutoScroll();
-  };
+    const targetStage = findStageInBoard(board, stageId);
+    if (
+      isCompletedStage(targetStage) &&
+      !isConsultingFunnelManager(profile) &&
+      lead &&
+      !isLeadOnCompletedStage(lead, board)
+    ) {
+      /* сотрудник может завершить лид — перенос на «Завершено» разрешён */
+    }
 
-  const onDropToStage = async (stageId) => {
-    const leadId = dragLeadId;
-    setDragOverStage(null);
-    setDragLeadId(null);
-    stopAutoScroll();
-    if (!leadId) return;
+    setDragState(null);
+    setBoardsMap((prev) => ({
+      ...prev,
+      [funnelId]: moveLeadOnBoard(prev[funnelId], leadId, stageId),
+    }));
 
-    const current =
-      columns.find((c) => (c.leads || []).some((l) => l.id === leadId))?.stage
-        ?.id ?? null;
-    const target = stageId ?? null;
-    if (current === target) return;
-
-    dispatch(moveLeadLocally({ leadId, toStageId: target }));
     try {
-      if (target) {
-        await dispatch(moveLeadStage({ id: leadId, stage: target })).unwrap();
+      if (stageId) {
+        await dispatch(moveLeadStage({ id: leadId, stage: stageId })).unwrap();
+        if (isCompletedStage(targetStage)) {
+          setNotice(
+            "Лид завершён. Запись в аналитику и начисление зарплаты выполняются на сервере.",
+          );
+        }
       } else {
         await dispatch(
           updateLead({ id: leadId, data: { stage: null } })
         ).unwrap();
       }
-    } catch {
-      dispatch(getFunnelBoard(funnelId));
+    } catch (e) {
+      await refreshBoard(funnelId);
+      setNotice(
+        errToText(
+          e,
+          "Не удалось переместить лид. Проверьте права на управление лидами.",
+        ),
+      );
     }
   };
 
-  const selectedFunnel = useMemo(
-    () => funnels.find((f) => f.id === funnelId) || null,
-    [funnels, funnelId]
+  const activeLeadModalFunnelId = leadModal?.funnelId;
+  const activeLeadBoard = activeLeadModalFunnelId
+    ? boardsMap[activeLeadModalFunnelId]
+    : null;
+  const activeLeadStages = (activeLeadBoard?.columns || []).map((c) => c.stage);
+  const activeLeadFunnel = visibleFunnels.find(
+    (f) => f.id === activeLeadModalFunnelId
   );
+  const activeLeadCanManage = canManageLeadsInFunnel(profile, activeLeadFunnel);
+
+  const stageFormBoard = stageFormFunnelId
+    ? boardsMap[stageFormFunnelId]
+    : null;
+
+  if (!canViewFunnel) {
+    return (
+      <section className="funnel">
+        <div className="funnel__placeholder">
+          Нет доступа к воронке продаж. Обратитесь к администратору.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="funnel">
@@ -328,65 +610,44 @@ export default function ConsultingFunnel() {
         <div>
           <h2 className="funnel__title">Воронка продаж</h2>
           <p className="funnel__subtitle">
-            {selectedFunnel
-              ? hasFilters
-                ? `${selectedFunnel.name} · показано ${shownLeads} из ${totalLeads}`
-                : `${selectedFunnel.name} · ${totalLeads} лид(ов)`
+            {visibleFunnels.length
+              ? `${visibleFunnels.length} воронок с доступом`
               : "Канбан-доска лидов"}
+            {visibleFunnelIdsKey && (
+              <span
+                className={`funnel__live${isConnected ? " funnel__live--on" : ""}`}
+                title={
+                  isConnected
+                    ? "Обновления в реальном времени"
+                    : "Подключение к обновлениям…"
+                }
+              >
+                {isConnected ? "● Live" : "○ …"}
+              </span>
+            )}
           </p>
         </div>
 
         <div className="funnel__actions">
-          <select
-            className="funnel__select"
-            value={funnelId || ""}
-            onChange={(e) => setSelectedId(e.target.value || null)}
-            disabled={!funnels.length}
-            aria-label="Выбор воронки"
+          <button
+            type="button"
+            className="funnel__btn"
+            onClick={() => setArchiveOpen(true)}
           >
-            {!funnels.length && <option value="">Нет воронок</option>}
-            {funnels.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-                {f.is_active ? "" : " (неактивна)"}
-              </option>
-            ))}
-          </select>
-
-          {FUNNEL_V2 && (
-            <button
-              className="funnel__btn"
-              onClick={() => setAnalyticsOpen(true)}
-              disabled={!funnelId}
-            >
-              Аналитика
+            Архив
+          </button>
+          {isManager && (
+            <button className="funnel__btn" onClick={() => setFunnelFormOpen(true)}>
+              + Воронка
             </button>
           )}
-          <button className="funnel__btn" onClick={() => setFunnelFormOpen(true)}>
-            + Воронка
-          </button>
-          <button
-            className="funnel__btn"
-            onClick={() => setStageFormOpen(true)}
-            disabled={!funnelId}
-          >
-            + Стадия
-          </button>
-          <button
-            className="funnel__btn funnel__btn--primary"
-            onClick={() =>
-              setLeadModal({ create: true, stageId: columns[0]?.stage?.id })
-            }
-            disabled={!funnelId}
-          >
-            + Лид
-          </button>
         </div>
       </header>
 
       {!!error && <div className="funnel__error">{errToText(error)}</div>}
+      {!!notice && <div className="funnel__notice">{notice}</div>}
 
-      {funnelId && (rawColumns.length > 0 || rawUnassigned.length > 0) && (
+      {visibleFunnels.length > 0 && (
         <div className="funnel__toolbar">
           <div className="funnel__searchWrap">
             <span className="funnel__searchIcon" aria-hidden>
@@ -458,99 +719,162 @@ export default function ConsultingFunnel() {
         </div>
       )}
 
-      {boardLoading || loading ? (
+      {loading ? (
         <div className="funnel__placeholder">Загрузка…</div>
-      ) : !funnelId ? (
+      ) : !visibleFunnels.length ? (
         <div className="funnel__placeholder">
-          Создайте воронку, чтобы начать работу.
-        </div>
-      ) : !rawColumns.length && !rawUnassigned.length ? (
-        <div className="funnel__placeholder">
-          В воронке пока нет стадий. Добавьте стадию, затем создавайте лиды.
+          {isManager
+            ? "Создайте воронку, чтобы начать работу."
+            : "Нет доступных воронок. Обратитесь к администратору."}
         </div>
       ) : (
-        <div
-          className="funnel__board"
-          ref={boardRef}
-          onDragOver={onBoardDragOver}
-        >
-          {columns.map((col) => (
-            <Column
-              key={col.stage?.id}
-              stage={col.stage}
-              leads={col.leads || []}
-              isOver={dragOverStage === col.stage?.id}
-              dragLeadId={dragLeadId}
-              dropState={
-                !dragLeadId || !allowedStageIds
-                  ? null
-                  : allowedStageIds.has(col.stage?.id)
-                  ? "allowed"
-                  : "blocked"
+        <div className="funnel__rows">
+          {sortedFunnels.map((f) => (
+            <FunnelBoardRow
+              key={f.id}
+              funnel={f}
+              board={boardsMap[f.id]}
+              profile={profile}
+              isManager={isManager}
+              matchLead={matchLead}
+              hasFilters={hasFilters}
+              dragState={dragState}
+              onDragStart={(funnelId, leadId) =>
+                setDragState({ funnelId, leadId })
               }
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverStage(col.stage?.id);
-              }}
-              onDragLeave={() => setDragOverStage(null)}
-              onDrop={() => onDropToStage(col.stage?.id)}
-              onCardDragStart={onDragStart}
-              onCardDragEnd={onDragEnd}
-              onAddLead={() => setLeadModal({ create: true, stageId: col.stage?.id })}
-              onCardClick={(lead) => setLeadModal({ leadId: lead.id })}
+              onDragEnd={() => setDragState(null)}
+              onDropStage={onDropToStage}
+              claimBusyId={claimBusyId}
+              onClaimLead={(leadId) => refreshBoard(f.id)}
+              onOpenLead={(funnelId, leadId) =>
+                setLeadModal({ funnelId, leadId })
+              }
+              onCreateLead={(funnelId, stageId) =>
+                setLeadModal({ funnelId, create: true, stageId })
+              }
+              onTransferLead={(funnelId, lead) =>
+                setTransferModal({ sourceFunnelId: funnelId, sourceLead: lead })
+              }
+              onEditFunnel={(funnel) => setFunnelEditTarget(funnel)}
+              onDeleteFunnel={onDeleteFunnel}
+              onAddStage={(id) => setStageFormFunnelId(id)}
+              onEditStage={(funnelId, stage) =>
+                setStageEditTarget({ funnelId, stage })
+              }
+              onDeleteStage={onDeleteStage}
+              allowedTransitions={allowedTransitions}
+              onRefreshBoard={() => refreshBoard(f.id)}
+              funnelDragId={funnelDragId}
+              isDragOver={funnelDragOverId === String(f.id)}
+              onFunnelHandlePointerDown={onFunnelHandlePointerDown}
             />
           ))}
-
-          {!!unassigned.length && (
-            <Column
-              key="unassigned"
-              stage={{ name: "Без стадии", color: "#94a3b8" }}
-              leads={unassigned}
-              unassigned
-              isOver={dragOverStage === "unassigned"}
-              dragLeadId={dragLeadId}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverStage("unassigned");
-              }}
-              onDragLeave={() => setDragOverStage(null)}
-              onDrop={() => onDropToStage(null)}
-              onCardDragStart={onDragStart}
-              onCardDragEnd={onDragEnd}
-              onCardClick={(lead) => setLeadModal({ leadId: lead.id })}
-            />
-          )}
         </div>
       )}
 
-      {funnelFormOpen && <FunnelForm onClose={() => setFunnelFormOpen(false)} />}
-      {stageFormOpen && (
+      {funnelFormOpen && (
+        <FunnelForm
+          onClose={() => {
+            setFunnelFormOpen(false);
+            dispatch(getFunnels());
+            refreshAllBoards();
+          }}
+        />
+      )}
+      {funnelEditTarget && (
+        <FunnelForm
+          funnel={funnelEditTarget}
+          onClose={() => {
+            setFunnelEditTarget(null);
+            refreshBoard(funnelEditTarget.id);
+          }}
+        />
+      )}
+      {stageFormFunnelId && (
         <StageForm
-          funnelId={funnelId}
-          nextOrder={columns.length}
-          onClose={() => setStageFormOpen(false)}
+          funnelId={stageFormFunnelId}
+          nextOrder={stageFormBoard?.columns?.length || 0}
+          onClose={() => {
+            setStageFormFunnelId(null);
+            refreshBoard(stageFormFunnelId);
+          }}
         />
       )}
-      {leadModal?.create && (
+      {stageEditTarget && (
+        <StageForm
+          funnelId={stageEditTarget.funnelId}
+          stage={stageEditTarget.stage}
+          onClose={() => {
+            const fid = stageEditTarget.funnelId;
+            setStageEditTarget(null);
+            refreshBoard(fid);
+          }}
+        />
+      )}
+      {leadModal?.create && activeLeadModalFunnelId && (
         <LeadCreateForm
-          funnelId={funnelId}
-          stages={columns.map((c) => c.stage)}
+          funnelId={activeLeadModalFunnelId}
+          funnel={activeLeadFunnel}
+          stages={activeLeadStages}
           initialStageId={leadModal.stageId}
-          onClose={() => setLeadModal(null)}
+          onClose={() => {
+            setLeadModal(null);
+            refreshBoard(activeLeadModalFunnelId);
+          }}
         />
       )}
-      {leadModal?.leadId && (
+      {leadModal?.leadId && activeLeadModalFunnelId && (
         <LeadDetail
           leadId={leadModal.leadId}
-          funnelId={funnelId}
-          stages={columns.map((c) => c.stage)}
+          funnelId={activeLeadModalFunnelId}
+          board={activeLeadBoard}
+          stages={activeLeadStages}
+          wsUserId={wsUserId}
+          wsIsManager={wsIsManager || isManager}
+          canManageLeads={activeLeadCanManage}
+          visibleFunnels={visibleFunnels}
+          boardsMap={boardsMap}
+          profile={profile}
           onClose={() => setLeadModal(null)}
+          onNotice={setNotice}
+          onTransfer={(lead) =>
+            setTransferModal({
+              sourceFunnelId: activeLeadModalFunnelId,
+              sourceLead: lead,
+            })
+          }
+          onBoardRefresh={() => refreshBoard(activeLeadModalFunnelId)}
         />
       )}
-      {FUNNEL_V2 && analyticsOpen && (
+      {transferModal && (
+        <LeadTransferModal
+          sourceLead={transferModal.sourceLead}
+          sourceFunnelId={transferModal.sourceFunnelId}
+          funnels={visibleFunnels}
+          boardsMap={boardsMap}
+          profile={profile}
+          onClose={() => setTransferModal(null)}
+          onSuccess={async (_created, { targetFunnelId }) => {
+            setNotice("Лид передан в другую воронку.");
+            await refreshBoard(targetFunnelId);
+          }}
+        />
+      )}
+      {archiveOpen && (
+        <FunnelArchiveModal
+          funnels={funnels}
+          profile={profile}
+          onClose={() => setArchiveOpen(false)}
+          onOpenLead={(funnelId, leadId) => {
+            setArchiveOpen(false);
+            setLeadModal({ funnelId, leadId });
+          }}
+        />
+      )}
+      {FUNNEL_V2 && analyticsFunnelId && (
         <AnalyticsModal
-          funnelId={funnelId}
-          onClose={() => setAnalyticsOpen(false)}
+          funnelId={analyticsFunnelId}
+          onClose={() => setAnalyticsFunnelId(null)}
         />
       )}
     </section>
@@ -572,26 +896,31 @@ function Column({
   onCardDragEnd,
   onAddLead,
   onCardClick,
+  onClaimLead,
+  claimBusyId,
+  canManageLeads = true,
 }) {
   const cls = [
     "funnel__col",
     isOver ? "funnel__col--over" : "",
     dropState === "allowed" ? "funnel__col--allowed" : "",
     dropState === "blocked" ? "funnel__col--blocked" : "",
+    !unassigned && isSystemStage(stage) ? "funnel__col--system" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   const stageColor = stage?.color || "#cbd5e1";
   const sum = leads.reduce((acc, l) => acc + (Number(l.estimated_value) || 0), 0);
+  const systemStage = !unassigned && isSystemStage(stage);
 
   return (
     <div
       className={cls}
       style={{ "--stage-color": stageColor }}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDragOver={canManageLeads ? onDragOver : undefined}
+      onDragLeave={canManageLeads ? onDragLeave : undefined}
+      onDrop={canManageLeads ? onDrop : undefined}
     >
       <div className="funnel__colBar" />
       <div className="funnel__colHead">
@@ -600,6 +929,11 @@ function Column({
           <span className="funnel__colName" title={stage?.name}>
             {stage?.name || "—"}
           </span>
+          {systemStage && (
+            <span className="funnel__colLock" title="Системная стадия (нельзя изменить)">
+              🔒
+            </span>
+          )}
           <span className="funnel__colCount">{leads.length}</span>
         </div>
         {sum > 0 && (
@@ -616,17 +950,20 @@ function Column({
             onDragStart={() => onCardDragStart(lead.id)}
             onDragEnd={onCardDragEnd}
             onClick={() => onCardClick(lead)}
+            onClaim={onClaimLead}
+            claimBusy={claimBusyId === lead.id}
+            canManageLeads={canManageLeads}
           />
         ))}
         {!leads.length && (
           <div className="funnel__colEmpty">
             <span className="funnel__colEmptyIcon">↓</span>
-            Перетащите карточку
+            {canManageLeads ? "Перетащите карточку" : "Нет лидов"}
           </div>
         )}
       </div>
 
-      {!unassigned && (
+      {!unassigned && canManageLeads && (
         <button className="funnel__colAdd" onClick={onAddLead}>
           <span>+</span> Добавить лид
         </button>
@@ -636,31 +973,38 @@ function Column({
 }
 
 /* ===================== Карточка лида ===================== */
-function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick }) {
+function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads = true }) {
+  const inPool = !lead.owner;
+
   return (
     <article
       className={`funnel__card${dragging ? " funnel__card--dragging" : ""}${
         lead.is_at_risk ? " funnel__card--risk" : ""
+      }${inPool ? " funnel__card--pool" : ""}${
+        !canManageLeads ? " funnel__card--readonly" : ""
       }`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={canManageLeads}
+      onDragStart={canManageLeads ? onDragStart : undefined}
+      onDragEnd={canManageLeads ? onDragEnd : undefined}
       onClick={onClick}
     >
       <div className="funnel__cardTop">
         <div className="funnel__cardTitle" title={lead.title}>
           {lead.title || "Без названия"}
         </div>
-        {lead.score_grade && (
-          <span
-            className={`funnel__grade funnel__grade--${String(
-              lead.score_grade
-            ).toLowerCase()}`}
-            title={`Скоринг: ${lead.score_value ?? "—"}`}
-          >
-            {lead.score_grade}
-          </span>
-        )}
+        <div className="funnel__cardTopRight">
+          {inPool && <span className="funnel__poolBadge">Пул</span>}
+          {lead.score_grade && (
+            <span
+              className={`funnel__grade funnel__grade--${String(
+                lead.score_grade
+              ).toLowerCase()}`}
+              title={`Скоринг: ${lead.score_value ?? "—"}`}
+            >
+              {lead.score_grade}
+            </span>
+          )}
+        </div>
       </div>
 
       {(lead.full_name || lead.phone) && (
@@ -704,23 +1048,37 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick }) {
         </div>
       )}
 
-      {(lead.next_action_date || lead.owner_display) && (
+      {(lead.next_action_date || lead.owner_display || inPool) && (
         <div className="funnel__cardFoot">
           {lead.next_action_date && (
             <span className="funnel__cardNext">
               🕑 {fmtDate(lead.next_action_date)}
             </span>
           )}
-          {lead.owner_display && (
-            <span
-              className="funnel__avatar"
-              title={lead.owner_display}
-              style={{
-                background: `hsl(${avatarHue(lead.owner_display)} 65% 55%)`,
+          {inPool && canManageLeads ? (
+            <button
+              type="button"
+              className="funnel__cardClaim"
+              disabled={claimBusy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClaim?.(lead.id);
               }}
             >
-              {initials(lead.owner_display)}
-            </span>
+              {claimBusy ? "…" : "Взять"}
+            </button>
+          ) : (
+            lead.owner_display && (
+              <span
+                className="funnel__avatar"
+                title={lead.owner_display}
+                style={{
+                  background: `hsl(${avatarHue(lead.owner_display)} 65% 55%)`,
+                }}
+              >
+                {initials(lead.owner_display)}
+              </span>
+            )
           )}
         </div>
       )}
@@ -783,11 +1141,12 @@ function FormActions({ saving, onClose }) {
 }
 
 /* ===================== Форма воронки ===================== */
-function FunnelForm({ onClose }) {
+function FunnelForm({ funnel: existing, onClose }) {
   const dispatch = useDispatch();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  const isEdit = !!existing?.id;
+  const [name, setName] = useState(existing?.name || "");
+  const [description, setDescription] = useState(existing?.description || "");
+  const [isActive, setIsActive] = useState(existing?.is_active ?? true);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -797,23 +1156,33 @@ function FunnelForm({ onClose }) {
     if (!name.trim()) return setErr("Введите название воронки.");
     setSaving(true);
     try {
-      await dispatch(
-        createFunnel({
-          name: name.trim(),
-          description: description.trim(),
-          is_active: isActive,
-        })
-      ).unwrap();
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        is_active: isActive,
+      };
+      if (isEdit) {
+        await dispatch(
+          updateFunnel({ id: existing.id, data: payload })
+        ).unwrap();
+      } else {
+        await dispatch(createFunnel(payload)).unwrap();
+      }
       onClose();
     } catch (e2) {
-      setErr(errToText(e2, "Не удалось создать воронку."));
+      setErr(
+        errToText(
+          e2,
+          isEdit ? "Не удалось сохранить воронку." : "Не удалось создать воронку.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="Новая воронка" onClose={onClose}>
+    <Modal title={isEdit ? "Изменить воронку" : "Новая воронка"} onClose={onClose}>
       {!!err && <div className="funnel__error">{err}</div>}
       <form className="funnel__form" onSubmit={submit}>
         <div className="funnel__field">
@@ -858,19 +1227,26 @@ const PRESET_COLORS = [
   "#1abc9c",
 ];
 
-function StageForm({ funnelId, nextOrder, onClose }) {
+function StageForm({ funnelId, stage, nextOrder, onClose }) {
   const dispatch = useDispatch();
-  const [name, setName] = useState("");
-  const [order, setOrder] = useState(nextOrder ?? 0);
-  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const isEdit = !!stage?.id;
+  const [name, setName] = useState(stage?.name || "");
+  const [order, setOrder] = useState(stage?.order ?? nextOrder ?? 0);
+  const [color, setColor] = useState(stage?.color || PRESET_COLORS[0]);
   // v2
-  const [stageType, setStageType] = useState("new_lead");
-  const [slaHours, setSlaHours] = useState("");
-  const [allowSkip, setAllowSkip] = useState(false);
-  const [requiredFields, setRequiredFields] = useState("");
+  const [stageType, setStageType] = useState(stage?.stage_type || "new_lead");
+  const [slaHours, setSlaHours] = useState(
+    stage?.sla_hours != null ? String(stage.sla_hours) : "",
+  );
+  const [allowSkip, setAllowSkip] = useState(!!stage?.allow_skip);
+  const [requiredFields, setRequiredFields] = useState(
+    Array.isArray(stage?.required_fields)
+      ? stage.required_fields.join(", ")
+      : "",
+  );
   // базовый бэкенд
-  const [isFinal, setIsFinal] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isFinal, setIsFinal] = useState(!!stage?.is_final);
+  const [isSuccess, setIsSuccess] = useState(!!stage?.is_success);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -900,17 +1276,26 @@ function StageForm({ funnelId, nextOrder, onClose }) {
         payload.is_success = isFinal ? isSuccess : false;
       }
 
-      await dispatch(createStage(payload)).unwrap();
+      if (isEdit) {
+        await dispatch(updateStage({ id: stage.id, data: payload })).unwrap();
+      } else {
+        await dispatch(createStage(payload)).unwrap();
+      }
       onClose();
     } catch (e2) {
-      setErr(errToText(e2, "Не удалось создать стадию."));
+      setErr(
+        errToText(
+          e2,
+          isEdit ? "Не удалось изменить стадию." : "Не удалось создать стадию.",
+        ),
+      );
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="Новая стадия" onClose={onClose}>
+    <Modal title={isEdit ? "Редактирование стадии" : "Новая стадия"} onClose={onClose}>
       {!!err && <div className="funnel__error">{err}</div>}
       <form className="funnel__form" onSubmit={submit}>
         <div className="funnel__grid2">
@@ -1044,7 +1429,7 @@ function StageForm({ funnelId, nextOrder, onClose }) {
 }
 
 /* ===================== Создание лида ===================== */
-function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
+function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
   const dispatch = useDispatch();
   const [form, setForm] = useState({
     title: "",
@@ -1057,10 +1442,63 @@ function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
     probability: "",
     urgency: "medium",
     description: "",
+    service: "",
+    tariff: "",
   });
+  const [participants, setParticipants] = useState([]);
+  const [services, setServices] = useState([]);
+  const [postCreateLead, setPostCreateLead] = useState(null);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    let cancelled = false;
+    dispatch(getConsultingServices())
+      .unwrap()
+      .then((rows) => {
+        if (!cancelled) setServices(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch]);
+
+  // Услуги, доступные в этой воронке. На воронке роли показываем только услуги
+  // этой роли + общие (без роли). На основной/без custom_role — все услуги.
+  const funnelRoleId = funnel?.custom_role ? String(funnel.custom_role) : null;
+  const visibleServices = useMemo(() => {
+    if (!funnelRoleId) return services;
+    return services.filter((s) => {
+      const sr = s.custom_role ? String(s.custom_role) : null;
+      return !sr || sr === funnelRoleId;
+    });
+  }, [services, funnelRoleId]);
+
+  const selectedService = services.find(
+    (s) => String(s.id) === String(form.service),
+  );
+  const serviceTariffs = selectedService?.tariffs || [];
+
+  const selectedTariff = serviceTariffs.find(
+    (t) => String(t.id) === String(form.tariff) || t.name === form.tariff,
+  );
+  const tariffSubHint = formatTariffSubscription(selectedTariff);
+
+  useEffect(() => {
+    if (!selectedService) return;
+    const total = calcConsultingSaleTotal({
+      service: selectedService,
+      tariffId: form.tariff || null,
+      items: [],
+      discount: 0,
+      markup: 0,
+    });
+    if (total > 0) {
+      setForm((f) => ({ ...f, estimated_value: String(total) }));
+    }
+  }, [form.service, form.tariff, selectedService]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1080,11 +1518,19 @@ function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
       probability: form.probability === "" ? 0 : Number(form.probability) || 0,
     };
     if (FUNNEL_V2) payload.urgency = form.urgency;
+    if (form.service) payload.service = form.service;
+    if (form.tariff) payload.tariff = form.tariff;
+    if (participants.length) payload.participant_ids = participants;
 
     setSaving(true);
     try {
-      await dispatch(createLead(payload)).unwrap();
-      onClose();
+      const created = await dispatch(createLead(payload)).unwrap();
+      if (participants.length && created?.id) {
+        await dispatch(
+          setLeadParticipants({ id: created.id, participant_ids: participants }),
+        ).unwrap();
+      }
+      setPostCreateLead(created);
     } catch (e2) {
       setErr(errToText(e2, "Не удалось создать лид."));
     } finally {
@@ -1093,9 +1539,15 @@ function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
   };
 
   return (
-    <Modal title="Новый лид" onClose={onClose}>
-      {!!err && <div className="funnel__error">{err}</div>}
+    <>
+      <Modal title="Новый лид" onClose={onClose}>
       <form className="funnel__form" onSubmit={submit}>
+        {funnel && (
+          <p className="funnel__hint">
+            Воронка: <strong>{getFunnelDisplayName(funnel)}</strong>
+          </p>
+        )}
+        {!!err && <div className="funnel__error">{err}</div>}
         <div className="funnel__field">
           <label className="funnel__label">Название *</label>
           <input
@@ -1105,6 +1557,64 @@ function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
             autoFocus
           />
         </div>
+
+        <div className="funnel__field">
+          <label className="funnel__label">Сотрудники воронки</label>
+          <FunnelEmployeesPicker
+            funnelId={funnelId}
+            value={participants}
+            onChange={setParticipants}
+            disabled={saving}
+          />
+        </div>
+
+        <div className="funnel__grid2">
+          <div className="funnel__field">
+            <label className="funnel__label">Услуга (опционально)</label>
+            <select
+              className="funnel__input"
+              value={form.service}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  service: e.target.value,
+                  tariff: "",
+                }))
+              }
+            >
+              <option value="">Не выбрана</option>
+              {visibleServices.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Тариф (опционально)</label>
+            <select
+              className="funnel__input"
+              value={form.tariff}
+              onChange={set("tariff")}
+              disabled={!serviceTariffs.length}
+            >
+              <option value="">Базовая цена</option>
+              {serviceTariffs.map((t) => {
+                const sub = formatTariffSubscription(t);
+                return (
+                  <option key={t.id || t.name} value={t.id || t.name}>
+                    {t.name} — {Number(t.price || 0).toLocaleString()} с
+                    {sub ? ` (+ абон. ${sub})` : ""}
+                  </option>
+                );
+              })}
+            </select>
+            {tariffSubHint && (
+              <p className="funnel__hint">Абонентская плата: {tariffSubHint}</p>
+            )}
+          </div>
+        </div>
+
         <div className="funnel__grid2">
           <div className="funnel__field">
             <label className="funnel__label">Стадия</label>
@@ -1213,6 +1723,20 @@ function LeadCreateForm({ funnelId, stages, initialStageId, onClose }) {
         <FormActions saving={saving} onClose={onClose} />
       </form>
     </Modal>
+      {postCreateLead && (
+        <LeadCreateClientModal
+          lead={postCreateLead}
+          onClose={() => {
+            setPostCreateLead(null);
+            onClose();
+          }}
+          onSkip={() => {
+            setPostCreateLead(null);
+            onClose();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -1226,15 +1750,34 @@ function findLead(board, leadId) {
   return (board.unassigned || []).find((l) => l.id === leadId) || null;
 }
 
-function LeadDetail({ leadId, funnelId, stages, onClose }) {
+function LeadDetail({
+  leadId,
+  funnelId,
+  board: boardProp,
+  stages,
+  wsUserId,
+  wsIsManager,
+  canManageLeads = true,
+  profile,
+  onClose,
+  onNotice,
+  onTransfer,
+  onBoardRefresh,
+}) {
   const dispatch = useDispatch();
-  const { board, lossReasons = [], timeline, tasks } = useFunnel();
+  const confirm = useConfirm();
+  const { board: boardFromStore, lossReasons = [], timeline, tasks } = useFunnel();
+  const board = boardProp || boardFromStore;
   const lead = findLead(board, leadId);
 
   const [tab, setTab] = useState("info");
   const [loseOpen, setLoseOpen] = useState(false);
+  const [createClientOpen, setCreateClientOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [assignTo, setAssignTo] = useState("");
 
   useEffect(() => {
     if (FUNNEL_V2) {
@@ -1246,6 +1789,31 @@ function LeadDetail({ leadId, funnelId, stages, onClose }) {
     };
   }, [dispatch, leadId]);
 
+  useEffect(() => {
+    if (!wsIsManager) return undefined;
+    let cancelled = false;
+    api
+      .get("/users/employees/")
+      .then(({ data }) => {
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : data.results || [];
+        setEmployees(
+          rows.map((e) => ({
+            id: e.id,
+            name:
+              e.full_name ||
+              [e.first_name, e.last_name].filter(Boolean).join(" ") ||
+              e.email ||
+              "Сотрудник",
+          }))
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [wsIsManager]);
+
   if (!lead) {
     return (
       <Modal title="Лид" onClose={onClose} wide>
@@ -1255,6 +1823,72 @@ function LeadDetail({ leadId, funnelId, stages, onClose }) {
   }
 
   const closed = lead.status === "won" || lead.status === "lost";
+  const onCompleted = isLeadOnCompletedStage(lead, board);
+  const completedLocked = isLeadLockedForEmployee(lead, board, profile);
+  const isMine = wsUserId && lead.owner === wsUserId;
+  const inPool = !lead.owner;
+  const clientId = lead.client || lead.client_id;
+  const clientName = lead.client_display || lead.client_full_name;
+
+  const onArchive = () => {
+    confirm(
+      "Перенести лид в архив? Карточка исчезнет с доски, данные сохранятся в аналитике.",
+      async (result) => {
+        if (!result) return;
+        setErr("");
+        setBusy(true);
+        try {
+          await dispatch(archiveLead(leadId)).unwrap();
+          onNotice?.("Лид перенесён в архив.");
+          onBoardRefresh?.();
+          onClose();
+        } catch (e) {
+          setErr(errToText(e, "Не удалось перенести лид в архив."));
+        } finally {
+          setBusy(false);
+        }
+      },
+    );
+  };
+
+  const onClaim = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      await dispatch(claimLead(leadId)).unwrap();
+    } catch (e) {
+      setErr(errToText(e, "Не удалось взять лид."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRelease = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      await dispatch(releaseLead(leadId)).unwrap();
+    } catch (e) {
+      setErr(errToText(e, "Не удалось вернуть лид в пул."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAssign = async () => {
+    if (!assignTo) return setErr("Выберите сотрудника для назначения.");
+    setErr("");
+    setBusy(true);
+    try {
+      await dispatch(assignLead({ id: leadId, owner: assignTo })).unwrap();
+      onNotice?.("Лид назначен сотруднику.");
+      setAssignTo("");
+    } catch (e) {
+      setErr(errToText(e, "Не удалось назначить лид."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onWin = async () => {
     setErr("");
@@ -1298,35 +1932,123 @@ function LeadDetail({ leadId, funnelId, stages, onClose }) {
           {lead.stage_name && (
             <span className="funnel__chip">{lead.stage_name}</span>
           )}
+          {clientId && (
+            <Link
+              to={`/crm/consulting/client/${clientId}`}
+              className="funnel__chip funnel__chip--client"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Клиент: {clientName || clientId}
+            </Link>
+          )}
           {lead.is_at_risk && (
             <span className="funnel__chip funnel__chip--risk">⚠ Под риском</span>
           )}
+          {inPool ? (
+            <span className="funnel__chip funnel__chip--pool">Общий пул</span>
+          ) : (
+            lead.owner_display && (
+              <span className="funnel__chip">{lead.owner_display}</span>
+            )
+          )}
         </div>
-        {FUNNEL_V2 && (
-          <div className="funnel__detailActions">
-            <button className="funnel__btn" onClick={onRecalc} disabled={busy}>
-              ↻ Скоринг
+        <div className="funnel__detailActions">
+          {canManageLeads && inPool && (
+            <button className="funnel__btn funnel__btn--primary" onClick={onClaim} disabled={busy}>
+              Взять в работу
             </button>
-            {!closed && (
-              <>
-                <button
-                  className="funnel__btn funnel__btn--success"
-                  onClick={onWin}
-                  disabled={busy}
-                >
-                  Выиграть
-                </button>
-                <button
-                  className="funnel__btn funnel__btn--danger"
-                  onClick={() => setLoseOpen((v) => !v)}
-                  disabled={busy}
-                >
-                  Проиграть
-                </button>
-              </>
-            )}
-          </div>
-        )}
+          )}
+          {canManageLeads && isMine && !closed && (
+            <button className="funnel__btn" onClick={onRelease} disabled={busy}>
+              Вернуть в пул
+            </button>
+          )}
+          {canManageLeads && wsIsManager && employees.length > 0 && !closed && (
+            <>
+              <select
+                className="funnel__select funnel__select--inline"
+                value={assignTo}
+                onChange={(e) => setAssignTo(e.target.value)}
+                aria-label="Назначить ответственного"
+              >
+                <option value="">Назначить…</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="funnel__btn"
+                onClick={onAssign}
+                disabled={busy || !assignTo}
+              >
+                Назначить
+              </button>
+            </>
+          )}
+          {onCompleted && !lead.is_archived && canManageLeads && (
+            <button
+              className="funnel__btn funnel__btn--secondary"
+              onClick={onArchive}
+              disabled={busy}
+            >
+              В архив
+            </button>
+          )}
+          {canManageLeads && !closed && !completedLocked && onTransfer && (
+            <button
+              className="funnel__btn"
+              onClick={() => onTransfer(lead)}
+              disabled={busy}
+            >
+              ⇄ В другую воронку
+            </button>
+          )}
+          {canManageLeads && !clientId && (
+            <button
+              className="funnel__btn funnel__btn--secondary"
+              onClick={() => setCreateClientOpen(true)}
+              disabled={busy}
+            >
+              + Клиент
+            </button>
+          )}
+          {canManageLeads && clientId && !lead.payment_registered && (
+            <button
+              className="funnel__btn funnel__btn--primary"
+              onClick={() => setPaymentOpen(true)}
+              disabled={busy}
+            >
+              Оформить оплату
+            </button>
+          )}
+          {FUNNEL_V2 && (
+            <>
+              <button className="funnel__btn" onClick={onRecalc} disabled={busy}>
+                ↻ Скоринг
+              </button>
+              {!closed && (
+                <>
+                  <button
+                    className="funnel__btn funnel__btn--success"
+                    onClick={onWin}
+                    disabled={busy}
+                  >
+                    Выиграть
+                  </button>
+                  <button
+                    className="funnel__btn funnel__btn--danger"
+                    onClick={() => setLoseOpen((v) => !v)}
+                    disabled={busy}
+                  >
+                    Проиграть
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {!!err && <div className="funnel__error">{err}</div>}
@@ -1367,13 +2089,43 @@ function LeadDetail({ leadId, funnelId, stages, onClose }) {
           funnelId={funnelId}
           stages={stages}
           onClose={onClose}
+          readOnly={!canManageLeads || completedLocked}
         />
+      )}
+      {completedLocked && (
+        <p className="funnel__hint funnel__hint--lock">
+          Лид на стадии «Завершено». Редактирование и перемещение доступны только
+          администратору или владельцу.
+        </p>
       )}
       {FUNNEL_V2 && tab === "timeline" && (
         <TimelineTab leadId={leadId} timeline={timeline} />
       )}
       {FUNNEL_V2 && tab === "tasks" && (
         <TasksTab leadId={leadId} tasks={tasks} />
+      )}
+      {createClientOpen && (
+        <LeadCreateClientModal
+          lead={lead}
+          onClose={() => setCreateClientOpen(false)}
+          onSuccess={() => {
+            setCreateClientOpen(false);
+            onNotice?.("Клиент создан и привязан к лиду.");
+            onBoardRefresh?.();
+          }}
+          onSkip={() => setCreateClientOpen(false)}
+        />
+      )}
+      {paymentOpen && (
+        <LeadPaymentModal
+          lead={lead}
+          onClose={() => setPaymentOpen(false)}
+          onSuccess={() => {
+            setPaymentOpen(false);
+            onNotice?.("Оплата оформлена.");
+            onBoardRefresh?.();
+          }}
+        />
       )}
     </Modal>
   );
@@ -1445,7 +2197,7 @@ function LoseForm({ leadId, lossReasons, onDone, onError }) {
 }
 
 /* ---------- вкладка «Информация» ---------- */
-function LeadInfoForm({ lead, funnelId, stages, onClose }) {
+function LeadInfoForm({ lead, funnelId, stages, onClose, readOnly = false }) {
   const dispatch = useDispatch();
   const [form, setForm] = useState({
     title: lead.title || "",
@@ -1528,9 +2280,16 @@ function LeadInfoForm({ lead, funnelId, stages, onClose }) {
   };
 
   return (
-    <form className="funnel__form" onSubmit={submit}>
+    <form className="funnel__form" onSubmit={readOnly ? (e) => e.preventDefault() : submit}>
+      {readOnly && (
+        <p className="funnel__hint">
+          Режим просмотра. Для создания и изменения лидов нужен доступ
+          «Управление лидами воронки».
+        </p>
+      )}
       {!!err && <div className="funnel__error">{err}</div>}
 
+      <fieldset disabled={readOnly} className="funnel__fieldset">
       <div className="funnel__field">
         <label className="funnel__label">Название *</label>
         <input
@@ -1724,7 +2483,9 @@ function LeadInfoForm({ lead, funnelId, stages, onClose }) {
           {fmtDate(lead.last_activity_at)}
         </p>
       )}
+      </fieldset>
 
+      {!readOnly && (
       <div className="funnel__formActions">
         <button
           type="button"
@@ -1752,6 +2513,14 @@ function LeadInfoForm({ lead, funnelId, stages, onClose }) {
           </button>
         </div>
       </div>
+      )}
+      {!readOnly ? null : (
+        <div className="funnel__formActions funnel__formActions--end">
+          <button type="button" className="funnel__btn" onClick={onClose}>
+            Закрыть
+          </button>
+        </div>
+      )}
     </form>
   );
 }

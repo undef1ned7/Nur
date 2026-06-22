@@ -1,5 +1,10 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api";
+import { normalizeDealCreateInput } from "../../tools/clientDeals";
+import {
+  fetchAccessibleFunnelBoards,
+  fetchFunnelBoard,
+} from "../../utils/funnelBoardFetch";
 
 const BASE = "/consalting";
 
@@ -59,12 +64,25 @@ export const getFunnelBoard = createAsyncThunk(
   "funnel/getBoard",
   async (funnelId, { rejectWithValue }) => {
     try {
-      const { data } = await api.get(`${BASE}/funnels/${funnelId}/board/`);
-      return data;
+      return await fetchFunnelBoard(funnelId);
     } catch (e) {
       return rejectWithValue(e.response?.data || e.message);
     }
   }
+);
+
+/** Все доски доступных воронок (предпочтительно один запрос). */
+export const getAccessibleFunnelBoards = createAsyncThunk(
+  "funnel/getAccessibleBoards",
+  async (funnelIds = [], { rejectWithValue }) => {
+    try {
+      return await fetchAccessibleFunnelBoards({
+        funnelIds: Array.isArray(funnelIds) ? funnelIds : [],
+      });
+    } catch (e) {
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
 );
 
 /* ===================== Стадии (Funnel Stages) ===================== */
@@ -119,6 +137,63 @@ export const deleteStage = createAsyncThunk(
   }
 );
 
+// Bulk-переупорядочивание стадий одним запросом.
+// items: [{ id, order }]. При 404 (эндпоинта нет) — caller делает fallback на N×PATCH.
+export const reorderStages = createAsyncThunk(
+  "funnel/reorderStages",
+  async (items, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/funnel-stages/reorder/`, items);
+      return data;
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
+/* ============ Пользовательские предпочтения (порядок воронок) ============ */
+
+// Возвращает массив id воронок в персональном порядке (или [] если нет/404).
+export const getFunnelOrder = createAsyncThunk(
+  "funnel/getFunnelOrder",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${BASE}/user-preferences/`);
+      return Array.isArray(data?.funnel_order)
+        ? data.funnel_order.map(String)
+        : [];
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
+// Сохраняет персональный порядок воронок. funnel_order: string[]
+export const saveFunnelOrder = createAsyncThunk(
+  "funnel/saveFunnelOrder",
+  async (funnel_order, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`${BASE}/user-preferences/`, {
+        funnel_order,
+      });
+      return Array.isArray(data?.funnel_order)
+        ? data.funnel_order.map(String)
+        : funnel_order;
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
 /* ===================== Лиды (Leads) ===================== */
 
 export const getLeads = createAsyncThunk(
@@ -131,6 +206,46 @@ export const getLeads = createAsyncThunk(
       return rejectWithValue(e.response?.data || e.message);
     }
   }
+);
+
+/* Передача лида в другую воронку (копия на основе исходного) */
+export const transferLeadToFunnel = createAsyncThunk(
+  "funnel/transferLead",
+  async ({ id, target_funnel, target_stage = null }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/transfer/`, {
+        target_funnel,
+        target_stage,
+      });
+      return data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        try {
+          const { data: source } = await api.get(`${BASE}/leads/${id}/`);
+          const { data: created } = await api.post(`${BASE}/leads/`, {
+            funnel: target_funnel,
+            stage: target_stage,
+            source_lead: id,
+            title: source.title,
+            full_name: source.full_name,
+            phone: source.phone,
+            email: source.email,
+            source: source.source,
+            description: source.description,
+            estimated_value: source.estimated_value,
+            probability: source.probability,
+            urgency: source.urgency,
+          });
+          return created;
+        } catch (fallbackErr) {
+          return rejectWithValue(
+            fallbackErr.response?.data || fallbackErr.message,
+          );
+        }
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
 );
 
 export const createLead = createAsyncThunk(
@@ -163,6 +278,101 @@ export const deleteLead = createAsyncThunk(
     try {
       await api.delete(`${BASE}/leads/${id}/`);
       return id;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  }
+);
+
+/** Участники лида (после создания, если bulk в POST не поддержан). */
+export const setLeadParticipants = createAsyncThunk(
+  "funnel/setLeadParticipants",
+  async ({ id, participant_ids }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/participants/`, {
+        participant_ids,
+      });
+      return data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        return { id, participant_ids, skipped: true };
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
+/** Перенос завершённого лида в архив. */
+export const archiveLead = createAsyncThunk(
+  "funnel/archiveLead",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/archive/`);
+      return data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        const { data } = await api.patch(`${BASE}/leads/${id}/`, {
+          is_archived: true,
+        });
+        return data;
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
+/** Архивные (завершённые) лиды для просмотра. */
+export const getArchivedLeads = createAsyncThunk(
+  "funnel/getArchivedLeads",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${BASE}/leads/archived/`);
+      return Array.isArray(data) ? data : data.results || data.leads || [];
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        const { data } = await api.get(`${BASE}/leads/`, {
+          params: { is_archived: true, status: "won" },
+        });
+        return Array.isArray(data) ? data : data.results || [];
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
+/* Взять лид из общего пула */
+export const claimLead = createAsyncThunk(
+  "funnel/claimLead",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/claim/`);
+      return data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  }
+);
+
+/* Вернуть лид в общий пул */
+export const releaseLead = createAsyncThunk(
+  "funnel/releaseLead",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/release/`);
+      return data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  }
+);
+
+/* Назначить ответственного (руководитель) */
+export const assignLead = createAsyncThunk(
+  "funnel/assignLead",
+  async ({ id, owner }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/assign/`, { owner });
+      return data;
     } catch (e) {
       return rejectWithValue(e.response?.data || e.message);
     }
@@ -368,4 +578,110 @@ export const getFunnelAnalytics = createAsyncThunk(
       return rejectWithValue(e.response?.data || e.message);
     }
   }
+);
+
+/** Создать клиента на основе лида и привязать к карточке. */
+export const createClientFromLead = createAsyncThunk(
+  "funnel/createClientFromLead",
+  async ({ leadId, ...clientData }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `${BASE}/leads/${leadId}/create-client/`,
+        clientData,
+      );
+      return data?.client || data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        try {
+          const { data: lead } = await api.get(`${BASE}/leads/${leadId}/`);
+          const payload = {
+            full_name:
+              clientData.full_name || lead.full_name || lead.title || "Клиент",
+            phone: clientData.phone || lead.phone || "",
+            email: clientData.email || lead.email || "",
+            type: "client",
+            note: clientData.note || lead.description || "",
+            source_lead: leadId,
+            service: clientData.service || lead.service || undefined,
+          };
+          const { data: client } = await api.post("/main/clients/", payload);
+          await api.patch(`${BASE}/leads/${leadId}/`, { client: client.id });
+          return client;
+        } catch (fallbackErr) {
+          return rejectWithValue(
+            fallbackErr.response?.data || fallbackErr.message,
+          );
+        }
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
+/** Оформить оплату по лиду (наличные, перевод, долг, рассрочка). */
+export const registerLeadPayment = createAsyncThunk(
+  "funnel/registerLeadPayment",
+  async (
+    { leadId, payment_mode, amount, debt_months, prepayment, note },
+    { rejectWithValue },
+  ) => {
+    try {
+      const { data } = await api.post(
+        `${BASE}/leads/${leadId}/register-payment/`,
+        { payment_mode, amount, debt_months, prepayment, note },
+      );
+      return data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        try {
+          const { data: lead } = await api.get(`${BASE}/leads/${leadId}/`);
+          const clientId = lead.client || lead.client_id;
+          if (!clientId) {
+            return rejectWithValue(
+              "Сначала создайте клиента из лида.",
+            );
+          }
+          const statusRuMap = {
+            cash: "Продажа",
+            transfer: "Продажа",
+            debt: "Долги",
+            installment: "Предоплата",
+          };
+          const payLabel =
+            payment_mode === "transfer"
+              ? "Перевод"
+              : payment_mode === "cash"
+                ? "Наличные"
+                : payment_mode === "installment"
+                  ? "Рассрочка"
+                  : "Долг";
+          const dealPayload = normalizeDealCreateInput({
+            clientId,
+            title: lead.title || "Оплата по лиду",
+            statusRu: statusRuMap[payment_mode] || "Продажа",
+            amount,
+            debtMonths: debt_months,
+            prepayment,
+            note: [note, payLabel].filter(Boolean).join(" · "),
+          });
+          dealPayload.lead = leadId;
+          dealPayload.payment_method = payment_mode;
+          const { data: deal } = await api.post(
+            `/main/clients/${clientId}/deals/`,
+            dealPayload,
+          );
+          await api.patch(`${BASE}/leads/${leadId}/`, {
+            payment_registered: true,
+            payment_mode,
+          });
+          return { deal, lead_id: leadId, client_id: clientId };
+        } catch (fallbackErr) {
+          return rejectWithValue(
+            fallbackErr.response?.data || fallbackErr.message,
+          );
+        }
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
 );

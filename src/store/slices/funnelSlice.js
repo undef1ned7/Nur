@@ -13,6 +13,9 @@ import {
   updateLead,
   deleteLead,
   moveLeadStage,
+  claimLead,
+  releaseLead,
+  assignLead,
   getAllowedTransitions,
   recalculateScore,
   winLead,
@@ -105,6 +108,16 @@ const funnelSlice = createSlice({
       if (!lead) return;
       lead.stage = toStageId || null;
       placeLead(state.board, lead);
+    },
+    // Real-time: добавить или обновить карточку (WebSocket upsert)
+    upsertLeadOnBoard: (state, { payload: lead }) => {
+      if (!belongsToBoard(state.board, lead)) return;
+      pluckLead(state.board, lead.id);
+      placeLead(state.board, lead);
+    },
+    // Real-time: убрать карточку с доски (WebSocket removed/deleted)
+    removeLeadFromBoard: (state, { payload: id }) => {
+      pluckLead(state.board, id);
     },
   },
   extraReducers: (builder) => {
@@ -220,6 +233,31 @@ const funnelSlice = createSlice({
         state.error = payload;
       })
 
+      .addCase(claimLead.fulfilled, (state, { payload }) => {
+        if (!state.board) return;
+        pluckLead(state.board, payload.id);
+        if (belongsToBoard(state.board, payload)) placeLead(state.board, payload);
+      })
+      .addCase(claimLead.rejected, (state, { payload }) => {
+        state.error = payload;
+      })
+      .addCase(releaseLead.fulfilled, (state, { payload }) => {
+        if (!state.board) return;
+        pluckLead(state.board, payload.id);
+        if (belongsToBoard(state.board, payload)) placeLead(state.board, payload);
+      })
+      .addCase(releaseLead.rejected, (state, { payload }) => {
+        state.error = payload;
+      })
+      .addCase(assignLead.fulfilled, (state, { payload }) => {
+        if (!state.board) return;
+        pluckLead(state.board, payload.id);
+        if (belongsToBoard(state.board, payload)) placeLead(state.board, payload);
+      })
+      .addCase(assignLead.rejected, (state, { payload }) => {
+        state.error = payload;
+      })
+
       /* ---------- win / lose / score (возвращают карточку лида) ---------- */
       .addCase(winLead.fulfilled, (state, { payload }) => {
         if (!state.board) return;
@@ -321,8 +359,13 @@ const funnelSlice = createSlice({
   },
 });
 
-export const { clearFunnelError, clearLeadDetail, moveLeadLocally } =
-  funnelSlice.actions;
+export const {
+  clearFunnelError,
+  clearLeadDetail,
+  moveLeadLocally,
+  upsertLeadOnBoard,
+  removeLeadFromBoard,
+} = funnelSlice.actions;
 export const useFunnel = () => useSelector((state) => state.funnel);
 
 export default funnelSlice.reducer;

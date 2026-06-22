@@ -14,6 +14,7 @@ import {
   createClientAsync,
 } from "../../../../store/creators/clientCreators";
 import { useSelector } from "react-redux";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 const clean = (s) => String(s || "").trim();
 const toLocalDT = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
@@ -27,6 +28,8 @@ const statusRu = (v) =>
 
 export default function ConsultingClientRequests() {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const alert = useAlert();
 
   const { requests = [], loading, error } = useSelector((s) => s.consulting);
   const clients = useSelector((s) => s.client?.list ?? []); // адаптируй под свой слайс клиентов
@@ -160,17 +163,19 @@ export default function ConsultingClientRequests() {
     }
   };
 
-  const removeReq = async (r) => {
+  const removeReq = (r) => {
     if (!r?.id) return;
-    if (!window.confirm(`Удалить заявку «${r.name || "—"}»?`)) return;
-    try {
-      await dispatch(deleteConsultingRequest(r.id)).unwrap();
-      // можно рефетчнуть при необходимости:
-      // await dispatch(getConsultingRequests());
-    } catch (e) {
-      console.error(e);
-      alert("Не удалось удалить заявку.");
-    }
+    confirm(`Удалить заявку «${r.name || "—"}»?`, async (result) => {
+      if (!result) return;
+      try {
+        await dispatch(deleteConsultingRequest(r.id)).unwrap();
+        // можно рефетчнуть при необходимости:
+        // await dispatch(getConsultingRequests());
+      } catch (e) {
+        console.error(e);
+        alert("Не удалось удалить заявку.", true);
+      }
+    });
   };
 
   /* inline клиент */
