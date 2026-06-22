@@ -1,5 +1,5 @@
 import { pdf } from "@react-pdf/renderer";
-import { Download, X } from "lucide-react";
+import { FileText, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   getAgentSaleInvoiceJson,
@@ -7,6 +7,7 @@ import {
   getAllProductionSaleDetail,
 } from "../../../../api/agentSales";
 import { useUser } from "../../../../store/slices/userSlice";
+import Modal from "../../../common/Modal/Modal";
 import ProductionInvoicePdfDocument from "./ProductionInvoicePdfDocument";
 
 const kindTranslate = {
@@ -16,10 +17,60 @@ const kindTranslate = {
   debt: "Долг",
 };
 
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return "—";
+  try {
+    return new Date(dateString).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(dateString);
+  }
+};
+
+const getStatusVariant = (status) => {
+  const s = String(status || "").toLowerCase();
+  if (s === "paid") return "paid";
+  if (s === "canceled" || s === "cancelled") return "canceled";
+  if (s === "debt") return "debt";
+  return "new";
+};
+
+const getLineDiscount = (product) =>
+  Number(
+    product?.line_discount ??
+      product?.line_discount_total ??
+      product?.discount_amount ??
+      product?.discount_total ??
+      0,
+  );
+
+const getLineTotal = (product) => {
+  const qty = Number(product?.quantity || 0);
+  const unitPrice = Number(product?.unit_price || 0);
+  const discount = getLineDiscount(product);
+  const computed = qty * unitPrice - discount;
+  const explicit = Number(product?.line_total);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return Math.max(0, computed);
+};
+
 const ProductionSellDetail = ({
   onClose,
   id,
-  onReturnSuccess,
   onOpenRefund,
   useGlobalAccess = false,
 }) => {
@@ -28,26 +79,6 @@ const ProductionSellDetail = ({
   const [loading, setLoading] = useState(true);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [error, setError] = useState("");
-  const formatMoney = (value) => Number(value || 0).toFixed(2);
-  const itemsDiscountTotal = Array.isArray(sale?.items)
-    ? sale.items.reduce(
-        (sum, item) =>
-          sum +
-          Number(
-            item?.line_discount ??
-              item?.discount_total ??
-              item?.line_discount_total ??
-              0,
-          ),
-        0,
-      )
-    : 0;
-  const discountTotal = Number(sale?.discount_total ?? itemsDiscountTotal ?? 0);
-  const taxTotal = Number(sale?.tax_total || 0);
-  const subtotal = Number(sale?.subtotal || 0);
-  const total = Number(sale?.total || 0);
-  const hasDiscount = discountTotal > 0;
-  const hasTax = taxTotal > 0;
 
   useEffect(() => {
     if (!id) {
@@ -56,6 +87,8 @@ const ProductionSellDetail = ({
     }
     let cancelled = false;
     setError("");
+    setSale(null);
+    setLoading(true);
     const loadSale = useGlobalAccess
       ? getAllProductionSaleDetail(id)
       : getAgentSaleDetail(id);
@@ -86,8 +119,6 @@ const ProductionSellDetail = ({
     setDownloadingInvoice(true);
     try {
       const invoiceData = await getAgentSaleInvoiceJson(id);
-      console.log("=== invoiceData ===", JSON.stringify(invoiceData, null, 2));
-      console.log("=== sale ===", JSON.stringify(sale, null, 2));
       if (!invoiceData) {
         throw new Error("Нет данных для генерации накладной");
       }
@@ -96,7 +127,6 @@ const ProductionSellDetail = ({
       const userDisplayLooksLikeEmail =
         typeof sale?.user_display === "string" &&
         sale.user_display.includes("@");
-      // Build a lookup map from sale.items by id for discount data
       const saleItemsMap = {};
       if (Array.isArray(sale?.items)) {
         sale.items.forEach((si) => {
@@ -104,7 +134,6 @@ const ProductionSellDetail = ({
         });
       }
 
-      // Merge discount fields from sale.items into invoiceData.items
       const mergedItems = Array.isArray(invoiceData?.items)
         ? invoiceData.items.map((item) => {
             const saleItem = saleItemsMap[item.id];
@@ -201,138 +230,164 @@ const ProductionSellDetail = ({
     }
   };
 
+  const statusVariant = getStatusVariant(sale?.status);
+  const statusLabel = kindTranslate[sale?.status] || sale?.status || "—";
+  const items = Array.isArray(sale?.items) ? sale.items : [];
+  const subtotal = Number(sale?.subtotal || 0);
+  const discountTotal = Number(sale?.discount_total || 0);
+  const taxTotal = Number(sale?.tax_total || 0);
+  const total = Number(sale?.total || 0);
   const canReturn =
     sale && ["paid", "debt"].includes((sale.status || "").toLowerCase());
 
   return (
-    <div className="sellDetail add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ width: "700px" }}>
-        <div className="add-modal__header">
-          <h3>Детали продажи</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
-        </div>
-        <div className="sellDetail__content">
-          {loading && <p>Загрузка...</p>}
-          {error && (
-            <p style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</p>
-          )}
-          {!loading && sale && (
-            <>
-              <div className="sell__box">
-                <p className="receipt__title">
-                  Клиент: {sale.client_name ?? "—"}
-                </p>
-                <p className="receipt__title">
-                  Статус: {kindTranslate[sale.status] || sale.status}
-                </p>
-                <p className="receipt__title">
-                  Дата:{" "}
-                  {sale.created_at
-                    ? new Date(sale.created_at).toLocaleString("ru-RU")
-                    : "—"}
-                </p>
+    <Modal
+      open
+      onClose={onClose}
+      title="Детали продажи"
+      className="sellDetailModal"
+      contentClassName="sellDetailModal__content"
+      wrapperId="production-sell-detail-modal"
+    >
+      <div className="sellDetail">
+        {loading ? (
+          <div className="sellDetail__loading">Загрузка данных о продаже...</div>
+        ) : error && !sale ? (
+          <div className="sellDetail__empty">{error}</div>
+        ) : (
+          <>
+            {error && (
+              <div className="sellReturn__error" role="alert">
+                {error}
               </div>
+            )}
 
-              <div className="receipt">
-                {(sale.items || []).map((product, idx) => (
-                  <div className="receipt__item" key={idx}>
-                    <p className="receipt__item-name">
-                      {idx + 1}. {product.product_name ?? product.name ?? "—"}
-                    </p>
-                    <div>
-                      {(() => {
-                        const qty = Number(product.quantity || 0);
-                        const unitPrice = Number(product.unit_price || 0);
-                        const lineDiscount = Number(
-                          product.line_discount ??
-                            product.discount_total ??
-                            product.line_discount_total ??
-                            0,
-                        );
-                        const lineBase = qty * unitPrice;
-                        const lineTotal = Math.max(0, lineBase - lineDiscount);
-                        return (
-                          <p className="receipt__item-price">
-                            {qty} × {unitPrice.toFixed(2)} ={" "}
-                            {lineTotal.toFixed(2)} сом
-                          </p>
-                        );
-                      })()}
-                      {Number(
-                        product.line_discount ??
-                          product.discount_total ??
-                          product.line_discount_total ??
-                          0,
-                      ) > 0 && (
-                        <p className="receipt__item-price">
-                          Скидка по позиции:{" "}
-                          {formatMoney(
-                            product.line_discount ??
-                              product.discount_total ??
-                              product.line_discount_total ??
-                              0,
-                          )}{" "}
-                          сом
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            <div className="sellDetail__meta">
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Клиент</span>
+                <span className="sellDetail__metaValue">
+                  {sale?.client_name || "Без клиента"}
+                </span>
+              </div>
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Статус</span>
+                <span className={`sellBadge sellBadge--${statusVariant}`}>
+                  {statusLabel}
+                </span>
+              </div>
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Дата</span>
+                <span className="sellDetail__metaValue">
+                  {formatDateTime(sale?.created_at)}
+                </span>
+              </div>
+            </div>
 
-                <div className="receipt__total">
-                  <b>ИТОГО</b>
-                  <div
-                    style={{
-                      gap: "10px",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    {subtotal > 0 && <p>Подытог {formatMoney(subtotal)}</p>}
-                    {hasDiscount && <p>Скидка {formatMoney(discountTotal)}</p>}
-                    {hasTax && <p>Налог {formatMoney(taxTotal)}</p>}
-                    <b>{formatMoney(total)} сом</b>
+            <section className="sellDetail__section" aria-label="Позиции продажи">
+              <h4 className="sellDetail__sectionTitle">
+                Позиции
+                <span className="sellDetail__sectionCount">{items.length}</span>
+              </h4>
+
+              {items.length === 0 ? (
+                <div className="sellDetail__empty">Нет позиций в продаже</div>
+              ) : (
+                <div className="sellDetail__items">
+                  <div className="sellDetail__itemsHead" aria-hidden>
+                    <span>Товар</span>
+                    <span>Кол-во</span>
+                    <span>Цена</span>
+                    <span>Сумма</span>
                   </div>
+                  {items.map((product, idx) => {
+                    const name =
+                      product.product_name ?? product.name ?? "—";
+                    const qty = Number(product.quantity || 0);
+                    const unitPrice = Number(product.unit_price || 0);
+                    const lineDiscount = getLineDiscount(product);
+                    const lineTotal = getLineTotal(product);
+
+                    return (
+                      <div className="sellDetail__item" key={product.id ?? idx}>
+                        <div className="sellDetail__itemName">
+                          <span className="sellDetail__itemNo">{idx + 1}</span>
+                          <span>{name}</span>
+                        </div>
+                        <div className="sellDetail__itemQty">
+                          {qty.toLocaleString("ru-RU", {
+                            maximumFractionDigits: 3,
+                          })}
+                        </div>
+                        <div className="sellDetail__itemPrice">
+                          {formatMoney(unitPrice)}
+                        </div>
+                        <div className="sellDetail__itemTotal">
+                          <strong>{formatMoney(lineTotal)}</strong>
+                          {lineDiscount > 0 && (
+                            <span className="sellDetail__itemDiscount">
+                              −{formatMoney(lineDiscount)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
+            </section>
 
-                <div
-                  className="receipt__row"
-                  style={{ display: "flex", justifyContent: "center", gap: 12 }}
+            <section className="sellDetail__totals" aria-label="Итоги продажи">
+              {subtotal > 0 && (
+                <div className="sellDetail__totalRow">
+                  <span>Промежуточный итог</span>
+                  <span>{formatMoney(subtotal)} сом</span>
+                </div>
+              )}
+              {discountTotal > 0 && (
+                <div className="sellDetail__totalRow sellDetail__totalRow--discount">
+                  <span>Скидка</span>
+                  <span>−{formatMoney(discountTotal)} сом</span>
+                </div>
+              )}
+              {taxTotal > 0 && (
+                <div className="sellDetail__totalRow">
+                  <span>Налог</span>
+                  <span>{formatMoney(taxTotal)} сом</span>
+                </div>
+              )}
+              <div className="sellDetail__totalRow sellDetail__totalRow--final">
+                <span>Итого к оплате</span>
+                <strong>{formatMoney(total)} сом</strong>
+              </div>
+            </section>
+
+            <div
+              className={`sellDetail__actions${canReturn ? " sellDetail__actions--withRefund" : ""}`}
+            >
+              <button
+                type="button"
+                className="sellDetail__actionBtn sellDetail__actionBtn--secondary"
+                onClick={handleDownloadInvoice}
+                disabled={downloadingInvoice}
+              >
+                <FileText size={18} strokeWidth={2.2} aria-hidden />
+                {downloadingInvoice ? "Скачивание..." : "Скачать накладную"}
+              </button>
+              {canReturn && (
+                <button
+                  type="button"
+                  className="sellDetail__actionBtn sellDetail__actionBtn--refund"
+                  onClick={() => onOpenRefund?.(sale)}
                 >
-                  <button
-                    type="button"
-                    className="receipt__row-btn"
-                    onClick={handleDownloadInvoice}
-                    disabled={downloadingInvoice}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      minWidth: 170,
-                    }}
-                  >
-                    <Download size={16} />
-                    {downloadingInvoice ? "Скачивание..." : "Накладная"}
-                  </button>
-                  {canReturn && (
-                    <button
-                      type="button"
-                      className="receipt__row-btn"
-                      onClick={() => onOpenRefund?.(sale)}
-                      style={{ minWidth: 170 }}
-                    >
-                      Возврат
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                  <RotateCcw size={18} strokeWidth={2.2} aria-hidden />
+                  Оформить возврат
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };
 

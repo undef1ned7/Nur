@@ -7,6 +7,7 @@ import {
   remapQueueOrderIds,
   saveSnapshot,
   pruneDeadQueueActions,
+  pruneFailedCreateOrderDependents,
   getFailedQueueDetails,
 } from "../services/cafeOfflineService";
 import api from "../api";
@@ -19,6 +20,8 @@ export function useCafeSync() {
   const [justSynced, setJustSynced] = useState(false);
   const [lastFailed, setLastFailed] = useState([]);
   const prevOnline = useRef(isOnline);
+  const hasSyncedOnMount = useRef(false);
+  const hasRefreshedSnapshotRef = useRef(false);
 
   useEffect(() => {
     const updateCount = async () => {
@@ -76,6 +79,17 @@ export function useCafeSync() {
       await markSynced(syncedIds);
 
       if (failed && failed.length > 0) {
+        const failedOrderIds = failed
+          .map((f) => queue[f.action_index])
+          .filter((item) => item?.type === "CREATE_ORDER")
+          .map((item) =>
+            String(item.payload?.client_id || item.payload?.order_id || ""),
+          )
+          .filter(Boolean);
+        if (failedOrderIds.length) {
+          await pruneFailedCreateOrderDependents(failedOrderIds);
+        }
+
         const detailed = await getFailedQueueDetails(failed, queue);
         setLastFailed(detailed);
       }
@@ -104,11 +118,47 @@ export function useCafeSync() {
   }, []);
 
   useEffect(() => {
+    if (hasSyncedOnMount.current) return;
+    hasSyncedOnMount.current = true;
+    if (!isOnline) return;
+
+    (async () => {
+      const queue = await getPendingQueue();
+      if (queue.length > 0) {
+        console.log(
+          `[useCafeSync] Found ${queue.length} pending on mount — syncing`,
+        );
+        syncQueue();
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (prevOnline.current === false && isOnline === true) {
       syncQueue();
     }
     prevOnline.current = isOnline;
   }, [isOnline, syncQueue]);
+
+  const refreshSnapshot = useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const { data: snapshot } = await api.get("/cafe/offline-snapshot/");
+      await saveSnapshot(snapshot);
+    } catch {
+      // не критично
+    }
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    if (!hasRefreshedSnapshotRef.current) {
+      hasRefreshedSnapshotRef.current = true;
+      refreshSnapshot();
+    }
+    const interval = setInterval(refreshSnapshot, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isOnline, refreshSnapshot]);
 
   return {
     isOnline,
@@ -118,5 +168,6 @@ export function useCafeSync() {
     justSynced,
     syncQueue,
     lastFailed,
+    refreshSnapshot,
   };
 }

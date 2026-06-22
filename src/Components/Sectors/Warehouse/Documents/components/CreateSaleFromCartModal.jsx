@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { X, ChevronDown, ChevronUp } from "lucide-react";
 import { useDispatch } from "react-redux";
-import warehouseAPI from "../../../../../api/warehouse";
+import warehouseAPI, { listCompanyAgentRequests } from "../../../../../api/warehouse";
 import { createSaleFromAgentCartAsync } from "../../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../../store/slices/userSlice";
 import "./ReconciliationModal.scss";
 import "./CreateSaleFromCartModal.scss";
 
@@ -29,6 +30,9 @@ export default function CreateSaleFromCartModal({
   onSuccess,
 }) {
   const dispatch = useDispatch();
+  const { profile } = useUser();
+  const isOwnerOrAdmin =
+    profile?.role === "owner" || profile?.role === "admin";
   const [counterparties, setCounterparties] = useState([]);
   const [counterpartiesLoading, setCounterpartiesLoading] = useState(false);
   const [cartItems, setCartItems] = useState([]);
@@ -36,6 +40,7 @@ export default function CreateSaleFromCartModal({
   const [itemsDropdownOpen, setItemsDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [agentCanSellWholesale, setAgentCanSellWholesale] = useState(false);
 
   const [form, setForm] = useState({
     counterparty: "",
@@ -45,6 +50,7 @@ export default function CreateSaleFromCartModal({
     discount_amount: "0",
     comment: "",
     is_sale_request: true,
+    is_wholesale: false,
     post: false,
   });
 
@@ -60,6 +66,7 @@ export default function CreateSaleFromCartModal({
         discount_amount: "0",
         comment: "",
         is_sale_request: true,
+        is_wholesale: false,
         post: false,
       });
       loadCounterparties();
@@ -103,6 +110,47 @@ export default function CreateSaleFromCartModal({
     }
   }, [open, cart?.agent, counterparties]);
 
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) {
+      setAgentCanSellWholesale(isOwnerOrAdmin);
+      return;
+    }
+    const agentId = cart?.agent;
+    if (!agentId) {
+      setAgentCanSellWholesale(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listCompanyAgentRequests({ status: "active" });
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        const membership =
+          list.find((item) => String(item.user) === String(agentId)) || null;
+        if (!cancelled) {
+          setAgentCanSellWholesale(Boolean(membership?.can_sell_wholesale));
+        }
+      } catch (err) {
+        console.error("Не удалось загрузить право агента на опт:", err);
+        if (!cancelled) setAgentCanSellWholesale(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, cart?.agent, isOwnerOrAdmin]);
+
+  const showWholesaleToggle = isOwnerOrAdmin;
+
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) return;
+    setForm((prev) => ({ ...prev, is_wholesale: agentCanSellWholesale }));
+  }, [open, isOwnerOrAdmin, agentCanSellWholesale]);
+
   const loadCounterparties = async () => {
     setCounterpartiesLoading(true);
     try {
@@ -141,6 +189,7 @@ export default function CreateSaleFromCartModal({
       discount_amount: String(Number(form.discount_amount) || 0),
       comment: form.comment || "",
       is_sale_request: Boolean(form.is_sale_request),
+      is_wholesale: Boolean(form.is_wholesale),
     };
     if (form.payment_kind === "credit" && form.prepayment_amount) {
       payload.prepayment_amount = String(
@@ -252,6 +301,7 @@ export default function CreateSaleFromCartModal({
                             <th>Товар</th>
                             <th>Кол-во</th>
                             <th>Цена</th>
+                            <th>Опт</th>
                             <th>Сумма</th>
                           </tr>
                         </thead>
@@ -274,6 +324,9 @@ export default function CreateSaleFromCartModal({
                               row.price ??
                               row.unit_price ??
                               row.unit_price_requested;
+                            const wholesalePrice =
+                              row.product_wholesale_price ??
+                              row.product?.wholesale_price;
                             const sum = row.line_total ?? row.total ?? row.sum;
                             const formatNum = (v) =>
                               v != null && v !== ""
@@ -285,6 +338,7 @@ export default function CreateSaleFromCartModal({
                                 <td>{name}</td>
                                 <td>{formatNum(qty)}</td>
                                 <td>{formatNum(price)}</td>
+                                <td>{formatNum(wholesalePrice)}</td>
                                 <td>{formatNum(sum)}</td>
                               </tr>
                             );
@@ -317,6 +371,42 @@ export default function CreateSaleFromCartModal({
                 ))}
               </select>
             </div>
+
+            {showWholesaleToggle && (
+              <div className="reconciliation-modal__form-group">
+                <span className="reconciliation-modal__label">Режим цен</span>
+                <div className="create-sale-cart-modal__wholesale">
+                  <button
+                    type="button"
+                    className={`create-sale-cart-modal__wholesale-btn ${
+                      !form.is_wholesale
+                        ? "create-sale-cart-modal__wholesale-btn--active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setForm((prev) => ({ ...prev, is_wholesale: false }))
+                    }
+                    disabled={submitting}
+                  >
+                    Розница
+                  </button>
+                  <button
+                    type="button"
+                    className={`create-sale-cart-modal__wholesale-btn ${
+                      form.is_wholesale
+                        ? "create-sale-cart-modal__wholesale-btn--active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setForm((prev) => ({ ...prev, is_wholesale: true }))
+                    }
+                    disabled={submitting}
+                  >
+                    Опт
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="reconciliation-modal__form-group">
               <span className="reconciliation-modal__label">Оплата</span>

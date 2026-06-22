@@ -168,6 +168,74 @@ describe("posSaleCarts", () => {
       expect(state.posCarts[0].itemCount).toBe(0);
     });
 
+    it("preserves sale_package on PATCH when response omits it", () => {
+      const state = {
+        activeSaleId: saleId,
+        start: {
+          id: saleId,
+          items: [
+            {
+              id: "line-piece",
+              product: "prod-1",
+              quantity: "1.000",
+              sale_package_id: "pkg-1",
+            },
+          ],
+          total: "15",
+        },
+        posCarts: [{ saleId, isMain: true, itemCount: 1, total: "15" }],
+      };
+
+      applyPosCartItemPatchToState(
+        state,
+        {
+          id: "line-piece",
+          product: "prod-1",
+          quantity: "2.000",
+          unit_price: "15.00",
+          line_total: "30.00",
+        },
+        { salePackageId: "pkg-1" },
+      );
+
+      expect(state.start.items[0].sale_package).toBe("pkg-1");
+      expect(state.start.items[0].quantity).toBe("2.000");
+    });
+
+    it("preserves sale_package_id from previous line on full sale PATCH", () => {
+      const state = {
+        activeSaleId: saleId,
+        start: {
+          id: saleId,
+          items: [
+            {
+              id: "line-piece",
+              product: "prod-1",
+              quantity: "1.000",
+              sale_package_id: "pkg-1",
+            },
+          ],
+          total: "15",
+        },
+        posCarts: [{ saleId, isMain: true, itemCount: 1, total: "15" }],
+      };
+
+      applyPosCartItemPatchToState(state, {
+        id: saleId,
+        items: [
+          {
+            id: "line-piece",
+            product: "prod-1",
+            quantity: "2.000",
+            unit_price: "15.00",
+          },
+        ],
+        total: "30",
+      });
+
+      expect(state.start.items[0].sale_package).toBe("pkg-1");
+    });
+
     it("preserves items when start response omits items field", () => {
       const state = {
         activeSaleId: saleId,

@@ -8,12 +8,14 @@ export async function saveSnapshot(snapshot) {
     db.cafe_tables,
     db.open_orders,
     db.current_shift,
+    db.kitchen_tasks,
     async () => {
       await db.menu_categories.clear();
       await db.menu_items.clear();
       await db.cafe_tables.clear();
       await db.open_orders.clear();
       await db.current_shift.clear();
+      await db.kitchen_tasks.clear();
 
       if (snapshot.menu?.categories?.length) {
         await db.menu_categories.bulkPut(snapshot.menu.categories);
@@ -34,6 +36,10 @@ export async function saveSnapshot(snapshot) {
       if (snapshot.current_shift) {
         await db.current_shift.put(snapshot.current_shift);
       }
+
+      if (snapshot.kitchen_tasks?.length) {
+        await db.kitchen_tasks.bulkPut(snapshot.kitchen_tasks);
+      }
     },
   );
 
@@ -44,13 +50,15 @@ export async function saveSnapshot(snapshot) {
 }
 
 export async function getSnapshot() {
-  const [categories, items, tables, open_orders, shifts] = await Promise.all([
-    db.menu_categories.orderBy("sort_order").toArray(),
-    db.menu_items.toArray(),
-    db.cafe_tables.toArray(),
-    db.open_orders.toArray(),
-    db.current_shift.toArray(),
-  ]);
+  const [categories, items, tables, open_orders, shifts, kitchen_tasks] =
+    await Promise.all([
+      db.menu_categories.orderBy("sort_order").toArray(),
+      db.menu_items.toArray(),
+      db.cafe_tables.toArray(),
+      db.open_orders.toArray(),
+      db.current_shift.toArray(),
+      db.kitchen_tasks.toArray(),
+    ]);
 
   return {
     categories,
@@ -58,6 +66,7 @@ export async function getSnapshot() {
     tables,
     open_orders,
     current_shift: shifts[0] || null,
+    kitchen_tasks,
   };
 }
 
@@ -120,6 +129,26 @@ export async function remapQueueOrderIds(offlineId, serverId) {
   }
 }
 
+export async function pruneFailedCreateOrderDependents(offlineIds) {
+  if (!offlineIds?.length) return 0;
+  const ids = offlineIds.map(String);
+  const all = await db.offline_queue.toArray();
+  const toDelete = all
+    .filter(
+      (item) =>
+        !item.synced &&
+        ids.includes(String(item.payload?.order_id || "")),
+    )
+    .map((item) => item.id);
+  if (toDelete.length) {
+    await db.offline_queue.bulkDelete(toDelete);
+    console.warn(
+      `pruneFailedCreateOrderDependents: удалено ${toDelete.length} зависимых actions`,
+    );
+  }
+  return toDelete.length;
+}
+
 export async function pruneDeadQueueActions() {
   const all = await db.offline_queue.toArray();
   const pending = all.filter((item) => item.synced === false);
@@ -165,6 +194,18 @@ export async function updateTableStatusLocally(tableId, status) {
   if (table) await db.cafe_tables.put({ ...table, status });
 }
 
+export async function saveTablesLocally(tables) {
+  if (!Array.isArray(tables) || !tables.length) return;
+  await db.cafe_tables.clear();
+  await db.cafe_tables.bulkPut(tables);
+}
+
+export async function saveOpenOrdersLocally(orders) {
+  if (!Array.isArray(orders)) return;
+  await db.open_orders.clear();
+  await db.open_orders.bulkPut(orders);
+}
+
 export async function addOrderLocally(order) {
   await db.open_orders.put(order);
 }
@@ -206,4 +247,35 @@ export async function createOrderLocally(orderData) {
   };
   await db.open_orders.put(order);
   return order;
+}
+
+export async function getKitchenTasksLocally() {
+  return await db.kitchen_tasks.toArray();
+}
+
+export async function updateKitchenTasksLocally(taskIds, updates) {
+  const ids = Array.isArray(taskIds) ? taskIds : [taskIds];
+  const result = [];
+  for (const id of ids) {
+    const task = await db.kitchen_tasks.get(id);
+    if (!task) continue;
+    const next = { ...task, ...updates };
+    await db.kitchen_tasks.put(next);
+    result.push(next);
+  }
+  return result;
+}
+
+export function getCurrentEmployeeInfo() {
+  try {
+    const raw = localStorage.getItem("userData");
+    const u = raw ? JSON.parse(raw) : null;
+    const label =
+      [u?.last_name, u?.first_name].filter(Boolean).join(" ").trim() ||
+      u?.email ||
+      "";
+    return { id: u?.id || null, label };
+  } catch {
+    return { id: null, label: "" };
+  }
 }

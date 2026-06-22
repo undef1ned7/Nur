@@ -1632,11 +1632,20 @@ const CashierPage = () => {
           let changed = prev.length !== orderedCart.length;
           const next = orderedCart.map((item) => {
             const prevItem = prevById.get(item.id);
-            if (isSameCartLine(prevItem, item)) {
+            const preservedSalePackage =
+              prevItem?.salePackage &&
+              (item.salePackage == null || item.salePackage === "")
+                ? prevItem.salePackage
+                : item.salePackage;
+            const resolvedItem =
+              preservedSalePackage !== item.salePackage
+                ? { ...item, salePackage: preservedSalePackage }
+                : item;
+            if (isSameCartLine(prevItem, resolvedItem)) {
               return prevItem;
             }
             changed = true;
-            return item;
+            return resolvedItem;
           });
           return changed ? next : prev;
         });
@@ -2148,6 +2157,9 @@ const CashierPage = () => {
             id: saleId,
             productId: existingCartLine.itemId,
             quantity: newQuantity,
+            ...(existingCartLine.salePackage
+              ? { salePackageId: existingCartLine.salePackage }
+              : {}),
           }),
         );
         requestCartQuantityFocus({
@@ -2324,6 +2336,7 @@ const CashierPage = () => {
             id: saleId,
             productId: item.itemId,
             quantity: newQuantity,
+            ...(item.salePackage ? { salePackageId: item.salePackage } : {}),
           }),
         );
         // Обновляем локальное значение количества
@@ -2436,6 +2449,7 @@ const CashierPage = () => {
             id: saleId,
             productId: item.itemId,
             quantity: qtyNum,
+            ...(item.salePackage ? { salePackageId: item.salePackage } : {}),
           }),
         );
         // Обновляем локальное значение количества

@@ -404,9 +404,36 @@ $due-red: #dc2626;
   }
 
   &__group-product-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-weight: 700;
     color: #b45309;
     white-space: nowrap;
+  }
+
+  &__group-product-price-mode {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #92400e;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__sidebar-price-hint {
+    margin: -4px 0 12px;
+    font-size: 13px;
+    color: #64748b;
+
+    strong {
+      color: #b45309;
+      font-weight: 700;
+    }
   }
 
   &__group-product-stock {
@@ -1015,6 +1042,80 @@ $due-red: #dc2626;
 
     input {
       accent-color: $primary-dark;
+    }
+  }
+
+  &__wholesale-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 2px solid $primary-dark;
+    border-radius: 12px;
+    background: $summary-bg;
+    box-shadow: 0 2px 8px rgba(230, 197, 71, 0.25);
+  }
+
+  &__wholesale-mode-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #854d0e;
+    white-space: nowrap;
+  }
+
+  &__wholesale-seg {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+  }
+
+  &__wholesale-seg-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.15s ease;
+
+    input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    &:hover:not(.is-active) {
+      color: #334155;
+      background: #f8fafc;
+    }
+
+    &.is-active {
+      color: #0f172a;
+      background: linear-gradient(180deg, $primary 0%, $primary-dark 100%);
+      box-shadow: 0 2px 6px rgba(230, 197, 71, 0.45);
+      transform: translateY(-1px);
     }
   }
 
@@ -2068,6 +2169,33 @@ $due-red: #dc2626;
 
     &__comment-textarea {
       min-height: 60px;
+    }
+  }
+}
+
+.create-sale-document {
+  &__wholesale-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-right: 4px;
+  }
+
+  &__wholesale-btn {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+
+    &--active {
+      background: #f7d617;
+      border-color: #e5c100;
+      color: #111827;
+      font-weight: 600;
     }
   }
 }

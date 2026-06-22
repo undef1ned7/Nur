@@ -277,7 +277,7 @@ export const historySellProductDetail = createAsyncThunk(
 
 export const returnSale = createAsyncThunk(
   "products/returnSale",
-  async ({ saleId, items }, { rejectWithValue, getState }) => {
+  async ({ saleId, items, is_defect }, { rejectWithValue, getState }) => {
     try {
       const role = String(getState()?.user?.profile?.role || "")
         .trim()
@@ -286,7 +286,13 @@ export const returnSale = createAsyncThunk(
         role === "agent"
           ? `/main/agents/me/sales/${saleId}/return/`
           : `/main/pos/sales/${saleId}/return/`;
-      const payload = Array.isArray(items) && items.length > 0 ? { items } : {};
+      const payload = {};
+      if (Array.isArray(items) && items.length > 0) {
+        payload.items = items;
+      }
+      if (is_defect === true) {
+        payload.is_defect = true;
+      }
       const { data } = await api.post(endpoint, payload);
       return data;
     } catch (error) {

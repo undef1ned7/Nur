@@ -28,6 +28,7 @@ import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getSa
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
+import { useNetworkStatus } from "../../../../hooks/useNetworkStatus";
 import {
   formatKitchenTaskQty,
   kitchenTaskQtyNum,
@@ -257,6 +258,7 @@ const stLabels = {
 const Cook = () => {
   const alert = useAlert();
   const dispatch = useDispatch();
+  const { isOnline } = useNetworkStatus();
   const { tasks, loading, error, updatingStatus } = useSelector(
     (state) => state.cafeOrders
   );
@@ -908,6 +910,14 @@ const Cook = () => {
         statusOptions={statusOptions}
         onCreateKitchen={() => setKitchenModalOpen(true)}
       />
+
+      {!isOnline && (
+        <div className="cafeCook__notice cafeCook__notice--warn">
+          <div className="cafeCook__noticeText">
+            Офлайн — задачи загружены из кэша. Изменения статусов сохранятся и синхронизируются при появлении сети.
+          </div>
+        </div>
+      )}
 
       {notice?.text ? (
         <div className={`cafeCook__notice cafeCook__notice--${notice.type}`}>

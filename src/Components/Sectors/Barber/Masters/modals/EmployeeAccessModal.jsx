@@ -11,8 +11,16 @@ const EmployeeAccessModal = ({
   tariff,
   company,
   empSaving,
+  isWarehouseSector = false,
+  isOwnerOrAdmin = false,
+  warehouseMembership = null,
+  warehouseMembershipLoading = false,
+  canSellWholesale = false,
+  onCanSellWholesaleChange,
 }) => {
   if (!accessModalOpen || !accessModalEmployee) return null;
+
+  const showWarehouseWholesaleSection = isWarehouseSector && isOwnerOrAdmin;
 
   return (
     <div
@@ -71,6 +79,73 @@ const EmployeeAccessModal = ({
             overflowY: "auto",
           }}
         >
+          {showWarehouseWholesaleSection && (
+            <div
+              style={{
+                marginBottom: "24px",
+                paddingBottom: "20px",
+                borderBottom: "1px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Агент склада
+              </h4>
+
+              {warehouseMembershipLoading ? (
+                <div style={{ color: "#666", fontSize: "14px" }}>
+                  Загрузка настроек агента…
+                </div>
+              ) : warehouseMembership ? (
+                <>
+                  <label
+                    className="barbermasters__label"
+                    style={{ display: "block", marginBottom: "8px" }}
+                  >
+                    Оптовые продажи
+                  </label>
+                  <div className="barbermasters__seg">
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        !canSellWholesale ? "is-active" : ""
+                      }`}
+                      onClick={() => onCanSellWholesaleChange?.(false)}
+                      disabled={empSaving}
+                    >
+                      Только розница
+                    </button>
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        canSellWholesale ? "is-active" : ""
+                      }`}
+                      onClick={() => onCanSellWholesaleChange?.(true)}
+                      disabled={empSaving}
+                    >
+                      Разрешить опт
+                    </button>
+                  </div>
+                  <div className="barbermasters__help" style={{ marginTop: 8 }}>
+                    Сохраняется вместе с доступами. Агент сможет создавать
+                    продажи с переключателем «Опт».
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: "#666", fontSize: "14px", lineHeight: 1.5 }}>
+                  Сотрудник ещё не назначен агентом склада. Сначала нажмите
+                  «Агент склада» в карточке сотрудника.
+                </div>
+              )}
+            </div>
+          )}
+
           <AccessList
             employeeAccesses={accessModalAccesses}
             onSaveAccesses={handleSaveEmployeeAccesses}

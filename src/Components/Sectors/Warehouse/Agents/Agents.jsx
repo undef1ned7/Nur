@@ -3754,6 +3754,8 @@ const Agents = () => {
   const [newMembershipUserId, setNewMembershipUserId] = useState("");
   const [newMembershipCommonEnabled, setNewMembershipCommonEnabled] =
     useState(false);
+  const [newMembershipCanSellWholesale, setNewMembershipCanSellWholesale] =
+    useState(false);
   const [newMembershipAssignedWarehouse, setNewMembershipAssignedWarehouse] =
     useState("");
   const [newMembershipWarehouse, setNewMembershipWarehouse] = useState("");
@@ -4238,6 +4240,26 @@ const Agents = () => {
     }
   };
 
+  const handleCompanyWholesaleChange = async (request, nextValue) => {
+    if (!request?.id || companyActionBusyId) return;
+    setCompanyActionBusyId(request.id);
+    try {
+      await patchCompanyAgentCommonAccess(request.id, {
+        can_sell_wholesale: Boolean(nextValue),
+      });
+      await loadCompanyRequests();
+    } catch (e) {
+      console.error(e);
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось обновить право на оптовые продажи",
+      );
+    } finally {
+      setCompanyActionBusyId(null);
+    }
+  };
+
   const handleCreateMembership = async () => {
     if (!newMembershipUserId.trim() || newMembershipBusy) return;
     const assignedWarehouse = newMembershipAssignedWarehouse || null;
@@ -4252,14 +4274,19 @@ const Agents = () => {
       const payload = {
         user: newMembershipUserId.trim(),
         assigned_warehouse: assignedWarehouse,
+        can_sell_wholesale: Boolean(newMembershipCanSellWholesale),
       };
       if (newMembershipCommonEnabled) {
         payload.common_access_enabled = true;
         payload.common_warehouse = commonWarehouse;
       }
+      if (newMembershipCanSellWholesale) {
+        payload.can_sell_wholesale = true;
+      }
       await createCompanyMembership(payload);
       setNewMembershipUserId("");
       setNewMembershipCommonEnabled(false);
+      setNewMembershipCanSellWholesale(false);
       setNewMembershipAssignedWarehouse("");
       setNewMembershipWarehouse("");
       await loadCompanyRequests();
@@ -5441,6 +5468,17 @@ const Agents = () => {
                         />
                         Общий прайс
                       </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newMembershipCanSellWholesale}
+                          onChange={(e) =>
+                            setNewMembershipCanSellWholesale(e.target.checked)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        Разрешить опт
+                      </label>
                       <select
                         className="warehouse-search__input"
                         style={{ minWidth: 220 }}
@@ -5494,6 +5532,7 @@ const Agents = () => {
                             <th>Email</th>
                             <th>Склад</th>
                             <th>Общий прайс</th>
+                            <th>Оптовые продажи</th>
                             <th>Склад общего прайса</th>
                             <th>Создан</th>
                             <th>Обновлён</th>
@@ -5504,7 +5543,7 @@ const Agents = () => {
                           {companyRequestsLoading ? (
                             <tr>
                               <td
-                                colSpan={9}
+                                colSpan={10}
                                 className="warehouse-table__loading"
                               >
                                 Загрузка…
@@ -5513,7 +5552,7 @@ const Agents = () => {
                           ) : activeCompanyAgents.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={9}
+                                colSpan={10}
                                 className="warehouse-table__empty"
                               >
                                 Активных агентов нет
@@ -5543,6 +5582,24 @@ const Agents = () => {
                                       ? "Включен"
                                       : "Выключен"}
                                   </span>
+                                </td>
+                                <td>
+                                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(r.can_sell_wholesale)}
+                                      onChange={(e) =>
+                                        handleCompanyWholesaleChange(
+                                          r,
+                                          e.target.checked,
+                                        )
+                                      }
+                                      disabled={companyActionBusyId === r.id}
+                                    />
+                                    {r.can_sell_wholesale
+                                      ? "Разрешено"
+                                      : "Запрещено"}
+                                  </label>
                                 </td>
                                 <td>
                                   <select

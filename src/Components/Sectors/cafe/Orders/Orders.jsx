@@ -54,6 +54,8 @@ import {
   updateTableStatusLocally,
   getSnapshot,
   resolveOrderId,
+  saveTablesLocally,
+  saveOpenOrdersLocally,
 } from "../../../../services/cafeOfflineService";
 import CafeOpenShift from "../CafeOpenShift/CafeOpenShift";
 import { useShifts } from "../../../../store/slices/shiftSlice";
@@ -86,8 +88,59 @@ import {
   weightQtyValidationHint,
 } from "../cafeMenuWeight";
 
+const OFFLINE_MENU_PAGE_SIZE = 20;
+
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
+
+const paginateOfflineMenu = (
+  items,
+  {
+    page = 1,
+    search = "",
+    categoryId = null,
+    pageSize = OFFLINE_MENU_PAGE_SIZE,
+  },
+) => {
+  let filtered = items || [];
+
+  if (categoryId) {
+    filtered = filtered.filter(
+      (i) => String(i.category_id) === String(categoryId),
+    );
+  }
+
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    filtered = filtered.filter((i) =>
+      String(i.name || "")
+        .toLowerCase()
+        .includes(q),
+    );
+  }
+
+  filtered = filtered.filter((i) => i.is_available !== false);
+
+  const count = filtered.length;
+  const start = (page - 1) * pageSize;
+  const results = filtered.slice(start, start + pageSize).map((i) => ({
+    id: i.id,
+    title: i.name,
+    price: i.price,
+    category: i.category_id,
+    image_url: i.image_url || "",
+    kitchen: i.kitchen ?? null,
+    is_sold_by_weight: i.is_sold_by_weight ?? false,
+    sale_unit: i.sale_unit ?? null,
+  }));
+
+  return {
+    count,
+    results,
+    next: start + pageSize < count ? page + 1 : null,
+    previous: page > 1 ? page - 1 : null,
+  };
+};
 
 const toNum = (x) => {
   if (x === null || x === undefined) return 0;
@@ -258,7 +311,9 @@ const orderItemTitle = (it) => {
     const t = String(it.service_title || it.title || "").trim();
     return t || "Услуга";
   }
-  return String(it.menu_item_title || it.title || "Позиция");
+  return String(
+    it.menu_item_title || it.menu_item_name || it.title || it.name || "Позиция",
+  );
 };
 
 const normalizeEmployee = (e = {}) => ({
@@ -468,11 +523,14 @@ const Orders = () => {
       setTables(tables || []);
       return;
     }
-    setTables(listFrom(await api.get("/cafe/tables/")));
+    const tables = listFrom(await api.get("/cafe/tables/"));
+    setTables(tables);
+    saveTablesLocally(tables).catch(() => {});
   };
 
-  const fetchEmployees = async () => {
-    const arr = listFrom(await api.get("/users/employees/")) || [];
+  const EMPLOYEES_CACHE_KEY = "cafe_employees_cache";
+
+  const applyEmployees = (arr) => {
     setWaiterOptionsFilter((prevOptions) => {
       const staticOption = prevOptions[0] || {
         value: null,
@@ -488,6 +546,21 @@ const Orders = () => {
       return options;
     });
     setEmployees(arr.map(normalizeEmployee));
+  };
+
+  const fetchEmployees = async () => {
+    if (!isOnline) {
+      try {
+        const raw = localStorage.getItem(EMPLOYEES_CACHE_KEY);
+        if (raw) applyEmployees(JSON.parse(raw));
+      } catch {}
+      return;
+    }
+    const arr = listFrom(await api.get("/users/employees/")) || [];
+    try {
+      localStorage.setItem(EMPLOYEES_CACHE_KEY, JSON.stringify(arr));
+    } catch {}
+    applyEmployees(arr);
   };
 
   const fetchKitchens = async () => {
@@ -507,10 +580,19 @@ const Orders = () => {
       setMenuLoading(true);
       try {
         const snapshot = await getSnapshot();
-        setMenuItems({
-          results: snapshot.items,
-          count: snapshot.items.length,
+        const data = paginateOfflineMenu(snapshot.items, {
+          page,
+          categoryId: selectedCategoryFilter,
+          pageSize: OFFLINE_MENU_PAGE_SIZE,
         });
+        setMenuItems(data);
+
+        for (const m of data.results) {
+          menuCacheRef.current.set(String(m.id), {
+            ...m,
+            kitchen: m.kitchen ?? null,
+          });
+        }
       } finally {
         setMenuLoading(false);
       }
@@ -555,6 +637,32 @@ const Orders = () => {
     async (newPage, searchQuery = "") => {
       if (newPage < 1) return;
 
+      if (!isOnline) {
+        setMenuLoading(true);
+        try {
+          const snapshot = await getSnapshot();
+          const data = paginateOfflineMenu(snapshot.items, {
+            page: newPage,
+            search: searchQuery,
+            categoryId: selectedCategoryFilter,
+            pageSize: OFFLINE_MENU_PAGE_SIZE,
+          });
+          setMenuItems(data);
+
+          for (const m of data.results) {
+            menuCacheRef.current.set(String(m.id), {
+              ...m,
+              kitchen: m.kitchen ?? null,
+            });
+          }
+
+          setMenuCurrentPage(newPage);
+        } finally {
+          setMenuLoading(false);
+        }
+        return;
+      }
+
       // Всегда загружаем данные с сервера (с поиском или без)
       setMenuLoading(true);
       try {
@@ -597,7 +705,7 @@ const Orders = () => {
         setMenuLoading(false);
       }
     },
-    [],
+    [selectedCategoryFilter, isOnline],
   );
 
   const fetchCashboxes = async () => {
@@ -619,7 +727,10 @@ const Orders = () => {
     !Array.isArray(o?.items) || o.items.length === 0;
 
   const hydrateOrdersDetails = async (list) => {
-    const ids = list.filter(orderNeedsDetail).map((o) => o.id);
+    const ids = list
+      .filter(orderNeedsDetail)
+      .filter((o) => !String(o.id).startsWith("offline-"))
+      .map((o) => o.id);
     if (!ids.length) return list;
 
     const details = await Promise.all(
@@ -665,6 +776,7 @@ const Orders = () => {
       totalCount: data.count,
     }));
     setOrders(full);
+    saveOpenOrdersLocally(full).catch(() => {});
   }, [
     debouncedOrderSearchQuery,
     waiterFilter,
@@ -1628,10 +1740,7 @@ const Orders = () => {
       if (!isEditing) {
         if (!isOnline) {
           const offlineOrderId =
-            "offline-" +
-            Date.now() +
-            "-" +
-            Math.random().toString(36).slice(2);
+            "offline-" + Date.now() + "-" + Math.random().toString(36).slice(2);
 
           await addToQueue("CREATE_ORDER", {
             client_id: offlineOrderId,
@@ -1645,10 +1754,16 @@ const Orders = () => {
             })),
           });
 
+          const _localTableId = toId(form.table) || null;
+          const _localTableObj = _localTableId
+            ? tables.find((t) => String(t.id) === String(_localTableId))
+            : null;
+
           const localOrder = {
             id: offlineOrderId,
-            table_id: toId(form.table) || null,
-            table: toId(form.table) || null,
+            table_id: _localTableId,
+            table: _localTableId,
+            table_number: _localTableObj?.number ?? null,
             status: "open",
             created_at: new Date().toISOString(),
             items: form.items.map((i, idx) => {
@@ -1777,8 +1892,15 @@ const Orders = () => {
             });
           }
 
+          const normalizedItems = form.items.map((i) => ({
+            ...i,
+            menu_item_title:
+              i.menu_item_title || i.title || i.service_title || "",
+            title: i.title || i.menu_item_title || i.service_title || "",
+          }));
+
           await updateOrderLocally(editingId, {
-            items: form.items,
+            items: normalizedItems,
             table_id: toId(form.table) || null,
           });
 
@@ -1787,7 +1909,7 @@ const Orders = () => {
               String(o.id) === String(editingId)
                 ? {
                     ...o,
-                    items: form.items,
+                    items: normalizedItems,
                     table_id: toId(form.table) || null,
                   }
                 : o,
@@ -2061,7 +2183,10 @@ const Orders = () => {
         `/cafe/fiscal/orders/${orderId}/receipt-payload/?${params}`,
       );
 
-      const connectorResult = await sendReceipt(fiscalSettings, receiptPayload.body);
+      const connectorResult = await sendReceipt(
+        fiscalSettings,
+        receiptPayload.body,
+      );
 
       // Сохранить ФД в Nur (в фоне, не блокируем кассира)
       api
@@ -2914,15 +3039,13 @@ const Orders = () => {
                                 await removeOrderLocally(editingId);
                                 setOrders((prev) =>
                                   prev.filter(
-                                    (o) =>
-                                      String(o.id) !== String(editingId),
+                                    (o) => String(o.id) !== String(editingId),
                                   ),
                                 );
                               } else {
-                                await api.patch(
-                                  `/cafe/orders/${editingId}/`,
-                                  { status: "cancelled" },
-                                );
+                                await api.patch(`/cafe/orders/${editingId}/`, {
+                                  status: "cancelled",
+                                });
                                 await fetchOrders();
                               }
                               setModalOpen(false);

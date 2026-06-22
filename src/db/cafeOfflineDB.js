@@ -30,6 +30,17 @@ db.version(3).stores({
   id_mapping: "offline_id, server_id",
 });
 
+db.version(4).stores({
+  menu_categories: "id, sort_order",
+  menu_items: "id, category_id",
+  cafe_tables: "id, hall_id, status",
+  open_orders: "id, table_id, status",
+  current_shift: "id",
+  offline_queue: "++id, type, created_at, synced",
+  id_mapping: "offline_id, server_id",
+  kitchen_tasks: "id, status, order_id",
+});
+
 export async function resetOfflineDB() {
   await db.delete();
   await db.open();

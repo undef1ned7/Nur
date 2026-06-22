@@ -119,6 +119,7 @@ const AddProductBarcode = ({
   const lastScanErrorRef = useRef(null);
   const lastAddErrorRef = useRef(null);
   const lastBarcodeErrorRef = useRef(null);
+  const lastSyncedScanKeyRef = useRef(null);
 
   // Ref для хранения функции onShowErrorAlert, чтобы она не менялась при каждом рендере
   const onShowErrorAlertRef = useRef(onShowErrorAlert);
@@ -280,6 +281,7 @@ const AddProductBarcode = ({
     if (!barcodeScan) return;
 
     // Очищаем предыдущий результат
+    lastSyncedScanKeyRef.current = null;
     dispatch(clearScannedProduct());
 
     (async () => {
@@ -390,11 +392,44 @@ const AddProductBarcode = ({
     }
   }, [barcodeError]);
 
-  // Автоматическое заполнение названия товара при обнаружении
+  // Заполняем поля только при новом сканировании, не перезаписывая ручные правки
   useEffect(() => {
-    if (scannedProduct?.name) {
-      setState((prev) => ({ ...prev, name: scannedProduct.name }));
+    if (!scannedProduct) {
+      lastSyncedScanKeyRef.current = null;
+      return;
     }
+
+    const scanKey =
+      scannedProduct.barcode ||
+      scannedProduct.id ||
+      scannedProduct.uuid ||
+      null;
+    if (!scanKey || lastSyncedScanKeyRef.current === scanKey) return;
+
+    lastSyncedScanKeyRef.current = scanKey;
+    setState((prev) => ({
+      ...prev,
+      name: scannedProduct.name || "",
+      price:
+        scannedProduct.price != null && scannedProduct.price !== ""
+          ? String(scannedProduct.price)
+          : prev.price,
+      purchase_price:
+        scannedProduct.purchase_price != null &&
+        scannedProduct.purchase_price !== ""
+          ? String(scannedProduct.purchase_price)
+          : prev.purchase_price,
+      wholesale_price:
+        scannedProduct.wholesale_price != null &&
+        scannedProduct.wholesale_price !== ""
+          ? String(scannedProduct.wholesale_price)
+          : prev.wholesale_price,
+      plu:
+        scannedProduct.plu != null && scannedProduct.plu !== ""
+          ? String(scannedProduct.plu)
+          : prev.plu,
+      scale_type: scannedProduct.scale_type || prev.scale_type,
+    }));
   }, [scannedProduct]);
 
   const handleAddToWarehouse = async () => {
@@ -649,6 +684,7 @@ const AddProductBarcode = ({
 
   const handleCancel = () => {
     dispatch(clearScannedProduct());
+    lastSyncedScanKeyRef.current = null;
     setQuantity(1);
     setState({
       name: "",
