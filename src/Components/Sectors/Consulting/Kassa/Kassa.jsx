@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 import ConsultingReports from "./Reports/Reports";
+import { useAlert } from "../../../../hooks/useDialog";
 import "./kassa.scss";
 
 /* helpers */
@@ -80,6 +81,7 @@ export default function ConsultingCafeKassa() {
 
 /* =========================== СПИСОК КАСС =========================== */
 function CashboxList({ onOpenDetail }) {
+  const alert = useAlert();
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -119,7 +121,7 @@ function CashboxList({ onOpenDetail }) {
 
   const onCreate = async () => {
     const title = (name || "").trim();
-    if (!title) return alert("Введите название кассы");
+    if (!title) return alert("Введите название кассы", true);
     try {
       await api.post("/construction/cashboxes/", { name: title });
       setCreateOpen(false);
@@ -127,7 +129,7 @@ function CashboxList({ onOpenDetail }) {
       load();
     } catch (e) {
       console.error(e);
-      alert("Не удалось создать кассу");
+      alert("Не удалось создать кассу", true);
     }
   };
 
@@ -265,6 +267,7 @@ function CashboxList({ onOpenDetail }) {
 
 /* =========================== ДЕТАЛИ КАССЫ =========================== */
 function CashboxDetailView({ id, onBack }) {
+  const alert = useAlert();
   const [box, setBox] = useState(null);
   const [ops, setOps] = useState([]);
   const [tab, setTab] = useState("all");

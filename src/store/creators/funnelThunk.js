@@ -137,6 +137,63 @@ export const deleteStage = createAsyncThunk(
   }
 );
 
+// Bulk-переупорядочивание стадий одним запросом.
+// items: [{ id, order }]. При 404 (эндпоинта нет) — caller делает fallback на N×PATCH.
+export const reorderStages = createAsyncThunk(
+  "funnel/reorderStages",
+  async (items, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/funnel-stages/reorder/`, items);
+      return data;
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
+/* ============ Пользовательские предпочтения (порядок воронок) ============ */
+
+// Возвращает массив id воронок в персональном порядке (или [] если нет/404).
+export const getFunnelOrder = createAsyncThunk(
+  "funnel/getFunnelOrder",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${BASE}/user-preferences/`);
+      return Array.isArray(data?.funnel_order)
+        ? data.funnel_order.map(String)
+        : [];
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
+// Сохраняет персональный порядок воронок. funnel_order: string[]
+export const saveFunnelOrder = createAsyncThunk(
+  "funnel/saveFunnelOrder",
+  async (funnel_order, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`${BASE}/user-preferences/`, {
+        funnel_order,
+      });
+      return Array.isArray(data?.funnel_order)
+        ? data.funnel_order.map(String)
+        : funnel_order;
+    } catch (e) {
+      return rejectWithValue({
+        status: e.response?.status,
+        data: e.response?.data || e.message,
+      });
+    }
+  }
+);
+
 /* ===================== Лиды (Leads) ===================== */
 
 export const getLeads = createAsyncThunk(

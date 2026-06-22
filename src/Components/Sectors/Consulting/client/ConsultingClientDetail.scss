@@ -73,33 +73,77 @@
     font-weight: 700;
   }
 
-  &__chart {
-    width: 100%;
-    min-height: 240px;
-  }
-
-  &__subList {
-    list-style: none;
-    margin: 12px 0 0;
-    padding: 0;
-    border-top: 1px solid #e5e7eb;
-  }
-
-  &__subRow {
+  // ---- Календарь абонентских платежей ----
+  &__calendar {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px;
-    padding: 8px 0;
-    font-size: 13px;
-    border-bottom: 1px solid #f3f4f6;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
   }
 
-  &__status {
-    font-size: 12px;
+  &__calCell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    text-align: center;
+    font-family: inherit;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+
     &--paid {
-      color: #059669;
+      background: #ecfdf5;
+      border-color: #6ee7b7;
     }
     &--planned {
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+
+    // не оплачиваемые плитки (оплачено / нет dealId) — обычные, не кликабельны
+    &:disabled {
+      cursor: default;
+    }
+
+    // оплачиваемые — кликабельны, подсвечиваются при наведении
+    &--payable {
+      cursor: pointer;
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #f59e0b;
+      }
+    }
+  }
+
+  &__calMonth {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: capitalize;
+    line-height: 1.1;
+  }
+
+  &__calYear {
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  &__calAmount {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  &__calStatus {
+    font-size: 11px;
+    font-weight: 600;
+    .clientDetail__calCell--paid & {
+      color: #059669;
+    }
+    .clientDetail__calCell--planned & {
       color: #d97706;
     }
   }
@@ -152,5 +196,98 @@
     padding: 8px 14px;
     cursor: pointer;
     font-size: 13px;
+
+    &--primary {
+      background: #f7d74f;
+      border-color: #f7d74f;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  // ---- Модалка оплаты абонентки ----
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 1000;
+  }
+
+  &__modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+
+  &__modalHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  &__modalTitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__modalClose {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #6b7280;
+    &:hover {
+      color: #0f172a;
+    }
+  }
+
+  &__modalForm {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__modalField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 13px;
+    color: #374151;
+
+    input,
+    select {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      &:focus {
+        border-color: #f7d74f;
+      }
+    }
+  }
+
+  &__modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
   }
 }

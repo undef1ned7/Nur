@@ -22,6 +22,7 @@ import { convertEmployeeAccessesToLabels } from "../../Barber/Masters/employeeAc
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 
 import { normalizeFunnelGrants } from "../../../../utils/consultingFunnelAccess";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 /* ===== API ===== */
 const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
@@ -166,6 +167,8 @@ const SL_PER_PAGE = 10;
 
 function ConsultingSchoolTeachers() {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const alert = useAlert();
   const { company, profile, tariff } = useUser();
   /* ===== tabs ===== */
   const [tab, setTab] = useState("employees"); // 'employees' | 'roles'
@@ -697,26 +700,28 @@ function ConsultingSchoolTeachers() {
   };
 
   /* ===== ROLE: delete ===== */
-  const removeRole = async (r) => {
+  const removeRole = (r) => {
     if (!r?.id) return;
-    if (
-      !window.confirm(`Удалить роль «${r.name || "—"}»? Действие необратимо.`)
-    )
-      return;
-    setRoleDeletingIds((prev) => new Set(prev).add(r.id));
-    try {
-      await api.delete(ROLE_ITEM_URL(r.id));
-      await fetchRoles();
-    } catch (err) {
-      console.error(err);
-      alert(pickApiError(err, "Не удалось удалить роль"));
-    } finally {
-      setRoleDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(r.id);
-        return next;
-      });
-    }
+    confirm(
+      `Удалить роль «${r.name || "—"}»? Действие необратимо.`,
+      async (result) => {
+        if (!result) return;
+        setRoleDeletingIds((prev) => new Set(prev).add(r.id));
+        try {
+          await api.delete(ROLE_ITEM_URL(r.id));
+          await fetchRoles();
+        } catch (err) {
+          console.error(err);
+          alert(pickApiError(err, "Не удалось удалить роль"), true);
+        } finally {
+          setRoleDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(r.id);
+            return next;
+          });
+        }
+      }
+    );
   };
 
   /* ===== EMPLOYEE: create ===== */
@@ -869,32 +874,31 @@ function ConsultingSchoolTeachers() {
     }
   };
 
-  const removeEmployee = async (u) => {
+  const removeEmployee = (u) => {
     if (!u?.id) return;
-    if (
-      !window.confirm(
-        `Удалить сотрудника «${
-          fullName(u) || u.email || "—"
-        }»? Действие необратимо.`
-      )
-    )
-      return;
-
-    const id = u.id;
-    setEmpDeletingIds((prev) => new Set(prev).add(id));
-    try {
-      await api.delete(EMPLOYEE_ITEM_URL(id));
-      await fetchEmployees();
-    } catch (err) {
-      console.error(err);
-      alert(pickApiError(err, "Не удалось удалить сотрудника"));
-    } finally {
-      setEmpDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
+    confirm(
+      `Удалить сотрудника «${
+        fullName(u) || u.email || "—"
+      }»? Действие необратимо.`,
+      async (result) => {
+        if (!result) return;
+        const id = u.id;
+        setEmpDeletingIds((prev) => new Set(prev).add(id));
+        try {
+          await api.delete(EMPLOYEE_ITEM_URL(id));
+          await fetchEmployees();
+        } catch (err) {
+          console.error(err);
+          alert(pickApiError(err, "Не удалось удалить сотрудника"), true);
+        } finally {
+          setEmpDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }
+      }
+    );
   };
 
   /* ===== RENDER ===== */

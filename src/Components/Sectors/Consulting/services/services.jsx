@@ -15,9 +15,12 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import api from "../../../../api";
 import "./services.scss";
 
 const SERVICES_VIEW_STORAGE_KEY = "consulting_services_view_mode";
+const ROLES_LIST_URL = "/users/roles/"; // кастомные роли [{id, name}]
 
 const emptyServiceForm = () => ({
   name: "",
@@ -25,6 +28,7 @@ const emptyServiceForm = () => ({
   installation_price: "",
   description: "",
   tariffs: [],
+  custom_role: "", // роль, к которой относится услуга ("" = общая, видна везде)
 });
 
 function TariffEditor({ tariffs, onChange, disabled }) {
@@ -125,6 +129,8 @@ export default function ConsultingServices({
   disabled = false,
 }) {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const alert = useAlert();
   const {
     services: rows,
     loading: loadingFromSlice,
@@ -153,6 +159,14 @@ export default function ConsultingServices({
   /* удаление */
   const [deletingIds, setDeletingIds] = useState(new Set());
 
+  /* кастомные роли — для привязки услуги к роли */
+  const [roles, setRoles] = useState([]);
+  const roleNameById = useMemo(() => {
+    const m = new Map();
+    roles.forEach((r) => m.set(String(r.id), r.name));
+    return m;
+  }, [roles]);
+
   /* helpers */
   const clean = (s) =>
     String(s || "")
@@ -168,6 +182,24 @@ export default function ConsultingServices({
   useEffect(() => {
     dispatch(getConsultingServices());
   }, [dispatch]);
+
+  /* загрузка ролей (для выбора роли услуги) */
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get(ROLES_LIST_URL)
+      .then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res.data)
+          ? res.data
+          : res.data?.results || [];
+        setRoles(list.map((r) => ({ id: r.id, name: r.name || "" })));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* фильтр */
   const filtered = useMemo(() => {
@@ -188,6 +220,32 @@ export default function ConsultingServices({
         new Date(a.updated_at || a.created_at || 0)
     );
   }, [rows, q]);
+
+  /* группировка услуг по ролям: каждая роль — отдельный блок,
+     услуги без роли уходят в «Общие услуги» (всегда внизу) */
+  const NO_ROLE = "__none__";
+  const groupedByRole = useMemo(() => {
+    const groups = new Map();
+    filtered.forEach((s) => {
+      const rid = s.custom_role ? String(s.custom_role) : NO_ROLE;
+      if (!groups.has(rid)) {
+        groups.set(rid, {
+          id: rid,
+          name:
+            rid === NO_ROLE
+              ? "Общие услуги"
+              : roleNameById.get(rid) || "Без названия роли",
+          items: [],
+        });
+      }
+      groups.get(rid).items.push(s);
+    });
+    return [...groups.values()].sort((a, b) => {
+      if (a.id === NO_ROLE) return 1;
+      if (b.id === NO_ROLE) return -1;
+      return a.name.localeCompare(b.name, "ru");
+    });
+  }, [filtered, roleNameById]);
 
   /* валидация */
   const validate = (f, setErrState) => {
@@ -217,6 +275,8 @@ export default function ConsultingServices({
     installation_price: num(f.installation_price),
     description: f.description || "",
     tariffs: normalizeTariffsForApi(f.tariffs),
+    // "" → null: услуга без роли считается общей (видна во всех воронках)
+    custom_role: f.custom_role || null,
   });
 
   /* СОЗДАНИЕ */
@@ -254,6 +314,7 @@ export default function ConsultingServices({
       installation_price:
         s.installation_price != null ? String(s.installation_price) : "",
       description: s.description ?? "",
+      custom_role: s.custom_role ? String(s.custom_role) : "",
       tariffs: (s.tariffs || []).map((t) => ({
         name: t.name || "",
         price: String(t.price ?? ""),
@@ -293,26 +354,31 @@ export default function ConsultingServices({
   };
 
   /* УДАЛЕНИЕ */
-  const removeService = async (s) => {
+  const removeService = (s) => {
     if (!s?.id) return;
-    if (!window.confirm(`Удалить услугу «${s.title ?? s.name ?? "—"}»?`))
-      return;
-    setDeletingIds((prev) => new Set(prev).add(s.id));
-    try {
-      await dispatch(deleteConsultingService(s.id)).unwrap();
-      dispatch(getConsultingServices());
-    } catch (err) {
-      alert(
-        (typeof err === "string" ? err : err?.detail) ||
-          "Не удалось удалить услугу."
-      );
-    } finally {
-      setDeletingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(s.id);
-        return next;
-      });
-    }
+    confirm(
+      `Удалить услугу «${s.title ?? s.name ?? "—"}»?`,
+      async (result) => {
+        if (!result) return;
+        setDeletingIds((prev) => new Set(prev).add(s.id));
+        try {
+          await dispatch(deleteConsultingService(s.id)).unwrap();
+          dispatch(getConsultingServices());
+        } catch (err) {
+          alert(
+            (typeof err === "string" ? err : err?.detail) ||
+              "Не удалось удалить услугу.",
+            true
+          );
+        } finally {
+          setDeletingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(s.id);
+            return next;
+          });
+        }
+      }
+    );
   };
 
   const renderServiceActions = (s) => (
@@ -396,102 +462,117 @@ export default function ConsultingServices({
       {!!effError && <div className="services__alert">{String(effError)}</div>}
 
       {!effLoading && viewMode === VIEW_MODES.TABLE && (
-        <div className="services__tableWrap">
-          <table className="services__table">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Базовая цена</th>
-                <th>Установка</th>
-                <th>Тарифы</th>
-                <th>Описание</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length ? (
-                filtered.map((s) => (
-                  <tr key={s.id}>
-                    <td
-                      className="services__ellipsis"
-                      title={s.title ?? s.name}
-                    >
-                      {s.title ?? s.name ?? "—"}
-                    </td>
-                    <td>{money(s.price)}</td>
-                    <td>{money(s.installation_price)}</td>
-                    <td className="services__ellipsis" title={formatTariffs(s)}>
-                      {formatTariffs(s)}
-                    </td>
-                    <td className="services__ellipsis" title={s.description}>
-                      {s.description || "—"}
-                    </td>
-                    <td className="services__rowActions">
-                      {renderServiceActions(s)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="services__empty" colSpan={6}>
-                    Ничего не найдено
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        !filtered.length ? (
+          <div className="services__empty">Ничего не найдено</div>
+        ) : (
+          groupedByRole.map((group) => (
+            <div className="services__group" key={group.id}>
+              <h3 className="services__groupTitle">
+                {group.name}
+                <span className="services__groupCount">{group.items.length}</span>
+              </h3>
+              <div className="services__tableWrap">
+                <table className="services__table">
+                  <thead>
+                    <tr>
+                      <th>Название</th>
+                      <th>Базовая цена</th>
+                      <th>Установка</th>
+                      <th>Тарифы</th>
+                      <th>Описание</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.items.map((s) => (
+                      <tr key={s.id}>
+                        <td
+                          className="services__ellipsis"
+                          title={s.title ?? s.name}
+                        >
+                          {s.title ?? s.name ?? "—"}
+                        </td>
+                        <td>{money(s.price)}</td>
+                        <td>{money(s.installation_price)}</td>
+                        <td
+                          className="services__ellipsis"
+                          title={formatTariffs(s)}
+                        >
+                          {formatTariffs(s)}
+                        </td>
+                        <td className="services__ellipsis" title={s.description}>
+                          {s.description || "—"}
+                        </td>
+                        <td className="services__rowActions">
+                          {renderServiceActions(s)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))
+        )
       )}
 
       {!effLoading && viewMode === VIEW_MODES.CARDS && (
-        <div className="services__cards">
-          {filtered.length ? (
-            filtered.map((s) => (
-              <article key={s.id} className="services__card">
-                <h3 className="services__cardTitle" title={s.title ?? s.name}>
-                  {s.title ?? s.name ?? "—"}
-                </h3>
-                <dl className="services__cardMeta">
-                  <div>
-                    <dt>Базовая цена</dt>
-                    <dd>{money(s.price)}</dd>
-                  </div>
-                  <div>
-                    <dt>Установка</dt>
-                    <dd>{money(s.installation_price)}</dd>
-                  </div>
-                  <div className="services__cardMetaRow--full">
-                    <dt>Тарифы</dt>
-                    <dd>
-                      {(s.tariffs || []).length ? (
-                        <ul className="services__tariffList">
-                          {(s.tariffs || []).map((t) => (
-                            <li key={t.id || t.name}>
-                              {t.name} — {money(t.price)}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        "—"
-                      )}
-                    </dd>
-                  </div>
-                  {s.description ? (
-                    <div className="services__cardMetaRow--full">
-                      <dt>Описание</dt>
-                      <dd>{s.description}</dd>
+        !filtered.length ? (
+          <div className="services__cardsEmpty">Ничего не найдено</div>
+        ) : (
+          groupedByRole.map((group) => (
+            <div className="services__group" key={group.id}>
+              <h3 className="services__groupTitle">
+                {group.name}
+                <span className="services__groupCount">{group.items.length}</span>
+              </h3>
+              <div className="services__cards">
+                {group.items.map((s) => (
+                  <article key={s.id} className="services__card">
+                    <h3 className="services__cardTitle" title={s.title ?? s.name}>
+                      {s.title ?? s.name ?? "—"}
+                    </h3>
+                    <dl className="services__cardMeta">
+                      <div>
+                        <dt>Базовая цена</dt>
+                        <dd>{money(s.price)}</dd>
+                      </div>
+                      <div>
+                        <dt>Установка</dt>
+                        <dd>{money(s.installation_price)}</dd>
+                      </div>
+                      <div className="services__cardMetaRow--full">
+                        <dt>Тарифы</dt>
+                        <dd>
+                          {(s.tariffs || []).length ? (
+                            <ul className="services__tariffList">
+                              {(s.tariffs || []).map((t) => (
+                                <li key={t.id || t.name}>
+                                  {t.name} — {money(t.price)}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            "—"
+                          )}
+                        </dd>
+                      </div>
+                      {s.description ? (
+                        <div className="services__cardMetaRow--full">
+                          <dt>Описание</dt>
+                          <dd>{s.description}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    <div className="services__cardActions">
+                      {renderServiceActions(s)}
                     </div>
-                  ) : null}
-                </dl>
-                <div className="services__cardActions">
-                  {renderServiceActions(s)}
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="services__cardsEmpty">Ничего не найдено</div>
-          )}
-        </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ))
+        )
       )}
 
       {/* ====== CREATE MODAL ====== */}
@@ -563,6 +644,28 @@ export default function ConsultingServices({
                     }
                     disabled={createSaving || disabled}
                   />
+                </div>
+
+                <div className="services__field">
+                  <label className="services__label">Роль</label>
+                  <select
+                    className="services__input"
+                    value={createForm.custom_role}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({
+                        ...p,
+                        custom_role: e.target.value,
+                      }))
+                    }
+                    disabled={createSaving || disabled}
+                  >
+                    <option value="">Общая (видна во всех воронках)</option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name || "—"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="services__field services__field--full">
@@ -685,6 +788,28 @@ export default function ConsultingServices({
                     }
                     disabled={editSaving || disabled}
                   />
+                </div>
+
+                <div className="services__field">
+                  <label className="services__label">Роль</label>
+                  <select
+                    className="services__input"
+                    value={editForm.custom_role}
+                    onChange={(e) =>
+                      setEditForm((p) => ({
+                        ...p,
+                        custom_role: e.target.value,
+                      }))
+                    }
+                    disabled={editSaving || disabled}
+                  >
+                    <option value="">Общая (видна во всех воронках)</option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name || "—"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="services__field services__field--full">

@@ -31,6 +31,8 @@ import {
   assignLead,
   archiveLead,
   setLeadParticipants,
+  getFunnelOrder,
+  saveFunnelOrder,
 } from "../../../../store/creators/funnelThunk";
 import { getConsultingServices } from "../../../../store/creators/consultingThunk";
 import {
@@ -75,6 +77,8 @@ import {
   fetchAccessibleFunnelBoards,
   fetchFunnelBoard,
 } from "../../../../utils/funnelBoardFetch";
+import { useConfirm } from "../../../../hooks/useDialog";
+import { usePointerReorder } from "../../../../hooks/usePointerReorder";
 
 /**
  * Расширенные возможности «Воронка 2.0» (скоринг, лента, задачи, win/lose,
@@ -189,6 +193,7 @@ const errToText = (err, fallback = "Что-то пошло не так.") => {
 /* ===================== главный экран ===================== */
 export default function ConsultingFunnel() {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
   const { profile } = useUser();
   const isManager = isConsultingFunnelManager(profile);
   const canViewFunnel = canViewConsultingFunnel(profile);
@@ -237,6 +242,31 @@ export default function ConsultingFunnel() {
   const [claimBusyId, setClaimBusyId] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
+  // Порядок воронок per-user. Источник истины — сервер (user-preferences),
+  // localStorage используется как кэш и fallback при отсутствии эндпоинта (404).
+  const [funnelOrderIds, setFunnelOrderIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("consulting_funnel_order_v1") || "[]"); }
+    catch { return []; }
+  });
+
+  // При загрузке тянем серверный порядок; пустой ответ/404 — оставляем localStorage.
+  useEffect(() => {
+    dispatch(getFunnelOrder())
+      .unwrap()
+      .then((order) => {
+        if (Array.isArray(order) && order.length) {
+          setFunnelOrderIds(order.map(String));
+          try {
+            localStorage.setItem(
+              "consulting_funnel_order_v1",
+              JSON.stringify(order.map(String)),
+            );
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [dispatch]);
+
   const loadBoards = useCallback(async (ids) => {
     if (!ids.length) return {};
     return fetchAccessibleFunnelBoards({ funnelIds: ids });
@@ -269,44 +299,42 @@ export default function ConsultingFunnel() {
     }
   }, [visibleFunnelIdsKey, loadBoards]);
 
-  const onDeleteStage = async (funnelId, stage) => {
+  const onDeleteStage = (funnelId, stage) => {
     if (!stage?.id || isSystemStage(stage)) return;
-    if (
-      !window.confirm(
-        `Удалить стадию «${stage.name || "без названия"}»? Лиды останутся без этой стадии.`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await dispatch(deleteStage(stage.id)).unwrap();
-      setNotice("Стадия удалена.");
-      refreshBoard(funnelId);
-    } catch (e) {
-      setNotice(errToText(e, "Не удалось удалить стадию."));
-    }
+    confirm(
+      `Удалить стадию «${stage.name || "без названия"}»? Лиды останутся без этой стадии.`,
+      async (result) => {
+        if (!result) return;
+        try {
+          await dispatch(deleteStage(stage.id)).unwrap();
+          setNotice("Стадия удалена.");
+          refreshBoard(funnelId);
+        } catch (e) {
+          setNotice(errToText(e, "Не удалось удалить стадию."));
+        }
+      },
+    );
   };
 
-  const onDeleteFunnel = async (funnel) => {
+  const onDeleteFunnel = (funnel) => {
     if (!funnel || isProtectedFunnel(funnel)) return;
-    if (
-      !window.confirm(
-        `Удалить воронку «${getFunnelDisplayName(funnel)}»? Это действие необратимо.`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await dispatch(deleteFunnel(funnel.id)).unwrap();
-      setBoardsMap((prev) => {
-        const next = { ...prev };
-        delete next[funnel.id];
-        return next;
-      });
-      setNotice("Воронка удалена.");
-    } catch (e) {
-      setNotice(errToText(e, "Не удалось удалить воронку."));
-    }
+    confirm(
+      `Удалить воронку «${getFunnelDisplayName(funnel)}»? Это действие необратимо.`,
+      async (result) => {
+        if (!result) return;
+        try {
+          await dispatch(deleteFunnel(funnel.id)).unwrap();
+          setBoardsMap((prev) => {
+            const next = { ...prev };
+            delete next[funnel.id];
+            return next;
+          });
+          setNotice("Воронка удалена.");
+        } catch (e) {
+          setNotice(errToText(e, "Не удалось удалить воронку."));
+        }
+      },
+    );
   };
 
   const { isConnected, userId: wsUserId, isManager: wsIsManager } =
@@ -399,6 +427,59 @@ export default function ConsultingFunnel() {
       boardsLoadGenRef.current += 1;
     };
   }, [loading, profile, visibleFunnelIdsKey]);
+
+  // sync funnel order when visible funnels change (add new, remove deleted)
+  useEffect(() => {
+    setFunnelOrderIds((prev) => {
+      const currentIds = visibleFunnels.map((f) => String(f.id));
+      const kept = prev.filter((id) => currentIds.includes(id));
+      const added = currentIds.filter((id) => !kept.includes(id));
+      const next = [...kept, ...added];
+      try { localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [visibleFunnels]);
+
+  const sortedFunnels = useMemo(() => {
+    if (!funnelOrderIds.length) return visibleFunnels;
+    return funnelOrderIds
+      .map((id) => visibleFunnels.find((f) => String(f.id) === id))
+      .filter(Boolean);
+  }, [funnelOrderIds, visibleFunnels]);
+
+  // Переупорядочивание воронок — на pointer-событиях (см. usePointerReorder).
+  // Порядок засеивается из текущего видимого порядка (sortedFunnels), иначе при
+  // пустом localStorage indexOf вернул бы -1 и перестановка не применилась бы.
+  const handleFunnelReorder = useCallback(
+    (dragId, targetId) => {
+      if (!dragId || dragId === targetId) return;
+      setFunnelOrderIds(() => {
+        const ids = sortedFunnels.map((f) => String(f.id));
+        const from = ids.indexOf(String(dragId));
+        const to = ids.indexOf(String(targetId));
+        if (from === -1 || to === -1) return ids;
+        ids.splice(from, 1);
+        ids.splice(to, 0, String(dragId));
+        try {
+          localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(ids));
+        } catch { /* localStorage недоступен — порядок не сохранится, не критично */ }
+        // Сохраняем на сервер (per-user). Ошибку/404 игнорируем — localStorage кэш.
+        dispatch(saveFunnelOrder(ids));
+        return ids;
+      });
+    },
+    [sortedFunnels, dispatch]
+  );
+
+  const {
+    dragId: funnelDragId,
+    overId: funnelDragOverId,
+    onHandlePointerDown: onFunnelHandlePointerDown,
+  } = usePointerReorder({
+    itemSelector: ".funnel__row",
+    idAttr: "data-funnel-id",
+    onReorder: handleFunnelReorder,
+  });
 
   // владельцы для фильтра — из всех досок
   const owners = useMemo(() => {
@@ -648,7 +729,7 @@ export default function ConsultingFunnel() {
         </div>
       ) : (
         <div className="funnel__rows">
-          {visibleFunnels.map((f) => (
+          {sortedFunnels.map((f) => (
             <FunnelBoardRow
               key={f.id}
               funnel={f}
@@ -682,6 +763,10 @@ export default function ConsultingFunnel() {
               }
               onDeleteStage={onDeleteStage}
               allowedTransitions={allowedTransitions}
+              onRefreshBoard={() => refreshBoard(f.id)}
+              funnelDragId={funnelDragId}
+              isDragOver={funnelDragOverId === String(f.id)}
+              onFunnelHandlePointerDown={onFunnelHandlePointerDown}
             />
           ))}
         </div>
@@ -1380,6 +1465,17 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
     };
   }, [dispatch]);
 
+  // Услуги, доступные в этой воронке. На воронке роли показываем только услуги
+  // этой роли + общие (без роли). На основной/без custom_role — все услуги.
+  const funnelRoleId = funnel?.custom_role ? String(funnel.custom_role) : null;
+  const visibleServices = useMemo(() => {
+    if (!funnelRoleId) return services;
+    return services.filter((s) => {
+      const sr = s.custom_role ? String(s.custom_role) : null;
+      return !sr || sr === funnelRoleId;
+    });
+  }, [services, funnelRoleId]);
+
   const selectedService = services.find(
     (s) => String(s.id) === String(form.service),
   );
@@ -1487,7 +1583,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
               }
             >
               <option value="">Не выбрана</option>
-              {services.map((s) => (
+              {visibleServices.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
@@ -1669,6 +1765,7 @@ function LeadDetail({
   onBoardRefresh,
 }) {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
   const { board: boardFromStore, lossReasons = [], timeline, tasks } = useFunnel();
   const board = boardProp || boardFromStore;
   const lead = findLead(board, leadId);
@@ -1733,26 +1830,25 @@ function LeadDetail({
   const clientId = lead.client || lead.client_id;
   const clientName = lead.client_display || lead.client_full_name;
 
-  const onArchive = async () => {
-    if (
-      !window.confirm(
-        "Перенести лид в архив? Карточка исчезнет с доски, данные сохранятся в аналитике.",
-      )
-    ) {
-      return;
-    }
-    setErr("");
-    setBusy(true);
-    try {
-      await dispatch(archiveLead(leadId)).unwrap();
-      onNotice?.("Лид перенесён в архив.");
-      onBoardRefresh?.();
-      onClose();
-    } catch (e) {
-      setErr(errToText(e, "Не удалось перенести лид в архив."));
-    } finally {
-      setBusy(false);
-    }
+  const onArchive = () => {
+    confirm(
+      "Перенести лид в архив? Карточка исчезнет с доски, данные сохранятся в аналитике.",
+      async (result) => {
+        if (!result) return;
+        setErr("");
+        setBusy(true);
+        try {
+          await dispatch(archiveLead(leadId)).unwrap();
+          onNotice?.("Лид перенесён в архив.");
+          onBoardRefresh?.();
+          onClose();
+        } catch (e) {
+          setErr(errToText(e, "Не удалось перенести лид в архив."));
+        } finally {
+          setBusy(false);
+        }
+      },
+    );
   };
 
   const onClaim = async () => {

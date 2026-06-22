@@ -31,6 +31,7 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 const SALES_VIEW_STORAGE_KEY = "consulting_sales_view_mode";
 
@@ -114,6 +115,8 @@ export default function ConsultingSale({
   disabled = false,
 }) {
   const dispatch = useDispatch();
+  const confirm = useConfirm();
+  const alert = useAlert();
   const { services = [], rows = [] } = useConsulting();
   const { list: clients = [] } = useClient();
   const { company } = useUser();
@@ -328,22 +331,25 @@ export default function ConsultingSale({
   };
 
   /* удалить продажу — через thunk */
-  const removeSale = async (row) => {
+  const removeSale = (row) => {
     if (!row?.id) return;
-    if (!window.confirm("Удалить эту продажу?")) return;
-    try {
-      if (onDeleteSale) {
-        await onDeleteSale(row);
-      } else {
-        await dispatch(deleteConsultingSale(row.id)).unwrap();
+    confirm("Удалить эту продажу?", async (result) => {
+      if (!result) return;
+      try {
+        if (onDeleteSale) {
+          await onDeleteSale(row);
+        } else {
+          await dispatch(deleteConsultingSale(row.id)).unwrap();
+        }
+        dispatch(getConsultingRows());
+      } catch (err) {
+        alert(
+          (typeof err === "string" ? err : err?.detail) ||
+            "Не удалось удалить продажу.",
+          true
+        );
       }
-      dispatch(getConsultingRows());
-    } catch (err) {
-      alert(
-        (typeof err === "string" ? err : err?.detail) ||
-          "Не удалось удалить продажу."
-      );
-    }
+    });
   };
 
   /* начальные загрузки */

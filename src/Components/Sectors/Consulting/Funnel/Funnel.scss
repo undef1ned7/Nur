@@ -1544,6 +1544,58 @@
   &__modal > .funnel__error {
     margin: 0 22px 14px;
   }
+
+  // ---------------- drag handles ----------------
+  &__rowDragHandle,
+  &__colDragHandle {
+    cursor: grab;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    opacity: 0.25;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+    padding: 3px 5px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    user-select: none;
+    // pointer-drag: чтобы тач не уводил в скролл и работал на всех браузерах
+    touch-action: none;
+    -webkit-user-select: none;
+    &:hover {
+      color: var(--text);
+      background: var(--border);
+      opacity: 1 !important;
+    }
+    &:active {
+      cursor: grabbing;
+    }
+  }
+  &__row:hover &__rowDragHandle {
+    opacity: 0.6;
+  }
+  &__col:hover &__colDragHandle {
+    opacity: 0.6;
+  }
+
+  // funnel row drag states
+  &__row--dragging {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  &__row--dragOver {
+    box-shadow: 0 -3px 0 0 var(--primary-dark), var(--shadow-md);
+    border-color: var(--primary-dark);
+  }
+
+  // stage column drag states
+  &__col--stageDragging {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  &__col--stageDragOver {
+    border-left: 3px solid var(--primary-dark) !important;
+    box-shadow: -2px 0 8px rgba(247, 215, 79, 0.35), var(--shadow-sm);
+  }
 }
 
 @keyframes funnelFade {
