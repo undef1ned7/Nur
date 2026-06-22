@@ -25,6 +25,18 @@ const isGenericMessage = (message) => {
   );
 };
 
+const dedupe = (parts) => {
+  const seen = new Set();
+  const result = [];
+  for (const part of parts) {
+    const key = part.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(key);
+  }
+  return result;
+};
+
 const formatCandidate = (candidate) => {
   if (typeof candidate === "string" && candidate.trim()) {
     return candidate.trim();
@@ -38,21 +50,35 @@ const formatCandidate = (candidate) => {
             item.message ||
             item.msg ||
             item.detail ||
-            (typeof item.toString === "function" ? String(item) : "")
+            // Вложенные ошибки полей, напр. { quantity_fact: ["..."] }
+            formatCandidate(item) ||
+            ""
           );
         }
         return "";
       })
       .filter(Boolean);
-    if (parts.length > 0) {
-      return parts.join(parts.length > 1 ? "\n" : ", ");
+    const unique = dedupe(parts);
+    if (unique.length > 0) {
+      return unique.join(unique.length > 1 ? "\n" : ", ");
     }
   }
   if (candidate && typeof candidate === "object") {
-    const nested = formatCandidate(
+    const direct = formatCandidate(
       candidate.detail ?? candidate.message ?? candidate.error,
     );
-    if (nested) return nested;
+    if (direct) return direct;
+
+    // Собираем сообщения из всех полей объекта (DRF возвращает { field: [...] }).
+    const parts = [];
+    for (const value of Object.values(candidate)) {
+      const parsed = formatCandidate(value);
+      if (parsed) parts.push(parsed);
+    }
+    const unique = dedupe(parts);
+    if (unique.length > 0) {
+      return unique.join(unique.length > 1 ? "\n" : ", ");
+    }
   }
   return null;
 };

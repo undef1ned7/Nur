@@ -12,6 +12,21 @@ const normalizeQuantityValue = (value) => {
   return normalized;
 };
 
+// Убирает хвостовые нули после дробной части: "920.00" -> "920", "900.50" -> "900.5"
+const trimTrailingZeros = (value) => {
+  const normalized = normalizeQuantityValue(value);
+  if (normalized === "" || !normalized.includes(".")) return normalized;
+  return normalized.replace(/\.?0+$/, "");
+};
+
+// Ограничивает дробную часть двумя знаками (бэкенд принимает максимум 2 цифры после запятой)
+const clampToTwoDecimals = (value) => {
+  const normalized = normalizeQuantityValue(value);
+  const dotIndex = normalized.indexOf(".");
+  if (dotIndex === -1) return normalized;
+  return normalized.slice(0, dotIndex + 3);
+};
+
 const InventoryModal = ({ products, onClose, onSaved }) => {
   const [note, setNote] = useState("");
   const [allowNegative, setAllowNegative] = useState(false);
@@ -23,7 +38,7 @@ const InventoryModal = ({ products, onClose, onSaved }) => {
     const initialQuantities = Object.fromEntries(
       (products || []).map((product) => [
         product.id,
-        normalizeQuantityValue(product.quantity ?? 0),
+        trimTrailingZeros(product.quantity ?? 0),
       ]),
     );
     setQuantities(initialQuantities);
@@ -268,13 +283,13 @@ const InventoryModal = ({ products, onClose, onSaved }) => {
 
                     <input
                       type="number"
-                      step="0.001"
+                      step="0.01"
                       className="warehouse-inventory-modal__input"
                       value={row.quantityFactRaw}
                       onChange={(event) =>
                         setQuantities((prev) => ({
                           ...prev,
-                          [row.id]: event.target.value,
+                          [row.id]: clampToTwoDecimals(event.target.value),
                         }))
                       }
                       placeholder="0"
