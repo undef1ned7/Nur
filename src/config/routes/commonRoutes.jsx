@@ -90,7 +90,19 @@ const SellCashierPage = lazy(
   () => import("../../Components/pages/Sell/Cashier/SellCashierPage"),
 );
 
-export const commonRoutes = (profile) => [
+const kassaRoutes = (profile, sector) => {
+  const useFullKassa =
+    profile?.role === "owner" || isMarketSectorName(sector);
+
+  return useFullKassa
+    ? [
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
+    : [createProtectedRoute("kassa/*", KassWorker)];
+};
+
+export const commonRoutes = (profile, sector = "") => [
   createProtectedRoute("set", Set),
   createProtectedRoute("pos-print-settings", PosPrintSettings),
   createProtectedRoute("raspisanie", Raspisanie),
@@ -127,12 +139,7 @@ export const commonRoutes = (profile) => [
   createProtectedRoute("branch", Branch),
   createProtectedRoute("branch/:id", BranchDetails),
   createProtectedRoute("sector", SectorSelect),
-  ...(profile?.role === "owner"
-    ? [
-        createProtectedRoute("kassa/*", Kassa),
-        createProtectedRoute("kassa/:id", KassaDet),
-      ]
-    : [createProtectedRoute("kassa/*", KassWorker)]),
+  ...kassaRoutes(profile, sector),
   createProtectedRoute("instagram", Instagram),
   createProtectedRoute("debts", Debts),
   createProtectedRoute("pending", Pending),

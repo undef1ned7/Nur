@@ -11,9 +11,12 @@ import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
 import "./i18n.js";
 import { ModalProvider } from "./context/modal";
+import { useUser } from "./store/slices/userSlice";
 
 function AppRoutes({ profile }) {
   const { pathname } = useLocation();
+  const { sector, company } = useUser();
+  const sectorName = sector || company?.sector?.name || "";
   const [crmRoutesElements, setCrmRoutesElements] = useState(null);
 
   useEffect(() => {
@@ -23,28 +26,16 @@ function AppRoutes({ profile }) {
 
     let cancelled = false;
 
-    const loadRoutes = () =>
-      import("./config/routes/index.js")
-        .then((mod) => {
-          if (!cancelled) {
-            setCrmRoutesElements(mod.crmRoutes(profile));
-          }
-        })
-        .catch((err) => {
-          console.error("Не удалось загрузить CRM-маршруты:", err);
-          if (!cancelled) {
-            setTimeout(() => {
-              if (!cancelled) loadRoutes();
-            }, 1500);
-          }
-        });
-
-    loadRoutes();
+    import("./config/routes/index.js").then((mod) => {
+      if (!cancelled) {
+        setCrmRoutesElements(mod.crmRoutes(profile, sectorName));
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [pathname, profile]);
+  }, [pathname, profile, sectorName]);
 
   return (
     <Suspense fallback={<RouteFallback />}>

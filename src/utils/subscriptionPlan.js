@@ -8,7 +8,7 @@ export function isStartPlan(tariffName) {
   return t === "старт" || t === "start";
 }
 
-const isMarketSectorName = (sectorName) => {
+export function isMarketSectorName(sectorName) {
   const sector = String(sectorName || "")
     .trim()
     .toLowerCase();
@@ -17,7 +17,27 @@ const isMarketSectorName = (sectorName) => {
     sector === "цветочный магазин" ||
     sector.includes("магазин")
   );
-};
+}
+
+export const MARKET_START_EMPLOYEE_LIMIT = 3;
+
+export const MARKET_START_EMPLOYEE_LIMIT_MESSAGE =
+  "На тарифе Старт для Маркета можно иметь максимум 3 сотрудников, включая владельца.";
+
+/** Лимит сотрудников на тарифе «Старт» в Магазине (включая владельца). */
+export function canAddEmployeeOnMarketStart({
+  tariffName,
+  sectorName,
+  employees = [],
+} = {}) {
+  if (!isStartPlan(tariffName) || !isMarketSectorName(sectorName)) {
+    return true;
+  }
+  const list = Array.isArray(employees) ? employees : [];
+  const hasOwnerInList = list.some((employee) => employee?.role === "owner");
+  const totalEmployeesWithOwner = list.length + (hasOwnerInList ? 0 : 1);
+  return totalEmployeesWithOwner < MARKET_START_EMPLOYEE_LIMIT;
+}
 
 /** Онлайн-витрина на «Старт» в Магазине — только после заявки (can_view_showcase). */
 export function isMarketStartShowcaseRequestOnly(tariffName, sectorName) {

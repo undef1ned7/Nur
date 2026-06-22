@@ -13,6 +13,7 @@ import { useDispatch, useStore } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
 import { useDebounce, useDebounceByKey } from "../../../../hooks/useDebounce";
+import { useCashierQtyScanGuard } from "../../../../hooks/useCashierQtyScanGuard";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import {
@@ -708,9 +709,9 @@ const CashierPage = () => {
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
   const productsGridRef = React.useRef(null);
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
-  const qtyInputScanGuardRef = React.useRef({ count: 0, lastTime: 0 });
   const qtyInputFocusRef = React.useRef({ itemId: null, prevValue: "" });
   const suppressQtyBlurUpdateRef = React.useRef({});
+  const commitFocusedQuantityInputRef = React.useRef(null);
   const cartQtyInputRefs = React.useRef(new Map()); // item.id -> input
   const pendingQtyFocusRef = React.useRef(null); // { itemId?, productId?, salePackage? }
   /** Последнее значение из инпута количества, для которого запланирован debounced API */
@@ -1220,7 +1221,14 @@ const CashierPage = () => {
           String(activeEl.className || "").includes(
             "cashier-page__search-input",
           );
-        if (!isSearch) {
+        const isQty = String(activeEl.className || "").includes(
+          "cashier-page__cart-item-quantity-input",
+        );
+        if (isQty) {
+          await commitFocusedQuantityInputRef.current?.();
+          activeEl.blur();
+          searchInputRef.current?.focus();
+        } else if (!isSearch) {
           return;
         }
       }
@@ -1422,6 +1430,15 @@ const CashierPage = () => {
   useEffect(() => {
     cartRef.current = cart;
   }, [cart]);
+
+  useCashierQtyScanGuard({
+    searchInputRef,
+    cartRef,
+    setCartQuantities,
+    commitQuantityRef: commitFocusedQuantityInputRef,
+    pendingQtyLineInputRef,
+    suppressQtyBlurUpdateRef,
+  });
 
   // Инициализация данных при первой загрузке
   useEffect(() => {
@@ -1870,61 +1887,6 @@ const CashierPage = () => {
   }, [searchTerm]);
 
   // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
-  useEffect(() => {
-    // Если сканер начинает "печатать" в инпут количества, сначала снимаем фокус с инпута,
-    // чтобы символы скана не попали в поле количества (например "10").
-    const blurQtyInputBeforeScan = (e) => {
-      const active = document.activeElement;
-      if (!(active instanceof HTMLInputElement)) return;
-      if (!active.classList.contains("cashier-page__cart-item-quantity-input")) {
-        qtyInputScanGuardRef.current.count = 0;
-        return;
-      }
-
-      const key = e.key || "";
-      const isChar = key.length === 1 && /^[0-9A-Za-z]$/.test(key);
-      const isScanTerminator = key === "Enter" || key === "Tab";
-      if (!isChar && !isScanTerminator) return;
-
-      const now = Date.now();
-      const dt = now - qtyInputScanGuardRef.current.lastTime;
-      qtyInputScanGuardRef.current.lastTime = now;
-
-      // Для ручного ввода (в т.ч. дробных значений) guard НЕ должен срабатывать.
-      // Считаем сканером только очень быстрый поток символов.
-      if (dt < 40) {
-        qtyInputScanGuardRef.current.count += 1;
-      } else {
-        qtyInputScanGuardRef.current.count = 1;
-      }
-
-      // Блокируем ввод в количество только при явном паттерне сканера
-      // (несколько символов подряд с очень маленьким интервалом).
-      if (qtyInputScanGuardRef.current.count >= 3) {
-        e.preventDefault();
-        const focusedItemId = active.dataset?.cartItemId;
-        if (
-          focusedItemId &&
-          qtyInputFocusRef.current.itemId === focusedItemId &&
-          qtyInputFocusRef.current.prevValue !== ""
-        ) {
-          suppressQtyBlurUpdateRef.current[focusedItemId] = true;
-          setCartQuantities((prev) => ({
-            ...prev,
-            [focusedItemId]: qtyInputFocusRef.current.prevValue,
-          }));
-        }
-        active.blur();
-        qtyInputScanGuardRef.current.count = 0;
-      }
-    };
-
-    window.addEventListener("keydown", blurQtyInputBeforeScan, true);
-    return () => {
-      window.removeEventListener("keydown", blurQtyInputBeforeScan, true);
-    };
-  }, []);
-
   useEffect(() => {
     const handleGlobalEnter = (e) => {
       const now = Date.now();
@@ -2604,6 +2566,124 @@ const CashierPage = () => {
       );
     }
   };
+
+  const commitCartLineQuantityInput = useCallback(
+    async (item, rawInput) => {
+      if (!item) return;
+
+      const lineKey = String(item.id);
+      debouncedQtyApiByLine.cancel(lineKey);
+      pendingQtyLineInputRef.current.delete(lineKey);
+
+      let value = String(rawInput ?? "").trim();
+      if (value === "" || value === "-") {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+        qtyInputFocusRef.current = { itemId: null, prevValue: "" };
+        return;
+      }
+      if (value === "." || value === ",") {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+        qtyInputFocusRef.current = { itemId: null, prevValue: "" };
+        return;
+      }
+      if (/[.,]$/.test(value)) {
+        value = value.slice(0, -1);
+      }
+      const qtyNum = normalizeQuantity(
+        Math.max(0, parseDecimalInput(value) || 0),
+      );
+
+      if (!item.isCustom && !item.salePackage) {
+        const product = products.find((p) => p.id === item.productId);
+        if (
+          product &&
+          !isMarketWarehouseServiceProduct(product)
+        ) {
+          const availableQuantity = parseFloat(product.quantity || 0);
+          if (
+            availableQuantity > 0 &&
+            qtyNum > availableQuantity
+          ) {
+            showAlert(
+              "warning",
+              "Недостаточно товара",
+              `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+            );
+            setCartQuantities((prev) => ({
+              ...prev,
+              [item.id]: formatQuantity(item.quantity || 0),
+            }));
+            qtyInputFocusRef.current = { itemId: null, prevValue: "" };
+            return;
+          }
+        }
+      }
+
+      if (qtyNum === 0) {
+        if (item.isCustom) {
+          await removeCustomFromCart(item);
+        } else {
+          await removeFromCart(item);
+        }
+      } else if (
+        qtyNum !== normalizeQuantity(item.quantity || 0)
+      ) {
+        if (item.isCustom) {
+          await updateCustomQuantityDirect(item, qtyNum);
+        } else {
+          await updateQuantityDirect(item, qtyNum);
+        }
+      } else {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+      }
+      qtyInputFocusRef.current = { itemId: null, prevValue: "" };
+    },
+    [
+      products,
+      removeCustomFromCart,
+      removeFromCart,
+      updateCustomQuantityDirect,
+      updateQuantityDirect,
+    ],
+  );
+
+  const commitFocusedQuantityInput = useCallback(
+    async (itemOverride, rawValueOverride) => {
+      const active = document.activeElement;
+      let item = itemOverride;
+      let rawValue = rawValueOverride;
+
+      if (!item) {
+        if (!(active instanceof HTMLInputElement)) return;
+        if (
+          !active.classList.contains("cashier-page__cart-item-quantity-input")
+        ) {
+          return;
+        }
+        const lineKey = active.dataset?.cartItemId;
+        if (!lineKey) return;
+        item = cartRef.current.find((c) => String(c.id) === String(lineKey));
+        rawValue = rawValue ?? active.value;
+      }
+
+      if (!item) return;
+      await commitCartLineQuantityInput(item, rawValue);
+    },
+    [commitCartLineQuantityInput],
+  );
+
+  useEffect(() => {
+    commitFocusedQuantityInputRef.current = commitFocusedQuantityInput;
+  }, [commitFocusedQuantityInput]);
 
   // PATCH: только unit_price (MARKET_POS_CART — цена и скидка меняются независимо).
   // Без скидки по строке — цена не может быть ниже закупочной; при наличии скидки — можно.
@@ -3723,6 +3803,7 @@ const CashierPage = () => {
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
                           data-cart-item-id={item.id}
+                          data-is-weight={item.isWeight ? "1" : "0"}
                           value={
                             cartQuantities[item.id] ??
                             formatQuantity(item.quantity || 0)
@@ -3879,100 +3960,33 @@ const CashierPage = () => {
                           }}
                           onBlur={async (e) => {
                             const lineKey = String(item.id);
-                            debouncedQtyApiByLine.cancel(lineKey);
-                            pendingQtyLineInputRef.current.delete(lineKey);
                             if (suppressQtyBlurUpdateRef.current[lineKey]) {
                               delete suppressQtyBlurUpdateRef.current[lineKey];
+                              debouncedQtyApiByLine.cancel(lineKey);
+                              pendingQtyLineInputRef.current.delete(lineKey);
                               qtyInputFocusRef.current = {
                                 itemId: null,
                                 prevValue: "",
                               };
                               return;
                             }
-                            let value = e.target.value.trim();
-                            if (value === "" || value === "-") {
-                              setCartQuantities((prev) => ({
-                                ...prev,
-                                [item.id]: formatQuantity(item.quantity || 0),
-                              }));
-                              qtyInputFocusRef.current = {
-                                itemId: null,
-                                prevValue: "",
-                              };
-                              return;
-                            }
-                            if (value === "." || value === ",") {
-                              setCartQuantities((prev) => ({
-                                ...prev,
-                                [item.id]: formatQuantity(item.quantity || 0),
-                              }));
-                              qtyInputFocusRef.current = {
-                                itemId: null,
-                                prevValue: "",
-                              };
-                              return;
-                            }
-                            if (/[.,]$/.test(value)) {
-                              value = value.slice(0, -1);
-                            }
-                            const qtyNum = normalizeQuantity(
-                              Math.max(0, parseDecimalInput(value) || 0),
+                            await commitCartLineQuantityInput(
+                              item,
+                              e.target.value,
                             );
-                            if (!item.isCustom && !item.salePackage) {
-                              const product = products.find(
-                                (p) => p.id === item.productId,
-                              );
-                              if (
-                                product &&
-                                !isMarketWarehouseServiceProduct(product)
-                              ) {
-                                const availableQuantity = parseFloat(
-                                  product.quantity || 0,
-                                );
-                                if (
-                                  availableQuantity > 0 &&
-                                  qtyNum > availableQuantity
-                                ) {
-                                  showAlert(
-                                    "warning",
-                                    "Недостаточно товара",
-                                    `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
-                                  );
-                                  setCartQuantities((prev) => ({
-                                    ...prev,
-                                    [item.id]: formatQuantity(
-                                      item.quantity || 0,
-                                    ),
-                                  }));
-                                  return;
-                                }
-                              }
-                            }
-                            if (qtyNum === 0) {
-                              if (item.isCustom) {
-                                await removeCustomFromCart(item);
-                              } else {
-                                await removeFromCart(item);
-                              }
-                            } else if (qtyNum !== item.quantity) {
-                              if (item.isCustom) {
-                                await updateCustomQuantityDirect(item, qtyNum);
-                              } else {
-                                await updateQuantityDirect(item, qtyNum);
-                              }
-                            } else {
-                              setCartQuantities((prev) => ({
-                                ...prev,
-                                [item.id]: formatQuantity(item.quantity || 0),
-                              }));
-                            }
-                            qtyInputFocusRef.current = {
-                              itemId: null,
-                              prevValue: "",
-                            };
                           }}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") e.target.blur();
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const lineKey = String(item.id);
+                              suppressQtyBlurUpdateRef.current[lineKey] = true;
+                              void commitCartLineQuantityInput(
+                                item,
+                                e.currentTarget.value,
+                              ).finally(() => {
+                                e.currentTarget.blur();
+                              });
+                            }
                           }}
                           inputMode={item.isWeight ? "decimal" : "numeric"}
                         />

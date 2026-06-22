@@ -12,6 +12,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useCashierQtyScanGuard } from "@/hooks/useCashierQtyScanGuard";
 import { fetchClientsAsync } from "@/store/creators/clientCreators";
 import { fetchProductsAsync } from "@/store/creators/productCreators";
 import {
@@ -156,6 +157,7 @@ const SellCashierPage = () => {
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const debounceTimerRef = React.useRef(null);
   const [cart, setCart] = useState([]);
+  const cartRef = React.useRef([]);
   const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
   const [cartPrices, setCartPrices] = useState({}); // Локальные значения цены за единицу
@@ -168,6 +170,8 @@ const SellCashierPage = () => {
   const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
   const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
   const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
+  const suppressQtyBlurUpdateRef = React.useRef({});
+  const commitQuantityRef = React.useRef(null);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
@@ -380,6 +384,34 @@ const SellCashierPage = () => {
       isScanningRef.current = true;
       lastScannedBarcodeRef.current = barcode;
       setScannedBarcode(barcode);
+
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement
+      ) {
+        const isSearch =
+          activeEl === searchInputRef.current ||
+          String(activeEl.className || "").includes(
+            "cashier-page__search-input",
+          );
+        const isQty = String(activeEl.className || "").includes(
+          "cashier-page__cart-item-quantity-input",
+        );
+        if (isQty) {
+          const lineKey = activeEl.dataset?.cartItemId;
+          const item = cartRef.current.find(
+            (c) => String(c.id) === String(lineKey),
+          );
+          if (item) {
+            await commitQuantityRef.current?.(item, activeEl.value);
+          }
+          activeEl.blur();
+          searchInputRef.current?.focus();
+        } else if (!isSearch) {
+          return;
+        }
+      }
 
       // Проверяем наличие открытой смены
       if (!openShiftId) {
@@ -868,6 +900,18 @@ const SellCashierPage = () => {
     }
   }, [searchTerm]);
 
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  useCashierQtyScanGuard({
+    searchInputRef,
+    cartRef,
+    setCartQuantities,
+    commitQuantityRef,
+    suppressQtyBlurUpdateRef,
+  });
+
   // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
   useEffect(() => {
     const handleGlobalEnter = (e) => {
@@ -1347,6 +1391,72 @@ const SellCashierPage = () => {
       );
     }
   };
+
+  const commitCartLineQuantityInput = useCallback(
+    async (item, rawInput) => {
+      if (!item) return;
+
+      let value = String(rawInput ?? "").trim();
+      if (value === "" || value === "-") {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+        return;
+      }
+
+      const qtyNum = normalizeQuantity(Math.max(0, parseFloat(value) || 0));
+
+      if (!item.isCustom) {
+        const product = products.find((p) => p.id === item.id);
+        if (product) {
+          const availableQuantity = parseFloat(product.quantity || 0);
+          if (availableQuantity > 0 && qtyNum > availableQuantity) {
+            showAlert(
+              "warning",
+              "Недостаточно товара",
+              `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+            );
+            setCartQuantities((prev) => ({
+              ...prev,
+              [item.id]: formatQuantity(item.quantity || 0),
+            }));
+            return;
+          }
+        }
+      }
+
+      if (qtyNum === 0) {
+        if (item.isCustom) {
+          await removeCustomFromCart(item);
+        } else {
+          await removeFromCart(item.id);
+        }
+      } else if (qtyNum !== normalizeQuantity(item.quantity || 0)) {
+        if (item.isCustom) {
+          await updateCustomQuantityDirect(item, qtyNum);
+        } else {
+          await updateQuantityDirect(item.id, qtyNum);
+        }
+      } else {
+        setCartQuantities((prev) => ({
+          ...prev,
+          [item.id]: formatQuantity(item.quantity || 0),
+        }));
+      }
+    },
+    [
+      products,
+      removeCustomFromCart,
+      removeFromCart,
+      updateCustomQuantityDirect,
+      updateQuantityDirect,
+    ],
+  );
+
+  useEffect(() => {
+    commitQuantityRef.current = commitCartLineQuantityInput;
+  }, [commitCartLineQuantityInput]);
 
   // PATCH позиции: цена за единицу (unit_price). Цена не может быть ниже цены товара
   const patchCartItemPrice = async (item, value) => {
@@ -1923,6 +2033,8 @@ const SellCashierPage = () => {
                         <input
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
+                          data-cart-item-id={item.id}
+                          data-is-weight={item.isWeight ? "1" : "0"}
                           value={
                             cartQuantities[item.id] ??
                             formatQuantity(item.quantity || 0)
@@ -1990,63 +2102,27 @@ const SellCashierPage = () => {
                             }));
                           }}
                           onBlur={async (e) => {
-                            const value = e.target.value;
-                            const qtyNum = normalizeQuantity(
-                              Math.max(0, parseFloat(value) || 0),
+                            const lineKey = String(item.id);
+                            if (suppressQtyBlurUpdateRef.current[lineKey]) {
+                              delete suppressQtyBlurUpdateRef.current[lineKey];
+                              return;
+                            }
+                            await commitCartLineQuantityInput(
+                              item,
+                              e.target.value,
                             );
-
-                            // Находим товар для проверки наличия
-                            if (!item.isCustom) {
-                              const product = products.find(
-                                (p) => p.id === item.id,
-                              );
-                              if (product) {
-                                const availableQuantity = parseFloat(
-                                  product.quantity || 0,
-                                );
-                                if (
-                                  availableQuantity > 0 &&
-                                  qtyNum > availableQuantity
-                                ) {
-                                  showAlert(
-                                    "warning",
-                                    "Недостаточно товара",
-                                    `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
-                                  );
-                                  setCartQuantities((prev) => ({
-                                    ...prev,
-                                    [item.id]: formatQuantity(
-                                      item.quantity || 0,
-                                    ),
-                                  }));
-                                  return;
-                                }
-                              }
-                            }
-
-                            if (qtyNum === 0) {
-                              if (item.isCustom) {
-                                await removeCustomFromCart(item);
-                              } else {
-                                await removeFromCart(item.id);
-                              }
-                            } else if (qtyNum !== item.quantity) {
-                              if (item.isCustom) {
-                                await updateCustomQuantityDirect(item, qtyNum);
-                              } else {
-                                await updateQuantityDirect(item.id, qtyNum);
-                              }
-                            } else {
-                              // Если количество не изменилось, просто обновляем локальное значение
-                              setCartQuantities((prev) => ({
-                                ...prev,
-                                [item.id]: formatQuantity(item.quantity || 0),
-                              }));
-                            }
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
-                              e.target.blur();
+                              e.preventDefault();
+                              const lineKey = String(item.id);
+                              suppressQtyBlurUpdateRef.current[lineKey] = true;
+                              void commitCartLineQuantityInput(
+                                item,
+                                e.currentTarget.value,
+                              ).finally(() => {
+                                e.currentTarget.blur();
+                              });
                             }
                           }}
                           min="0"
