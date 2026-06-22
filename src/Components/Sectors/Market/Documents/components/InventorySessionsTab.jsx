@@ -198,6 +198,7 @@ const InventorySessionsTab = () => {
   const hasPrevPage = page > 1;
 
   const itemsCount = (session) => {
+    if (Array.isArray(session?.lines)) return session.lines.length;
     if (Array.isArray(session?.items)) return session.items.length;
     if (typeof session?.items_count === "number") return session.items_count;
     return "—";
@@ -376,7 +377,7 @@ const InventorySessionsTab = () => {
                         <span>Δ</span>
                       </div>
                       <div className="warehouse-inventory-modal__rows">
-                        {(detail.items || []).map((line) => {
+                        {(detail.lines || detail.items || []).map((line) => {
                           const pname =
                             line.product?.name ||
                             line.product_name ||
