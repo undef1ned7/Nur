@@ -92,8 +92,7 @@ const SellCashierPage = lazy(
 );
 
 const kassaRoutes = (profile, sector) => {
-  const useFullKassa =
-    profile?.role === "owner" || isMarketSectorName(sector);
+  const useFullKassa = profile?.role === "owner" || isMarketSectorName(sector);
 
   return useFullKassa
     ? [

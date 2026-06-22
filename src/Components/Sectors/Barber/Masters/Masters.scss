@@ -1009,7 +1009,7 @@
   background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 
   &::before {
     content: "";
@@ -1044,6 +1044,11 @@
   align-items: center;
   min-width: 0;
   flex: 1;
+
+  > div:last-child {
+    min-width: 0;
+    flex: 1;
+  }
 }
 
 .barbermasters__cardLeft--clickable {
@@ -1146,10 +1151,107 @@
   gap: 8px;
   min-width: fit-content;
   flex-wrap: wrap;
+  flex-shrink: 0;
   visibility: visible;
   opacity: 1;
-  z-index: 1;
+  z-index: 2;
   position: relative;
+}
+
+@media (max-width: 1024px) {
+  .barbermasters__card {
+    flex-wrap: wrap;
+    align-items: stretch;
+    overflow: visible;
+  }
+
+  .barbermasters__cardLeft {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .barbermasters__cardActions {
+    flex: 1 0 100%;
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .barbermasters__card {
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+  }
+
+  .barbermasters__cardLeft {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .barbermasters__cardActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    flex: 0 0 auto;
+    flex-basis: auto;
+    width: 100%;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .barbermasters__cardActions .barbermasters__btn {
+    display: inline-flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    justify-content: center;
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .barbermasters__cardActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .barbermasters__cardActions .barbermasters__btn {
+    min-height: 40px;
+    height: auto;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .barbermasters__cardActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .barbermasters__cardActions .barbermasters__btn {
+    font-size: 12px;
+    padding: 8px;
+  }
+
+  .barbermasters__cardActions .barbermasters__btnText {
+    display: inline !important;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .barbermasters__cardActions {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Кнопка копирования в модалке логина */
@@ -1768,17 +1870,34 @@
 
     &__card {
       flex-wrap: wrap;
+      align-items: stretch;
       gap: 12px;
       padding: 16px 18px;
+      overflow: visible;
+    }
+
+    &__cardLeft {
+      flex: 1 1 auto;
+      min-width: 0;
+
+      > div:last-child {
+        min-width: 0;
+        flex: 1;
+      }
     }
 
     &__cardActions {
+      flex: 1 0 100%;
+      flex-basis: 100%;
       width: 100%;
+      min-width: 0;
       justify-content: flex-start;
+      flex-wrap: wrap;
       margin-left: 0;
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px solid var(--border);
+      flex-shrink: 0;
     }
 
     &__modal {
@@ -1836,28 +1955,82 @@
     &__card {
       padding: 14px 16px;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
+      overflow: visible;
+
+      &:hover {
+        transform: none;
+      }
     }
 
     &__cardLeft {
+      flex: 0 0 auto;
       width: 100%;
       gap: 12px;
+
+      > div:last-child {
+        min-width: 0;
+        flex: 1;
+      }
+    }
+
+    &__cardLeft--clickable {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+    }
+
+    &__name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    &__meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+
+      .bm-item {
+        white-space: normal;
+        word-break: break-word;
+        max-width: 100%;
+
+        + .bm-item::before {
+          content: none;
+          margin: 0;
+        }
+      }
     }
 
     &__cardActions {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      flex: 0 0 auto;
+      flex-basis: auto;
       width: 100%;
+      min-width: 0;
       justify-content: flex-start;
-      flex-wrap: wrap;
       gap: 8px;
+      margin-left: 0;
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      visibility: visible;
+      opacity: 1;
     }
 
     &__cardActions .barbermasters__btn {
-      flex: 1 1 auto;
-      min-width: 120px;
+      display: inline-flex;
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      flex: none;
       justify-content: center;
+      visibility: visible;
+      opacity: 1;
 
       &Text {
         display: inline !important;
@@ -1976,6 +2149,7 @@
     &__list {
       // max-height: 55dvh;
       gap: 8px;
+      padding: 0 4px 0 0;
     }
 
     &__card {
@@ -1994,7 +2168,7 @@
     }
 
     &__meta {
-      gap: 6px;
+      gap: 4px;
       margin-top: 6px;
     }
 
@@ -2003,7 +2177,15 @@
     }
 
     &__cardActions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
+    }
+
+    &__cardActions .barbermasters__btn {
+      min-height: 40px;
+      height: auto;
+      flex: none;
+      width: 100%;
     }
 
     &__btn {
@@ -2166,20 +2348,25 @@
 
     &__card {
       padding: 10px 12px;
+      border-radius: 10px;
     }
 
     &__cardActions {
-      flex-direction: column;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       width: 100%;
     }
 
     &__cardActions .barbermasters__btn {
       width: 100%;
       justify-content: center;
-      min-width: auto;
+      min-width: 0;
+      padding: 0 8px;
+      font-size: 12px;
 
       &Text {
         display: inline !important;
+        white-space: normal;
+        text-align: center;
       }
     }
 
@@ -2308,6 +2495,10 @@
 
     &__card {
       padding: 8px 10px;
+    }
+
+    &__cardActions {
+      grid-template-columns: 1fr;
     }
 
     &__avatar {
@@ -2668,6 +2859,15 @@
     &__btn {
       min-height: 44px;
       min-width: 44px;
+    }
+
+    &__card:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    &__card:hover .barbermasters__avatar {
+      transform: none;
     }
 
     &__cardActions .barbermasters__btn {
