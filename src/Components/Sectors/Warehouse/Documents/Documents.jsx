@@ -57,6 +57,7 @@ import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
 import { numberToWords } from "../../../../utils/numberToWords";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { prepareItemsWithImages } from "./utils/prepareItemsWithImages";
+import { formatWholesaleModeLabel } from "../utils/wholesalePricing";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -98,6 +99,11 @@ const formatWarehousePaymentKindLabel = (kind) => {
     default:
       return String(kind);
   }
+};
+
+const formatWarehouseWholesaleModeLabel = (doc) => {
+  if (doc?.doc_type !== "SALE") return "—";
+  return formatWholesaleModeLabel(doc?.is_wholesale);
 };
 
 /** Подтверждение/отклонение кассой — только при оплате через кассу (после post — CASH_PENDING). */
@@ -403,7 +409,7 @@ const Documents = () => {
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
         paymentKindLabel: formatWarehousePaymentKindLabel(doc.payment_kind),
-        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
+        wholesaleModeLabel: formatWarehouseWholesaleModeLabel(doc),
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -433,7 +439,7 @@ const Documents = () => {
         statusType: getStatusType(resolvedStatus),
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
-        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
+        wholesaleModeLabel: formatWarehouseWholesaleModeLabel(doc),
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -463,7 +469,7 @@ const Documents = () => {
         statusType: getStatusType(resolvedStatus),
         rawStatus: resolvedStatus,
         payment_kind: doc.payment_kind,
-        wholesaleLabel: doc.is_wholesale ? "Опт" : "Розница",
+        wholesaleModeLabel: formatWarehouseWholesaleModeLabel(doc),
         document: doc,
         agentDisplay:
           doc.agent_display?.trim?.() ||
@@ -1427,6 +1433,7 @@ const Documents = () => {
                       <th>Дата</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
+                      {docType === "SALE" && <th>Цены</th>}
                       <th>Позиций</th>
                       <th>Сумма</th>
                       <th>Скидка</th>
@@ -1440,6 +1447,7 @@ const Documents = () => {
                       <th>Дата</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
+                      {docType === "SALE" && <th>Цены</th>}
                       <th>Позиций</th>
                       <th>Сумма</th>
                       <th>Скидка</th>
@@ -1480,7 +1488,7 @@ const Documents = () => {
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
                           {docType === "SALE" && (
-                            <td>{item.wholesaleLabel ?? "—"}</td>
+                            <td>{item.wholesaleModeLabel ?? "—"}</td>
                           )}
                           {docType === "RECEIPT" && (
                             <td>{item.paymentKindLabel}</td>
@@ -1587,7 +1595,7 @@ const Documents = () => {
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
                           {docType === "SALE" && (
-                            <td>{item.wholesaleLabel ?? "—"}</td>
+                            <td>{item.wholesaleModeLabel ?? "—"}</td>
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
@@ -1706,7 +1714,7 @@ const Documents = () => {
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
                           {docType === "SALE" && (
-                            <td>{item.wholesaleLabel ?? "—"}</td>
+                            <td>{item.wholesaleModeLabel ?? "—"}</td>
                           )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
@@ -1913,7 +1921,7 @@ const Documents = () => {
                       <div className="documents__card-row">
                         <span className="documents__card-label">Цены</span>
                         <span className="documents__card-value">
-                          {item.wholesaleLabel ?? "—"}
+                          {item.wholesaleModeLabel ?? "—"}
                         </span>
                       </div>
                     )}

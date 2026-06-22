@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, ChevronDown, ChevronUp } from "lucide-react";
 import { useDispatch } from "react-redux";
-import warehouseAPI from "../../../../../api/warehouse";
+import warehouseAPI, { listCompanyAgentRequests } from "../../../../../api/warehouse";
 import { createSaleFromAgentCartAsync } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
 import "./ReconciliationModal.scss";
@@ -33,7 +33,6 @@ export default function CreateSaleFromCartModal({
   const { profile } = useUser();
   const isOwnerOrAdmin =
     profile?.role === "owner" || profile?.role === "admin";
-  const [agentCanSellWholesale, setAgentCanSellWholesale] = useState(false);
   const [counterparties, setCounterparties] = useState([]);
   const [counterpartiesLoading, setCounterpartiesLoading] = useState(false);
   const [cartItems, setCartItems] = useState([]);
@@ -41,6 +40,7 @@ export default function CreateSaleFromCartModal({
   const [itemsDropdownOpen, setItemsDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [agentCanSellWholesale, setAgentCanSellWholesale] = useState(false);
 
   const [form, setForm] = useState({
     counterparty: "",
@@ -53,29 +53,6 @@ export default function CreateSaleFromCartModal({
     is_wholesale: false,
     post: false,
   });
-
-  const showWholesaleToggle = isOwnerOrAdmin || agentCanSellWholesale;
-
-  useEffect(() => {
-    if (!open || isOwnerOrAdmin) return;
-    const userId = profile?.id;
-    if (!userId) {
-      setAgentCanSellWholesale(false);
-      return;
-    }
-    warehouseAPI
-      .listCompanyAgentRequests({ status: "active" })
-      .then((data) => {
-        const list = Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data)
-            ? data
-            : [];
-        const mine = list.find((row) => String(row.user) === String(userId));
-        setAgentCanSellWholesale(Boolean(mine?.can_sell_wholesale));
-      })
-      .catch(() => setAgentCanSellWholesale(false));
-  }, [open, isOwnerOrAdmin, profile?.id]);
 
   useEffect(() => {
     if (open) {
@@ -132,6 +109,47 @@ export default function CreateSaleFromCartModal({
       );
     }
   }, [open, cart?.agent, counterparties]);
+
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) {
+      setAgentCanSellWholesale(isOwnerOrAdmin);
+      return;
+    }
+    const agentId = cart?.agent;
+    if (!agentId) {
+      setAgentCanSellWholesale(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listCompanyAgentRequests({ status: "active" });
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        const membership =
+          list.find((item) => String(item.user) === String(agentId)) || null;
+        if (!cancelled) {
+          setAgentCanSellWholesale(Boolean(membership?.can_sell_wholesale));
+        }
+      } catch (err) {
+        console.error("Не удалось загрузить право агента на опт:", err);
+        if (!cancelled) setAgentCanSellWholesale(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, cart?.agent, isOwnerOrAdmin]);
+
+  const showWholesaleToggle = isOwnerOrAdmin;
+
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) return;
+    setForm((prev) => ({ ...prev, is_wholesale: agentCanSellWholesale }));
+  }, [open, isOwnerOrAdmin, agentCanSellWholesale]);
 
   const loadCounterparties = async () => {
     setCounterpartiesLoading(true);
@@ -283,6 +301,7 @@ export default function CreateSaleFromCartModal({
                             <th>Товар</th>
                             <th>Кол-во</th>
                             <th>Цена</th>
+                            <th>Опт</th>
                             <th>Сумма</th>
                           </tr>
                         </thead>
@@ -305,6 +324,9 @@ export default function CreateSaleFromCartModal({
                               row.price ??
                               row.unit_price ??
                               row.unit_price_requested;
+                            const wholesalePrice =
+                              row.product_wholesale_price ??
+                              row.product?.wholesale_price;
                             const sum = row.line_total ?? row.total ?? row.sum;
                             const formatNum = (v) =>
                               v != null && v !== ""
@@ -316,6 +338,7 @@ export default function CreateSaleFromCartModal({
                                 <td>{name}</td>
                                 <td>{formatNum(qty)}</td>
                                 <td>{formatNum(price)}</td>
+                                <td>{formatNum(wholesalePrice)}</td>
                                 <td>{formatNum(sum)}</td>
                               </tr>
                             );

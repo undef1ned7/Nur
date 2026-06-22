@@ -417,10 +417,10 @@ const AddWarehouseProductPage = () => {
                   "",
               ) || "",
             price: product.price || "",
+            wholesale_price: product.wholesale_price || "",
             quantity: product.quantity || "",
             client: product.client || "",
             purchase_price: product.purchase_price || "",
-            wholesale_price: product.wholesale_price || "",
             plu: product.plu || "",
             scale_type: product.scale_type || "",
           });
@@ -518,10 +518,10 @@ const AddWarehouseProductPage = () => {
               "",
           ) || "",
         price: product.price || "",
+        wholesale_price: product.wholesale_price || "",
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
         purchase_price: product.purchase_price || "",
-        wholesale_price: product.wholesale_price || "",
         plu: product.plu || "",
         scale_type: product.scale_type || "",
       });
@@ -638,6 +638,7 @@ const AddWarehouseProductPage = () => {
       brand,
       category,
       price,
+      wholesale_price,
       quantity,
       client,
       purchase_price,
@@ -805,6 +806,10 @@ const AddWarehouseProductPage = () => {
     // Базовый payload для маркета
     // Убеждаемся, что цена правильно извлекается
     const finalPrice = price && price.trim() !== "" ? price.toString() : "0";
+    const finalWholesalePrice =
+      wholesale_price && String(wholesale_price).trim() !== ""
+        ? String(wholesale_price)
+        : "0";
 
     // Определяем kind на основе itemType
     let kindValue = "product"; // default
@@ -825,11 +830,7 @@ const AddWarehouseProductPage = () => {
       unit: marketData.unit || "шт",
       is_weight: isWeight,
       price: finalPrice,
-      wholesale_price:
-        newItemData.wholesale_price &&
-        String(newItemData.wholesale_price).trim() !== ""
-          ? String(newItemData.wholesale_price)
-          : "0",
+      wholesale_price: finalWholesalePrice,
       discount_percent: (marketData.discount || "0").toString(),
       country: marketData.country || "",
       expiration_date: marketData.expiryDate || null,
@@ -2133,6 +2134,24 @@ const AddWarehouseProductPage = () => {
 
                   <div className="add-product-page__form-group">
                     <label className="add-product-page__label">
+                      Оптовая цена
+                    </label>
+                    <div className="add-product-page__price-input">
+                      <input
+                        type="text"
+                        name="wholesale_price"
+                        placeholder="0.00"
+                        inputMode="decimal"
+                        className="add-product-page__input"
+                        value={newItemData.wholesale_price || ""}
+                        onChange={handleChange}
+                      />
+                      <span className="add-product-page__currency">P</span>
+                    </div>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
                       Количество *
                     </label>
                     <div className="add-product-page__price-input">
@@ -3218,7 +3237,7 @@ const MarketProductForm = ({
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
-                  Оптовая цена
+                  Оптовая цена (за 1 {marketData.unit || "ед."})
                 </label>
                 <div className="market-product-form__price-input">
                   <input
@@ -3227,7 +3246,8 @@ const MarketProductForm = ({
                     className="market-product-form__input"
                     value={newItemData.wholesale_price || ""}
                     onChange={handleChange}
-                    placeholder="0"
+                    placeholder="0.000"
+                    inputMode="decimal"
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
