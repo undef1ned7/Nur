@@ -1,4 +1,5 @@
 import { createProtectedRoute } from "./helpers";
+import { isMarketSectorName } from "../../utils/subscriptionPlan";
 import { lazy } from "react";
 const Set = lazy(() => import("../../Components/pages/Info/Settings/Settings"));
 const Analytics = lazy(

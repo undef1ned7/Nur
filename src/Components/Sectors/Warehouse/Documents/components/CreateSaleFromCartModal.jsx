@@ -4,7 +4,6 @@ import { useDispatch } from "react-redux";
 import warehouseAPI, { listCompanyAgentRequests } from "../../../../../api/warehouse";
 import { createSaleFromAgentCartAsync } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
-import { formatWholesaleModeLabel } from "../../utils/wholesalePricing";
 import "./ReconciliationModal.scss";
 import "./CreateSaleFromCartModal.scss";
 
@@ -54,29 +53,6 @@ export default function CreateSaleFromCartModal({
     is_wholesale: false,
     post: false,
   });
-
-  const showWholesaleToggle = isOwnerOrAdmin || agentCanSellWholesale;
-
-  useEffect(() => {
-    if (!open || isOwnerOrAdmin) return;
-    const userId = profile?.id;
-    if (!userId) {
-      setAgentCanSellWholesale(false);
-      return;
-    }
-    warehouseAPI
-      .listCompanyAgentRequests({ status: "active" })
-      .then((data) => {
-        const list = Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data)
-            ? data
-            : [];
-        const mine = list.find((row) => String(row.user) === String(userId));
-        setAgentCanSellWholesale(Boolean(mine?.can_sell_wholesale));
-      })
-      .catch(() => setAgentCanSellWholesale(false));
-  }, [open, isOwnerOrAdmin, profile?.id]);
 
   useEffect(() => {
     if (open) {
@@ -168,7 +144,12 @@ export default function CreateSaleFromCartModal({
     };
   }, [open, cart?.agent, isOwnerOrAdmin]);
 
-  const showWholesaleToggle = isOwnerOrAdmin || agentCanSellWholesale;
+  const showWholesaleToggle = isOwnerOrAdmin;
+
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) return;
+    setForm((prev) => ({ ...prev, is_wholesale: agentCanSellWholesale }));
+  }, [open, isOwnerOrAdmin, agentCanSellWholesale]);
 
   const loadCounterparties = async () => {
     setCounterpartiesLoading(true);
@@ -458,43 +439,6 @@ export default function CreateSaleFromCartModal({
                 </label>
               </div>
             </div>
-
-            {showWholesaleToggle && (
-              <div className="reconciliation-modal__form-group">
-                <span className="reconciliation-modal__label">Цены</span>
-                <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-                  <label
-                    style={{ display: "flex", alignItems: "center", gap: 6 }}
-                  >
-                    <input
-                      type="radio"
-                      name="is_wholesale"
-                      checked={!form.is_wholesale}
-                      onChange={() =>
-                        setForm((prev) => ({ ...prev, is_wholesale: false }))
-                      }
-                    />
-                    Розница
-                  </label>
-                  <label
-                    style={{ display: "flex", alignItems: "center", gap: 6 }}
-                  >
-                    <input
-                      type="radio"
-                      name="is_wholesale"
-                      checked={form.is_wholesale}
-                      onChange={() =>
-                        setForm((prev) => ({ ...prev, is_wholesale: true }))
-                      }
-                    />
-                    Опт
-                  </label>
-                </div>
-                <div style={{ marginTop: 6, color: "#666", fontSize: 13 }}>
-                  Режим: {formatWholesaleModeLabel(form.is_wholesale)}
-                </div>
-              </div>
-            )}
 
             {form.payment_kind === "credit" && (
               <div className="reconciliation-modal__form-group">

@@ -2041,14 +2041,23 @@ const CreateSaleDocument = () => {
     };
   }, [docType, isOwnerOrAdmin, currentUserAgentId]);
 
-  const canUseWholesaleMode = isOwnerOrAdmin || agentCanSellWholesale;
-  const showWholesaleToggle = docType === "SALE" && canUseWholesaleMode;
+  const showWholesaleToggle = docType === "SALE" && isOwnerOrAdmin;
 
   useEffect(() => {
-    if (!showWholesaleToggle && isWholesale) {
-      setIsWholesale(false);
-    }
-  }, [showWholesaleToggle, isWholesale]);
+    if (editDocumentId) return;
+    if (docType !== "SALE" || isOwnerOrAdmin) return;
+    setIsWholesale(agentCanSellWholesale);
+    setCartItems((prev) =>
+      prev.map((item) =>
+        applyWholesaleModeToCartItem(item, agentCanSellWholesale),
+      ),
+    );
+  }, [
+    editDocumentId,
+    docType,
+    isOwnerOrAdmin,
+    agentCanSellWholesale,
+  ]);
 
   const handleWholesaleModeChange = (nextWholesale) => {
     setIsWholesale(nextWholesale);
