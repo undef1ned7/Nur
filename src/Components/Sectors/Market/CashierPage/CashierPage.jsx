@@ -111,6 +111,17 @@ const normalizeHotkeyGroup = (value) => {
   return HOTKEY_GROUP_PATTERN.test(normalized) ? normalized : "";
 };
 
+// Программно меняет значение controlled-инпута так, чтобы сработал React onChange.
+const setNativeInputValue = (el, value) => {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  if (setter) setter.call(el, value);
+  else el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
 const normalizeCompactProductsResponse = (data) => {
   const rawList = Array.isArray(data?.results)
     ? data.results
@@ -1112,6 +1123,32 @@ const CashierPage = () => {
     showShiftPage,
   ]);
 
+  // Защита кнопок +/- от потока символов сканера.
+  // В сами поля цены/скидки/количества на keydown мы НЕ вмешиваемся — это ломало
+  // ручное редактирование (стирание, выделение, перезапись, дробные веса).
+  // «Утёкшие» в поле символы штрих-кода убираются позже, в onComplete сканера.
+  // А кнопки +/- нажимать с клавиатуры кассир не должен: одиночный печатный
+  // символ или Enter, пришедшие на сфокусированную кнопку, — это поток сканера,
+  // поэтому снимаем фокус, чтобы скан её не «нажимал».
+  useEffect(() => {
+    const isQtyStepButton = (el) =>
+      el instanceof HTMLButtonElement &&
+      el.classList.contains("cashier-page__cart-item-btn");
+
+    const handleKeyDownCapture = (event) => {
+      const el = event.target;
+      if (!isQtyStepButton(el)) return;
+      if (event.key === "Enter" || (event.key && event.key.length === 1)) {
+        el.blur();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDownCapture, true);
+    return () =>
+      window.removeEventListener("keydown", handleKeyDownCapture, true);
+  }, []);
+
   // Автодобавление товара по сканеру штрих-кода
   // Отслеживаем сканирование напрямую для автоматического создания продажи
   const [scannedBarcode, setScannedBarcode] = useState("");
@@ -1216,16 +1253,36 @@ const CashierPage = () => {
         activeEl instanceof HTMLInputElement ||
         activeEl instanceof HTMLTextAreaElement
       ) {
+        const cls = String(activeEl.className || "");
         const isSearch =
           activeEl === searchInputRef.current ||
-          String(activeEl.className || "").includes(
-            "cashier-page__search-input",
-          );
-        const isQty = String(activeEl.className || "").includes(
-          "cashier-page__cart-item-quantity-input",
+          cls.includes("cashier-page__search-input");
+        const isQty = cls.includes("cashier-page__cart-item-quantity-input");
+        const isPriceOrDiscount = cls.includes(
+          "cashier-page__cart-item-price-input",
         );
-        if (isQty) {
-          await commitFocusedQuantityInputRef.current?.();
+
+        if (isQty || isPriceOrDiscount) {
+          // Символы штрих-кода «утекли» в сфокусированное поле. Отрезаем хвост со
+          // штрих-кодом, чтобы зафиксировать только введённое кассиром значение,
+          // и продолжаем обработку скана. Если хвост не совпал (нестандартный
+          // штрих-код) — безопасно откатываем поле.
+          const raw = activeEl.value;
+          const recovered =
+            barcode && raw.endsWith(barcode)
+              ? raw.slice(0, -barcode.length)
+              : "";
+          if (isQty) {
+            const item = cartRef.current.find(
+              (c) => String(c.id) === String(activeEl.dataset?.cartItemId),
+            );
+            if (item) {
+              await commitFocusedQuantityInputRef.current?.(item, recovered);
+            }
+          } else {
+            // Цена/скидка: возвращаем значение кассира и фиксируем через blur.
+            setNativeInputValue(activeEl, recovered);
+          }
           activeEl.blur();
           searchInputRef.current?.focus();
         } else if (!isSearch) {
@@ -3501,6 +3558,11 @@ const CashierPage = () => {
                   ? products.find((p) => p.id === item.productId)
                   : null;
                 const cartUnitLabel = cartItemUnitLabel(item, cartProduct);
+                // Строка продажи не всегда возвращает is_weight — берём признак
+                // весового товара из карточки товара как запасной вариант,
+                // иначе в инпуте количества нельзя ввести дробное значение.
+                const itemIsWeight =
+                  item.isWeight || Boolean(cartProduct?.is_weight);
                 return (
                 <div key={item.id} className="cashier-page__cart-item">
                   <div className="cashier-page__cart-item-main">
@@ -3786,6 +3848,7 @@ const CashierPage = () => {
                         <button
                           type="button"
                           className="cashier-page__cart-item-btn"
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             if (item.isCustom)
                               return updateCustomQuantityByDelta(item, -1);
@@ -3803,7 +3866,7 @@ const CashierPage = () => {
                           type="text"
                           className="cashier-page__cart-item-quantity-input"
                           data-cart-item-id={item.id}
-                          data-is-weight={item.isWeight ? "1" : "0"}
+                          data-is-weight={itemIsWeight ? "1" : "0"}
                           value={
                             cartQuantities[item.id] ??
                             formatQuantity(item.quantity || 0)
@@ -3821,7 +3884,7 @@ const CashierPage = () => {
                               }));
                               return;
                             }
-                            if (item.isWeight) {
+                            if (itemIsWeight) {
                               if (!DECIMAL_INPUT_PATTERN.test(rawValue)) {
                                 return;
                               }
@@ -3988,11 +4051,12 @@ const CashierPage = () => {
                               });
                             }
                           }}
-                          inputMode={item.isWeight ? "decimal" : "numeric"}
+                          inputMode={itemIsWeight ? "decimal" : "numeric"}
                         />
                         <button
                           type="button"
                           className="cashier-page__cart-item-btn"
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             if (item.isCustom)
                               return updateCustomQuantityByDelta(item, 1);
