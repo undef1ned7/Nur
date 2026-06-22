@@ -1,0 +1,10 @@
+@use "../../../../assets/scss/variables" as *;
+@use "../CashRegister/CashRegister.scss" as *;
+@use "../../../Deposits/Sklad/AddProductPage.scss" as *;
+
+.add-product-page--modal-form {
+  min-height: auto;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}

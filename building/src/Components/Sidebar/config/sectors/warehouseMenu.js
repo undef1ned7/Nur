@@ -1,0 +1,125 @@
+import { menuIcons } from "../menuIcons";
+
+export const warehouseMenu = [
+      {
+        label: "Аналитика",
+        to: "/crm/warehouse/analytics",
+        icon: menuIcons.chartLine,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Аналитика партнёров",
+        to: "/crm/warehouse/partners/analytics",
+        icon: menuIcons.chartLine,
+        permission: "can_view_analytics",
+        ownerAdminOnly: true,
+        implemented: true,
+      },
+      {
+        label: "Документы",
+        to: "/crm/warehouse/documents/all",
+        icon: menuIcons.documentScanner,
+        permission: "can_view_document",
+        implemented: true,
+        children: [
+          { label: "Продажа", to: "/crm/warehouse/documents/sale" },
+          { label: "Покупка", to: "/crm/warehouse/documents/purchase" },
+          {
+            label: "Возврат продажи",
+            to: "/crm/warehouse/documents/sale_return",
+          },
+          {
+            label: "Возврат покупки",
+            to: "/crm/warehouse/documents/purchase_return",
+          },
+          { label: "Инвентаризация", to: "/crm/warehouse/documents/inventory" },
+          { label: "Приход", to: "/crm/warehouse/documents/receipt" },
+          { label: "Списание", to: "/crm/warehouse/documents/write_off" },
+          { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
+          {
+            label: "Коммерческое предложение",
+            to: "/crm/warehouse/documents/commercial_offer",
+          },
+          {
+            label: "Приход в кассу",
+            to: "/crm/warehouse/documents/money/receipt",
+          },
+          {
+            label: "Расход в кассу",
+            to: "/crm/warehouse/documents/money/expense",
+          },
+        ],
+      },
+      {
+        label: "Склады",
+        to: "/crm/warehouse/warehouses",
+        icon: menuIcons.boxOpen,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Бренды и категории",
+        to: "/crm/warehouse/brands",
+        icon: menuIcons.tags,
+        permission: "can_view_brand_category",
+        implemented: true,
+      },
+      {
+        label: "Контрагенты",
+        to: "/crm/warehouse/counterparties",
+        icon: menuIcons.filePerson,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Касса",
+        to: "/crm/warehouse/kassa",
+        icon: menuIcons.cashRegister,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Заявки агентов",
+        to: "/crm/warehouse/agents",
+        icon: menuIcons.user,
+        permission: "can_view_agent",
+        implemented: true,
+      },
+
+      // {
+      //   label: "Справочники",
+      //   to: "/crm/warehouse/directories",
+      //   icon: menuIcons.tags,
+      //   permission: "can_view_brand_category",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Остатки",
+      //   to: "/crm/warehouse/stocks",
+      //   icon: menuIcons.warehouse,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
+      {
+        label: "Операции (Приход / Отгрузки)",
+        to: "/crm/warehouse/movements",
+        icon: menuIcons.exchangeAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Поставки",
+        to: "/crm/warehouse/supply",
+        icon: menuIcons.truckLoading,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Списание",
+        to: "/crm/warehouse/write_offs",
+        icon: menuIcons.trashAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+    ];
