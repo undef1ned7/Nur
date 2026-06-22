@@ -34,7 +34,7 @@ export function resolveTableLabel(order, tablesMap) {
     tableId === null ||
     tableId === undefined ||
     tableId === "" ||
-    normalizeLabel(String(tableId)) === "";
+    String(tableId).trim() === "";
 
   if (isEmpty) return TAKEAWAY_LABEL;
 

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import "./newLanding.scss";
 import LazySection from "./components/LazySection";
@@ -17,7 +18,10 @@ const Team = lazy(() => import("./sections/Team/Team"));
 const Base = lazy(() => import("./sections/Base/Base"));
 const Demo = lazy(() => import("./sections/Demo/Demo"));
 
+const SUPPORT_PHONE_HREF = "tel:+996551900556";
+
 const NewLanding = () => {
+  const { t } = useTranslation("newLanding");
   const { hash } = useLocation();
 
   useEffect(() => {
@@ -89,6 +93,12 @@ const NewLanding = () => {
       <LazySection minHeight={320}>
         <Footer />
       </LazySection>
+      <a
+        className="new-landing-page__support-phone"
+        href={SUPPORT_PHONE_HREF}
+      >
+        {t("supportPhone.label")}: {t("supportPhone.number")}
+      </a>
     </div>
   );
 };

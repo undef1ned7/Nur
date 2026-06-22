@@ -47,3 +47,16 @@ export const getProductionAnalytics = async (params = {}) => {
 
   return response.data;
 };
+
+/**
+ * Аналитика контрагента глазами текущего агента.
+ * @param {string} clientId
+ * @param {{ period?: string, date_from?: string, date_to?: string }} params
+ */
+export const getClientAgentAnalytics = async (clientId, params = {}) => {
+  const response = await api.get(
+    `/main/clients/${clientId}/agent-analytics/`,
+    { params },
+  );
+  return response.data;
+};

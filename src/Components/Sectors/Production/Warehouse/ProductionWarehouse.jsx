@@ -804,10 +804,29 @@ const PendingModal = ({ onClose, onChanged }) => {
                                                 <li
                                                   key={returnItem.id || itemIdx}
                                                 >
-                                                  qty:{" "}
+                                                  <span
+                                                    style={{
+                                                      color: returnItem.is_defect
+                                                        ? "#b45309"
+                                                        : "#047857",
+                                                      fontWeight: 600,
+                                                    }}
+                                                  >
+                                                    {returnItem.is_defect
+                                                      ? "Брак"
+                                                      : "Возврат"}
+                                                  </span>
+                                                  {" · "}qty:{" "}
                                                   <strong>
                                                     {returnItem.qty || 0}
                                                   </strong>
+                                                  {returnItem.client_name
+                                                    ? ` · ${returnItem.client_name}`
+                                                    : ""}
+                                                  {returnItem.amount &&
+                                                  Number(returnItem.amount) > 0
+                                                    ? ` · ${Number(returnItem.amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом`
+                                                    : ""}
                                                   {returnItem.returned_at
                                                     ? ` · ${new Date(
                                                         returnItem.returned_at,

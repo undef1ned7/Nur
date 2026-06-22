@@ -186,9 +186,11 @@ const saleSlice = createSlice({
       .addCase(updateManualFilling.pending, (state) => {
         // Не ставим loading: PATCH строки корзины обновляет state из ответа
       })
-      .addCase(updateManualFilling.fulfilled, (state, { payload }) => {
+      .addCase(updateManualFilling.fulfilled, (state, { payload, meta }) => {
         if (payload && typeof payload === "object") {
-          applyPosCartItemPatchToState(state, payload);
+          applyPosCartItemPatchToState(state, payload, {
+            salePackageId: meta?.arg?.salePackageId,
+          });
         }
         state.loading = false;
       })

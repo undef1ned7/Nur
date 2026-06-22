@@ -140,14 +140,18 @@ export const enrichPosSaleResponse = (data, options = {}) => {
   return next;
 };
 
+const resolveCartLineSalePackage = (line) =>
+  line?.sale_package ?? line?.sale_package_id ?? null;
+
 const preserveSalePackageFromPrevItems = (nextItems, prevItems) => {
   if (!Array.isArray(nextItems) || !Array.isArray(prevItems)) return nextItems;
   return nextItems.map((item) => {
-    const existing = item.sale_package ?? item.sale_package_id ?? null;
+    const existing = resolveCartLineSalePackage(item);
     if (existing != null && String(existing) !== "") return item;
     const prevLine = prevItems.find((p) => String(p.id) === String(item.id));
-    if (prevLine?.sale_package) {
-      return { ...item, sale_package: prevLine.sale_package };
+    const prevPkg = resolveCartLineSalePackage(prevLine);
+    if (prevPkg != null && String(prevPkg) !== "") {
+      return { ...item, sale_package: prevPkg };
     }
     return item;
   });
@@ -219,9 +223,8 @@ export const mergeCartLineIntoStart = (state, lineItem) => {
                 ...it,
                 ...lineItem,
                 sale_package:
-                  lineItem.sale_package ??
-                  lineItem.sale_package_id ??
-                  it.sale_package ??
+                  resolveCartLineSalePackage(lineItem) ??
+                  resolveCartLineSalePackage(it) ??
                   null,
               }
             : it,
@@ -230,8 +233,7 @@ export const mergeCartLineIntoStart = (state, lineItem) => {
           ...prevItems,
           {
             ...lineItem,
-            sale_package:
-              lineItem.sale_package ?? lineItem.sale_package_id ?? null,
+            sale_package: resolveCartLineSalePackage(lineItem) ?? null,
           },
         ];
 

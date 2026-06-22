@@ -4,18 +4,44 @@ import { createProtectedRoute } from "./helpers";
 import { lazy } from "react";
 
 const MarketBar = lazy(() => import("../../Components/Sectors/Market/Bar/Bar"));
-const MarketWarehouse = lazy(() => import("../../Components/Sectors/Market/Warehouse/Warehouse"));
-const MarketProductDetail = lazy(() => import("../../Components/Sectors/Market/Warehouse/components/ProductDetail"));
-const MarketSupplierReceiptPage = lazy(() => import("../../Components/Sectors/Market/Warehouse/SupplierReceiptPage"));
-const MarketSupplierReceiptsListPage = lazy(() => import("../../Components/Sectors/Market/Warehouse/SupplierReceiptsListPage"));
-const MarketCashierPage = lazy(() => import("../../Components/Sectors/Market/CashierPage/CashierPage"));
-const MarketCategories = lazy(() => import("../../Components/Sectors/Market/Categories/Categories"));
-const MarketClients = lazy(() => import("../../Components/Sectors/Market/Clients/Clients"));
-const MarketClientDetails = lazy(() => import("../../Components/Sectors/Market/ClientDetails/ClientDetails"));
-const MarketHistory = lazy(() => import("../../Components/Sectors/Market/History/History"));
-const MarketDocuments = lazy(() => import("../../Components/Sectors/Market/Documents/Documents"));
-const CreateSaleDocument = lazy(() => import("../../Components/Sectors/Market/Documents/CreateSaleDocument"));
-const MarketAnalytics = lazy(() => import("../../Components/Sectors/Market/Analytics/Analytics"));
+const MarketWarehouse = lazy(
+  () => import("../../Components/Sectors/Market/Warehouse/Warehouse"),
+);
+const MarketProductDetail = lazy(
+  () =>
+    import("../../Components/Sectors/Market/Warehouse/components/ProductDetail"),
+);
+const MarketSupplierReceiptPage = lazy(
+  () => import("../../Components/Sectors/Market/Warehouse/SupplierReceiptPage"),
+);
+const MarketSupplierReceiptsListPage = lazy(
+  () =>
+    import("../../Components/Sectors/Market/Warehouse/SupplierReceiptsListPage"),
+);
+const MarketCashierPage = lazy(
+  () => import("../../Components/Sectors/Market/CashierPage/CashierPage"),
+);
+const MarketCategories = lazy(
+  () => import("../../Components/Sectors/Market/Categories/Categories"),
+);
+const MarketClients = lazy(
+  () => import("../../Components/Sectors/Market/Clients/Clients"),
+);
+const MarketClientDetails = lazy(
+  () => import("../../Components/Sectors/Market/ClientDetails/ClientDetails"),
+);
+const MarketHistory = lazy(
+  () => import("../../Components/Sectors/Market/History/History"),
+);
+const MarketDocuments = lazy(
+  () => import("../../Components/Sectors/Market/Documents/Documents"),
+);
+const CreateSaleDocument = lazy(
+  () => import("../../Components/Sectors/Market/Documents/CreateSaleDocument"),
+);
+const MarketAnalytics = lazy(
+  () => import("../../Components/Sectors/Market/Analytics/Analytics"),
+);
 
 export const marketRoutes = () => [
   createProtectedRoute("market/bar", MarketBar),

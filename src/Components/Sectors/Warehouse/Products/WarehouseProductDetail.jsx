@@ -352,6 +352,7 @@ const WarehouseProductDetail = () => {
                 <thead>
                   <tr>
                     <th>Цена продажи</th>
+                    <th>Оптовая цена</th>
                     <th>Цена закупки</th>
                     <th>Наценка</th>
                   </tr>
@@ -359,6 +360,7 @@ const WarehouseProductDetail = () => {
                 <tbody>
                   <tr>
                     <td>{formatPrice(product.price)} сом</td>
+                    <td>{formatPrice(product.wholesale_price)} сом</td>
                     <td>{formatPrice(product.purchase_price)} сом</td>
                     <td>{product.markup_percent ?? "—"}%</td>
                   </tr>

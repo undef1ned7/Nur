@@ -58,9 +58,15 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
         return;
       }
 
+      // Если нет сети — доверяем токену, не делаем API-запрос
+      if (!navigator.onLine) {
+        console.warn("AuthGuard: нет сети, токен принят без проверки");
+        setIsCheckingToken(false);
+        return;
+      }
+
       // Проверяем валидность токена через API
       try {
-        // const response = await api.get("/users/profile/");
         await getProfileFunc();
 
         // Если токен валиден и мы на публичной странице - редирект на /crm
@@ -70,23 +76,22 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
         }
       } catch (err) {
         const isNetworkError =
-          !err.response &&
-          (err.code === "ERR_NETWORK" ||
-            err.code === "ECONNABORTED" ||
-            err.message === "Network Error" ||
+          !err?.response &&
+          (err?.code === "ERR_NETWORK" ||
+            err?.code === "ECONNABORTED" ||
+            err?.message === "Network Error" ||
             !navigator.onLine);
 
         if (isNetworkError) {
           console.warn("AuthGuard: нет сети, сессия сохранена");
-          return;
-        }
+        } else {
+          console.error("Ошибка проверки токена:", err);
+          clearTokens();
 
-        console.error("Ошибка проверки токена:", err);
-        clearTokens();
-
-        if (!isAllowedPathWithoutToken(currentPath)) {
-          window.location.href = DEFAULT_UNAUTHENTICATED_PATH;
-          return;
+          if (!isAllowedPathWithoutToken(currentPath)) {
+            window.location.href = DEFAULT_UNAUTHENTICATED_PATH;
+            return;
+          }
         }
       } finally {
         setIsCheckingToken(false);

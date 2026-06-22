@@ -3,6 +3,7 @@ import { X, ChevronDown, ChevronUp } from "lucide-react";
 import { useDispatch } from "react-redux";
 import warehouseAPI from "../../../../../api/warehouse";
 import { createSaleFromAgentCartAsync } from "../../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../../store/slices/userSlice";
 import "./ReconciliationModal.scss";
 import "./CreateSaleFromCartModal.scss";
 
@@ -29,6 +30,10 @@ export default function CreateSaleFromCartModal({
   onSuccess,
 }) {
   const dispatch = useDispatch();
+  const { profile } = useUser();
+  const isOwnerOrAdmin =
+    profile?.role === "owner" || profile?.role === "admin";
+  const [agentCanSellWholesale, setAgentCanSellWholesale] = useState(false);
   const [counterparties, setCounterparties] = useState([]);
   const [counterpartiesLoading, setCounterpartiesLoading] = useState(false);
   const [cartItems, setCartItems] = useState([]);
@@ -45,8 +50,32 @@ export default function CreateSaleFromCartModal({
     discount_amount: "0",
     comment: "",
     is_sale_request: true,
+    is_wholesale: false,
     post: false,
   });
+
+  const showWholesaleToggle = isOwnerOrAdmin || agentCanSellWholesale;
+
+  useEffect(() => {
+    if (!open || isOwnerOrAdmin) return;
+    const userId = profile?.id;
+    if (!userId) {
+      setAgentCanSellWholesale(false);
+      return;
+    }
+    warehouseAPI
+      .listCompanyAgentRequests({ status: "active" })
+      .then((data) => {
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        const mine = list.find((row) => String(row.user) === String(userId));
+        setAgentCanSellWholesale(Boolean(mine?.can_sell_wholesale));
+      })
+      .catch(() => setAgentCanSellWholesale(false));
+  }, [open, isOwnerOrAdmin, profile?.id]);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +89,7 @@ export default function CreateSaleFromCartModal({
         discount_amount: "0",
         comment: "",
         is_sale_request: true,
+        is_wholesale: false,
         post: false,
       });
       loadCounterparties();
@@ -141,6 +171,7 @@ export default function CreateSaleFromCartModal({
       discount_amount: String(Number(form.discount_amount) || 0),
       comment: form.comment || "",
       is_sale_request: Boolean(form.is_sale_request),
+      is_wholesale: Boolean(form.is_wholesale),
     };
     if (form.payment_kind === "credit" && form.prepayment_amount) {
       payload.prepayment_amount = String(
@@ -317,6 +348,42 @@ export default function CreateSaleFromCartModal({
                 ))}
               </select>
             </div>
+
+            {showWholesaleToggle && (
+              <div className="reconciliation-modal__form-group">
+                <span className="reconciliation-modal__label">Режим цен</span>
+                <div className="create-sale-cart-modal__wholesale">
+                  <button
+                    type="button"
+                    className={`create-sale-cart-modal__wholesale-btn ${
+                      !form.is_wholesale
+                        ? "create-sale-cart-modal__wholesale-btn--active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setForm((prev) => ({ ...prev, is_wholesale: false }))
+                    }
+                    disabled={submitting}
+                  >
+                    Розница
+                  </button>
+                  <button
+                    type="button"
+                    className={`create-sale-cart-modal__wholesale-btn ${
+                      form.is_wholesale
+                        ? "create-sale-cart-modal__wholesale-btn--active"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setForm((prev) => ({ ...prev, is_wholesale: true }))
+                    }
+                    disabled={submitting}
+                  >
+                    Опт
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="reconciliation-modal__form-group">
               <span className="reconciliation-modal__label">Оплата</span>

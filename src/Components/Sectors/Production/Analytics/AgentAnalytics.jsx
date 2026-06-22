@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../../../api";
+import { getClientAgentAnalytics } from "../../../../api/analytics";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,6 +29,7 @@ import {
   Clock,
   Percent,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { fetchAgentAnalytics } from "../../../../store/creators/analyticsCreators";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -78,6 +80,14 @@ const AgentAnalytics = () => {
     rows: [],
     meta: { ...INITIAL_CARD_DETAILS_META },
   });
+  const [clientAnalyticsModal, setClientAnalyticsModal] = useState({
+    open: false,
+    loading: false,
+    error: "",
+    clientId: "",
+    clientName: "",
+    data: null,
+  });
 
   // Получаем данные из Redux store
   const {
@@ -114,6 +124,61 @@ const AgentAnalytics = () => {
 
   const fetchData = () => {
     dispatch(fetchAgentAnalytics(analyticsQueryParams));
+  };
+
+  const buildClientAnalyticsParams = () => {
+    const params = { period };
+    if (period === "day") {
+      params.date = dateForDay || new Date().toISOString().slice(0, 10);
+    } else if (period === "custom") {
+      if (dateFromCustom) params.date_from = dateFromCustom;
+      if (dateToCustom) params.date_to = dateToCustom;
+    }
+    return params;
+  };
+
+  const openClientAnalytics = async (clientId, clientName) => {
+    if (!clientId) return;
+    setClientAnalyticsModal({
+      open: true,
+      loading: true,
+      error: "",
+      clientId,
+      clientName,
+      data: null,
+    });
+    try {
+      const data = await getClientAgentAnalytics(
+        clientId,
+        buildClientAnalyticsParams(),
+      );
+      setClientAnalyticsModal((prev) => ({
+        ...prev,
+        loading: false,
+        data,
+      }));
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Не удалось загрузить аналитику клиента";
+      setClientAnalyticsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: typeof message === "string" ? message : "Ошибка загрузки",
+      }));
+    }
+  };
+
+  const closeClientAnalytics = () => {
+    setClientAnalyticsModal({
+      open: false,
+      loading: false,
+      error: "",
+      clientId: "",
+      clientName: "",
+      data: null,
+    });
   };
 
   const buildCardDetailsParams = (cardKey, offset = 0) => {
@@ -250,6 +315,9 @@ const AgentAnalytics = () => {
         totalAcceptances: 0,
         totalQuantityTransferred: 0,
         defectiveItems: 0,
+        defectiveItemsAmount: 0,
+        returnsCount: 0,
+        returnsAmount: 0,
         totalSalesAmount: 0,
         totalSalesCount: 0,
         totalDiscounts: 0,
@@ -271,6 +339,9 @@ const AgentAnalytics = () => {
       totalAcceptances: summary.acceptances_count || 0,
       totalQuantityTransferred: summary.items_transferred || 0,
       defectiveItems: Number(summary.defective_items) || 0,
+      defectiveItemsAmount: Number(summary.defective_items_amount) || 0,
+      returnsCount: Number(summary.returns_count) || 0,
+      returnsAmount: Number(summary.returns_amount) || 0,
       totalSalesAmount: summary.sales_amount || 0,
       totalSalesCount: summary.sales_count || 0,
       totalDiscounts,
@@ -281,12 +352,25 @@ const AgentAnalytics = () => {
   }, [analyticsData]);
 
   // Данные для графика долга по клиентам из charts.clients_debt
-  const clientsDebtChartData = useMemo(() => {
+  const clientsDebtList = useMemo(() => {
     const clientsDebt = Array.isArray(analyticsData?.charts?.clients_debt)
       ? analyticsData.charts.clients_debt
       : [];
+    return Array.from(clientsDebt)
+      .map((item) => ({
+        clientId: item.client_id || item.id || null,
+        name:
+          item.client_name ||
+          item.name ||
+          item.full_name ||
+          `Клиент #${item.client_id || "?"}`,
+        debt: Number(item.debt || item.amount || item.total || 0),
+      }))
+      .sort((a, b) => b.debt - a.debt);
+  }, [analyticsData]);
 
-    if (clientsDebt.length === 0) {
+  const clientsDebtChartData = useMemo(() => {
+    if (clientsDebtList.length === 0) {
       return {
         labels: ["Нет данных"],
         datasets: [
@@ -302,17 +386,7 @@ const AgentAnalytics = () => {
       };
     }
 
-    const sorted = Array.from(clientsDebt)
-      .map((item) => ({
-        name:
-          item.client_name ||
-          item.name ||
-          item.full_name ||
-          `Клиент #${item.client_id || "?"}`,
-        debt: Number(item.debt || item.amount || item.total || 0),
-      }))
-      .sort((a, b) => b.debt - a.debt)
-      .slice(0, 15);
+    const sorted = clientsDebtList.slice(0, 15);
 
     return {
       labels: sorted.map((item) => item.name),
@@ -327,7 +401,7 @@ const AgentAnalytics = () => {
         },
       ],
     };
-  }, [analyticsData]);
+  }, [clientsDebtList]);
 
   // Данные для графика передач по товарам из charts.top_products_by_transfers
   const transfersByProductData = useMemo(() => {
@@ -1135,6 +1209,29 @@ const AgentAnalytics = () => {
           <div>
             <h3>Брак за период</h3>
             <p>{metrics.defectiveItems.toLocaleString()}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              {metrics.defectiveItemsAmount.toLocaleString("ru-RU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              сом
+            </span>
+          </div>
+        </div>
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <RotateCcw size={24} />
+          </div>
+          <div>
+            <h3>Обычные возвраты</h3>
+            <p>{metrics.returnsCount.toLocaleString()}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              {metrics.returnsAmount.toLocaleString("ru-RU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              сом
+            </span>
           </div>
         </div>
         <div
@@ -1352,6 +1449,51 @@ const AgentAnalytics = () => {
             </div>
           </div>
         </div>
+        {!agentId && clientsDebtList.length > 0 && (
+          <div className="agent-analytics__table-card noPadding" style={{ marginTop: 16 }}>
+            <div className="agent-analytics__table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Клиент</th>
+                    <th>Долг</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientsDebtList.slice(0, 20).map((client) => (
+                    <tr key={client.clientId || client.name}>
+                      <td>{client.name}</td>
+                      <td>
+                        {client.debt.toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        сом
+                      </td>
+                      <td>
+                        {client.clientId ? (
+                          <button
+                            type="button"
+                            className="agent-analytics__refresh-btn"
+                            style={{ padding: "4px 10px", fontSize: 13 }}
+                            onClick={() =>
+                              openClientAnalytics(client.clientId, client.name)
+                            }
+                          >
+                            Аналитика
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Графики передач и приёмок */}
@@ -1621,6 +1763,121 @@ const AgentAnalytics = () => {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clientAnalyticsModal.open && (
+        <div className="agent-analytics__modal-backdrop" onClick={closeClientAnalytics}>
+          <div
+            className="agent-analytics__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="agent-analytics__modal-header">
+              <h3>Клиент: {clientAnalyticsModal.clientName || "—"}</h3>
+              <button type="button" onClick={closeClientAnalytics}>
+                ×
+              </button>
+            </div>
+            <div className="agent-analytics__modal-body">
+              {clientAnalyticsModal.loading && <p>Загрузка…</p>}
+              {!clientAnalyticsModal.loading && clientAnalyticsModal.error && (
+                <p>{clientAnalyticsModal.error}</p>
+              )}
+              {!clientAnalyticsModal.loading &&
+                !clientAnalyticsModal.error &&
+                clientAnalyticsModal.data && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: 12,
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Продажи",
+                        count: clientAnalyticsModal.data?.sales?.count,
+                        amount: clientAnalyticsModal.data?.sales?.amount,
+                      },
+                      {
+                        label: "Брак",
+                        count: clientAnalyticsModal.data?.defects?.count,
+                        amount: clientAnalyticsModal.data?.defects?.amount,
+                      },
+                      {
+                        label: "Возвраты",
+                        count: clientAnalyticsModal.data?.returns?.count,
+                        amount: clientAnalyticsModal.data?.returns?.amount,
+                      },
+                    ].map((block) => (
+                      <div
+                        key={block.label}
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          padding: 12,
+                          background: "#f9fafb",
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                          {block.label} за период
+                        </div>
+                        <div style={{ fontWeight: 600, marginTop: 4 }}>
+                          {Number(block.count || 0).toLocaleString("ru-RU")}
+                        </div>
+                        <div style={{ fontSize: 13, marginTop: 2 }}>
+                          {Number(block.amount || 0).toLocaleString("ru-RU", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          сом
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        border: "1px solid #fde68a",
+                        borderRadius: 10,
+                        padding: 12,
+                        background: "#fffbeb",
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: "#92400e" }}>
+                        Долг (текущий)
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 13 }}>
+                        POS:{" "}
+                        {Number(
+                          clientAnalyticsModal.data?.debt?.pos_sales_debt || 0,
+                        ).toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        сом · Сделки:{" "}
+                        {Number(
+                          clientAnalyticsModal.data?.debt?.client_deals_debt || 0,
+                        ).toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        сом
+                      </div>
+                      <div style={{ fontWeight: 700, marginTop: 4 }}>
+                        Итого:{" "}
+                        {Number(
+                          clientAnalyticsModal.data?.debt?.total || 0,
+                        ).toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        сом
+                      </div>
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
         </div>

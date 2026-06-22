@@ -8,6 +8,10 @@
     "knowledgeBase": "Билим базасы",
     "faq": "FAQ"
   },
+  "supportPhone": {
+    "label": "Тех. колдоо",
+    "number": "+996 (551) 900 556"
+  },
   "header": {
     "logoAlt": "NurCRM",
     "login": "Кирүү",
