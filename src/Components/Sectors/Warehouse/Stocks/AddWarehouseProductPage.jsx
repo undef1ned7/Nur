@@ -3218,7 +3218,7 @@ const MarketProductForm = ({
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
-                  Цена продажи
+                  Оптовая цена
                 </label>
                 <div className="market-product-form__price-input">
                   <input
@@ -3237,7 +3237,7 @@ const MarketProductForm = ({
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
-                  Оптовая цена (за 1 {marketData.unit || "ед."})
+                  Цена агента (за 1 {marketData.unit || "ед."})
                 </label>
                 <div className="market-product-form__price-input">
                   <input
