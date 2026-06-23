@@ -316,6 +316,12 @@ const Masters = () => {
   const [warehouseAgentWarehouses, setWarehouseAgentWarehouses] = useState([]);
   const [warehouseAgentWarehousesLoading, setWarehouseAgentWarehousesLoading] =
     useState(false);
+  const [
+    warehouseAgentExistingMembership,
+    setWarehouseAgentExistingMembership,
+  ] = useState(null);
+  const [warehouseAgentMembershipLoading, setWarehouseAgentMembershipLoading] =
+    useState(false);
 
   const sectorName = String(company?.sector?.name || "").trim();
   const isWarehouseSector = sectorName === "Склад";
@@ -900,7 +906,63 @@ const Masters = () => {
   };
 
   /* ========= Warehouse: assign as warehouse agent (company membership) ========= */
-  const openWarehouseAgentModal = (employee) => {
+  const loadWarehouseAgentWarehouses = useCallback(async () => {
+    if (warehouseAgentWarehouses.length > 0) return warehouseAgentWarehouses;
+    try {
+      setWarehouseAgentWarehousesLoading(true);
+      const res = await listWarehouses({ page_size: 1000 });
+      const list = Array.isArray(res?.results) ? res.results : res || [];
+      setWarehouseAgentWarehouses(list);
+      return list;
+    } catch (err) {
+      console.error("Не удалось загрузить склады для выбора:", err);
+      setWarehouseAgentError(
+        pickApiError(err, "Не удалось загрузить список складов."),
+      );
+      return [];
+    } finally {
+      setWarehouseAgentWarehousesLoading(false);
+    }
+  }, [warehouseAgentWarehouses]);
+
+  const loadWarehouseAgentMembership = useCallback(
+    async (employeeId) => {
+      if (!employeeId || !isWarehouseSector) {
+        setWarehouseAgentExistingMembership(null);
+        return null;
+      }
+
+      setWarehouseAgentMembershipLoading(true);
+      try {
+        const data = await listCompanyAgentRequests({ status: "active" });
+        const list = asArray(data);
+        const membership =
+          list.find((item) => String(item.user) === String(employeeId)) || null;
+        setWarehouseAgentExistingMembership(membership);
+        return membership;
+      } catch (err) {
+        console.error("Не удалось загрузить данные агента склада:", err);
+        setWarehouseAgentExistingMembership(null);
+        return null;
+      } finally {
+        setWarehouseAgentMembershipLoading(false);
+      }
+    },
+    [isWarehouseSector],
+  );
+
+  const getWarehouseAgentLabel = useCallback(
+    (warehouseId) => {
+      if (!warehouseId) return "Все склады компании";
+      const warehouse = warehouseAgentWarehouses.find(
+        (item) => String(item.id) === String(warehouseId),
+      );
+      return warehouse?.name || warehouse?.title || warehouseId;
+    },
+    [warehouseAgentWarehouses],
+  );
+
+  const openWarehouseAgentModal = async (employee) => {
     if (!employee?.id) return;
     setWarehouseAgentEmployee(employee);
     setWarehouseAgentCommonEnabled(false);
@@ -908,28 +970,25 @@ const Masters = () => {
     setWarehouseAgentCommonWarehouse("");
     setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
+    setWarehouseAgentExistingMembership(null);
     setWarehouseAgentModalOpen(true);
 
-    if (
-      isWarehouseSector &&
-      !warehouseAgentWarehousesLoading &&
-      warehouseAgentWarehouses.length === 0
-    ) {
-      (async () => {
-        try {
-          setWarehouseAgentWarehousesLoading(true);
-          const res = await listWarehouses({ page_size: 1000 });
-          const list = Array.isArray(res?.results) ? res.results : res || [];
-          setWarehouseAgentWarehouses(list);
-        } catch (err) {
-          console.error("Не удалось загрузить склады для выбора:", err);
-          setWarehouseAgentError(
-            pickApiError(err, "Не удалось загрузить список складов."),
-          );
-        } finally {
-          setWarehouseAgentWarehousesLoading(false);
-        }
-      })();
+    const [, membership] = await Promise.all([
+      loadWarehouseAgentWarehouses(),
+      loadWarehouseAgentMembership(employee.id),
+    ]);
+
+    if (membership) {
+      setWarehouseAgentAssignedWarehouse(
+        membership.assigned_warehouse
+          ? String(membership.assigned_warehouse)
+          : "",
+      );
+      setWarehouseAgentCommonEnabled(Boolean(membership.common_access_enabled));
+      setWarehouseAgentCommonWarehouse(
+        membership.common_warehouse ? String(membership.common_warehouse) : "",
+      );
+      setWarehouseAgentCanSellWholesale(Boolean(membership.can_sell_wholesale));
     }
   };
 
@@ -942,6 +1001,7 @@ const Masters = () => {
     setWarehouseAgentCommonWarehouse("");
     setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
+    setWarehouseAgentExistingMembership(null);
   };
 
   const submitWarehouseAgent = async (e) => {
@@ -958,19 +1018,35 @@ const Masters = () => {
     setWarehouseAgentError("");
     setPageNotice("");
     try {
-      const payload = {
-        user: warehouseAgentEmployee.id,
-        assigned_warehouse: assignedWarehouse || null,
-      };
-      if (warehouseAgentCommonEnabled) {
-        payload.common_access_enabled = true;
-        payload.common_warehouse = commonWarehouse;
+      if (warehouseAgentExistingMembership?.id) {
+        const patchPayload = {
+          assigned_warehouse: assignedWarehouse || null,
+          common_access_enabled: warehouseAgentCommonEnabled,
+          can_sell_wholesale: Boolean(warehouseAgentCanSellWholesale),
+        };
+        if (warehouseAgentCommonEnabled) {
+          patchPayload.common_warehouse = commonWarehouse;
+        }
+        await patchCompanyAgentCommonAccess(
+          warehouseAgentExistingMembership.id,
+          patchPayload,
+        );
+        setPageNotice("Настройки агента склада обновлены.");
+      } else {
+        const payload = {
+          user: warehouseAgentEmployee.id,
+          assigned_warehouse: assignedWarehouse || null,
+        };
+        if (warehouseAgentCommonEnabled) {
+          payload.common_access_enabled = true;
+          payload.common_warehouse = commonWarehouse;
+        }
+        if (warehouseAgentCanSellWholesale) {
+          payload.can_sell_wholesale = true;
+        }
+        await createCompanyMembership(payload);
+        setPageNotice("Сотрудник назначен агентом склада.");
       }
-      if (warehouseAgentCanSellWholesale) {
-        payload.can_sell_wholesale = true;
-      }
-      await createCompanyMembership(payload);
-      setPageNotice("Сотрудник назначен агентом склада.");
       closeWarehouseAgentModal();
     } catch (err) {
       setWarehouseAgentError(
@@ -1498,6 +1574,30 @@ const Masters = () => {
                   </div>
                 </div>
 
+                {warehouseAgentExistingMembership && (
+                  <div className="barbermasters__field barbermasters__field--full">
+                    <div className="barbermasters__help">
+                      Текущее назначение:{" "}
+                      <strong>
+                        {getWarehouseAgentLabel(
+                          warehouseAgentExistingMembership.assigned_warehouse,
+                        )}
+                      </strong>
+                      {warehouseAgentExistingMembership.common_access_enabled && (
+                        <>
+                          {" "}
+                          · общий прайс:{" "}
+                          <strong>
+                            {getWarehouseAgentLabel(
+                              warehouseAgentExistingMembership.common_warehouse,
+                            )}
+                          </strong>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="barbermasters__field barbermasters__field--full">
                   <label className="barbermasters__label">
                     Ограничить доступ одним складом
@@ -1509,12 +1609,15 @@ const Masters = () => {
                       setWarehouseAgentAssignedWarehouse(e.target.value)
                     }
                     disabled={
-                      warehouseAgentSaving || warehouseAgentWarehousesLoading
+                      warehouseAgentSaving ||
+                      warehouseAgentWarehousesLoading ||
+                      warehouseAgentMembershipLoading
                     }
                   >
                     <option value="">
-                      {warehouseAgentWarehousesLoading
-                        ? "Загрузка складов…"
+                      {warehouseAgentWarehousesLoading ||
+                      warehouseAgentMembershipLoading
+                        ? "Загрузка…"
                         : "Все склады компании"}
                     </option>
                     {warehouseAgentWarehouses.map((w) => (
@@ -1571,12 +1674,14 @@ const Masters = () => {
                       disabled={
                         warehouseAgentSaving ||
                         warehouseAgentWarehousesLoading ||
+                        warehouseAgentMembershipLoading ||
                         Boolean(warehouseAgentAssignedWarehouse)
                       }
                     >
                       <option value="">
-                        {warehouseAgentWarehousesLoading
-                          ? "Загрузка складов…"
+                        {warehouseAgentWarehousesLoading ||
+                        warehouseAgentMembershipLoading
+                          ? "Загрузка…"
                           : "Выберите склад"}
                       </option>
                       {warehouseAgentWarehouses.map((w) => (
@@ -1605,7 +1710,7 @@ const Masters = () => {
                       onClick={() => setWarehouseAgentCanSellWholesale(false)}
                       disabled={warehouseAgentSaving}
                     >
-                      Только розница
+                      Оптовая цена
                     </button>
                     <button
                       type="button"
@@ -1615,7 +1720,7 @@ const Masters = () => {
                       onClick={() => setWarehouseAgentCanSellWholesale(true)}
                       disabled={warehouseAgentSaving}
                     >
-                      Разрешить опт
+                      Цена агента
                     </button>
                   </div>
                   <div className="barbermasters__help">
@@ -1636,7 +1741,11 @@ const Masters = () => {
                   className="barbermasters__btn barbermasters__btn--primary"
                   disabled={warehouseAgentSaving}
                 >
-                  {warehouseAgentSaving ? "Назначение…" : "Назначить агентом"}
+                  {warehouseAgentSaving
+                    ? "Сохранение…"
+                    : warehouseAgentExistingMembership
+                      ? "Сохранить изменения"
+                      : "Назначить агентом"}
                 </button>
                 <button
                   type="button"

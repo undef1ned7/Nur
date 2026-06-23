@@ -1166,7 +1166,8 @@ const CreateSaleDocument = () => {
                         {getSalePriceModeLabel(isWholesale)}
                       </span>
                     ) : null}
-                    {formatDocumentPrice(getProductPriceForDocument(product))} сом
+                    {formatDocumentPrice(getProductPriceForDocument(product))}{" "}
+                    сом
                   </span>
                   <span className="create-sale-document__group-product-stock">
                     {product.quantity ?? 0}
@@ -3895,7 +3896,7 @@ const CreateSaleDocument = () => {
                           checked={!isWholesale}
                           onChange={() => handleWholesaleModeChange(false)}
                         />
-                        <span>Розница</span>
+                        <span>Оптовая цена</span>
                       </label>
                       <label
                         className={`create-sale-document__wholesale-seg-btn ${
@@ -3908,7 +3909,7 @@ const CreateSaleDocument = () => {
                           checked={isWholesale}
                           onChange={() => handleWholesaleModeChange(true)}
                         />
-                        <span>Опт</span>
+                        <span>Цена агента</span>
                       </label>
                     </div>
                   </div>
