@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useContext } from "react";
 import {
   ArrowLeft,
   DollarSign,
@@ -31,6 +31,7 @@ import api from "../../../../api/index";
 import { useUser } from "../../../../store/slices/userSlice";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
+import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import "./Analytics.scss";
 
 ChartJS.register(
@@ -62,6 +63,36 @@ const normalizeLowStockStatusType = (status) => {
   return "low";
 };
 
+// Доля значения от максимума в наборе — для ширины горизонтального бара в
+// таблицах (оформление «Top Selling Products» из дизайна).
+const barPercentOfMax = (value, values) => {
+  const nums = (values || []).map((v) => Number(v) || 0);
+  const max = Math.max(0, ...nums);
+  if (max <= 0) return 0;
+  return Math.max(2, ((Number(value) || 0) / max) * 100);
+};
+
+// Сортировка списка остатков по выбранному режиму (для блока «Остатки товаров»).
+const sortStockList = (list, mode) => {
+  const arr = [...(list || [])];
+  switch (mode) {
+    case "name-asc":
+      return arr.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "ru"),
+      );
+    case "name-desc":
+      return arr.sort((a, b) =>
+        String(b.name || "").localeCompare(String(a.name || ""), "ru"),
+      );
+    case "stock-desc":
+      return arr.sort((a, b) => (Number(b.stock) || 0) - (Number(a.stock) || 0));
+    case "stock-asc":
+      return arr.sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+    default:
+      return arr;
+  }
+};
+
 const MARKET_ANALYTICS_TIMEOUT_MS = 160000;
 const START_HIDDEN_SALES_KPI_TITLES = new Set([
   "Валовая прибыль",
@@ -72,6 +103,8 @@ const START_HIDDEN_PRODUCTS_KPI_TITLES = new Set([
 ]);
 
 const Analytics = () => {
+  const { mode } = useContext(ThemeModeContext);
+  const isDark = mode === "dark";
   const { company, currentUser } = useUser();
   const isStartTariff = isStartPlan(company?.subscription_plan?.name);
   const { list: cashBoxes } = useCash();
@@ -85,6 +118,8 @@ const Analytics = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [openProductTable, setOpenProductTable] = useState("topByRevenue");
   const [openFinanceTable, setOpenFinanceTable] = useState("expenseBreakdown");
+  // Сортировка блока «Остатки товаров» на вкладке «Склад».
+  const [stockSort, setStockSort] = useState("none");
   const [salaryAnalyticsRows, setSalaryAnalyticsRows] = useState([]);
   /** Вкладка «Сотрудники»: раскрытый tr с product_names / sold_products */
   const [expandedUserPerformanceId, setExpandedUserPerformanceId] =
@@ -99,6 +134,23 @@ const Analytics = () => {
   useEffect(() => {
     if (activeTab !== "users") setExpandedUserPerformanceId(null);
   }, [activeTab]);
+
+  // Тёмная тема дашборда: только в тёмном режиме перекрашиваем подписи осей/
+  // сетку/легенду Chart.js под тёмный фон. В светлом режиме оставляем дефолт
+  // (как было). Делаем это только пока смонтирована Маркет-аналитика и
+  // восстанавливаем прежние значения при размонтировании / смене темы, чтобы
+  // графики в других сферах не сломались (ChartJS.defaults — глобальный синглтон).
+  useEffect(() => {
+    if (!isDark) return undefined;
+    const prevColor = ChartJS.defaults.color;
+    const prevBorder = ChartJS.defaults.borderColor;
+    ChartJS.defaults.color = "#9aa1b2";
+    ChartJS.defaults.borderColor = "rgba(255, 255, 255, 0.08)";
+    return () => {
+      ChartJS.defaults.color = prevColor;
+      ChartJS.defaults.borderColor = prevBorder;
+    };
+  }, [isDark]);
 
   useEffect(() => {
     if (!isStartTariff) return;
@@ -1454,7 +1506,7 @@ const Analytics = () => {
   };
 
   return (
-    <div className="analytics-page">
+    <div className={`analytics-page${isDark ? " analytics-page--dark" : ""}`}>
       <div className="analytics-page__header">
         {/* <button className="analytics-page__back">
           <ArrowLeft size={20} />
@@ -1833,8 +1885,9 @@ const Analytics = () => {
             })}
           </div>
 
-          <div className="analytics-page__chart-card">
+          <div className="analytics-page__chart-card analytics-page__chart-card--fit">
             <h3 className="analytics-page__chart-title">Динамика продаж</h3>
+            <div className="analytics-page__chart-canvas">
             <Line
               data={{
                 labels: salesData.salesChart.labels,
@@ -1843,9 +1896,28 @@ const Analytics = () => {
                     label: "Выручка (сом)",
                     data: salesData.salesChart.data,
                     borderColor: "#f7d617",
-                    backgroundColor: "rgba(247, 214, 23, 0.1)",
+                    // Градиентная заливка под линией (area-график как в дизайне)
+                    backgroundColor: (ctx) => {
+                      const { chart } = ctx;
+                      const { ctx: c, chartArea } = chart;
+                      if (!chartArea) return "rgba(247, 214, 23, 0.2)";
+                      const g = c.createLinearGradient(
+                        0,
+                        chartArea.top,
+                        0,
+                        chartArea.bottom,
+                      );
+                      g.addColorStop(0, "rgba(247, 214, 23, 0.45)");
+                      g.addColorStop(1, "rgba(247, 214, 23, 0)");
+                      return g;
+                    },
                     fill: true,
-                    tension: 0.4,
+                    tension: 0.35,
+                    borderWidth: 2,
+                    pointBackgroundColor: "#f7d617",
+                    pointBorderColor: "#f7d617",
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
                   },
                 ],
               }}
@@ -1853,14 +1925,16 @@ const Analytics = () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                  legend: {
-                    display: true,
-                    position: "bottom",
-                  },
+                  legend: { display: false },
                 },
                 scales: {
+                  x: {
+                    grid: { display: false },
+                  },
                   y: {
                     beginAtZero: true,
+                    border: { display: false },
+                    grid: { borderDash: [4, 4] },
                     ticks: {
                       callback: function (value) {
                         return value.toLocaleString("ru-RU");
@@ -1870,6 +1944,7 @@ const Analytics = () => {
                 },
               }}
             />
+            </div>
           </div>
 
           {salesData.paymentMethods.labels.length > 0 && (
@@ -1877,22 +1952,46 @@ const Analytics = () => {
               <h3 className="analytics-page__chart-title">
                 Продажи по способам оплаты
               </h3>
-              <Doughnut
+              <Bar
                 data={{
                   labels: salesData.paymentMethods.labels,
                   datasets: [
                     {
+                      label: "Сумма (сом)",
                       data: salesData.paymentMethods.data,
-                      backgroundColor: ["#f7d617", "#f59e0b", "#10b981"],
+                      backgroundColor: "#f7d617",
+                      borderRadius: 6,
+                      borderSkipped: false,
+                      maxBarThickness: 34,
                     },
                   ],
                 }}
                 options={{
+                  indexAxis: "y",
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
-                    legend: {
-                      position: "bottom",
+                    legend: { display: false },
+                    tooltip: {
+                      callbacks: {
+                        label: (item) =>
+                          `${Number(item.raw).toLocaleString("ru-RU")} сом`,
+                      },
+                    },
+                  },
+                  scales: {
+                    x: {
+                      beginAtZero: true,
+                      border: { display: false },
+                      grid: { borderDash: [4, 4] },
+                      ticks: {
+                        callback: function (value) {
+                          return value.toLocaleString("ru-RU");
+                        },
+                      },
+                    },
+                    y: {
+                      grid: { display: false },
                     },
                   },
                 }}
@@ -1917,7 +2016,21 @@ const Analytics = () => {
                       <tr key={index}>
                         <td>{product.name}</td>
                         <td>{product.sold} шт</td>
-                        <td>{formatNumber(product.revenue)} сом</td>
+                        <td>
+                          <div className="analytics-page__bar-cell">
+                            <div
+                              className="analytics-page__bar-fill"
+                              style={{
+                                width: `${barPercentOfMax(
+                                  product.revenue,
+                                  salesData.topProducts.map((p) => p.revenue),
+                                )}%`,
+                              }}
+                            >
+                              {formatNumber(product.revenue)} сом
+                            </div>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -1957,7 +2070,21 @@ const Analytics = () => {
                       <tr key={index}>
                         <td>{doc.name}</td>
                         <td>{doc.quantity}</td>
-                        <td>{formatCurrency(doc.amount, 0)}</td>
+                        <td>
+                          <div className="analytics-page__bar-cell">
+                            <div
+                              className="analytics-page__bar-fill"
+                              style={{
+                                width: `${barPercentOfMax(
+                                  doc.amount,
+                                  salesData.documents.map((d) => d.amount),
+                                )}%`,
+                              }}
+                            >
+                              {formatCurrency(doc.amount, 0)}
+                            </div>
+                          </div>
+                        </td>
                         <td>
                           {doc.warehouse
                             ? formatCurrency(doc.warehouse, 0)
@@ -2084,9 +2211,21 @@ const Analytics = () => {
 
           {!isStartTariff && (
             <div className="analytics-page__table-card">
-              <h3 className="analytics-page__table-title">
-                Остатки товаров
-              </h3>
+              <div className="analytics-page__table-header">
+                <h3 className="analytics-page__table-title">Остатки товаров</h3>
+                <select
+                  className="analytics-page__sort-select"
+                  value={stockSort}
+                  onChange={(e) => setStockSort(e.target.value)}
+                  aria-label="Сортировка остатков"
+                >
+                  <option value="none">Без сортировки</option>
+                  <option value="name-asc">По алфавиту (А–Я)</option>
+                  <option value="name-desc">По алфавиту (Я–А)</option>
+                  <option value="stock-desc">По остатку (больше)</option>
+                  <option value="stock-asc">По остатку (меньше)</option>
+                </select>
+              </div>
               <table className="analytics-page__table">
                 <thead>
                   <tr>
@@ -2095,12 +2234,28 @@ const Analytics = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {warehouseData.lowStock.map((item, index) => (
-                    <tr key={index}>
-                      <td>{item.name}</td>
-                      <td>{formatAnalyticsQty(item.stock)}</td>
-                    </tr>
-                  ))}
+                  {sortStockList(warehouseData.lowStock, stockSort).map(
+                    (item, index) => (
+                      <tr key={index}>
+                        <td>{item.name}</td>
+                        <td>
+                          <div className="analytics-page__bar-cell">
+                            <div
+                              className="analytics-page__bar-fill"
+                              style={{
+                                width: `${barPercentOfMax(
+                                  item.stock,
+                                  warehouseData.lowStock.map((i) => i.stock),
+                                )}%`,
+                              }}
+                            >
+                              {formatAnalyticsQty(item.stock)}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>

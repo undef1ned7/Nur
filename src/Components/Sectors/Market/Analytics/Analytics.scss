@@ -395,6 +395,48 @@
     margin: 0 0 20px 0;
   }
 
+  // Карточка графика, которая подстраивается по высоте под canvas
+  // (заголовок + холст фиксированной высоты, без лишнего пустого места).
+  &__chart-card.analytics-page__chart-card--fit {
+    height: auto;
+  }
+
+  &__chart-canvas {
+    position: relative;
+    width: 100%;
+    height: 340px;
+
+    @media (max-width: 768px) {
+      height: 260px;
+    }
+  }
+
+  // Горизонтальный бар внутри ячейки таблицы (как «Top Selling Products»).
+  &__bar-cell {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 120px;
+  }
+
+  &__bar-fill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    min-width: fit-content;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: #f7d617;
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: width 0.3s ease;
+  }
+
   // Grid
   &__grid {
     display: grid;
@@ -464,6 +506,34 @@
 
   &__accordion-icon--open {
     transform: rotate(0deg);
+  }
+
+  // Селект сортировки (напр. блок «Остатки товаров»).
+  &__sort-select {
+    height: 36px;
+    padding: 0 32px 0 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background-color: #f9fafb;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      border-color: #c1c5cd;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #f7d617;
+      box-shadow: 0 0 0 3px rgba(247, 214, 23, 0.18);
+    }
   }
 
   &__date-filter {
@@ -1144,6 +1214,404 @@
       &--large {
         height: 380px;
       }
+    }
+  }
+}
+
+// ============================================================================
+// ТЁМНАЯ ТЕМА — применяется только когда у корня есть модификатор `--dark`
+// (включается в тёмном режиме приложения). Светлый режим выше остаётся как был.
+// Акцент — наш фирменный жёлтый #f7d617. Стили строго под `.analytics-page`,
+// другие сферы не затрагиваются.
+// ============================================================================
+$dk-bg: #1d1d1d;
+$dk-panel: #1e2130;
+$dk-panel-hover: #262a3b;
+$dk-head: #1a1d2a;
+$dk-border: rgba(255, 255, 255, 0.07);
+$dk-border-strong: rgba(255, 255, 255, 0.12);
+$dk-text: #f3f4f8;
+$dk-muted: #9aa1b2;
+$dk-accent: #f7d617;
+$dk-accent-soft: rgba(247, 214, 23, 0.14);
+$dk-accent-border: rgba(247, 214, 23, 0.32);
+$dk-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+$dk-radius: 16px;
+
+.analytics-page--dark {
+  background: $dk-bg;
+  color: $dk-text;
+
+  .analytics-page__back {
+    background: $dk-panel;
+    border: 1px solid $dk-border;
+    color: $dk-text;
+
+    &:hover {
+      background: $dk-panel-hover;
+    }
+  }
+
+  .analytics-page__title {
+    color: $dk-text;
+  }
+
+  .analytics-page__subtitle {
+    color: $dk-muted;
+  }
+
+  .analytics-page__filter-btn {
+    background: $dk-accent;
+    color: #1a1a1a;
+
+    &:hover {
+      background: #ffe23a;
+    }
+  }
+
+  // --- Filters ---
+  .analytics-page__filters {
+    background: $dk-panel;
+    border-color: $dk-border;
+    box-shadow: $dk-shadow;
+    border-radius: $dk-radius;
+  }
+
+  .analytics-page__filters-header {
+    border-bottom-color: $dk-border;
+
+    h3 {
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__filters-close {
+    color: $dk-muted;
+
+    &:hover {
+      background: $dk-panel-hover;
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__filter-group {
+    label {
+      color: $dk-muted;
+    }
+
+    input[type="date"],
+    input[type="number"],
+    select {
+      background: $dk-head;
+      border-color: $dk-border-strong;
+      color: $dk-text;
+      color-scheme: dark;
+
+      &::placeholder {
+        color: #6e7589;
+      }
+
+      &:focus {
+        border-color: $dk-accent;
+        box-shadow: 0 0 0 3px $dk-accent-soft;
+      }
+    }
+
+    select option {
+      background: $dk-head;
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__filter-row span {
+    color: $dk-muted;
+  }
+
+  .analytics-page__filter-checkbox {
+    color: $dk-muted;
+
+    input[type="checkbox"] {
+      accent-color: $dk-accent;
+    }
+  }
+
+  .analytics-page__filters-actions {
+    border-top-color: $dk-border;
+  }
+
+  .analytics-page__filter-reset {
+    background: transparent;
+    color: $dk-muted;
+    border: 1px solid $dk-border-strong;
+
+    &:hover {
+      background: $dk-panel-hover;
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__filter-apply {
+    background: $dk-accent;
+    color: #1a1a1a;
+
+    &:hover {
+      background: #ffe23a;
+    }
+  }
+
+  // --- Tabs ---
+  .analytics-page__tabs {
+    border-bottom-color: $dk-border;
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: $dk-border-strong;
+    }
+  }
+
+  .analytics-page__tab {
+    color: $dk-muted;
+
+    &:hover {
+      color: $dk-text;
+    }
+
+    &--active {
+      color: $dk-accent;
+      border-bottom-color: $dk-accent;
+    }
+  }
+
+  // --- KPI cards ---
+  .analytics-page__kpi-card {
+    background: $dk-panel;
+    border: 1px solid $dk-border;
+    border-radius: $dk-radius;
+    box-shadow: $dk-shadow;
+
+    &--interactive:hover {
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+      border-color: $dk-accent-border;
+    }
+
+    &--interactive:focus-visible {
+      border-color: $dk-accent-border;
+      box-shadow: 0 0 0 4px $dk-accent-soft;
+    }
+  }
+
+  // Иконка KPI — «чип» как в дизайне Power BI.
+  .analytics-page__kpi-header svg {
+    box-sizing: content-box;
+    padding: 9px;
+    border-radius: 12px;
+    background: $dk-accent-soft;
+  }
+
+  .analytics-page__kpi-title {
+    color: $dk-muted;
+  }
+
+  .analytics-page__kpi-value {
+    color: $dk-text;
+  }
+
+  .analytics-page__kpi-currency {
+    color: $dk-muted;
+  }
+
+  .analytics-page__kpi-subtitle {
+    color: $dk-muted;
+  }
+
+  .analytics-page__kpi-change--positive {
+    color: #34d399;
+  }
+
+  .analytics-page__kpi-change--negative {
+    color: #f87171;
+  }
+
+  // --- Charts ---
+  .analytics-page__chart-card {
+    background: $dk-panel;
+    border: 1px solid $dk-border;
+    border-radius: $dk-radius;
+    box-shadow: $dk-shadow;
+  }
+
+  .analytics-page__chart-title {
+    color: $dk-text;
+  }
+
+  // --- Tables ---
+  .analytics-page__table-card {
+    background: $dk-panel;
+    border: 1px solid $dk-border;
+    border-radius: $dk-radius;
+    box-shadow: $dk-shadow;
+  }
+
+  .analytics-page__table-title {
+    color: $dk-text;
+  }
+
+  .analytics-page__accordion-icon {
+    color: $dk-muted;
+  }
+
+  .analytics-page__date-filter {
+    background: $dk-head;
+    border-color: $dk-border-strong;
+    color: $dk-muted;
+
+    &:hover {
+      background: $dk-panel-hover;
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__sort-select {
+    background-color: $dk-head;
+    border-color: $dk-border-strong;
+    color: $dk-text;
+    color-scheme: dark;
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    &:focus {
+      border-color: $dk-accent;
+      box-shadow: 0 0 0 3px $dk-accent-soft;
+    }
+
+    option {
+      background: $dk-head;
+      color: $dk-text;
+    }
+  }
+
+  .analytics-page__table {
+    thead {
+      background: $dk-head;
+    }
+
+    th {
+      color: $dk-muted;
+      border-bottom-color: $dk-border;
+    }
+
+    td {
+      color: $dk-text;
+      border-bottom-color: $dk-border;
+    }
+
+    tbody tr:hover {
+      background: $dk-panel-hover;
+    }
+  }
+
+  .analytics-page__table--suppliers thead th {
+    background: $dk-head;
+  }
+
+  .analytics-page__users-chevron {
+    color: $dk-muted;
+  }
+
+  .analytics-page__users-products-dropdown {
+    td {
+      border-bottom-color: $dk-border !important;
+      background: $dk-head;
+    }
+
+    &:hover td {
+      background: $dk-head;
+    }
+  }
+
+  .analytics-page__users-products-dropdown-panel {
+    border-top-color: $dk-border;
+  }
+
+  .analytics-page__users-sold-products,
+  .analytics-page__users-product-names-line {
+    color: $dk-muted;
+  }
+
+  // --- Status badges ---
+  .analytics-page__status {
+    &--critical {
+      background: rgba(248, 113, 113, 0.16);
+      border-color: rgba(248, 113, 113, 0.28);
+      color: #fca5a5;
+    }
+
+    &--low {
+      background: $dk-accent-soft;
+      border-color: $dk-accent-border;
+      color: $dk-accent;
+    }
+
+    &--active {
+      background: rgba(52, 211, 153, 0.16);
+      border-color: rgba(52, 211, 153, 0.28);
+      color: #6ee7b7;
+    }
+  }
+
+  // --- Place badges ---
+  .analytics-page__place {
+    &--first {
+      background: $dk-accent;
+      color: #1a1a1a;
+    }
+
+    &--other {
+      background: $dk-panel-hover;
+      color: $dk-muted;
+    }
+  }
+
+  // --- Loading / Error ---
+  .analytics-page__loading,
+  .analytics-page__error {
+    background: $dk-panel;
+    border: 1px solid $dk-border;
+    border-radius: $dk-radius;
+    box-shadow: $dk-shadow;
+  }
+
+  .analytics-page__loading p {
+    color: $dk-muted;
+  }
+
+  .analytics-page__error {
+    p {
+      color: #f87171;
+    }
+
+    button {
+      background: $dk-accent;
+      color: #1a1a1a;
+
+      &:hover {
+        background: #ffe23a;
+      }
+    }
+  }
+
+  // --- Help button ---
+  .analytics-page__help {
+    background: $dk-accent;
+    color: #1a1a1a;
+
+    &:hover {
+      background: #ffe23a;
     }
   }
 }
