@@ -30,3 +30,6 @@ export const mapSectorNameToSlug = (sectorName) => {
 
   return sectorMapping[sectorKey] || sectorKey;
 };
+
+export const isBuildingSector = (sectorName) =>
+  mapSectorNameToSlug(sectorName) === "building";

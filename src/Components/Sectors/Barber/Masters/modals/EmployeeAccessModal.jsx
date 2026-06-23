@@ -119,7 +119,7 @@ const EmployeeAccessModal = ({
                       onClick={() => onCanSellWholesaleChange?.(false)}
                       disabled={empSaving}
                     >
-                      Только розница
+                      Оптовая цена
                     </button>
                     <button
                       type="button"
@@ -129,7 +129,7 @@ const EmployeeAccessModal = ({
                       onClick={() => onCanSellWholesaleChange?.(true)}
                       disabled={empSaving}
                     >
-                      Разрешить опт
+                      Цена агента
                     </button>
                   </div>
                   <div className="barbermasters__help" style={{ marginTop: 8 }}>
@@ -138,7 +138,9 @@ const EmployeeAccessModal = ({
                   </div>
                 </>
               ) : (
-                <div style={{ color: "#666", fontSize: "14px", lineHeight: 1.5 }}>
+                <div
+                  style={{ color: "#666", fontSize: "14px", lineHeight: 1.5 }}
+                >
                   Сотрудник ещё не назначен агентом склада. Сначала нажмите
                   «Агент склада» в карточке сотрудника.
                 </div>

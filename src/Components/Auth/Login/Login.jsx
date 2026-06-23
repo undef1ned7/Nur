@@ -1,9 +1,11 @@
 // src/components/Education/Login.jsx
 import  { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {  loginUserAsync } from "../../../store/creators/userCreators";
+import {  loginUserAsync, getCompany } from "../../../store/creators/userCreators";
 import {  logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
+import { isBuildingSector } from "../../../utils/sectorMapping";
+import { redirectToBuildingApp } from "../../../utils/crossAppAuth";
 import "./Login.scss";
 
 const Login = () => {
@@ -67,7 +69,13 @@ const Login = () => {
     e.preventDefault(); // ← НЕ ДАДИМ БРАУЗЕРУ ПЕРЕЗАГРУЗИТЬ СТРАНИЦУ
     try {
       await dispatch(loginUserAsync(formData)).unwrap();
-     
+
+      const company = await dispatch(getCompany()).unwrap();
+      if (isBuildingSector(company?.sector?.name)) {
+        redirectToBuildingApp();
+        return;
+      }
+
       navigate("/crm/"); // навигация SPA, без reload
     } catch (e) {
       // Ошибка уже попадёт в Redux -> error, и покажется в errText
