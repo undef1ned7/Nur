@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { FileSpreadsheet, X, Download } from "lucide-react";
 import { msgFromError } from "../clientDetails.helpers";
 import api from "../../../../../api";
+import { ThemeModeContext } from "../../../../../theme/ThemeModeProvider";
+import "../ClientModals.redesign.scss";
 
 export default function ReconciliationModal({ open, clientId, onClose }) {
+  const { mode } = useContext(ThemeModeContext);
   const [filters, setFilters] = useState({ start: "", end: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -112,83 +116,75 @@ export default function ReconciliationModal({ open, clientId, onClose }) {
   };
 
   return (
-    <div
-      className="reconciliation-modal__overlay modal-overlay"
-      onClick={onClose}
-    >
+    <div className="cmx__overlay" data-theme={mode} onClick={onClose}>
       <div
-        className="reconciliation-modal modal"
+        className="cmx__dialog cmx__dialog--sm"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="reconciliation-modal__header">
-          <h3 className="reconciliation-modal__title">Акт сверки с клиентом</h3>
-          <button
-            className="reconciliation-modal__close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="reconciliation-modal__content">
-          <div className="reconciliation-modal__filters">
-            <div className="reconciliation-modal__filters-grid">
-              <div className="reconciliation-modal__filter-item">
-                <label className="reconciliation-modal__filter-label">
-                  Дата с
-                </label>
-                <input
-                  className="reconciliation-modal__filter-input analytics-sales__input"
-                  type="date"
-                  value={filters.start}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, start: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="reconciliation-modal__filter-item">
-                <label className="reconciliation-modal__filter-label">
-                  Дата по
-                </label>
-                <input
-                  className="reconciliation-modal__filter-input analytics-sales__input"
-                  type="date"
-                  value={filters.end}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, end: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="reconciliation-modal__actions-top">
-              <button
-                className="reconciliation-modal__btn reconciliation-modal__btn--primary btn btn--primary"
-                onClick={fetchReconciliation}
-                disabled={loading}
-              >
-                {loading ? "Загрузка..." : "Загрузить акт"}
-              </button>
+        <div className="cmx__header">
+          <div className="cmx__heading">
+            <span className="cmx__heading-icon">
+              <FileSpreadsheet />
+            </span>
+            <div className="cmx__heading-text">
+              <h3 className="cmx__title">Акт сверки с клиентом</h3>
+              <p className="cmx__subtitle">
+                Выберите период и выгрузите PDF
+              </p>
             </div>
           </div>
-
-          {err && (
-            <div className="reconciliation-modal__alert alert alert--error">
-              {err}
-            </div>
-          )}
+          <button className="cmx__close" onClick={onClose} aria-label="Закрыть">
+            <X />
+          </button>
         </div>
 
-        <div className="reconciliation-modal__actions modal-actions">
-          <button
-            className="reconciliation-modal__btn reconciliation-modal__btn--secondary btn btn--ghost"
-            onClick={onClose}
-          >
-            Закрыть
-          </button>
+        <div className="cmx__body">
+          <div className="cmx__grid">
+            <label className="cmx__field">
+              <span className="cmx__label">Дата с</span>
+              <input
+                className="cmx__input"
+                type="date"
+                value={filters.start}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, start: e.target.value }))
+                }
+              />
+            </label>
+            <label className="cmx__field">
+              <span className="cmx__label">Дата по</span>
+              <input
+                className="cmx__input"
+                type="date"
+                value={filters.end}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, end: e.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          {err && <div className="cmx__alert">{err}</div>}
+        </div>
+
+        <div className="cmx__footer">
+          <div className="cmx__footer-left">
+            <button className="cmx__btn cmx__btn--ghost" onClick={onClose}>
+              Закрыть
+            </button>
+          </div>
+          <div className="cmx__footer-right">
+            <button
+              className="cmx__btn cmx__btn--primary"
+              onClick={fetchReconciliation}
+              disabled={loading}
+            >
+              <Download />
+              {loading ? "Загрузка..." : "Загрузить акт"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

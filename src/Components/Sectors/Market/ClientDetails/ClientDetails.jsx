@@ -1,5 +1,5 @@
 // ClientDetails.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   useLocation,
   useNavigate,
@@ -7,11 +7,32 @@ import {
   useParams,
 } from "react-router-dom";
 
+import {
+  ArrowLeft,
+  Plus,
+  FileSpreadsheet,
+  Pencil,
+  Phone,
+  Mail,
+  User as UserIcon,
+  IdCard,
+  CalendarDays,
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  ReceiptText,
+  Layers,
+  Package,
+  RefreshCw,
+} from "lucide-react";
+
 import api from "../../../../api";
 import { productSearchHaystackLower } from "../../../../../tools/productBarcode";
 import "./ClientDetails.scss";
+import "./ClientDetails.redesign.scss";
 
 import { useUser } from "../../../../store/slices/userSlice";
+import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 
 import {
@@ -35,6 +56,7 @@ export default function MarketClientDetails() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const { company } = useUser();
+  const { mode } = useContext(ThemeModeContext);
   const { clients = [], setClients = () => {} } = useOutletContext() || {};
 
   const initialClient = useMemo(() => {
@@ -416,412 +438,500 @@ export default function MarketClientDetails() {
     [filteredSupplierProducts.length],
   );
 
+  // ---- UI-only derived values (no API / no data-model changes) ----
+  const dealKindCounts = useMemo(() => {
+    const acc = { debt: 0, prepayment: 0, sale: 0 };
+    for (const d of deals) {
+      const kind = d.kind || "sale";
+      if (kind === "debt") acc.debt += 1;
+      else if (kind === "prepayment") acc.prepayment += 1;
+      else acc.sale += 1;
+    }
+    return acc;
+  }, [deals]);
+
+  const clientInitials = useMemo(() => {
+    const parts = String(clientName || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!parts.length) return "—";
+    return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
+  }, [clientName]);
+
+  const statusText = kindTranslate[client?.status] || client?.status || "—";
+  const isBuildingSector = sectorName === "Строительная компания";
+
+  const kpis = [
+    {
+      key: "debt",
+      modifier: "cdx__kpi--debt",
+      icon: <TrendingDown />,
+      label: isBuildingSector ? "Сумма договора" : "Общий долг",
+      value: isBuildingSector ? totals.sale ?? 0 : totals.debt ?? 0,
+      count: dealKindCounts.debt,
+      onClick: () => setDetailsView("debt"),
+    },
+    {
+      key: "prepayment",
+      modifier: "cdx__kpi--prepay",
+      icon: <Wallet />,
+      label: isBuildingSector ? "Предоплата" : "Аванс",
+      value: totals.prepayment ?? 0,
+      count: dealKindCounts.prepayment,
+      onClick: () => setDetailsView("prepayment"),
+    },
+    {
+      key: "sale",
+      modifier: "cdx__kpi--sale",
+      icon: <TrendingUp />,
+      label: isBuildingSector ? "Остаток долга" : "Продажи",
+      value: isBuildingSector ? totals.debt ?? 0 : totals.sale ?? 0,
+      count: dealKindCounts.sale,
+      onClick: () => setDetailsView("sale"),
+    },
+  ];
+
+  const requisites = [
+    { label: "ОсОО", value: client?.llc },
+    { label: "ИНН", value: client?.inn },
+    { label: "ОКПО", value: client?.okpo },
+    { label: "Счет", value: client?.score },
+    { label: "БИК", value: client?.bik },
+    { label: "Адрес", value: client?.address, full: true },
+  ];
+
   return (
-    <div className="client-details">
-      {/* Header */}
-      <div className="client-details__header details-top">
-        <button
-          onClick={() =>
-            navigate(
-              company?.sector?.name === "Консалтинг"
-                ? "/crm/consulting/client"
-                : "/crm/clients"
-            )
-          }
-          className="client-details__back-btn btn btn--ghost"
-        >
-          ← Назад
-        </button>
-        <div className="client-details__header-actions">
+    <div className="cdx" data-theme={mode}>
+      {/* ===== Topbar ===== */}
+      <div className="cdx__topbar">
+        <div className="cdx__topbar-left">
           <button
-            className="client-details__btn client-details__btn--primary primary"
+            type="button"
+            onClick={() =>
+              navigate(
+                company?.sector?.name === "Консалтинг"
+                  ? "/crm/consulting/client"
+                  : "/crm/clients"
+              )
+            }
+            className="cdx__btn cdx__btn--ghost"
+          >
+            <ArrowLeft /> Назад
+          </button>
+
+          <div className="cdx__identity">
+            <div className="cdx__avatar" aria-hidden="true">
+              {clientInitials}
+            </div>
+            <div className="cdx__identity-text">
+              <h1 className="cdx__name" title={clientName}>
+                {clientName}
+              </h1>
+              <div className="cdx__identity-meta">
+                <span className="cdx__badge cdx__badge--status">
+                  {statusText}
+                </span>
+                <span className="cdx__identity-type">{clientTypeLabel}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="cdx__topbar-actions">
+          <button
+            type="button"
+            className="cdx__btn cdx__btn--primary"
             onClick={() => openDealForm()}
           >
-            Быстрое добавление сделки
+            <Plus /> Добавить сделку
           </button>
           <button
-            className="client-details__btn client-details__btn--secondary btn btn--secondary"
+            type="button"
+            className="cdx__btn cdx__btn--secondary"
             onClick={() => setShowReconciliation(true)}
           >
-            Акт сверки
+            <FileSpreadsheet /> Акт сверки
+          </button>
+          <button
+            type="button"
+            className="cdx__btn cdx__btn--secondary"
+            onClick={openClientForm}
+          >
+            <Pencil /> Редактировать клиента
           </button>
         </div>
       </div>
 
-      {/* Client Info Panel */}
-      <div className="client-details__panel panel">
-        <div className="client-details__panel-header">
-          <h2 className="client-details__title title">{clientName}</h2>
+      {clientErr && <div className="cdx__alert">{clientErr}</div>}
+
+      {/* ===== KPI Row ===== */}
+      <div className="cdx__kpis">
+        {kpis.map((kpi) => (
+          <button
+            key={kpi.key}
+            type="button"
+            className={`cdx__kpi ${kpi.modifier}`}
+            onClick={kpi.onClick}
+          >
+            <div className="cdx__kpi-top">
+              <span className="cdx__kpi-icon">{kpi.icon}</span>
+              <span className="cdx__kpi-label">{kpi.label}</span>
+            </div>
+            <div className="cdx__kpi-value">
+              {Number(kpi.value).toFixed(2)}
+              <span className="cdx__kpi-cur">сом</span>
+            </div>
+            <div className="cdx__kpi-foot">
+              <span className="cdx__kpi-pill">
+                <Layers />
+                {kpi.count}
+              </span>
+              {kpi.count === 1 ? "сделка" : "сделок"}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* ===== Profile + Requisites ===== */}
+      <div className="cdx__grid">
+        <div className="cdx__card">
+          <div className="cdx__card-head">
+            <h2 className="cdx__card-title">
+              <UserIcon /> Информация о клиенте
+            </h2>
+          </div>
+          <div className="cdx__card-body">
+            <div className="cdx__profile">
+              <div className="cdx__profile-avatar" aria-hidden="true">
+                {clientInitials}
+              </div>
+              <div className="cdx__profile-info">
+                <div className="cdx__profile-name">{clientName}</div>
+                <div className="cdx__profile-badges">
+                  <span className="cdx__badge cdx__badge--status">
+                    {statusText}
+                  </span>
+                  <span className="cdx__badge cdx__badge--type">
+                    {clientTypeLabel}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="cdx__contacts">
+              <div className="cdx__contact">
+                <span className="cdx__contact-ico">
+                  <Phone />
+                </span>
+                <div className="cdx__contact-body">
+                  <div className="cdx__contact-label">Телефон</div>
+                  <div className="cdx__contact-value">
+                    {client?.phone ? (
+                      <a href={`tel:${String(client.phone).replace(/\D/g, "")}`}>
+                        {client.phone}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="cdx__contact">
+                <span className="cdx__contact-ico">
+                  <Mail />
+                </span>
+                <div className="cdx__contact-body">
+                  <div className="cdx__contact-label">Email</div>
+                  <div className="cdx__contact-value">
+                    {client?.email || "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="cdx__contact">
+                <span className="cdx__contact-ico">
+                  <IdCard />
+                </span>
+                <div className="cdx__contact-body">
+                  <div className="cdx__contact-label">Тип клиента</div>
+                  <div className="cdx__contact-value">{clientTypeLabel}</div>
+                </div>
+              </div>
+
+              <div className="cdx__contact">
+                <span className="cdx__contact-ico">
+                  <CalendarDays />
+                </span>
+                <div className="cdx__contact-body">
+                  <div className="cdx__contact-label">Дата регистрации</div>
+                  <div className="cdx__contact-value">
+                    {toIsoDate10(client?.date) || "—"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        {clientErr && (
-          <div className="client-details__alert alert alert--error">
-            {clientErr}
+
+        <div className="cdx__card">
+          <div className="cdx__card-head">
+            <h2 className="cdx__card-title">
+              <ReceiptText /> Реквизиты
+            </h2>
           </div>
-        )}
-        <div className="client-details__divider divider"></div>
-
-        <div className="client-details__content content-wrapper">
-          <div className="client-details__info-grid">
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">ФИО</div>
-              <div className="client-details__info-value">{clientName}</div>
+          <div className="cdx__card-body">
+            <div className="cdx__req-grid">
+              {requisites.map((r) => (
+                <div
+                  key={r.label}
+                  className={`cdx__req-item${
+                    r.full ? " cdx__req-item--full" : ""
+                  }`}
+                >
+                  <div className="cdx__req-label">{r.label}</div>
+                  <div className="cdx__req-value">{r.value || "—"}</div>
+                </div>
+              ))}
             </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Телефон</div>
-              <div className="client-details__info-value">
-                {client?.phone ? (
-                  <a href={`tel:${String(client.phone).replace(/\D/g, "")}`}>
-                    {client.phone}
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Тип</div>
-              <div className="client-details__info-value">
-                {clientTypeLabel}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Email</div>
-              <div className="client-details__info-value">
-                {client?.email || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Дата</div>
-              <div className="client-details__info-value">
-                {toIsoDate10(client?.date) || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Статус</div>
-              <div className="client-details__info-value">
-                {kindTranslate[client?.status] || client?.status || "—"}
-              </div>
-              <button
-                className="client-details__edit-btn btn edit-btn"
-                onClick={openClientForm}
-              >
-                Редактировать
-              </button>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">ОсОО</div>
-              <div className="client-details__info-value">
-                {client?.llc || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">ИНН</div>
-              <div className="client-details__info-value">
-                {client?.inn || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">ОКПО</div>
-              <div className="client-details__info-value">
-                {client?.okpo || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Счет</div>
-              <div className="client-details__info-value">
-                {client?.score || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">БИК</div>
-              <div className="client-details__info-value">
-                {client?.bik || "—"}
-              </div>
-            </div>
-
-            <div className="client-details__info-item">
-              <div className="client-details__info-label">Адрес</div>
-              <div className="client-details__info-value">
-                {client?.address || "—"}
-              </div>
-            </div>
-          </div>
-
-          <div className="client-details__stats debts-wrapper">
-            <button
-              type="button"
-              className="client-details__stat-card client-details__stat-card--red debts debts--red client-details__stat-card--clickable"
-              onClick={() => setDetailsView("debt")}
-            >
-              <div className="client-details__stat-title debts-title">
-                {sectorName === "Строительная компания"
-                  ? "Сумма договора"
-                  : "Долг"}
-              </div>
-              <div className="client-details__stat-amount debts-amount">
-                {sectorName === "Строительная компания"
-                  ? (totals.sale ?? 0).toFixed(2)
-                  : (totals.debt ?? 0).toFixed(2)}
-                <span className="client-details__stat-currency">сом</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="client-details__stat-card client-details__stat-card--green debts debts--green client-details__stat-card--clickable"
-              onClick={() => setDetailsView("prepayment")}
-            >
-              <div className="client-details__stat-title debts-title">
-                {sectorName === "Строительная компания"
-                  ? "Предоплата"
-                  : "Аванс"}
-              </div>
-              <div className="client-details__stat-amount debts-amount">
-                {(totals.prepayment ?? 0).toFixed(2)}
-                <span className="client-details__stat-currency">сом</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="client-details__stat-card client-details__stat-card--orange debts debts--orange client-details__stat-card--clickable"
-              onClick={() => setDetailsView("sale")}
-            >
-              <div className="client-details__stat-title debts-title">
-                {sectorName === "Строительная компания"
-                  ? "Остаток долга"
-                  : "Продажа"}
-              </div>
-              <div className="client-details__stat-amount debts-amount">
-                {sectorName === "Строительная компания"
-                  ? (totals.debt ?? 0).toFixed(2)
-                  : (totals.sale ?? 0).toFixed(2)}
-                <span className="client-details__stat-currency">сом</span>
-              </div>
-            </button>
           </div>
         </div>
       </div>
 
-  
-
-      {/* Filters Panel */}
-      <div className="client-details__filters filters panel">
-        <div className="client-details__filters-grid">
-          <div className="client-details__filter-item">
-            <label className="client-details__filter-label">Дата с</label>
+      {/* ===== Filters toolbar ===== */}
+      <div className="cdx__toolbar">
+        <div className="cdx__toolbar-dates">
+          <div className="cdx__field">
+            <label className="cdx__field-label">Дата с</label>
             <input
-              className="client-details__filter-input analytics-sales__input"
+              className="cdx__input"
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
             />
           </div>
-          <div className="client-details__filter-item">
-            <label className="client-details__filter-label">Дата по</label>
+          <div className="cdx__field">
+            <label className="cdx__field-label">Дата по</label>
             <input
-              className="client-details__filter-input analytics-sales__input"
+              className="cdx__input"
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
             />
           </div>
         </div>
-        <div className="client-details__quick-filters">
+
+        <div className="cdx__toolbar-presets">
           <button
-            className="client-details__quick-filter-btn btn btn--ghost"
+            type="button"
+            className="cdx__chip"
             onClick={() => applyPreset("today")}
           >
             Сегодня
           </button>
           <button
-            className="client-details__quick-filter-btn btn btn--ghost"
+            type="button"
+            className="cdx__chip"
             onClick={() => applyPreset("week")}
           >
             Неделя
           </button>
           <button
-            className="client-details__quick-filter-btn btn btn--ghost"
+            type="button"
+            className="cdx__chip"
             onClick={() => applyPreset("month")}
           >
             Месяц
           </button>
           <button
-            className="client-details__clear-btn btn"
+            type="button"
+            className="cdx__chip cdx__chip--clear"
             onClick={() => applyPreset("clear")}
           >
             Очистить
           </button>
         </div>
-        <div className="client-details__filter-info muted">
+
+        <div className="cdx__toolbar-info">
           Показано: <b>{filteredDeals.length}</b> из {deals.length}
         </div>
       </div>
 
-      {/* Deals List */}
-      <div className="client-details__deals deals-list">
-        <div className="client-details__deals-header">
-          <h3 className="client-details__deals-title">Сделки</h3>
+      {/* ===== Deals ===== */}
+      <div className="cdx__deals">
+        <div className="cdx__deals-head">
+          <h3 className="cdx__deals-title">
+            <ReceiptText /> Сделки
+          </h3>
+          <span className="cdx__deals-count">{filteredDeals.length}</span>
         </div>
-        {dealsLoading && (
-          <div className="client-details__deals-loading muted">Загрузка…</div>
-        )}
-        {dealsErr && (
-          <div className="client-details__alert alert alert--error">
-            {dealsErr}
-          </div>
-        )}
-        {!dealsLoading && filteredDeals.length === 0 && (
-          <div className="client-details__deals-empty muted">Сделок нет</div>
-        )}
 
-        {filteredDeals.map((deal) => (
-          (() => {
+        <div className="cdx__deals-body">
+          {dealsLoading && <div className="cdx__state">Загрузка…</div>}
+          {dealsErr && <div className="cdx__alert">{dealsErr}</div>}
+          {!dealsLoading && !dealsErr && filteredDeals.length === 0 && (
+            <div className="cdx__state">Сделок нет</div>
+          )}
+
+          {filteredDeals.map((deal) => {
             const isDebt = deal.kind === "debt";
             const debtProgress = isDebt ? getDebtProgress(deal) : null;
             const debtStatusLabel =
-              isDebt && Number(deal.prepayment || 0) !== 0 ? "Предоплата" : "Долг";
+              isDebt && Number(deal.prepayment || 0) !== 0
+                ? "Предоплата"
+                : "Долг";
+            const dealDate = getDealDateISO(deal);
 
             return (
-          <div
-            key={deal.id}
-            onClick={() => {
-              deal.kind === "debt" && dataTransmission(deal.id);
-            }}
-            className="client-details__deal-item deal-item"
-          >
-            <span className="client-details__deal-name deal-name">
-              {deal.title}
-            </span>
-            <span className="client-details__deal-amount deal-budget">
-              {Number(deal.amount || 0).toFixed(2)}
-            </span>
-            <span
-              className={`client-details__deal-status deal-status ${isDebt ? "is-debt" : ""}`}
-              style={
-                isDebt
-                  ? {
-                      background: debtProgress.bg,
-                      border: `1px solid ${debtProgress.border}`,
-                      color: "var(--text)",
-                      boxShadow: debtProgress.glow,
-                    }
-                  : undefined
-              }
-              title={
-                isDebt
-                  ? `Оплачено ${debtProgress.paid.toFixed(2)} из ${debtProgress.total.toFixed(
-                      2
-                    )} (${debtProgress.percent}%)`
-                  : undefined
-              }
-            >
-              {isDebt ? (
-                <span className="client-details__debtProgress">
-                  <span className="client-details__debtText">
-                    {debtStatusLabel} •{" "}
-                    <span className="client-details__debtPercent">
-                      {debtProgress.percent}%
-                    </span>
-                  </span>
-                  <span className="client-details__battery" aria-hidden="true">
-                    <span
-                      className="client-details__batteryFill"
-                      style={{
-                        width: `${debtProgress.percent}%`,
-                        backgroundColor: debtProgress.fill,
-                      }}
-                    />
-                  </span>
-                </span>
-              ) : (
-                kindLabel(deal.kind)
-              )}
-            </span>
-            <span className="client-details__deal-tasks deal-tasks">
-              Нет задач
-            </span>
-            <div onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => openDealForm(deal)}
-                className="client-details__edit-btn btn edit-btn"
+              <div
+                key={deal.id}
+                onClick={() => {
+                  if (deal.kind === "debt") dataTransmission(deal.id);
+                }}
+                className={`cdx__deal${
+                  isDebt ? " cdx__deal--clickable" : ""
+                }`}
               >
-                Редактировать
-              </button>
-            </div>
-          </div>
+                <div className="cdx__deal-main">
+                  <span className="cdx__deal-name">{deal.title}</span>
+                  <div className="cdx__deal-meta">
+                    {isDebt ? (
+                      <span className="cdx__badge cdx__badge--debt">
+                        {debtStatusLabel}
+                      </span>
+                    ) : (
+                      <span className="cdx__badge cdx__badge--neutral">
+                        {kindLabel(deal.kind)}
+                      </span>
+                    )}
+                    {dealDate && (
+                      <span className="cdx__deal-meta-item">
+                        <CalendarDays />
+                        {dealDate}
+                      </span>
+                    )}
+                    <span className="cdx__deal-meta-item">Нет задач</span>
+                  </div>
+                </div>
+
+                <div className="cdx__deal-money">
+                  <div className="cdx__deal-amount">
+                    {Number(deal.amount || 0).toFixed(2)}
+                    <span className="cdx__deal-amount-cur">сом</span>
+                  </div>
+                  {isDebt && (
+                    <div className="cdx__deal-remaining">
+                      Остаток: {Number(deal.remaining_debt || 0).toFixed(2)} сом
+                    </div>
+                  )}
+                </div>
+
+                <div className="cdx__progress">
+                  {isDebt ? (
+                    <>
+                      <div className="cdx__progress-top">
+                        <span className="cdx__progress-label">
+                          Оплачено {debtProgress.paid.toFixed(2)} из{" "}
+                          {debtProgress.total.toFixed(2)}
+                        </span>
+                        <span className="cdx__progress-pct">
+                          {debtProgress.percent}%
+                        </span>
+                      </div>
+                      <div className="cdx__progress-track">
+                        <div
+                          className="cdx__progress-fill"
+                          style={{
+                            width: `${debtProgress.percent}%`,
+                            backgroundColor: debtProgress.fill,
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="cdx__deal-meta-item">
+                      {kindLabel(deal.kind)}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  className="cdx__deal-actions"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => openDealForm(deal)}
+                    className="cdx__btn cdx__btn--secondary"
+                  >
+                    <Pencil /> Редактировать
+                  </button>
+                </div>
+              </div>
             );
-          })()
-        ))}
+          })}
+        </div>
       </div>
       {isSupplierClient && company?.sector?.name === "Магазин" && (
-        <div className="client-details__supplier-products panel">
-          <div className="client-details__supplier-products-head">
+        <div className="cdx__card">
+          <div className="cdx__supplier-head">
             <div>
-              <h3 className="client-details__deals-title">
-                Товары поставщика
+              <h3 className="cdx__card-title">
+                <Package /> Товары поставщика
               </h3>
-              <div className="client-details__supplier-products-subtitle">
+              <div className="cdx__supplier-subtitle">
                 Список товаров, которые этот поставщик привозит
               </div>
             </div>
 
-            <div className="client-details__supplier-products-actions">
+            <div className="cdx__supplier-actions">
               <input
                 type="text"
-                className="client-details__filter-input"
+                className="cdx__input"
                 placeholder="Поиск по названию, коду, артикулу, штрихкоду"
                 value={supplierProductSearch}
                 onChange={(e) => setSupplierProductSearch(e.target.value)}
               />
               <button
                 type="button"
-                className="client-details__btn client-details__btn--secondary"
+                className="cdx__btn cdx__btn--secondary"
                 onClick={() => loadSupplierProducts(client?.id)}
                 disabled={!client?.id || supplierProductsLoading}
               >
+                <RefreshCw />
                 {supplierProductsLoading ? "Обновляем..." : "Обновить товары"}
               </button>
             </div>
           </div>
 
-          <div className="client-details__supplier-products-summary">
-            <div className="client-details__supplier-products-chip">
+          <div className="cdx__supplier-summary">
+            <div className="cdx__supplier-chip">
               Всего товаров: <b>{supplierProducts.length}</b>
             </div>
-            <div className="client-details__supplier-products-chip">
+            <div className="cdx__supplier-chip">
               Показано: <b>{supplierProductsCountLabel}</b>
             </div>
           </div>
 
           {supplierProductsErr && (
-            <div className="client-details__alert alert alert--error">
-              {supplierProductsErr}
+            <div style={{ padding: "16px 22px 0" }}>
+              <div className="cdx__alert">{supplierProductsErr}</div>
             </div>
           )}
 
           {supplierProductsLoading ? (
-            <div className="client-details__deals-loading muted">Загрузка…</div>
+            <div className="cdx__state">Загрузка…</div>
           ) : filteredSupplierProducts.length === 0 ? (
-            <div className="client-details__deals-empty muted">
+            <div className="cdx__state">
               {supplierProductSearch.trim()
                 ? "По вашему запросу товары не найдены"
                 : "У этого поставщика пока нет товаров"}
             </div>
           ) : (
             <>
-              <div className="client-details__supplier-products-table-wrap">
-                <table className="client-details__supplier-products-table">
+              <div className="cdx__supplier-table-wrap">
+                <table className="cdx__supplier-table">
                   <thead>
                     <tr>
                       <th>Товар</th>
@@ -853,38 +963,40 @@ export default function MarketClientDetails() {
                 </table>
               </div>
 
-              <div className="client-details__supplier-products-cards">
+              <div className="cdx__supplier-cards">
                 {filteredSupplierProducts.map((product) => (
                   <div
                     key={`card-${product?.id || product?.code || product?.barcode}`}
-                    className="client-details__supplier-product-card"
+                    className="cdx__supplier-card"
                   >
-                    <div className="client-details__supplier-product-name">
+                    <div className="cdx__supplier-card-name">
                       {product?.name || product?.title || "Без названия"}
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Код</span>
                       <strong>{product?.code || "—"}</strong>
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Артикул</span>
                       <strong>{product?.article || "—"}</strong>
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Штрихкод</span>
                       <strong>{product?.barcode || "—"}</strong>
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Остаток</span>
                       <strong>{product?.quantity ?? 0}</strong>
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Ед. изм.</span>
                       <strong>{product?.unit || "—"}</strong>
                     </div>
-                    <div className="client-details__supplier-product-meta">
+                    <div className="cdx__supplier-card-row">
                       <span>Закупочная цена</span>
-                      <strong>{product?.purchase_price ?? product?.price ?? "—"}</strong>
+                      <strong>
+                        {product?.purchase_price ?? product?.price ?? "—"}
+                      </strong>
                     </div>
                   </div>
                 ))}
@@ -930,30 +1042,38 @@ export default function MarketClientDetails() {
       />
 
       {detailsView && (
-        <div className="client-details__details-modal-overlay" onClick={() => setDetailsView(null)}>
-          <div className="client-details__details-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="client-details__details-modal-header">
-              <h3 className="client-details__details-modal-title">{detailsMeta.title}</h3>
+        <div
+          className="cdx__modal-overlay"
+          onClick={() => setDetailsView(null)}
+        >
+          <div className="cdx__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cdx__modal-head">
+              <h3 className="cdx__modal-title">{detailsMeta.title}</h3>
               <button
                 type="button"
-                className="client-details__details-modal-close"
+                className="cdx__modal-close"
                 onClick={() => setDetailsView(null)}
+                aria-label="Закрыть"
               >
                 ×
               </button>
             </div>
-            <div className="client-details__details-modal-total">
+            <div className="cdx__modal-total">
               Итого: <b>{detailsMeta.total.toFixed(2)} сом</b>
             </div>
-            <div className="client-details__details-modal-list">
+            <div className="cdx__modal-list">
               {detailRows.length === 0 && (
-                <div className="client-details__details-modal-empty">Нет данных по выбранной категории</div>
+                <div className="cdx__modal-empty">
+                  Нет данных по выбранной категории
+                </div>
               )}
               {detailRows.map((row) => (
-                <div key={row.id} className="client-details__details-modal-row">
-                  <div className="client-details__details-modal-what">{row.title}</div>
-                  <div className="client-details__details-modal-when">{row.date}</div>
-                  <div className="client-details__details-modal-howmuch">{row.amount.toFixed(2)} сом</div>
+                <div key={row.id} className="cdx__modal-row">
+                  <div className="cdx__modal-what">{row.title}</div>
+                  <div className="cdx__modal-when">{row.date}</div>
+                  <div className="cdx__modal-howmuch">
+                    {row.amount.toFixed(2)} сом
+                  </div>
                 </div>
               ))}
             </div>

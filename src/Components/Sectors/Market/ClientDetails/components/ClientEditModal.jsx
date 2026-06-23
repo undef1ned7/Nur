@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { UserCog, X, Trash2 } from "lucide-react";
 import { msgFromError, toIsoDate10 } from "../clientDetails.helpers";
 import api from "../../../../../api";
+import { ThemeModeContext } from "../../../../../theme/ThemeModeProvider";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import "../ClientModals.redesign.scss";
 
 export default function ClientEditModal({
   open,
@@ -10,6 +13,7 @@ export default function ClientEditModal({
   onUpdated,
   onDeleted,
 }) {
+  const { mode } = useContext(ThemeModeContext);
   const [editFio, setEditFio] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -156,187 +160,199 @@ export default function ClientEditModal({
   };
 
   return (
-    <div className="client-edit-modal__overlay modal-overlay" onClick={onClose}>
+    <div className="cmx__overlay" data-theme={mode} onClick={onClose}>
       <div
-        className="client-edit-modal modal"
+        className="cmx__dialog cmx__dialog--lg"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="client-edit-modal__header">
-          <h3 className="client-edit-modal__title">Редактировать клиента</h3>
-          <button
-            className="client-edit-modal__close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            ×
+        <div className="cmx__header">
+          <div className="cmx__heading">
+            <span className="cmx__heading-icon">
+              <UserCog />
+            </span>
+            <div className="cmx__heading-text">
+              <h3 className="cmx__title">Редактировать клиента</h3>
+              <p className="cmx__subtitle">
+                Контактные данные и платёжные реквизиты
+              </p>
+            </div>
+          </div>
+          <button className="cmx__close" onClick={onClose} aria-label="Закрыть">
+            <X />
           </button>
         </div>
 
-        <div className="client-edit-modal__content">
-          {saveClientErr && (
-            <div className="client-edit-modal__alert alert alert--error">
-              {saveClientErr}
+        <div className="cmx__body">
+          {saveClientErr && <div className="cmx__alert">{saveClientErr}</div>}
+
+          <div>
+            <div className="cmx__section-title">Контакты</div>
+            <div className="cmx__grid">
+              <label className="cmx__field">
+                <span className="cmx__label">
+                  ФИО <b className="cmx__req">*</b>
+                </span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editFio}
+                  onChange={(e) => setEditFio(e.target.value)}
+                  placeholder="Иванов Иван"
+                  autoFocus
+                  required
+                />
+              </label>
+
+              <label className="cmx__field">
+                <span className="cmx__label">
+                  Телефон <b className="cmx__req">*</b>
+                </span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+996 700 00-00-00"
+                  required
+                />
+              </label>
+
+              <label className="cmx__field">
+                <span className="cmx__label">Email</span>
+                <input
+                  type="email"
+                  className="cmx__input"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@mail.com"
+                />
+              </label>
+
+              <label className="cmx__field">
+                <span className="cmx__label">Дата</span>
+                <input
+                  type="date"
+                  className="cmx__input"
+                  value={editDate || ""}
+                  onChange={(e) => setEditDate(e.target.value)}
+                />
+                <span className="cmx__hint">
+                  Например: <b>21.08.2025</b> (сохранится как 2025-08-21)
+                </span>
+              </label>
+
+              <label className="cmx__field">
+                <span className="cmx__label">Статус</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  placeholder="new"
+                />
+              </label>
             </div>
-          )}
+          </div>
 
-          <div className="client-edit-modal__fields">
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">
-                ФИО <b className="req">*</b>
-              </span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editFio}
-                onChange={(e) => setEditFio(e.target.value)}
-                placeholder="Иванов Иван"
-                autoFocus
-                required
-              />
-            </label>
+          <div>
+            <div className="cmx__section-title">Реквизиты</div>
+            <div className="cmx__grid">
+              <label className="cmx__field">
+                <span className="cmx__label">ОсОО</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editLlc}
+                  onChange={(e) => setEditLlc(e.target.value)}
+                  placeholder="ОсОО"
+                />
+              </label>
 
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">
-                Телефон <b className="req">*</b>
-              </span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
-                placeholder="+996 700 00-00-00"
-                required
-              />
-            </label>
+              <label className="cmx__field">
+                <span className="cmx__label">ИНН</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editInn}
+                  onChange={(e) => setEditInn(e.target.value)}
+                  placeholder="ИНН"
+                />
+              </label>
 
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">Email</span>
-              <input
-                type="email"
-                className="client-edit-modal__input"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                placeholder="user@mail.com"
-              />
-            </label>
+              <label className="cmx__field">
+                <span className="cmx__label">ОКПО</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editOkpo}
+                  onChange={(e) => setEditOkpo(e.target.value)}
+                  placeholder="ОКПО"
+                />
+              </label>
 
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">Дата</span>
-              <input
-                type="date"
-                className="client-edit-modal__input"
-                value={editDate || ""}
-                onChange={(e) => setEditDate(e.target.value)}
-              />
-              <div className="client-edit-modal__hint hint">
-                Например: <b>21.08.2025</b> (сохранится как 2025-08-21)
-              </div>
-            </label>
+              <label className="cmx__field">
+                <span className="cmx__label">Счет</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editScore}
+                  onChange={(e) => setEditScore(e.target.value)}
+                  placeholder="Расчетный счет"
+                />
+              </label>
 
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">Статус</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                placeholder="new"
-              />
-            </label>
+              <label className="cmx__field">
+                <span className="cmx__label">БИК</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editBik}
+                  onChange={(e) => setEditBik(e.target.value)}
+                  placeholder="БИК"
+                />
+              </label>
 
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">ОсОО</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editLlc}
-                onChange={(e) => setEditLlc(e.target.value)}
-                placeholder="ОсОО"
-              />
-            </label>
-
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">ИНН</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editInn}
-                onChange={(e) => setEditInn(e.target.value)}
-                placeholder="ИНН"
-              />
-            </label>
-
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">ОКПО</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editOkpo}
-                onChange={(e) => setEditOkpo(e.target.value)}
-                placeholder="ОКПО"
-              />
-            </label>
-
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">Счет</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editScore}
-                onChange={(e) => setEditScore(e.target.value)}
-                placeholder="Расчетный счет"
-              />
-            </label>
-
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">БИК</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editBik}
-                onChange={(e) => setEditBik(e.target.value)}
-                placeholder="БИК"
-              />
-            </label>
-
-            <label className="client-edit-modal__field field">
-              <span className="client-edit-modal__label">Адрес</span>
-              <input
-                type="text"
-                className="client-edit-modal__input"
-                value={editAddress}
-                onChange={(e) => setEditAddress(e.target.value)}
-                placeholder="Адрес"
-              />
-            </label>
+              <label className="cmx__field cmx__field--full">
+                <span className="cmx__label">Адрес</span>
+                <input
+                  type="text"
+                  className="cmx__input"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  placeholder="Адрес"
+                />
+              </label>
+            </div>
           </div>
         </div>
 
-        <div className="client-edit-modal__actions modal-actions">
-          <button
-            className="client-edit-modal__btn client-edit-modal__btn--danger btn btn--red"
-            onClick={handleDelete}
-            disabled={savingClient}
-          >
-            Удалить
-          </button>
-          <div className="client-edit-modal__actions-right">
+        <div className="cmx__footer">
+          <div className="cmx__footer-left">
             <button
-              className="client-edit-modal__btn client-edit-modal__btn--primary btn btn--yellow"
+              className="cmx__btn cmx__btn--danger"
+              onClick={handleDelete}
+              disabled={savingClient}
+            >
+              <Trash2 /> Удалить
+            </button>
+          </div>
+          <div className="cmx__footer-right">
+            <button
+              className="cmx__btn cmx__btn--ghost"
+              onClick={onClose}
+              disabled={savingClient}
+            >
+              Отмена
+            </button>
+            <button
+              className="cmx__btn cmx__btn--primary"
               onClick={handleSave}
               disabled={!requiredOk || savingClient}
               title={!requiredOk ? "Заполните обязательные поля" : ""}
             >
               {savingClient ? "Сохранение…" : "Сохранить"}
-            </button>
-            <button
-              className="client-edit-modal__btn client-edit-modal__btn--secondary btn btn--ghost"
-              onClick={onClose}
-              disabled={savingClient}
-            >
-              Отмена
             </button>
           </div>
         </div>

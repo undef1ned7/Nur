@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { Handshake, X, Trash2, Info } from "lucide-react";
 import {
   toDecimalString,
   ruStatusToKind,
@@ -11,6 +12,8 @@ import {
 } from "../clientDetails.helpers";
 import api from "../../../../../api";
 import { useConfirm } from "../../../../../hooks/useDialog";
+import { ThemeModeContext } from "../../../../../theme/ThemeModeProvider";
+import "../ClientModals.redesign.scss";
 
 export default function DealFormModal({
   open,
@@ -22,6 +25,7 @@ export default function DealFormModal({
   onError,
 }) {
   const confirm = useConfirm();
+  const { mode } = useContext(ThemeModeContext);
   const [dealName, setDealName] = useState("");
   const [dealBudget, setDealBudget] = useState("");
   const [dealStatus, setDealStatus] = useState("Продажа");
@@ -165,45 +169,57 @@ export default function DealFormModal({
   };
 
   return (
-    <div
-      className="deal-form-modal__overlay modal-overlay"
-      onClick={() => onClose?.()}
-    >
+    <div className="cmx__overlay" data-theme={mode} onClick={() => onClose?.()}>
       <div
-        className="deal-form-modal modal"
+        className="cmx__dialog cmx__dialog--md"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="deal-form-modal__header">
-          <h3 className="deal-form-modal__title">
-            {editingDeal ? "Редактировать сделку" : "Новая сделка"}
-          </h3>
+        <div className="cmx__header">
+          <div className="cmx__heading">
+            <span className="cmx__heading-icon">
+              <Handshake />
+            </span>
+            <div className="cmx__heading-text">
+              <h3 className="cmx__title">
+                {editingDeal ? "Редактировать сделку" : "Новая сделка"}
+              </h3>
+              <p className="cmx__subtitle">
+                {editingDeal
+                  ? "Измените параметры сделки клиента"
+                  : "Заполните данные новой сделки"}
+              </p>
+            </div>
+          </div>
           <button
-            className="deal-form-modal__close"
+            className="cmx__close"
             onClick={() => onClose?.()}
             aria-label="Закрыть"
           >
-            ×
+            <X />
           </button>
         </div>
 
-        <div className="deal-form-modal__content">
+        <div className="cmx__body">
           {paymentsExist && (
-            <div className="deal-form-modal__hint hint">
-              По сделке уже есть платежи — можно изменить только название и
-              комментарий.
+            <div className="cmx__note">
+              <Info />
+              <span>
+                По сделке уже есть платежи — можно изменить только название и
+                комментарий.
+              </span>
             </div>
           )}
 
-          <div className="deal-form-modal__fields">
-            <label className="deal-form-modal__field field">
-              <span className="deal-form-modal__label">
-                Название сделки <b className="req">*</b>
+          <div className="cmx__grid">
+            <label className="cmx__field cmx__field--full">
+              <span className="cmx__label">
+                Название сделки <b className="cmx__req">*</b>
               </span>
               <input
                 type="text"
-                className="deal-form-modal__input"
+                className="cmx__input"
                 value={dealName}
                 onChange={(e) => setDealName(e.target.value)}
                 placeholder="Например: Продажа напитков"
@@ -212,15 +228,15 @@ export default function DealFormModal({
 
             {!paymentsExist && (
               <>
-                <label className="deal-form-modal__field field">
-                  <span className="deal-form-modal__label">
-                    Сумма <b className="req">*</b>
+                <label className="cmx__field">
+                  <span className="cmx__label">
+                    Сумма <b className="cmx__req">*</b>
                   </span>
                   <input
                     type="number"
                     inputMode="decimal"
                     step="0.01"
-                    className="deal-form-modal__input"
+                    className="cmx__input"
                     value={dealBudget}
                     onChange={(e) => setDealBudget(e.target.value)}
                     onBlur={() => setDealBudget(toDecimalString(dealBudget))}
@@ -236,12 +252,12 @@ export default function DealFormModal({
                   />
                 </label>
 
-                <label className="deal-form-modal__field field">
-                  <span className="deal-form-modal__label">
-                    Тип <b className="req">*</b>
+                <label className="cmx__field">
+                  <span className="cmx__label">
+                    Тип <b className="cmx__req">*</b>
                   </span>
                   <select
-                    className="deal-form-modal__input deal-form-modal__select"
+                    className="cmx__select"
                     value={dealStatus}
                     onChange={(e) => setDealStatus(e.target.value)}
                   >
@@ -255,30 +271,30 @@ export default function DealFormModal({
 
             {!paymentsExist && isDebtSelected && (
               <>
-                <label className="deal-form-modal__field field">
-                  <span className="deal-form-modal__label">
-                    Срок долга (дней) <b className="req">*</b>
+                <label className="cmx__field">
+                  <span className="cmx__label">
+                    Срок долга (дней) <b className="cmx__req">*</b>
                   </span>
                   <input
                     type="number"
                     inputMode="numeric"
                     step="1"
                     min="1"
-                    className="deal-form-modal__input"
+                    className="cmx__input"
                     value={dealDebtDays}
                     onChange={(e) => setDealDebtDays(e.target.value)}
                     placeholder="Например: 30"
                   />
                 </label>
 
-                <label className="deal-form-modal__field field">
-                  <span className="deal-form-modal__label">Предоплата</span>
+                <label className="cmx__field">
+                  <span className="cmx__label">Предоплата</span>
                   <input
                     type="number"
                     inputMode="decimal"
                     step="0.01"
                     min="0"
-                    className="deal-form-modal__input"
+                    className="cmx__input"
                     value={dealPrepayment}
                     onChange={(e) => setDealPrepayment(e.target.value)}
                     onBlur={() =>
@@ -288,46 +304,46 @@ export default function DealFormModal({
                   />
                 </label>
 
-                <label className="deal-form-modal__field field">
-                  <span className="deal-form-modal__label">
-                    Дата первого платежа
-                  </span>
+                <label className="cmx__field cmx__field--full">
+                  <span className="cmx__label">Дата первого платежа</span>
                   <input
                     type="date"
-                    className="deal-form-modal__input"
+                    className="cmx__input"
                     value={dealFirstDueDate}
                     onChange={(e) => setDealFirstDueDate(e.target.value)}
                   />
-                  <div className="deal-form-modal__hint hint">
+                  <span className="cmx__hint">
                     Если не указана — сегодня + срок в днях
-                  </div>
+                  </span>
                 </label>
               </>
             )}
 
             {!paymentsExist && isPrepaymentSelected && (
-              <label className="deal-form-modal__field field">
-                <span className="deal-form-modal__label">Сумма предоплаты</span>
+              <label className="cmx__field cmx__field--full">
+                <span className="cmx__label">Сумма предоплаты</span>
                 <input
                   type="number"
                   inputMode="decimal"
                   step="0.01"
                   min="0"
-                  className="deal-form-modal__input"
+                  className="cmx__input"
                   value={dealPrepayment}
                   onChange={(e) => setDealPrepayment(e.target.value)}
                   onBlur={() =>
-                    setDealPrepayment(toDecimalString(dealPrepayment || dealBudget))
+                    setDealPrepayment(
+                      toDecimalString(dealPrepayment || dealBudget)
+                    )
                   }
                   placeholder={toDecimalString(dealBudget)}
                 />
               </label>
             )}
 
-            <label className="deal-form-modal__field field">
-              <span className="deal-form-modal__label">Комментарий</span>
+            <label className="cmx__field cmx__field--full">
+              <span className="cmx__label">Комментарий</span>
               <textarea
-                className="deal-form-modal__input"
+                className="cmx__textarea"
                 rows={2}
                 value={dealNote}
                 onChange={(e) => setDealNote(e.target.value)}
@@ -337,28 +353,32 @@ export default function DealFormModal({
           </div>
         </div>
 
-        <div className="deal-form-modal__actions modal-actions">
-          <button
-            className="deal-form-modal__btn deal-form-modal__btn--primary btn btn--yellow"
-            onClick={handleSave}
-            disabled={!canSaveDeal}
-          >
-            {editingDeal ? "Сохранить" : "Добавить"}
-          </button>
-          {editingDeal && (
+        <div className="cmx__footer">
+          <div className="cmx__footer-left">
+            {editingDeal && (
+              <button
+                className="cmx__btn cmx__btn--danger"
+                onClick={handleDelete}
+              >
+                <Trash2 /> Удалить
+              </button>
+            )}
+          </div>
+          <div className="cmx__footer-right">
             <button
-              className="deal-form-modal__btn deal-form-modal__btn--danger btn btn--red"
-              onClick={handleDelete}
+              className="cmx__btn cmx__btn--ghost"
+              onClick={() => onClose?.()}
             >
-              Удалить
+              Отмена
             </button>
-          )}
-          <button
-            className="deal-form-modal__btn deal-form-modal__btn--secondary btn btn--ghost"
-            onClick={() => onClose?.()}
-          >
-            Отмена
-          </button>
+            <button
+              className="cmx__btn cmx__btn--primary"
+              onClick={handleSave}
+              disabled={!canSaveDeal}
+            >
+              {editingDeal ? "Сохранить" : "Добавить"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
