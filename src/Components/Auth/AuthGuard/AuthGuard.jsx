@@ -7,6 +7,8 @@ import {
   shouldRedirectToCrm,
   clearTokens,
 } from "../../../utils/authUtils";
+import { redirectToBuildingApp, shouldSkipBuildingRedirect, clearSkipBuildingRedirectParam } from "../../../utils/crossAppAuth";
+import { isBuildingSector } from "../../../utils/sectorMapping";
 import {
   DEFAULT_AUTHENTICATED_PATH,
   DEFAULT_UNAUTHENTICATED_PATH,
@@ -68,6 +70,22 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
       // Проверяем валидность токена через API
       try {
         await getProfileFunc();
+
+        if (shouldSkipBuildingRedirect()) {
+          clearSkipBuildingRedirectParam();
+        } else {
+          const company = await dispatch(getCompany()).unwrap();
+          if (isBuildingSector(company?.sector?.name)) {
+            const shouldSendToBuildingApp =
+              shouldRedirectToCrm(currentPath) ||
+              currentPath.startsWith("/crm/building");
+
+            if (shouldSendToBuildingApp) {
+              redirectToBuildingApp(currentPath);
+              return;
+            }
+          }
+        }
 
         // Если токен валиден и мы на публичной странице - редирект на /crm
         if (shouldRedirectToCrm(currentPath)) {

@@ -319,8 +319,7 @@ const Masters = () => {
 
   const sectorName = String(company?.sector?.name || "").trim();
   const isWarehouseSector = sectorName === "Склад";
-  const isOwnerOrAdmin =
-    profile?.role === "owner" || profile?.role === "admin";
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
   const isCafeSector = sectorName === "Кафе";
   const isSalePayrollSector = isSaleEmployeePayrollSector(sectorName);
   const canAddEmployeeByStartPlan = useMemo(
@@ -816,30 +815,33 @@ const Masters = () => {
     [company?.sector?.name],
   );
 
-  const loadWarehouseMembershipForEmployee = useCallback(async (employeeId) => {
-    if (!employeeId || !isWarehouseSector || !isOwnerOrAdmin) {
-      setAccessModalWarehouseMembership(null);
-      setAccessModalCanSellWholesale(false);
-      setAccessModalWarehouseMembershipLoading(false);
-      return;
-    }
+  const loadWarehouseMembershipForEmployee = useCallback(
+    async (employeeId) => {
+      if (!employeeId || !isWarehouseSector || !isOwnerOrAdmin) {
+        setAccessModalWarehouseMembership(null);
+        setAccessModalCanSellWholesale(false);
+        setAccessModalWarehouseMembershipLoading(false);
+        return;
+      }
 
-    setAccessModalWarehouseMembershipLoading(true);
-    try {
-      const data = await listCompanyAgentRequests({ status: "active" });
-      const list = asArray(data);
-      const membership =
-        list.find((item) => String(item.user) === String(employeeId)) || null;
-      setAccessModalWarehouseMembership(membership);
-      setAccessModalCanSellWholesale(Boolean(membership?.can_sell_wholesale));
-    } catch (err) {
-      console.error("Не удалось загрузить данные агента склада:", err);
-      setAccessModalWarehouseMembership(null);
-      setAccessModalCanSellWholesale(false);
-    } finally {
-      setAccessModalWarehouseMembershipLoading(false);
-    }
-  }, [isOwnerOrAdmin, isWarehouseSector]);
+      setAccessModalWarehouseMembershipLoading(true);
+      try {
+        const data = await listCompanyAgentRequests({ status: "active" });
+        const list = asArray(data);
+        const membership =
+          list.find((item) => String(item.user) === String(employeeId)) || null;
+        setAccessModalWarehouseMembership(membership);
+        setAccessModalCanSellWholesale(Boolean(membership?.can_sell_wholesale));
+      } catch (err) {
+        console.error("Не удалось загрузить данные агента склада:", err);
+        setAccessModalWarehouseMembership(null);
+        setAccessModalCanSellWholesale(false);
+      } finally {
+        setAccessModalWarehouseMembershipLoading(false);
+      }
+    },
+    [isOwnerOrAdmin, isWarehouseSector],
+  );
 
   const openAccessModal = async (employee) => {
     try {
@@ -1213,8 +1215,7 @@ const Masters = () => {
                   .charAt(0)
                   .toUpperCase() || "•";
               const roleLabel = resolveEmployeeRoleLabel(u, roleById);
-              const cafeOpenDetail =
-                isCafeSector && u.role !== "owner";
+              const cafeOpenDetail = isCafeSector && u.role !== "owner";
               const salePayrollOpenDetail =
                 isSalePayrollSector && u.role !== "owner";
               const openDetail = cafeOpenDetail || salePayrollOpenDetail;
