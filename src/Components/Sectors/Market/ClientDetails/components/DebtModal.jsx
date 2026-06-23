@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useParams } from "react-router-dom";
 
@@ -21,9 +21,13 @@ import {
   updateDealDetail,
 } from "../../../../../store/creators/clientCreators";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import { Wallet, X, Pencil, Trash2 } from "lucide-react";
+import { ThemeModeContext } from "../../../../../theme/ThemeModeProvider";
+import "../ClientModals.redesign.scss";
 
 const DebtModal = ({ id, onClose, onChanged, clientType }) => {
   const dispatch = useDispatch();
+  const { mode } = useContext(ThemeModeContext);
   const { dealDetail } = useClient();
   const { list: cashBoxes } = useCash();
   const { id: clientId } = useParams();
@@ -280,49 +284,69 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
   if (!id) return null;
 
   return (
-    <div
-      className="debt-modal__overlay modal-overlay"
-      onClick={onClose}
-    >
+    <div className="cmx__overlay" data-theme={mode} onClick={onClose}>
       <div
-        className="debt-modal modal clientModal"
+        className="cmx__dialog cmx__dialog--xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="debt-modal__header">
-          <h3 className="debt-modal__title">Долг клиента</h3>
-          <button
-            className="debt-modal__close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            ×
+        <div className="cmx__header">
+          <div className="cmx__heading">
+            <span className="cmx__heading-icon">
+              <Wallet />
+            </span>
+            <div className="cmx__heading-text">
+              <h3 className="cmx__title">Долг клиента</h3>
+              <p className="cmx__subtitle">
+                {dealDetail?.title || "Детали сделки и график платежей"}
+              </p>
+            </div>
+          </div>
+          <button className="cmx__close" onClick={onClose} aria-label="Закрыть">
+            <X />
           </button>
         </div>
 
-        <div className="debt-modal__content">
+        <div className="cmx__body">
+          <div className="cmx__summary">
+            <div className="cmx__summary-card cmx__summary-card--danger">
+              <div className="cmx__summary-label">Размер долга</div>
+              <div className="cmx__summary-value">
+                {dealDetail?.debt_amount ?? dealDetail?.amount ?? "—"}
+                <span>сом</span>
+              </div>
+            </div>
+            <div className="cmx__summary-card cmx__summary-card--success">
+              <div className="cmx__summary-label">Остаток долга</div>
+              <div className="cmx__summary-value">
+                {dealDetail?.remaining_debt ?? "—"}
+                <span>сом</span>
+              </div>
+            </div>
+            <div className="cmx__summary-card">
+              <div className="cmx__summary-label">Ежедневный платёж</div>
+              <div className="cmx__summary-value">{dailyPayment}</div>
+            </div>
+          </div>
 
-          <div className="debt-modal__info-grid">
-            <div className="debt-modal__info-item">
-              <div className="debt-modal__info-label">ФИО</div>
-              <div className="debt-modal__info-value">
+          <div className="cmx__info-grid">
+            <div className="cmx__info-item">
+              <div className="cmx__info-label">ФИО</div>
+              <div className="cmx__info-value">
                 {dealDetail?.client_full_name ?? "—"}
               </div>
             </div>
 
-            <div className="debt-modal__info-item">
-              <div className="debt-modal__info-label">Название сделки</div>
-              <div className="debt-modal__info-value">
+            <div className="cmx__info-item">
+              <div className="cmx__info-label">Название сделки</div>
+              <div className="cmx__info-value">
                 {dealDetail?.title ?? "—"}
               </div>
             </div>
 
-            <div className="debt-modal__info-item">
-              <label
-                className="debt-modal__info-label"
-                htmlFor="debt-modal-amount"
-              >
+            <div className="cmx__info-item">
+              <label className="cmx__info-label" htmlFor="debt-modal-amount">
                 Размер долга
               </label>
               {isEditing && !hasPayments ? (
@@ -333,22 +357,19 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                   step="0.01"
                   min="0"
                   name="amount"
-                  className="debt-modal__input debt__input"
+                  className="cmx__input cmx__input--sm"
                   value={state.amount}
                   onChange={onChange}
                 />
               ) : (
-                <div className="debt-modal__info-value">
+                <div className="cmx__info-value">
                   {dealDetail?.debt_amount ?? dealDetail?.amount ?? "—"}
                 </div>
               )}
             </div>
 
-            <div className="debt-modal__info-item">
-              <label
-                className="debt-modal__info-label"
-                htmlFor="debt-modal-debt_days"
-              >
+            <div className="cmx__info-item">
+              <label className="cmx__info-label" htmlFor="debt-modal-debt_days">
                 Срок долга (дней)
               </label>
               {isEditing && !hasPayments ? (
@@ -356,7 +377,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                   id="debt-modal-debt_days"
                   type="number"
                   inputMode="numeric"
-                  className="debt-modal__input debt__input"
+                  className="cmx__input cmx__input--sm"
                   step="1"
                   min="1"
                   name="debt_days"
@@ -364,15 +385,15 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                   onChange={onChange}
                 />
               ) : (
-                <div className="debt-modal__info-value">
+                <div className="cmx__info-value">
                   {dealDetail?.debt_days ?? dealDetail?.debt_months ?? "—"}
                 </div>
               )}
             </div>
 
-            <div className="debt-modal__info-item">
+            <div className="cmx__info-item">
               <label
-                className="debt-modal__info-label"
+                className="cmx__info-label"
                 htmlFor="debt-modal-first_due_date"
               >
                 Дата первого платежа
@@ -381,13 +402,13 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                 <input
                   id="debt-modal-first_due_date"
                   type="date"
-                  className="debt-modal__input debt__input"
+                  className="cmx__input cmx__input--sm"
                   name="first_due_date"
                   value={state.first_due_date}
                   onChange={onChange}
                 />
               ) : (
-                <div className="debt-modal__info-value">
+                <div className="cmx__info-value">
                   {dealDetail?.first_due_date
                     ? formatDateDDMMYYYY(dealDetail.first_due_date)
                     : "—"}
@@ -396,43 +417,29 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
             </div>
 
             {dealDetail?.prepayment !== "0.00" && (
-              <div className="debt-modal__info-item">
-                <div className="debt-modal__info-label">Предоплата</div>
-                <div className="debt-modal__info-value">
+              <div className="cmx__info-item">
+                <div className="cmx__info-label">Предоплата</div>
+                <div className="cmx__info-value">
                   {dealDetail?.prepayment ?? "—"}
                 </div>
               </div>
             )}
 
-            <div className="debt-modal__info-item">
-              <div className="debt-modal__info-label">Ежедневный платёж</div>
-              <div className="debt-modal__info-value">{dailyPayment}</div>
-            </div>
-
-            <div className="debt-modal__info-item">
-              <div className="debt-modal__info-label">Остаток долга</div>
-              <div className="debt-modal__info-value">
-                {dealDetail?.remaining_debt ?? "—"}
-              </div>
-            </div>
-
             {dealDetail?.note && (
-              <div className="debt-modal__info-item">
-                <div className="debt-modal__info-label">Заметки</div>
-                <div className="debt-modal__info-value">{dealDetail.note}</div>
+              <div className="cmx__info-item cmx__info-item--full">
+                <div className="cmx__info-label">Заметки</div>
+                <div className="cmx__info-value">{dealDetail.note}</div>
               </div>
             )}
           </div>
 
           {/* ===== График платежей (с сервера) ===== */}
           {installments.length > 0 && (
-            <section className="debt-modal__schedule schedule">
-              <div className="debt-modal__schedule-header">
-                <div className="debt-modal__schedule-title">График платежей</div>
-              </div>
-              <div className="debt-modal__schedule-content" aria-live="polite">
-                <div className="debt-modal__schedule-table-wrapper">
-                  <table className="debt-modal__schedule-table schedule__table" role="table">
+            <section>
+              <div className="cmx__section-title">График платежей</div>
+              <div aria-live="polite">
+                <div className="cmx__table-wrap">
+                  <table className="cmx__table" role="table">
                     <thead>
                     <tr>
                         <th style={{ textAlign: "left" }}>№</th>
@@ -467,9 +474,9 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                             key={p.number}
                             className={
                               isFullyPaid
-                                ? "debt-modal__schedule-row--paid schedule__row--paid"
+                                ? "cmx__table-row--paid"
                                 : instStatus.key === "overdue"
-                                  ? "debt-modal__schedule-row--overdue"
+                                  ? "cmx__table-row--overdue"
                                   : undefined
                             }
                             aria-checked={isFullyPaid}
@@ -481,7 +488,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                             {isEditing && !hasPayments ? (
                                 <input
                                 type="date"
-                                className="debt-modal__input debt__input"
+                                className="cmx__input cmx__input--sm"
                                 value={dueDateInputValue || ""}
                                 onChange={(e) =>
                                     setInstallmentEdits((prev) => ({
@@ -506,7 +513,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                className="debt-modal__input debt__input"
+                                className="cmx__input cmx__input--sm"
                                 value={amountInputValue}
                                 onChange={(e) =>
                                     setInstallmentEdits((prev) => ({
@@ -530,7 +537,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
 
                             <td style={{ textAlign: "left" }}>
                               <span
-                                className={`debt-modal__inst-status debt-modal__inst-status--${instStatus.key}`}
+                                className={`cmx__badge cmx__badge--${instStatus.key}`}
                               >
                                 {instStatus.label}
                               </span>
@@ -550,6 +557,8 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                     type="number"
                                     step="0.01"
                                     min="0"
+                                    className="cmx__input cmx__input--sm cmx__num"
+                                    style={{ width: "130px", textAlign: "right" }}
                                     value={
                                     paymentAmounts[p.number] !== undefined
                                         ? paymentAmounts[p.number]
@@ -567,23 +576,9 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                         ? `${remaining.toFixed(2)} (остаток)`
                                         : `${p.amount} (полная сумма)`
                                     }
-                                    style={{
-                                    width: "120px",
-                                    padding: "4px 8px",
-                                    border: "1px solid #ddd",
-                                    borderRadius: "4px",
-                                    textAlign: "right",
-                                    fontSize: "14px",
-                                    }}
                                 />
                                 {p.paid_amount && Number(p.paid_amount) > 0 && (
-                                    <div
-                                    style={{
-                                        fontSize: "11px",
-                                        color: "#666",
-                                        marginTop: "2px",
-                                    }}
-                                    >
+                                    <div className="cmx__paid-hint">
                                     Уже оплачено:{" "}
                                     {Number(p.paid_amount).toFixed(2)}
                                     </div>
@@ -598,7 +593,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                                 </span>
                             ) : remaining > 0 ? (
                                 <button
-                                className="debt-modal__pay-btn schedule__pay-btn"
+                                className="cmx__btn cmx__btn--primary cmx__btn--sm"
                                 onClick={() => {
                                     const userEnteredAmount =
                                     paymentAmounts[p.number] !== undefined &&
@@ -703,7 +698,7 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                             ) : Number(p.paid_amount || 0) > 0 ? (
                                 <button
                                   type="button"
-                                  className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
+                                  className="cmx__btn cmx__btn--secondary cmx__btn--sm"
                                   onClick={() => {
                                     setConfirmDialog({
                                       open: true,
@@ -745,48 +740,48 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
                     </tfoot>
                 </table>
                 {firstDueDate && (
-                  <p className="debt-modal__schedule-hint schedule__hint">
+                  <p className="cmx__schedule-foot-hint">
                     Первый платёж: {formatDateDDMMYYYY(firstDueDate)}.
                   </p>
                 )}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
           )}
         </div>
 
-        <div className="debt-modal__actions">
+        <div className="cmx__footer">
           {!isEditing ? (
             <>
-              <button
-                className="debt-modal__btn debt-modal__btn--primary btn edit-btn"
-                onClick={() => setIsEditing(true)}
-              >
-                Редактировать
-              </button>
-              <button
-                className="debt-modal__btn debt-modal__btn--danger btn edit-btn"
-                onClick={() => onDeleteDebts(dealDetail?.id)}
-              >
-                Удалить
-              </button>
-              <button
-                className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
-                onClick={onClose}
-              >
-                Отмена
-              </button>
+              <div className="cmx__footer-left">
+                <button
+                  className="cmx__btn cmx__btn--danger"
+                  onClick={() => onDeleteDebts(dealDetail?.id)}
+                >
+                  <Trash2 /> Удалить
+                </button>
+              </div>
+              <div className="cmx__footer-right">
+                <button
+                  className="cmx__btn cmx__btn--ghost"
+                  onClick={onClose}
+                >
+                  Отмена
+                </button>
+                <button
+                  className="cmx__btn cmx__btn--primary"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <Pencil /> Редактировать
+                </button>
+              </div>
             </>
           ) : (
             <>
+              <div className="cmx__footer-left" />
+              <div className="cmx__footer-right">
               <button
-                className="debt-modal__btn debt-modal__btn--primary btn edit-btn"
-                onClick={onSubmit}
-              >
-                Сохранить
-              </button>
-              <button
-                className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
+                className="cmx__btn cmx__btn--ghost"
                 onClick={() => {
                   setState({
                     amount:
@@ -811,6 +806,13 @@ const DebtModal = ({ id, onClose, onChanged, clientType }) => {
               >
                 Отмена
               </button>
+              <button
+                className="cmx__btn cmx__btn--primary"
+                onClick={onSubmit}
+              >
+                Сохранить
+              </button>
+              </div>
             </>
           )}
         </div>

@@ -1,0 +1,852 @@
+/* ============================================================
+   Client Modals — Unified Design System
+   Namespace: .cmx  (Client Modal eXperience)
+   - Self-contained tokens (light + dark via html.dark)
+   - Used ONLY by the redesigned modals in ClientDetails/components/*
+   - Does not touch the shared legacy *-modal__* styles used elsewhere
+   ============================================================ */
+
+.cmx__overlay {
+  /* ---- Brand (existing project colors with safe fallbacks) ---- */
+  --cmx-accent: var(--primary, #f7d74f);
+  --cmx-accent-strong: var(--primary-dark, #d4b800);
+  --cmx-accent-ink: #1a1505;
+
+  /* ---- Surfaces & text (light) ---- */
+  --cmx-bg: #ffffff;
+  --cmx-bg-2: #f7f8fa;
+  --cmx-head: #ffffff;
+  --cmx-border: #e9ecf1;
+  --cmx-border-strong: #dfe3ea;
+  --cmx-text: #0f172a;
+  --cmx-text-2: #475569;
+  --cmx-muted: #8a93a3;
+  --cmx-ring: rgba(247, 215, 79, 0.35);
+  --cmx-input-bg: #ffffff;
+
+  /* ---- Semantic ---- */
+  --cmx-danger: #ef4444;
+  --cmx-danger-soft: #fef2f2;
+  --cmx-danger-ink: #b91c1c;
+  --cmx-danger-border: rgba(239, 68, 68, 0.28);
+  --cmx-success: #10b981;
+  --cmx-success-soft: #ecfdf5;
+  --cmx-success-ink: #047857;
+  --cmx-success-border: rgba(16, 185, 129, 0.28);
+  --cmx-info: #3b82f6;
+  --cmx-info-soft: #eff6ff;
+  --cmx-info-ink: #1d4ed8;
+  --cmx-info-border: rgba(59, 130, 246, 0.28);
+  --cmx-warn-soft: #fffbeb;
+  --cmx-warn-ink: #92670c;
+  --cmx-warn-border: rgba(245, 158, 11, 0.3);
+
+  /* ---- Shape & depth ---- */
+  --cmx-radius: 22px;
+  --cmx-radius-md: 14px;
+  --cmx-radius-sm: 10px;
+  --cmx-shadow: 0 24px 70px rgba(15, 23, 42, 0.22),
+    0 6px 18px rgba(15, 23, 42, 0.1);
+  --cmx-track: rgba(15, 23, 42, 0.08);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(7px) saturate(140%);
+  -webkit-backdrop-filter: blur(7px) saturate(140%);
+  animation: cmxFade 0.2s ease-out;
+
+  font-family: "Inter", "Montserrat", system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+/* ===== Dark mode =====
+   Driven by ThemeModeContext -> data-theme="dark" set on each .cmx__overlay.
+   Self-contained per modal (works even when portaled). ===== */
+.cmx__overlay[data-theme="dark"] {
+  --cmx-bg: #141923;
+  --cmx-bg-2: #11161f;
+  --cmx-head: #161c27;
+  --cmx-border: #232a37;
+  --cmx-border-strong: #2c3543;
+  --cmx-text: #e7ebf2;
+  --cmx-text-2: #aab4c4;
+  --cmx-muted: #7c8696;
+  --cmx-ring: rgba(247, 215, 79, 0.28);
+  --cmx-input-bg: #0f141c;
+
+  --cmx-danger-soft: rgba(239, 68, 68, 0.13);
+  --cmx-danger-ink: #fca5a5;
+  --cmx-success-soft: rgba(16, 185, 129, 0.13);
+  --cmx-success-ink: #6ee7b7;
+  --cmx-info-soft: rgba(59, 130, 246, 0.13);
+  --cmx-info-ink: #93c5fd;
+  --cmx-warn-soft: rgba(245, 158, 11, 0.13);
+  --cmx-warn-ink: #fcd34d;
+
+  --cmx-shadow: 0 28px 80px rgba(0, 0, 0, 0.6);
+  --cmx-track: rgba(255, 255, 255, 0.1);
+
+  background: rgba(2, 6, 14, 0.62);
+}
+
+/* ============================================================
+   DIALOG
+   ============================================================ */
+.cmx__dialog {
+  width: 640px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cmx-bg);
+  color: var(--cmx-text);
+  border: 1px solid var(--cmx-border);
+  border-radius: var(--cmx-radius);
+  box-shadow: var(--cmx-shadow);
+  overflow: hidden;
+  animation: cmxPop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cmx__dialog--sm {
+  width: 480px;
+}
+.cmx__dialog--md {
+  width: 640px;
+}
+.cmx__dialog--lg {
+  width: 760px;
+}
+.cmx__dialog--xl {
+  width: 900px;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.cmx__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--cmx-head);
+  border-bottom: 1px solid var(--cmx-border);
+}
+
+.cmx__heading {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+
+.cmx__heading-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--cmx-accent-ink);
+  background: linear-gradient(
+    135deg,
+    var(--cmx-accent) 0%,
+    var(--cmx-accent-strong) 100%
+  );
+  box-shadow: 0 4px 12px var(--cmx-ring);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.cmx__heading-text {
+  min-width: 0;
+}
+
+.cmx__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--cmx-text);
+  line-height: 1.25;
+}
+
+.cmx__subtitle {
+  margin: 3px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cmx-muted);
+  line-height: 1.4;
+}
+
+.cmx__close {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--cmx-bg-2);
+  color: var(--cmx-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--cmx-danger-soft);
+    color: var(--cmx-danger-ink);
+    border-color: var(--cmx-danger-border);
+  }
+}
+
+/* ============================================================
+   BODY
+   ============================================================ */
+.cmx__body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cmx__section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cmx-muted);
+  margin-bottom: 2px;
+}
+
+/* ============================================================
+   FORM GRID & FIELDS
+   ============================================================ */
+.cmx__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cmx__field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cmx__field--full {
+  grid-column: 1 / -1;
+}
+
+.cmx__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cmx-text-2);
+}
+
+.cmx__req {
+  color: var(--cmx-danger);
+  font-weight: 700;
+}
+
+.cmx__hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmx-muted);
+  line-height: 1.4;
+
+  b {
+    color: var(--cmx-text-2);
+    font-weight: 700;
+  }
+}
+
+/* ---- Controls (input / select / textarea) ---- */
+.cmx__input,
+.cmx__select,
+.cmx__textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cmx-text);
+  background: var(--cmx-input-bg);
+  border: 1.5px solid var(--cmx-border-strong);
+  border-radius: var(--cmx-radius-sm);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    background 0.18s ease;
+
+  &::placeholder {
+    color: var(--cmx-muted);
+    font-weight: 400;
+  }
+
+  &:hover:not(:focus):not(:disabled) {
+    border-color: var(--cmx-muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--cmx-accent);
+    box-shadow: 0 0 0 3px var(--cmx-ring);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--cmx-bg-2);
+  }
+}
+
+.cmx__input,
+.cmx__select {
+  height: 42px;
+  padding: 0 14px;
+}
+
+.cmx__input--sm {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.cmx__textarea {
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+}
+
+.cmx__select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a93a3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  cursor: pointer;
+}
+
+/* lighter chevron for dark mode (better contrast) */
+.cmx__overlay[data-theme="dark"] .cmx__select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23aab4c4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* date input calendar icon visibility in dark mode */
+.cmx__overlay[data-theme="dark"] .cmx__input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+.cmx__input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+/* error state on a field */
+.cmx__field--error {
+  .cmx__input,
+  .cmx__select,
+  .cmx__textarea {
+    border-color: var(--cmx-danger);
+    box-shadow: 0 0 0 3px var(--cmx-danger-soft);
+  }
+}
+
+.cmx__error-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cmx-danger-ink);
+}
+
+/* ============================================================
+   ALERTS / BANNERS
+   ============================================================ */
+.cmx__alert {
+  padding: 12px 14px;
+  border-radius: var(--cmx-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  background: var(--cmx-danger-soft);
+  color: var(--cmx-danger-ink);
+  border: 1px solid var(--cmx-danger-border);
+}
+
+.cmx__note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--cmx-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  background: var(--cmx-info-soft);
+  color: var(--cmx-info-ink);
+  border: 1px solid var(--cmx-info-border);
+
+  svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+  }
+}
+
+/* ============================================================
+   SUMMARY CARDS (debt KPIs)
+   ============================================================ */
+.cmx__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cmx__summary-card {
+  padding: 14px 16px;
+  border-radius: var(--cmx-radius-md);
+  border: 1px solid var(--cmx-border);
+  background: var(--cmx-bg-2);
+}
+
+.cmx__summary-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--cmx-muted);
+}
+
+.cmx__summary-value {
+  margin-top: 6px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--cmx-text);
+
+  span {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cmx-muted);
+    margin-left: 4px;
+  }
+}
+
+.cmx__summary-card--danger .cmx__summary-value {
+  color: var(--cmx-danger-ink);
+}
+.cmx__summary-card--success .cmx__summary-value {
+  color: var(--cmx-success-ink);
+}
+
+/* ---- Read-only info rows ---- */
+.cmx__info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  border: 1px solid var(--cmx-border);
+  border-radius: var(--cmx-radius-md);
+  overflow: hidden;
+  background: var(--cmx-border);
+}
+
+.cmx__info-item {
+  padding: 12px 14px;
+  background: var(--cmx-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cmx__info-item--full {
+  grid-column: 1 / -1;
+}
+
+.cmx__info-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--cmx-muted);
+}
+
+.cmx__info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cmx-text);
+  word-break: break-word;
+}
+
+/* ============================================================
+   BADGES & STATUS PILLS
+   ============================================================ */
+.cmx__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.cmx__badge--paid {
+  color: var(--cmx-success-ink);
+  background: var(--cmx-success-soft);
+  border-color: var(--cmx-success-border);
+}
+.cmx__badge--partial {
+  color: var(--cmx-warn-ink);
+  background: var(--cmx-warn-soft);
+  border-color: var(--cmx-warn-border);
+}
+.cmx__badge--overdue {
+  color: var(--cmx-danger-ink);
+  background: var(--cmx-danger-soft);
+  border-color: var(--cmx-danger-border);
+}
+.cmx__badge--unpaid {
+  color: var(--cmx-text-2);
+  background: var(--cmx-bg-2);
+  border-color: var(--cmx-border-strong);
+}
+
+/* ============================================================
+   SCHEDULE TABLE (DebtModal)
+   ============================================================ */
+.cmx__table-wrap {
+  border: 1px solid var(--cmx-border);
+  border-radius: var(--cmx-radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cmx__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+
+  th,
+  td {
+    padding: 11px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--cmx-border);
+  }
+
+  thead th {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--cmx-muted);
+    background: var(--cmx-bg-2);
+    position: sticky;
+    top: 0;
+  }
+
+  tbody tr:hover {
+    background: var(--cmx-bg-2);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tfoot td {
+    font-weight: 800;
+    color: var(--cmx-text);
+    background: var(--cmx-bg-2);
+    border-top: 1.5px solid var(--cmx-border-strong);
+  }
+}
+
+.cmx__table-row--paid {
+  background: var(--cmx-success-soft);
+
+  td {
+    color: var(--cmx-success-ink);
+  }
+}
+.cmx__table-row--overdue {
+  background: var(--cmx-danger-soft);
+}
+
+.cmx__num {
+  text-align: right;
+}
+
+.cmx__paid-hint {
+  font-size: 11px;
+  color: var(--cmx-muted);
+  margin-top: 3px;
+}
+
+.cmx__schedule-foot-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cmx-muted);
+}
+
+/* ============================================================
+   PROGRESS (battery)
+   ============================================================ */
+.cmx__progress {
+  min-width: 160px;
+}
+
+.cmx__progress-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cmx__progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cmx-track);
+  overflow: hidden;
+}
+
+.cmx__progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.cmx__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--cmx-head);
+  border-top: 1px solid var(--cmx-border);
+  flex-wrap: wrap;
+}
+
+.cmx__footer-left,
+.cmx__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cmx__footer-right {
+  margin-left: auto;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.cmx__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: var(--cmx-radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease,
+    border-color 0.2s ease, color 0.2s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
+
+.cmx__btn--sm {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.cmx__btn--primary {
+  background: linear-gradient(
+    135deg,
+    var(--cmx-accent) 0%,
+    var(--cmx-accent-strong) 100%
+  );
+  color: var(--cmx-accent-ink);
+  box-shadow: 0 3px 10px var(--cmx-ring);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px var(--cmx-ring);
+  }
+}
+
+.cmx__btn--secondary {
+  background: var(--cmx-bg);
+  color: var(--cmx-text);
+  border-color: var(--cmx-border-strong);
+
+  &:hover:not(:disabled) {
+    border-color: var(--cmx-accent);
+    background: var(--cmx-bg-2);
+  }
+}
+
+.cmx__btn--ghost {
+  background: transparent;
+  color: var(--cmx-text-2);
+
+  &:hover:not(:disabled) {
+    background: var(--cmx-bg-2);
+    color: var(--cmx-text);
+  }
+}
+
+.cmx__btn--danger {
+  background: var(--cmx-danger-soft);
+  color: var(--cmx-danger-ink);
+  border-color: var(--cmx-danger-border);
+
+  &:hover:not(:disabled) {
+    background: var(--cmx-danger);
+    color: #fff;
+    border-color: var(--cmx-danger);
+    transform: translateY(-1px);
+  }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes cmxFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cmxPop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+@keyframes cmxSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — mobile bottom-sheet
+   ============================================================ */
+@media (max-width: 768px) {
+  .cmx__overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .cmx__dialog,
+  .cmx__dialog--sm,
+  .cmx__dialog--md,
+  .cmx__dialog--lg,
+  .cmx__dialog--xl {
+    width: 100%;
+    max-width: 100%;
+    max-height: 94vh;
+    border-radius: var(--cmx-radius) var(--cmx-radius) 0 0;
+    border-bottom: none;
+    animation: cmxSlideUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cmx__header {
+    padding: 18px 18px 16px;
+    position: sticky;
+    top: 0;
+  }
+
+  .cmx__body {
+    padding: 18px;
+  }
+
+  .cmx__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cmx__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .cmx__footer {
+    padding: 14px 18px;
+    position: sticky;
+    bottom: 0;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .cmx__footer-left,
+  .cmx__footer-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .cmx__footer .cmx__btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .cmx__info-grid {
+    grid-template-columns: 1fr;
+  }
+}
