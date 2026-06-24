@@ -522,9 +522,17 @@ function buildReceiptFromJSON(payload, opts = {}) {
         mapMarketReceiptItem,
       );
 
+  // Подытог — это ВАЛОВАЯ сумма до скидок. payload.discount — общая скидка
+  // (включая построчные), поэтому подытог считаем как «итог по строке + скидка
+  // по строке» (= цена×кол-во). Иначе построчная скидка вычиталась бы дважды:
+  // один раз в line_total, второй — в общей скидке. (см. баг: 200 - 150 = 50
+  // вместо 250 - 150 = 100).
   const subtotal = ekassaFields
     ? fromTyiyn(f(ekassaFields, "1020"))
-    : items.reduce((s, it) => s + toNum(it.total), 0);
+    : items.reduce(
+        (s, it) => s + toNum(it.total) + toNum(it.line_discount_amount),
+        0,
+      );
   const discount = resolveMarketOrderDiscount(payload, ekassaFields);
   const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : toNum(payload.tax);
   const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
