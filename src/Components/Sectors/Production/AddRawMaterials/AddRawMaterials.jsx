@@ -195,7 +195,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
   const disabled = !!validate();
 
   return (
-    <div className="add-modal z-50!">
+    <div className="add-modal raw-form z-50!">
       <div className="add-modal__overlay z-50!" onClick={onClose} />
       <div className="add-modal__content z-50!" style={{ height: "auto" }}>
         <div className="add-modal__header">
@@ -327,26 +327,15 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
 
           {/* касса автоматически выбирается - скрыто от пользователя */}
 
-          <div style={{ marginTop: 12 }}>
-            Итог к списанию: <b>{Number.isFinite(paymentType === "prepayment" ? toNum(prepayment) : expense) ? (paymentType === "prepayment" ? toNum(prepayment) : expense) : 0}</b>
+          <div className="raw-form__summary">
+            <span>Итог к списанию</span>
+            <b>{Number.isFinite(paymentType === "prepayment" ? toNum(prepayment) : expense) ? (paymentType === "prepayment" ? toNum(prepayment) : expense) : 0}</b>
           </div>
 
-          {error && (
-            <div
-              style={{
-                marginTop: 10,
-                color: "#c0392b",
-                fontSize: 14,
-                lineHeight: 1.3,
-              }}
-            >
-              {error}
-            </div>
-          )}
+          {error && <div className="raw-form__error">{error}</div>}
 
           <button
-            style={{ marginTop: 15, width: "100%", justifyContent: "center" }}
-            className="btn edit-btn py-2! text-lg!"
+            className="raw-form__submit btn edit-btn"
             type="submit"
             disabled={disabled}
           >

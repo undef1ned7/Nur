@@ -37,13 +37,8 @@ import {
   getMyAgentProductsAsync,
   checkoutAgentCart,
 } from "../../../../store/creators/agentCartCreators";
-import {
-  openShiftAsync,
-  fetchShiftsAsync,
-} from "../../../../store/creators/shiftThunk";
-import { useShifts } from "../../../../store/slices/shiftSlice";
-import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
-import { useUser } from "../../../../store/slices/userSlice";
+import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
+import { getCashBoxes } from "../../../../store/slices/cashSlice";
 import Cart from "./Cart";
 import "./ProductionCatalog.scss";
 import AlertModal from "../../../common/AlertModal/AlertModal";
@@ -162,6 +157,7 @@ const ProductCard = ({
   onAddToCart,
   onAddToCartWithoutCart,
 }) => {
+  const alert = useAlert();
   const [isLongPress, setIsLongPress] = useState(false);
   const longPressTimer = useRef(null);
   const [quantity, setQuantity] = useState(1);
@@ -191,9 +187,13 @@ const ProductCard = ({
 
   const handleIncrement = (e) => {
     e.stopPropagation();
-    if (available && quantity < maxQuantity) {
-      setQuantity(quantity + 1);
+    if (!available) return;
+    // Нельзя выбрать больше, чем есть в наличии
+    if (quantity >= maxQuantity) {
+      alert(`Недостаточно товара. Доступно: ${maxQuantity} шт.`, true);
+      return;
     }
+    setQuantity(quantity + 1);
   };
 
   const handleDecrement = (e) => {
@@ -888,9 +888,6 @@ const ProductionCatalog = () => {
   const { products, loading, error, selectedProduct, filters } = useSelector(
     (state) => state.catalog,
   );
-  const { shifts, currentShift } = useShifts();
-  const { list: cashBoxes } = useCash();
-  const { profile, currentUser, userId } = useUser();
 
   // console.log(1, products);
 
@@ -1282,60 +1279,12 @@ const ProductionCatalog = () => {
     }
   };
 
-  // Функция для проверки и открытия смены
-  const ensureShiftIsOpen = async () => {
-    // Проверяем наличие открытой смены
-    const openShift = shifts.find((s) => s.status === "open") || currentShift;
-
-    if (openShift) {
-      return; // Смена уже открыта
-    }
-
-    // Если смены нет, открываем её
-    let availableCashBoxes = cashBoxes;
-    if (!availableCashBoxes || availableCashBoxes.length === 0) {
-      // Загружаем кассы, если их нет
-      availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
-      if (!availableCashBoxes || availableCashBoxes.length === 0) {
-        throw new Error(
-          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены.",
-        );
-      }
-    }
-
-    const firstCashBox = availableCashBoxes[0];
-    const cashboxId = firstCashBox?.id;
-
-    if (!cashboxId) {
-      throw new Error("Не удалось определить кассу");
-    }
-
-    const cashierId = currentUser?.id || userId || profile?.id;
-
-    if (!cashierId) {
-      throw new Error("Не удалось определить кассира");
-    }
-
-    // Открываем смену с нулевой суммой
-    await dispatch(
-      openShiftAsync({
-        cashbox: cashboxId,
-        cashier: cashierId,
-        opening_cash: "0",
-      }),
-    ).unwrap();
-
-    // Обновляем список смен
-    await dispatch(fetchShiftsAsync());
-  };
-
   // Добавление в корзину без сохранения (создать корзину, добавить товар, отправить)
   const handleAddToCartWithoutCart = async (product, quantity = 1) => {
     if (!product || !product.id || quantity <= 0) return;
 
     try {
-      // Проверяем и открываем смену перед оформлением заказа
-      await ensureShiftIsOpen();
+      // Продажа выполняется без открытия смены
 
       // Создаем новую корзину
       const created = await dispatch(
