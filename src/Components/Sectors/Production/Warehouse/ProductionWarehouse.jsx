@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useContext } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import FinishedGoods from "../FinishedGoods/FinishedGoods";
 import RawMaterialsWarehouse from "../RawMaterialsWarehouse/RawMaterialsWarehouse";
 import TransferStatusModal from "../TransferStatus/TransferStatus";
@@ -20,7 +21,16 @@ import {
   Package,
 } from "lucide-react";
 import { useProducts } from "../../../../store/slices/productSlice";
+import {
+  ShoppingCart,
+  Banknote,
+  TrendingUp,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import "./PendingModal.scss";
+import "./WarehouseTotals.scss";
+import "../production-theme.scss";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   fetchTransfersAsync,
@@ -1160,10 +1170,32 @@ const PendingModal = ({ onClose, onChanged }) => {
   );
 };
 
+// Форматирование суммы: разделители тысяч (пробел) + 2 знака после точки
+const formatMoney = (n) =>
+  Number(n || 0)
+    .toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    .replace(/,/g, " ");
+
+const TOTALS_STORAGE_KEY = "production_warehouse_show_totals";
+
 const ProductionWarehouse = () => {
   const [searchParams] = useSearchParams();
+  const { mode } = useContext(ThemeModeContext);
   const [activeTab, setActiveTab] = useState(0);
+  const [showTotals, setShowTotals] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(TOTALS_STORAGE_KEY) !== "0";
+  });
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TOTALS_STORAGE_KEY, showTotals ? "1" : "0");
+    }
+  }, [showTotals]);
 
   useEffect(() => {
     if (searchParams.get("tab") === "raw") {
@@ -1220,25 +1252,61 @@ const ProductionWarehouse = () => {
   }, []);
 
   return (
-    <section className="warehouseP sklad">
+    <section className="warehouseP sklad prod" data-theme={mode}>
       <div className="vitrina__header" style={{ margin: "15px 0" }}>
         {activeTab === 0 && (
-          <div
-            style={{
-              marginBottom: "12px",
-              display: "flex",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div className="vitrina__tab" style={{ cursor: "default" }}>
-              Закупка: {warehouseTotals.purchase.toFixed(2)} сом
+          <div className="pwt-summary">
+            <button
+              type="button"
+              className="pwt-summary__toggle"
+              onClick={() => setShowTotals((v) => !v)}
+              aria-expanded={showTotals}
+            >
+              {showTotals ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showTotals ? "Скрыть сводку" : "Показать сводку"}
+            </button>
+          </div>
+        )}
+        {activeTab === 0 && showTotals && (
+          <div className="pwt">
+            <div className="pwt__card pwt__card--purchase">
+              <span className="pwt__icon">
+                <ShoppingCart />
+              </span>
+              <div className="pwt__body">
+                <span className="pwt__label">Закупка</span>
+                <span className="pwt__value">
+                  {formatMoney(warehouseTotals.purchase)} <i>сом</i>
+                </span>
+              </div>
             </div>
-            <div className="vitrina__tab" style={{ cursor: "default" }}>
-              Продажная стоимость: {warehouseTotals.sale.toFixed(2)} сом
+
+            <div className="pwt__card pwt__card--sale">
+              <span className="pwt__icon">
+                <Banknote />
+              </span>
+              <div className="pwt__body">
+                <span className="pwt__label">Продажная стоимость</span>
+                <span className="pwt__value">
+                  {formatMoney(warehouseTotals.sale)} <i>сом</i>
+                </span>
+              </div>
             </div>
-            <div className="vitrina__tab" style={{ cursor: "default" }}>
-              Потенциальная прибыль: {warehouseTotals.profit.toFixed(2)} сом
+
+            <div
+              className={`pwt__card pwt__card--profit ${
+                warehouseTotals.profit < 0 ? "pwt__card--negative" : ""
+              }`}
+            >
+              <span className="pwt__icon">
+                <TrendingUp />
+              </span>
+              <div className="pwt__body">
+                <span className="pwt__label">Потенциальная прибыль</span>
+                <span className="pwt__value">
+                  {formatMoney(warehouseTotals.profit)} <i>сом</i>
+                </span>
+              </div>
             </div>
           </div>
         )}

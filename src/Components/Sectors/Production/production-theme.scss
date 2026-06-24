@@ -1,0 +1,718 @@
+/* ============================================================
+   PRODUCTION MODULE — Theme (Агенты / Agents)
+   ------------------------------------------------------------
+   - Isolated under the `.prod` namespace (applied to the page
+     root AND to portaled modals). Nothing leaks to other modules.
+   - Uses EXISTING brand colors (--primary / --primary-dark) with
+     safe fallbacks. Brand identity preserved.
+   - Light + Dark via [data-theme="dark"] (existing ThemeModeContext).
+   - Modernizes the existing class structure (no JSX/class churn,
+     no logic changes) by winning on specificity inside `.prod`.
+   ============================================================ */
+
+.prod {
+  --prod-accent: var(--primary, #f7d74f);
+  --prod-accent-strong: var(--primary-dark, #d4b800);
+  --prod-accent-ink: #1a1505;
+
+  --prod-bg: #f6f7f9;
+  --prod-card: #ffffff;
+  --prod-card-2: #fbfcfd;
+  --prod-border: #e9ecf1;
+  --prod-border-strong: #dfe3ea;
+  --prod-text: #0f172a;
+  --prod-text-2: #475569;
+  --prod-muted: #8a93a3;
+  --prod-input-bg: #ffffff;
+  --prod-ring: rgba(247, 215, 79, 0.35);
+  --prod-scrim: rgba(15, 23, 42, 0.55);
+
+  --prod-success: #10b981;
+  --prod-success-soft: #ecfdf5;
+  --prod-success-ink: #047857;
+  --prod-success-border: rgba(16, 185, 129, 0.28);
+  --prod-danger: #ef4444;
+  --prod-danger-soft: #fef2f2;
+  --prod-danger-ink: #b91c1c;
+  --prod-danger-border: rgba(239, 68, 68, 0.28);
+  --prod-warn: #f59e0b;
+  --prod-warn-soft: #fffbeb;
+  --prod-warn-ink: #92670c;
+  --prod-info: #3b82f6;
+  --prod-info-soft: #eff6ff;
+  --prod-info-ink: #1d4ed8;
+
+  --prod-radius: 18px;
+  --prod-radius-md: 14px;
+  --prod-radius-sm: 10px;
+  --prod-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+  --prod-shadow: 0 4px 14px rgba(15, 23, 42, 0.06),
+    0 2px 6px rgba(15, 23, 42, 0.04);
+  --prod-shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
+
+  --prod-h1: 24px;
+  --prod-h2: 19px;
+  --prod-h3: 16px;
+
+  color: var(--prod-text);
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+/* ===== Dark theme (layered grays, no pure black) ===== */
+.prod[data-theme="dark"] {
+  --prod-bg: #0f1115;
+  --prod-card: #161a22;
+  --prod-card-2: #12161d;
+  --prod-border: #242b36;
+  --prod-border-strong: #2e3744;
+  --prod-text: #e7ebf2;
+  --prod-text-2: #aab4c4;
+  --prod-muted: #7c8696;
+  --prod-input-bg: #11151c;
+  --prod-ring: rgba(247, 215, 79, 0.26);
+  --prod-scrim: rgba(2, 6, 14, 0.62);
+
+  --prod-success-soft: rgba(16, 185, 129, 0.13);
+  --prod-success-ink: #6ee7b7;
+  --prod-danger-soft: rgba(239, 68, 68, 0.13);
+  --prod-danger-ink: #fca5a5;
+  --prod-warn-soft: rgba(245, 158, 11, 0.13);
+  --prod-warn-ink: #fcd34d;
+  --prod-info-soft: rgba(59, 130, 246, 0.13);
+  --prod-info-ink: #93c5fd;
+
+  --prod-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --prod-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --prod-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+/* ============================================================
+   AGENTS (Производство → Агенты) + shared Warehouse/Modal skins
+   Scoped under .prod (page root AND portaled modals).
+   ============================================================ */
+
+/* ---- Tabs ---- */
+.prod .vitrina__header { color: var(--prod-text); }
+
+.prod .vitrina__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.prod .vitrina__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  background: var(--prod-card);
+  color: var(--prod-text-2);
+  border: 1px solid var(--prod-border-strong);
+  border-radius: 999px;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.15s ease;
+
+  &:hover {
+    border-color: var(--prod-accent);
+    color: var(--prod-text);
+    background: var(--prod-card-2);
+  }
+
+  &.active,
+  &.vitrina__tab--active {
+    background: linear-gradient(135deg, var(--prod-accent), var(--prod-accent-strong));
+    color: var(--prod-accent-ink);
+    border-color: transparent;
+    box-shadow: 0 2px 8px var(--prod-ring);
+  }
+
+  &:active { transform: translateY(1px); }
+}
+
+@media (max-width: 768px) {
+  .prod .vitrina__tab { flex: 1 1 auto; }
+}
+
+/* ---- Warehouse totals (KPI summary) ---- */
+.prod .pwt-summary {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.prod .pwt-summary__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--prod-text-2);
+  background: var(--prod-card);
+  border: 1px solid var(--prod-border-strong);
+  border-radius: 999px;
+  transition: all 0.18s ease;
+
+  &:hover {
+    border-color: var(--prod-accent);
+    color: var(--prod-text);
+    background: var(--prod-card-2);
+  }
+}
+
+/* Dark-mode tokens for the KPI cards (WarehouseTotals.scss is light-only) */
+.prod[data-theme="dark"] .pwt {
+  --pwt-card: #161a22;
+  --pwt-border: #242b36;
+  --pwt-text: #e7ebf2;
+  --pwt-muted: #aab4c4;
+  --pwt-info-soft: rgba(59, 130, 246, 0.14);
+  --pwt-success-soft: rgba(16, 185, 129, 0.14);
+  --pwt-success-ink: #6ee7b7;
+  --pwt-danger-soft: rgba(239, 68, 68, 0.14);
+  --pwt-danger-ink: #fca5a5;
+}
+
+/* ---- Page header ---- */
+.prod .warehouse-page { color: var(--prod-text); }
+
+.prod .warehouse-header {
+  background: var(--prod-card);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius);
+  box-shadow: var(--prod-shadow-sm);
+}
+
+.prod .warehouse-header__icon-box {
+  background: var(--prod-card-2);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius-md);
+}
+
+.prod .warehouse-header__title { color: var(--prod-text); font-size: var(--prod-h2); }
+.prod .warehouse-header__subtitle { color: var(--prod-muted); }
+
+.prod .warehouse-header__create-btn {
+  background: linear-gradient(135deg, var(--prod-accent), var(--prod-accent-strong));
+  color: var(--prod-accent-ink);
+  border: none;
+  border-radius: var(--prod-radius-sm);
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+
+  &:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px var(--prod-ring); }
+  &:active:not(:disabled) { transform: translateY(0); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+/* ---- Search ---- */
+.prod .warehouse-search {
+  background: var(--prod-card);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  &:focus-within { border-color: var(--prod-accent); box-shadow: 0 0 0 3px var(--prod-ring); }
+}
+.prod .warehouse-search__icon { color: var(--prod-muted); }
+.prod .warehouse-search__input {
+  background: transparent;
+  color: var(--prod-text);
+  border: none;
+  &::placeholder { color: var(--prod-muted); }
+  &:focus { outline: none; }
+}
+.prod .warehouse-search__info { color: var(--prod-text-2); }
+.prod .warehouse-search__filter-btn {
+  background: var(--prod-card);
+  color: var(--prod-text);
+  border: 1px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  &:hover { border-color: var(--prod-accent); background: var(--prod-card-2); }
+}
+
+/* ---- Tables (warehouse + sklad) ---- */
+.prod .warehouse-table-container {
+  background: var(--prod-card);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius);
+  box-shadow: var(--prod-shadow-sm);
+  overflow: hidden;
+}
+
+.prod .warehouse-table,
+.prod .sklad__table {
+  color: var(--prod-text);
+  background: transparent;
+
+  thead th {
+    background: var(--prod-card-2);
+    color: var(--prod-muted);
+    border-bottom: 1px solid var(--prod-border);
+    font-weight: 700;
+  }
+
+  td {
+    border-bottom: 1px solid var(--prod-border);
+    color: var(--prod-text);
+  }
+
+  tbody tr:hover,
+  .warehouse-table__row:hover {
+    background: var(--prod-card-2);
+  }
+}
+
+.prod .warehouse-table__name,
+.prod .warehouse-table__name-cell { color: var(--prod-text); font-weight: 600; }
+.prod .warehouse-table__empty,
+.prod .warehouse-table__loading { color: var(--prod-muted); }
+
+/* ---- Cards view ---- */
+.prod .warehouse-cards { color: var(--prod-text); }
+.prod .warehouse-card {
+  background: var(--prod-card);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius);
+  box-shadow: var(--prod-shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  &:hover { transform: translateY(-2px); box-shadow: var(--prod-shadow); border-color: var(--prod-border-strong); }
+}
+
+/* ---- Badges ---- */
+.prod .pa-badge,
+.prod .pa-badge--warning,
+.prod .pa-badge--danger,
+.prod .sell__badge--success,
+.prod .sell__badge--warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.prod .pa-badge,
+.prod .sell__badge--success {
+  color: var(--prod-success-ink);
+  background: var(--prod-success-soft);
+  border: 1px solid var(--prod-success-border);
+  border-radius: 999px;
+}
+.prod .pa-badge--warning,
+.prod .sell__badge--warning {
+  color: var(--prod-warn-ink);
+  background: var(--prod-warn-soft);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 999px;
+}
+.prod .pa-badge--danger {
+  color: var(--prod-danger-ink);
+  background: var(--prod-danger-soft);
+  border: 1px solid var(--prod-danger-border);
+  border-radius: 999px;
+}
+
+/* ============================================================
+   SHARED MODAL SKIN — .add-modal (portaled, wrapped in .prod)
+   ============================================================ */
+.prod .add-modal__overlay {
+  background: var(--prod-scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.prod .add-modal__content {
+  background: var(--prod-card);
+  color: var(--prod-text);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius);
+  box-shadow: var(--prod-shadow-lg);
+}
+
+.prod .add-modal__header {
+  border-bottom: 1px solid var(--prod-border);
+  h3 { color: var(--prod-text); font-size: var(--prod-h3); }
+}
+
+.prod .add-modal__close-icon { color: var(--prod-muted); cursor: pointer; &:hover { color: var(--prod-danger-ink); } }
+.prod .add-modal__section { color: var(--prod-text-2); }
+
+.prod .add-modal__input {
+  background: var(--prod-input-bg);
+  color: var(--prod-text);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  &::placeholder { color: var(--prod-muted); }
+  &:focus { outline: none; border-color: var(--prod-accent); box-shadow: 0 0 0 3px var(--prod-ring); }
+}
+
+.prod .add-modal__footer { border-top: 1px solid var(--prod-border); }
+
+.prod .add-modal__save {
+  background: linear-gradient(135deg, var(--prod-accent), var(--prod-accent-strong));
+  color: var(--prod-accent-ink);
+  border: none;
+  border-radius: var(--prod-radius-sm);
+  font-weight: 700;
+  &:hover:not(:disabled) { box-shadow: 0 4px 12px var(--prod-ring); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.prod .add-modal__cancel {
+  background: var(--prod-card);
+  color: var(--prod-text);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  padding: 8px 14px;
+  font-weight: 600;
+  text-decoration: none;
+  &:hover:not(:disabled) { border-color: var(--prod-accent); background: var(--prod-card-2); }
+}
+
+/* Wider modals for table-heavy content
+   (Все передачи / Мои передачи для принятия / Мои возвраты /
+    Возвраты агентов). Modals with an inline width keep theirs. */
+.prod .add-modal.accept .add-modal__content,
+.prod .my-returns-modal .add-modal__content {
+  width: min(880px, 96vw);
+  max-width: 96vw;
+}
+
+/* Rounded, bordered scroll area for modal tables */
+.prod .table-wrapper {
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius-md);
+  background: var(--prod-card);
+}
+
+/* Sticky header inside scrollable modal tables */
+.prod .add-modal .sklad__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--prod-card-2);
+}
+
+/* Action buttons sitting inside table cells stay compact */
+.prod .sklad__table .add-modal__save,
+.prod .sklad__table .add-modal__cancel {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+/* ---- Receipt / sale detail ---- */
+.prod .receipt,
+.prod .sellDetail__content,
+.prod .sell__box { color: var(--prod-text); }
+.prod .receipt__item,
+.prod .receipt__total,
+.prod .receipt__row { border-color: var(--prod-border); }
+.prod .receipt__item-price { color: var(--prod-muted); }
+.prod .receipt__row-btn {
+  background: var(--prod-card);
+  color: var(--prod-text);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  &:hover { border-color: var(--prod-accent); background: var(--prod-card-2); }
+}
+
+/* ============================================================
+   RETURN PRODUCT MODAL (rich form)
+   ============================================================ */
+.prod .return-product-modal__title { color: var(--prod-text); }
+.prod .return-product-modal__close { color: var(--prod-muted); &:hover { color: var(--prod-danger-ink); } }
+.prod .return-product-modal__product-name { color: var(--prod-text-2); }
+
+.prod .return-product-modal__stat {
+  background: var(--prod-card-2);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius-md);
+  &--ok { background: var(--prod-success-soft); border-color: var(--prod-success-border); }
+  &--warn { background: var(--prod-warn-soft); border-color: rgba(245, 158, 11, 0.3); }
+}
+.prod .return-product-modal__stat-label { color: var(--prod-muted); }
+.prod .return-product-modal__stat-value { color: var(--prod-text); font-weight: 800; }
+
+.prod .return-product-modal__section-label { color: var(--prod-text-2); font-weight: 700; }
+
+.prod .return-product-modal__mode {
+  background: var(--prod-card);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-md);
+  transition: border-color 0.18s ease, background 0.18s ease;
+  &:hover { border-color: var(--prod-accent); }
+  &--active {
+    border-color: var(--prod-accent);
+    background: var(--prod-card-2);
+    box-shadow: 0 0 0 3px var(--prod-ring);
+  }
+}
+.prod .return-product-modal__mode-title { color: var(--prod-text); }
+.prod .return-product-modal__mode-desc { color: var(--prod-muted); }
+
+.prod .return-product-modal__field-label { color: var(--prod-text-2); }
+.prod .return-product-modal__select,
+.prod .return-product-modal__qty-input {
+  background: var(--prod-input-bg);
+  color: var(--prod-text);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  &:focus { outline: none; border-color: var(--prod-accent); box-shadow: 0 0 0 3px var(--prod-ring); }
+  &:disabled { opacity: 0.6; }
+}
+
+.prod .return-product-modal__qty-chip {
+  background: var(--prod-card);
+  color: var(--prod-text);
+  border: 1px solid var(--prod-border-strong);
+  border-radius: 999px;
+  &:hover:not(:disabled) { border-color: var(--prod-accent); color: var(--prod-accent-strong); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+.prod .return-product-modal__qty-hint { color: var(--prod-muted); strong { color: var(--prod-text) !important; } }
+
+.prod .return-product-modal__hint {
+  border-radius: var(--prod-radius-sm);
+  &--info { color: var(--prod-info-ink); background: var(--prod-info-soft); border: 1px solid rgba(59, 130, 246, 0.28); }
+  &--neutral { color: var(--prod-text-2); background: var(--prod-card-2); border: 1px solid var(--prod-border); }
+}
+
+.prod .return-product-modal__alert {
+  border-radius: var(--prod-radius-sm);
+  &--error,
+  &--api { color: var(--prod-danger-ink); background: var(--prod-danger-soft); border: 1px solid var(--prod-danger-border); }
+}
+
+.prod .return-product-modal__empty { color: var(--prod-muted); }
+.prod .return-product-modal__footer { border-top: 1px solid var(--prod-border); }
+
+.prod .return-product-modal__btn {
+  border-radius: var(--prod-radius-sm);
+  font-weight: 700;
+  &--primary {
+    background: linear-gradient(135deg, var(--prod-accent), var(--prod-accent-strong));
+    color: var(--prod-accent-ink);
+    border: none;
+    &:hover:not(:disabled) { box-shadow: 0 4px 12px var(--prod-ring); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+  &--secondary {
+    background: var(--prod-card);
+    color: var(--prod-text);
+    border: 1.5px solid var(--prod-border-strong);
+    &:hover:not(:disabled) { border-color: var(--prod-accent); background: var(--prod-card-2); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+}
+
+/* ============================================================
+   RAW-MATERIAL FORM MODALS — «Добавление товара» / «Редактирование
+   сырья». Shared `.raw-form` skin, token-driven (auto light/dark).
+   ============================================================ */
+.prod .raw-form .add-modal__content {
+  width: min(540px, 96vw);
+  max-width: 96vw;
+  padding: 22px 22px 20px;
+}
+
+.prod .raw-form .add-modal__header {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--prod-border);
+
+  h3 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: var(--prod-text);
+  }
+}
+
+/* Field rows */
+.prod .raw-form .add-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.prod .raw-form .add-modal__section > label,
+.prod .raw-form form > label {
+  margin: 0 0 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--prod-text-2);
+}
+
+.prod .raw-form form > h4 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--prod-text);
+  margin: 0 0 6px;
+
+  span { color: var(--prod-accent-strong); }
+}
+
+/* Inputs / selects — covers both .add-modal__input and the
+   Tailwind `border rounded-lg p-2` controls in «Добавление товара» */
+.prod .raw-form .add-modal__input,
+.prod .raw-form form input,
+.prod .raw-form form select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--prod-text);
+  background: var(--prod-input-bg);
+  border: 1.5px solid var(--prod-border-strong);
+  border-radius: var(--prod-radius-sm);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    background 0.18s ease;
+
+  &::placeholder { color: var(--prod-muted); }
+
+  &:hover:not(:focus):not(:disabled) { border-color: var(--prod-muted); }
+
+  &:focus {
+    outline: none;
+    border-color: var(--prod-accent);
+    box-shadow: 0 0 0 3px var(--prod-ring);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--prod-card-2);
+  }
+}
+
+.prod .raw-form form select { cursor: pointer; }
+
+/* Info box («В наличии сейчас») */
+.prod .raw-form form .border {
+  margin-top: 8px;
+  padding: 10px 12px !important;
+  font-size: 13px;
+  color: var(--prod-text-2);
+  background: var(--prod-card-2);
+  border: 1px solid var(--prod-border) !important;
+  border-radius: var(--prod-radius-sm) !important;
+
+  b { color: var(--prod-text); }
+}
+
+/* Summary row («Итог к списанию») */
+.prod .raw-form__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--prod-radius-md);
+  background: linear-gradient(135deg, rgba(247, 215, 79, 0.16), rgba(247, 215, 79, 0.06));
+  border: 1px solid var(--prod-accent);
+
+  span { font-size: 13px; font-weight: 600; color: var(--prod-text-2); }
+  b { font-size: 18px; font-weight: 800; color: var(--prod-text); }
+}
+
+.prod[data-theme="dark"] .raw-form__summary {
+  background: linear-gradient(135deg, rgba(247, 215, 79, 0.14), rgba(247, 215, 79, 0.05));
+}
+
+/* Error message under the form */
+.prod .raw-form__error {
+  margin-top: 12px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--prod-danger-ink);
+  background: var(--prod-danger-soft);
+  border: 1px solid var(--prod-danger-border);
+  border-radius: var(--prod-radius-sm);
+}
+
+/* Primary submit button («Сохранить» в «Добавление товара») */
+.prod .raw-form .raw-form__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 46px;
+  margin-top: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--prod-accent-ink);
+  background: linear-gradient(135deg, var(--prod-accent), var(--prod-accent-strong));
+  border: none;
+  border-radius: var(--prod-radius-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+
+  &:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px var(--prod-ring); }
+  &:active:not(:disabled) { transform: translateY(0); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.2); }
+}
+
+/* Footer (Редактирование сырья: Удалить + Сохранить) */
+.prod .raw-form .add-modal__footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--prod-border);
+  gap: 10px;
+}
+
+.prod .raw-form .add-modal__footer .add-modal__save {
+  flex: 1;
+  height: 44px;
+  font-size: 14px;
+}
+
+/* My returns summary */
+.prod .my-returns-modal__summary {
+  color: var(--prod-text-2);
+  background: var(--prod-card-2);
+  border: 1px solid var(--prod-border);
+  border-radius: var(--prod-radius-md);
+  b { color: var(--prod-text); }
+}
+
+/* ---- Dark-mode native date input legibility ---- */
+.prod[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+
+/* ============================================================
+   RESPONSIVE — finger-friendly targets, no horizontal scroll
+   ============================================================ */
+@media (max-width: 768px) {
+  .prod .warehouse-header__create-btn,
+  .prod .add-modal__save,
+  .prod .add-modal__cancel,
+  .prod .return-product-modal__btn {
+    min-height: 42px;
+  }
+}

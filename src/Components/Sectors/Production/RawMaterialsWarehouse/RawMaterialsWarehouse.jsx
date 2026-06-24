@@ -18,6 +18,7 @@ import { Plus, X, Search, LayoutGrid, Table2 } from "lucide-react";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import RawMaterialAddModal from "./RawMaterialAddModal";
 import "../../Market/Warehouse/Warehouse.scss";
+import "../production-theme.scss";
 import {
   useAlert,
   useConfirm,
@@ -126,7 +127,7 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
   };
 
   return (
-    <div className="add-modal raw-modal">
+    <div className="add-modal raw-modal raw-form">
       <div className="add-modal__overlay z-50!" onClick={onClose} />
       <div className="add-modal__content z-50!">
         <div className="add-modal__header">

@@ -1,0 +1,179 @@
+/* ============================================================
+   Warehouse totals — KPI summary cards
+   Scoped under .pwt (Production Warehouse Totals)
+   ============================================================ */
+.pwt {
+  --pwt-accent: var(--primary, #f7d74f);
+  --pwt-accent-strong: var(--primary-dark, #d4b800);
+  --pwt-card: #ffffff;
+  --pwt-border: #e9ecf1;
+  --pwt-text: #0f172a;
+  --pwt-muted: #6b7280;
+  --pwt-info: #3b82f6;
+  --pwt-info-soft: #eff6ff;
+  --pwt-success: #10b981;
+  --pwt-success-soft: #ecfdf5;
+  --pwt-success-ink: #047857;
+  --pwt-danger: #ef4444;
+  --pwt-danger-soft: #fef2f2;
+  --pwt-danger-ink: #b91c1c;
+
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+  font-family: inherit;
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+.pwt__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--pwt-card);
+  border: 1px solid var(--pwt-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 14px rgba(15, 23, 42, 0.05);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--pwt-bar, var(--pwt-accent));
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.1);
+  }
+}
+
+.pwt__icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--pwt-ic, var(--pwt-accent-strong));
+  background: var(--pwt-ic-bg, rgba(247, 215, 79, 0.16));
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.pwt__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pwt__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pwt-muted);
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+}
+
+.pwt__value {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--pwt-text);
+  line-height: 1.15;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+
+  i {
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--pwt-muted);
+  }
+}
+
+/* ---- Variants ---- */
+.pwt__card--purchase {
+  --pwt-bar: var(--pwt-info);
+  --pwt-ic: var(--pwt-info);
+  --pwt-ic-bg: var(--pwt-info-soft);
+}
+
+.pwt__card--sale {
+  --pwt-bar: var(--pwt-accent-strong);
+  --pwt-ic: var(--pwt-accent-strong);
+  --pwt-ic-bg: rgba(247, 215, 79, 0.18);
+}
+
+.pwt__card--profit {
+  --pwt-bar: var(--pwt-success);
+  --pwt-ic: var(--pwt-success-ink);
+  --pwt-ic-bg: var(--pwt-success-soft);
+
+  .pwt__value {
+    color: var(--pwt-success-ink);
+  }
+}
+
+.pwt__card--profit.pwt__card--negative {
+  --pwt-bar: var(--pwt-danger);
+  --pwt-ic: var(--pwt-danger-ink);
+  --pwt-ic-bg: var(--pwt-danger-soft);
+
+  .pwt__value {
+    color: var(--pwt-danger-ink);
+  }
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 992px) {
+  .pwt {
+    grid-template-columns: 1fr;
+  }
+
+  .pwt__value {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pwt__card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .pwt__icon {
+    width: 38px;
+    height: 38px;
+
+    svg {
+      width: 19px;
+      height: 19px;
+    }
+  }
+
+  .pwt__value {
+    font-size: 17px;
+  }
+}

@@ -55,12 +55,7 @@ const getCartStatusFlags = (status) => {
     isRejected,
   };
 };
-import { useUser } from "../../../../store/slices/userSlice";
-import {
-  openShiftAsync,
-  fetchShiftsAsync,
-} from "../../../../store/creators/shiftThunk";
-import { useShifts } from "../../../../store/slices/shiftSlice";
+import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
 // Alert is handled by parent (ProductionCatalog) via onNotify
@@ -82,6 +77,7 @@ const CartItem = ({
   onDiscountBlur,
 }) => {
   const confirm = useConfirm();
+  const alert = useAlert();
   const [quantity, setQuantity] = useState(
     Number(item.quantity ?? item.quantity_requested ?? 0),
   );
@@ -118,8 +114,13 @@ const CartItem = ({
     }
     const current = Number(quantity) || 0;
     const newQuantity = current + 1;
+    // Нельзя увеличить больше, чем есть в наличии (остаток + уже в корзине)
+    const maxAllowed = Number(maxStock || 0) + Number(item.quantity || 0);
+    if (newQuantity > maxAllowed) {
+      alert(`Недостаточно товара. Доступно: ${maxAllowed} шт.`, true);
+      return;
+    }
     setQuantity(newQuantity);
-    console.log("CartItem: incrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
 
@@ -417,8 +418,7 @@ const ClientSelector = ({
     }
 
     try {
-      const action = await dispatch(createClientAsync(state));
-      const created = action?.payload;
+      const created = await dispatch(createClientAsync(state)).unwrap();
       if (created) {
         onRefresh();
         onClientSelect(created);
@@ -427,8 +427,8 @@ const ClientSelector = ({
         setIsOpen(false);
       }
     } catch (e) {
-      console.log(e);
-      // error handled in slice; keep form open
+      // Показываем ошибку с бэкенда через validateResErrors
+      setFormError(validateResErrors(e, "Не удалось создать клиента"));
     }
   };
 
@@ -943,9 +943,7 @@ const Cart = ({
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
-  const { shifts, currentShift } = useShifts();
   const { list: cashBoxes } = useCash();
-  const { profile, currentUser, userId } = useUser();
 
   // Redux селекторы
   const cartItemsLocal = useSelector(selectCartItems);
@@ -1325,59 +1323,11 @@ const Cart = ({
     dispatch(getCashBoxes());
   }, [dispatch, isCartActive]);
 
-  // Функция для проверки и открытия смены
-  const ensureShiftIsOpen = async () => {
-    // Проверяем наличие открытой смены
-    const openShift = shifts.find((s) => s.status === "open") || currentShift;
-
-    if (openShift) {
-      return; // Смена уже открыта
-    }
-
-    // Если смены нет, открываем её
-    let availableCashBoxes = cashBoxes;
-    if (!availableCashBoxes || availableCashBoxes.length === 0) {
-      // Загружаем кассы, если их нет
-      availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
-      if (!availableCashBoxes || availableCashBoxes.length === 0) {
-        throw new Error(
-          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены.",
-        );
-      }
-    }
-
-    const firstCashBox = availableCashBoxes[0];
-    const cashboxId = firstCashBox?.id;
-
-    if (!cashboxId) {
-      throw new Error("Не удалось определить кассу");
-    }
-
-    const cashierId = currentUser?.id || userId || profile?.id;
-
-    if (!cashierId) {
-      throw new Error("Не удалось определить кассира");
-    }
-
-    // Открываем смену с нулевой суммой
-    await dispatch(
-      openShiftAsync({
-        cashbox: cashboxId,
-        cashier: cashierId,
-        opening_cash: "0",
-      }),
-    ).unwrap();
-
-    // Обновляем список смен
-    await dispatch(fetchShiftsAsync());
-  };
-
   const handleSubmit = async () => {
     if (!agentCartId || !selectedClient) return;
     setSubmitting(true);
     try {
-      // Проверяем и открываем смену перед оформлением заказа
-      await ensureShiftIsOpen();
+      // Продажа выполняется без открытия смены
 
       // Вычисляем общую сумму заказа
       let totalAmount = 0;

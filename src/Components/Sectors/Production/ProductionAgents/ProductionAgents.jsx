@@ -1,7 +1,8 @@
 import { Plus, Search, LayoutGrid, Table2, Undo2, X } from "lucide-react";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
+import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 
 import {
   fetchBrandsAsync,
@@ -44,6 +45,7 @@ import {
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
 import "./productionAgentsModals.scss";
+import "../production-theme.scss";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
@@ -57,9 +59,14 @@ import {
 import ProductionRefundPurchase from "../Sell/ProductionRefundPurchase";
 import ProductionAgentRequestCartsTab from "./ProductionAgentRequestCartsTab";
 
-const renderProductionModal = (node) =>
+const renderProductionModal = (node, mode) =>
   typeof document !== "undefined" && node
-    ? createPortal(node, document.body)
+    ? createPortal(
+        <div className="prod" data-theme={mode}>
+          {node}
+        </div>,
+        document.body,
+      )
     : null;
 
 // Компонент для детального просмотра продажи
@@ -1497,6 +1504,7 @@ const AgentHeldProductModal = ({ item, onClose, isOwner }) => {
 
 const ProductionAgents = () => {
   const alert = useAlert();
+  const { mode } = useContext(ThemeModeContext);
   const dispatch = useDispatch();
   const { profile, company } = useUser();
   const isPiloramaSector = company?.sector?.name === "Пилорама";
@@ -1672,7 +1680,10 @@ const ProductionAgents = () => {
       .then(({ data }) => {
         setAgents(data);
       })
-      .catch((e) => console.log(e));
+      .catch((e) =>
+        alert(validateResErrors(e, "Не удалось загрузить товары агентов"), true),
+      );
+    // `alert` из useAlert() нестабилен между рендерами — не добавляем в deps
   }, [profile?.role, dateFrom, dateTo]);
 
   // Обновление основного списка товаров на странице
@@ -2077,21 +2088,12 @@ const ProductionAgents = () => {
   );
 
   return (
-    <div>
+    <div className="prod" data-theme={mode}>
       <div className="vitrina__header" style={{ margin: "15px 0" }}>
         <div className="vitrina__tabs">
           <span
             className={`vitrina__tab ${activeTab === 0 ? "active" : ""}`}
             onClick={() => setActiveTab(0)}
-            style={{
-              cursor: "pointer",
-              padding: "8px 16px",
-              border: "1px solid #ddd",
-              borderRadius: "4px 4px 0 0",
-              backgroundColor: activeTab === 0 ? "#ffd400" : "transparent",
-              color: activeTab === 0 ? "#000" : "#333",
-              marginRight: "4px",
-            }}
           >
             Товары агентов
           </span>
@@ -2099,14 +2101,6 @@ const ProductionAgents = () => {
             <span
               className={`vitrina__tab ${activeTab === 1 ? "active" : ""}`}
               onClick={() => setActiveTab(1)}
-              style={{
-                cursor: "pointer",
-                padding: "8px 16px",
-                border: "1px solid #ddd",
-                borderRadius: "4px 4px 0 0",
-                backgroundColor: activeTab === 1 ? "#ffd400" : "transparent",
-                color: activeTab === 1 ? "#000" : "#333",
-              }}
             >
               История продаж
             </span>
@@ -2116,16 +2110,6 @@ const ProductionAgents = () => {
             <span
               className={`vitrina__tab ${activeTab === TAB_REQUESTS ? "active" : ""}`}
               onClick={() => setActiveTab(TAB_REQUESTS)}
-              style={{
-                cursor: "pointer",
-                padding: "8px 16px",
-                border: "1px solid #ddd",
-                borderRadius: "4px 4px 0 0",
-                backgroundColor:
-                  activeTab === TAB_REQUESTS ? "#ffd400" : "transparent",
-                color: activeTab === TAB_REQUESTS ? "#000" : "#333",
-                marginLeft: "4px",
-              }}
             >
               Заявки на товар
             </span>
@@ -2135,16 +2119,6 @@ const ProductionAgents = () => {
             <span
               className={`vitrina__tab ${activeTab === tabOwnerAgents ? "active" : ""}`}
               onClick={() => setActiveTab(tabOwnerAgents)}
-              style={{
-                cursor: "pointer",
-                padding: "8px 16px",
-                border: "1px solid #ddd",
-                borderRadius: "4px 4px 0 0",
-                backgroundColor:
-                  activeTab === tabOwnerAgents ? "#ffd400" : "transparent",
-                color: activeTab === tabOwnerAgents ? "#000" : "#333",
-                marginLeft: "4px",
-              }}
             >
               Агенты и клиенты
             </span>
@@ -2884,6 +2858,7 @@ const ProductionAgents = () => {
               refreshAfterAcceptOrReturn();
             }}
           />,
+          mode,
         )}
       {showReturnProductModal &&
         renderProductionModal(
@@ -2894,6 +2869,7 @@ const ProductionAgents = () => {
             }}
             item={itemId3}
           />,
+          mode,
         )}
       {showMyReturnsModal &&
         renderProductionModal(
@@ -2906,6 +2882,7 @@ const ProductionAgents = () => {
             defectFilter={myReturnsDefectFilter}
             onDefectFilterChange={handleMyReturnsDefectFilterChange}
           />,
+          mode,
         )}
       {showSellModal &&
         renderProductionModal(
@@ -2914,10 +2891,12 @@ const ProductionAgents = () => {
             selectCashBox={selectCashBox}
             onClose={() => setShowSellModal(false)}
           />,
+          mode,
         )}
       {showAddCashboxModal &&
         renderProductionModal(
           <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />,
+          mode,
         )}
 
       {showSaleDetail &&
@@ -2936,6 +2915,7 @@ const ProductionAgents = () => {
               setShowSaleRefundModal(true);
             }}
           />,
+          mode,
         )}
       {showSaleRefundModal &&
         saleRefundItem &&
@@ -2958,6 +2938,7 @@ const ProductionAgents = () => {
               }
             }}
           />,
+          mode,
         )}
       {showOwnerReturnsModal &&
         renderProductionModal(
@@ -2968,6 +2949,7 @@ const ProductionAgents = () => {
               refreshTransfers();
             }}
           />,
+          mode,
         )}
       {showAgentClientsModal &&
         renderProductionModal(
@@ -2986,6 +2968,7 @@ const ProductionAgents = () => {
             totalClientDebt={selectedAgentClientsTotalDebt}
             ownerDebt={selectedAgentOwnerDebt}
           />,
+          mode,
         )}
       {showAgentProductModal &&
         renderProductionModal(
@@ -2997,6 +2980,7 @@ const ProductionAgents = () => {
               setSelectedAgentProduct(null);
             }}
           />,
+          mode,
         )}
     </div>
   );
