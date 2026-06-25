@@ -58,6 +58,7 @@ import {
 } from "../../../../api/agentSales";
 import ProductionRefundPurchase from "../Sell/ProductionRefundPurchase";
 import ProductionAgentRequestCartsTab from "./ProductionAgentRequestCartsTab";
+import AgentNotificationsBell from "./AgentNotificationsBell";
 
 const renderProductionModal = (node, mode) =>
   typeof document !== "undefined" && node
@@ -2152,7 +2153,9 @@ const ProductionAgents = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
+                <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center items-center">
+                  {/* Задача №2 — уведомления для агента в веб-версии */}
+                  <AgentNotificationsBell />
                   {profile?.role !== "owner" ? (
                     <div className="flex gap-2 align-middle">
                       {" "}

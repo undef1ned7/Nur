@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   PiggyBank,
   PieChart,
+  Undo2,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -36,6 +37,7 @@ import { setProductionAnalyticsFilters } from "../../../../store/slices/analytic
 import { useUser } from "../../../../store/slices/userSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import AgentAnalytics from "./AgentAnalytics";
+import ProductionExpensesFromCash from "./ProductionExpensesFromCash";
 import "./AgentAnalytics.scss";
 import {
   CARD_DETAILS_PAGE_SIZE,
@@ -418,6 +420,74 @@ const ProductionAnalytics = () => {
           data: sales.map((item) => parseFloat(item.sales_amount || 0)),
           borderColor: "#f7d74f",
           backgroundColor: "rgba(247, 215, 79, 0.2)",
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  // Динамика возвратов (Задача №1) — charts.returns_by_date: [{date, qty, amount}]
+  const returnsByDateData = useMemo(() => {
+    const groupByType = analyticsData?.period?.group_by || "day";
+    const rows = analyticsData?.charts?.returns_by_date;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return {
+        labels: ["Нет данных"],
+        datasets: [
+          {
+            label: "Возвраты (qty)",
+            data: [0],
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59, 130, 246, 0.2)",
+            tension: 0.4,
+            fill: true,
+          },
+        ],
+      };
+    }
+    return {
+      labels: rows.map((i) => formatDateForDisplay(i.date, groupByType)),
+      datasets: [
+        {
+          label: "Возвраты (qty)",
+          data: rows.map((i) => parseFloat(i.qty || 0)),
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59, 130, 246, 0.2)",
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  // Динамика брака (Задача №1) — charts.defects_by_date: [{date, qty, amount}]
+  const defectsByDateData = useMemo(() => {
+    const groupByType = analyticsData?.period?.group_by || "day";
+    const rows = analyticsData?.charts?.defects_by_date;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return {
+        labels: ["Нет данных"],
+        datasets: [
+          {
+            label: "Брак (qty)",
+            data: [0],
+            borderColor: "#f97316",
+            backgroundColor: "rgba(249, 115, 22, 0.2)",
+            tension: 0.4,
+            fill: true,
+          },
+        ],
+      };
+    }
+    return {
+      labels: rows.map((i) => formatDateForDisplay(i.date, groupByType)),
+      datasets: [
+        {
+          label: "Брак (qty)",
+          data: rows.map((i) => parseFloat(i.qty || 0)),
+          borderColor: "#f97316",
+          backgroundColor: "rgba(249, 115, 22, 0.2)",
           tension: 0.4,
           fill: true,
         },
@@ -1188,17 +1258,46 @@ const ProductionAnalytics = () => {
           </div>
         )}
 
+        {/* Возврат и брак учитываются РАЗДЕЛЬНО (Задача №1).
+            Поля summary.returns_* / summary.defects_* приходят с бэкенда;
+            при их отсутствии — безопасный фолбэк, чтобы UI не ломался. */}
         <div
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
           role="button"
           tabIndex={0}
-          onClick={() =>
-            openCardDetails("defective_items", "Брак (принятые возвраты)")
-          }
+          onClick={() => openCardDetails("returns", "Возвраты (принятые)")}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              openCardDetails("defective_items", "Брак (принятые возвраты)");
+              openCardDetails("returns", "Возвраты (принятые)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
+            <Undo2 size={24} />
+          </div>
+          <div>
+            <h3>Возвраты</h3>
+            <p>
+              {formatNumber(
+                summary.returns_qty ?? summary.regular_returns_qty ?? 0,
+              )}
+            </p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Принятые возвраты на склад, qty за период
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("defects", "Брак (списанный)")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("defects", "Брак (списанный)");
             }
           }}
         >
@@ -1206,10 +1305,61 @@ const ProductionAnalytics = () => {
             <AlertTriangle size={24} />
           </div>
           <div>
-            <h3>Брак (возвраты)</h3>
-            <p>{formatNumber(summary.defective_items || 0)}</p>
+            <h3>Брак</h3>
+            <p>
+              {formatNumber(summary.defects_qty ?? summary.defective_items ?? 0)}
+            </p>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Принятые возвраты, qty за период
+              Списанный брак, qty за период
+            </span>
+          </div>
+        </div>
+
+        {/* Инвентаризация — излишки / недостачи (Задача №5) */}
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("inventory_surplus", "Излишки (инвентаризация)")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("inventory_surplus", "Излишки (инвентаризация)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <PiggyBank size={24} />
+          </div>
+          <div>
+            <h3>Излишки</h3>
+            <p>{formatNumber(summary.inventory_surplus_qty ?? 0)}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              По инвентаризациям за период
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+          role="button"
+          tabIndex={0}
+          onClick={() => openCardDetails("inventory_shortage", "Недостачи (инвентаризация)")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openCardDetails("inventory_shortage", "Недостачи (инвентаризация)");
+            }
+          }}
+        >
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h3>Недостачи</h3>
+            <p>{formatNumber(summary.inventory_shortage_qty ?? 0)}</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              По инвентаризациям за период
             </span>
           </div>
         </div>
@@ -1798,6 +1948,103 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
+
+      {/* Динамика возвратов и брака — РАЗДЕЛЬНО (Задача №1) */}
+      <div className="agent-analytics__section">
+        <h2 className="agent-analytics__section-title">
+          <span className="agent-analytics__section-icon chart-container">
+            <TrendingUp className="chart-icon" />
+          </span>
+          Динамика возвратов и брака
+        </h2>
+        <div className="agent-analytics__charts">
+          <div className="agent-analytics__chart-card">
+            <h3 className="agent-analytics__table-title">Динамика возвратов</h3>
+            <div className="agent-analytics__chart-container">
+              <Line data={returnsByDateData} options={lineOptions} />
+            </div>
+          </div>
+          <div className="agent-analytics__chart-card">
+            <h3 className="agent-analytics__table-title">Динамика брака</h3>
+            <div className="agent-analytics__chart-container">
+              <Line data={defectsByDateData} options={lineOptions} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Возврат и брак по агентам — РАЗДЕЛЬНО (Задача №1) */}
+      <div className="agent-analytics__section">
+        <div className="agent-analytics__table-card">
+          <h3 className="agent-analytics__table-title">Возврат по агентам</h3>
+          <div className="agent-analytics__table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Агент</th>
+                  <th>Количество</th>
+                  <th>Сумма (сом)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charts.top_agents_by_returns?.length > 0 ? (
+                  charts.top_agents_by_returns.map((row, index) => (
+                    <tr key={row.agent_id || row.agent_name || index}>
+                      <td>{row.agent_name || row.name || "—"}</td>
+                      <td>{formatNumber(row.qty || 0)}</td>
+                      <td>{formatMoney(row.amount || 0)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{ textAlign: "center", color: "#9ca3af" }}
+                    >
+                      Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="agent-analytics__table-card">
+          <h3 className="agent-analytics__table-title">Брак по агентам</h3>
+          <div className="agent-analytics__table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Агент</th>
+                  <th>Количество</th>
+                  <th>Сумма (сом)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charts.top_agents_by_defects?.length > 0 ? (
+                  charts.top_agents_by_defects.map((row, index) => (
+                    <tr key={row.agent_id || row.agent_name || index}>
+                      <td>{row.agent_name || row.name || "—"}</td>
+                      <td>{formatNumber(row.qty || 0)}</td>
+                      <td>{formatMoney(row.amount || 0)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{ textAlign: "center", color: "#9ca3af" }}
+                    >
+                      Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       {/* Таблицы: топы по товарам и пользователям */}
       <div className="agent-analytics__section">
         {/* <div className="agent-analytics__charts"> */}
@@ -2032,6 +2279,13 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
+
+      {/* Расходы из кассы — детальный список (Задача №4) */}
+      <ProductionExpensesFromCash
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        date={date}
+      />
     </div>
   );
 };

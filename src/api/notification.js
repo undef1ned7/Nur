@@ -26,3 +26,13 @@ export const getNotificationDetail = async (id) => {
     return Promise.reject(error.response?.data || error);
   }
 };
+
+// Отметить ОДНО уведомление прочитанным.
+export const markNotificationRead = async (id) => {
+  try {
+    const response = await api.post(`/main/notifications/${id}/read/`);
+    return response.data;
+  } catch (error) {
+    return Promise.reject(error.response?.data || error);
+  }
+};

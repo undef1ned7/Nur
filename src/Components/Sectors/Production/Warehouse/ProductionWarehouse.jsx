@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import FinishedGoods from "../FinishedGoods/FinishedGoods";
 import RawMaterialsWarehouse from "../RawMaterialsWarehouse/RawMaterialsWarehouse";
+import ProductionInventoryTab from "./ProductionInventoryTab";
+import ProductionMovementsTab from "./ProductionMovementsTab";
 import TransferStatusModal from "../TransferStatus/TransferStatus";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -1245,6 +1247,14 @@ const ProductionWarehouse = () => {
     {
       label: "Склад сырья",
       content: <RawMaterialsWarehouse />,
+    },
+    {
+      label: "Инвентаризация",
+      content: <ProductionInventoryTab />,
+    },
+    {
+      label: "Перемещение",
+      content: <ProductionMovementsTab />,
     },
   ];
   useEffect(() => {

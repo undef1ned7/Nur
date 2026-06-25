@@ -6,6 +6,7 @@ import {
   Search,
   LayoutGrid,
   Table2,
+  ArrowRightLeft,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -50,6 +51,8 @@ import MarriageModal from "../../../Deposits/Sklad/MarriageModal";
 import { useUser } from "../../../../store/slices/userSlice";
 import AddProductModal from "../../../Deposits/Sklad/AddProduct/AddProductModal";
 import api from "../../../../api";
+import { FinishedToRawModal } from "./FinishedToRawModals";
+import { reportStockShortage } from "../stockShortage";
 import FileInput from "./FileInput/FileInput";
 import "../../../Deposits/Sklad/Sklad.scss";
 import "./finishedGoods.scss";
@@ -865,9 +868,18 @@ const TransferProductModal = ({
         return false;
       }
       if (Number(product.qty_transferred) > Number(product.quantity)) {
+        // Задача №6 — блокируем выдачу и сообщаем о нехватке ответственным
         setValidationError(
-          `Недостаточно товара "${product.name}". Доступно: ${product.quantity}`,
+          `Недостаточно товара "${product.name}". Запрошено: ${product.qty_transferred}, доступно: ${product.quantity}`,
         );
+        reportStockShortage({
+          product: product.id,
+          productName: product.name,
+          requested: product.qty_transferred,
+          available: product.quantity,
+          agent: state.agent,
+          source: "transfer",
+        });
         return false;
       }
     }
@@ -1488,6 +1500,8 @@ const FinishedGoods = ({ products, onChanged }) => {
 
   const [showAcceptProductModal, setShowAcceptProductModal] = useState(false);
   const [showReturnProductModal, setShowReturnProductModal] = useState(false);
+  // Задача №3 — перемещение готовой продукции в сырьё
+  const [showMoveToRawModal, setShowMoveToRawModal] = useState(false);
   const [itemId, setItemId] = useState({});
   const [itemId1, setItemId1] = useState({});
   const [itemId2, setItemId2] = useState({});
@@ -1498,6 +1512,13 @@ const FinishedGoods = ({ products, onChanged }) => {
   // Debounce для поиска
   const debouncedSearch = useDebouncedValue(search, 400);
   const [categoryFilter, setCategoryFilter] = useState("");
+
+  // Задача №3 — обновить и готовую продукцию, и сырьё после перемещения/отмены
+  const refreshGoodsAndRaw = useCallback(() => {
+    dispatch(fetchProductsAsync({ search: debouncedSearch }));
+    dispatch(getItemsMake());
+    onChanged?.();
+  }, [dispatch, debouncedSearch, onChanged]);
 
   useEffect(() => {
     dispatch(
@@ -1688,6 +1709,13 @@ const FinishedGoods = ({ products, onChanged }) => {
               Передать товар
             </button>
           )}
+          <button
+            className="warehouse-header__create-btn"
+            onClick={() => setShowMoveToRawModal(true)}
+          >
+            <ArrowRightLeft size={16} />
+            В сырьё
+          </button>
         </div>
       </div>
 
@@ -2180,6 +2208,15 @@ const FinishedGoods = ({ products, onChanged }) => {
           onClose={() => setShowAddProductModal(false)}
           onChanged={() => dispatch(fetchProductsAsync()).unwrap()}
           item={itemId1}
+        />
+      )}
+
+      {/* Задача №3 — перемещение готовой продукции в сырьё */}
+      {showMoveToRawModal && (
+        <FinishedToRawModal
+          products={products}
+          onClose={() => setShowMoveToRawModal(false)}
+          onChanged={refreshGoodsAndRaw}
         />
       )}
     </div>

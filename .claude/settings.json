@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"parse errors: $\\(npx eslint src/Components/Sectors/Production/Analytics/analyticsCardDetailsShared.js src/Components/Sectors/Production/Analytics/ProductionAnalytics.jsx --no-ignore 2>&1)",
+      "Bash(awk 'NR>=1560 && NR<=2189' src/Components/Sectors/Production/FinishedGoods/FinishedGoods.jsx)",
+      "Bash(echo \"parse total: $\\(npx eslint src/Components/Sectors/Production/FinishedGoods/FinishedGoods.jsx src/Components/Sectors/Production/FinishedGoods/FinishedToRawModals.jsx --no-ignore 2>&1)",
+      "Bash(awk -F: '$1>2160')",
+      "Bash(cd /Users/kuku/Desktop/nur_crm; grep -nE \"list|itemsMake|return \\\\{\" src/Components/Sectors/Production/../../../store/slices/productSlice.js 2>/dev/null | grep -iE \"useProducts|itemsMake|list\" | head; echo \"=== useProducts hook shape ===\"; grep -n \"export const useProducts\\\\|itemsMake\\\\|list:\" src/store/slices/productSlice.js | head)",
+      "Read(//Users/kuku/Desktop/nur_crm/src/store/slices/**)",
+      "Bash(echo \"parse: $\\(npx eslint src/Components/Sectors/Production/Warehouse/ProductionMovementsTab.jsx src/Components/Sectors/Production/Warehouse/ProductionInventoryTab.jsx --no-ignore 2>&1)"
+    ]
+  }
+}

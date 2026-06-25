@@ -1,13 +1,33 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { getNotifications, markAllNotificationsRead, getNotificationDetail } from '../../api/notification';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  getNotificationDetail,
+  markNotificationRead,
+} from '../../api/notification';
 
 export const fetchNotificationsAsync = createAsyncThunk(
   'notification/fetchAll',
   async (params, thunkAPI) => {
     try {
-      return await getNotifications(params);
+      const data = await getNotifications(params);
+      // Признак догрузки страницы (lazy load) — не затирать список, а добавить.
+      return { data, append: Boolean(params?.append), offset: params?.offset || 0 };
     } catch (err) {
       return thunkAPI.rejectWithValue(err);
+    }
+  }
+);
+
+// Отметить ОДНО уведомление прочитанным (с оптимистичным обновлением в слайсе).
+export const markNotificationReadAsync = createAsyncThunk(
+  'notification/markOneRead',
+  async (id, thunkAPI) => {
+    try {
+      await markNotificationRead(id);
+      return id;
+    } catch (err) {
+      return thunkAPI.rejectWithValue({ id, err });
     }
   }
 );
