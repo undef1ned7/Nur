@@ -80,8 +80,8 @@ export const publicRoutes = [
     element={<CafeMenuOnline />}
   />,
   <Route
-    key="/barber/:company_slug/booking"
-    path="/barber/:company_slug/booking"
+    key="/service/:company_slug/booking"
+    path="/service/:company_slug/booking"
     element={<OnlineBooking />}
   />,
   <Route

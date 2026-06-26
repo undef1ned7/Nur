@@ -18,6 +18,19 @@ export const getSubscriptionPlans = async () => {
   }
 };
 
+// Асинхронная проверка доступности slug компании (без сохранения).
+// GET /users/company/check-slug/?slug=... → { available: bool, message?: string }
+export const checkSlug = async (slug) => {
+  try {
+    const response = await api.get("/users/company/check-slug/", {
+      params: { slug },
+    });
+    return response.data; // { available, message? }
+  } catch (error) {
+    return Promise.reject(error.response ? error.response.data : error.message);
+  }
+};
+
 // Маппинг секторов на их специфичные permissions
 const getSectorPermissions = (sectorName) => {
   const sectorPermissions = {
