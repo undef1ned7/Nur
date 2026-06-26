@@ -1801,6 +1801,7 @@ const CreateSaleDocument = () => {
                 ),
                 addedAt: it.created_at || new Date().toISOString(),
                 created_at: it.created_at,
+                sortOrder: idx,
               };
             })
           : [];
@@ -2279,7 +2280,7 @@ const CreateSaleDocument = () => {
     return docType === "TRANSFER";
   }, [docType]);
 
-  // Фильтрация и сортировка товаров в документе по дате (новые сверху)
+  // Фильтрация товаров в документе с сохранением порядка добавления
   const filteredDocumentItems = useMemo(() => {
     if (!cartItems || cartItems.length === 0) return [];
     const search = documentSearch.toLowerCase();
@@ -2290,9 +2291,15 @@ const CreateSaleDocument = () => {
       return haystack.includes(search);
     });
     return [...filtered].sort((a, b) => {
-      const dateA = a.addedAt || a.created_at || 0;
-      const dateB = b.addedAt || b.created_at || 0;
-      return new Date(dateB) - new Date(dateA);
+      const orderA =
+        a.sortOrder != null
+          ? Number(a.sortOrder)
+          : new Date(a.addedAt || a.created_at || 0).getTime();
+      const orderB =
+        b.sortOrder != null
+          ? Number(b.sortOrder)
+          : new Date(b.addedAt || b.created_at || 0).getTime();
+      return orderA - orderB;
     });
   }, [cartItems, documentSearch]);
 
@@ -2480,7 +2487,10 @@ const CreateSaleDocument = () => {
           characteristic: getProductCharacteristicText(product),
           addedAt: new Date().toISOString(),
         };
-        setCartItems((prev) => [...prev, newItem]);
+        setCartItems((prev) => [
+          ...prev,
+          { ...newItem, sortOrder: prev.length },
+        ]);
       }
 
       // Добавляем товар в список выбранных
