@@ -8,6 +8,7 @@ import {
   clearTokens,
 } from "../../../utils/authUtils";
 import { redirectToBuildingApp, shouldSkipBuildingRedirect, clearSkipBuildingRedirectParam } from "../../../utils/crossAppAuth";
+import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
 import { isBuildingSector } from "../../../utils/sectorMapping";
 import {
   DEFAULT_AUTHENTICATED_PATH,
@@ -39,6 +40,7 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
   useEffect(() => {
     const checkTokenValidity = async () => {
+      captureBuildingAppUrlFromSearch();
       const currentPath = window.location.pathname;
 
       if (currentPath === "/crm/logout") {
