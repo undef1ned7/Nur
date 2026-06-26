@@ -205,8 +205,11 @@ const userSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(updateUserCompanyName.fulfilled, (state) => {
+      .addCase(updateUserCompanyName.fulfilled, (state, { payload }) => {
         state.loading = false;
+        if (payload) {
+          state.company = { ...state.company, ...payload };
+        }
       })
       .addCase(updateUserCompanyName.rejected, (state, { payload }) => {
         state.loading = false;

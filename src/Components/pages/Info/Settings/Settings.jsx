@@ -1241,6 +1241,12 @@ const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
 const safeOrigin = () =>
   typeof window !== "undefined" ? window.location.origin : "";
 
+const SCALE_BARCODE_MODE_OPTIONS = [
+  { value: "auto", label: "Авто (по префиксу)" },
+  { value: "weight", label: "По весу" },
+  { value: "amount", label: "По сумме" },
+];
+
 const Settings = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -1383,6 +1389,7 @@ const Settings = () => {
     address: company?.address || "",
     phones_howcase: company?.phones_howcase || "",
     cashier_password: company?.cashier_password || "",
+    scale_barcode_mode: company?.scale_barcode_mode || "auto",
   });
 
   useEffect(() => {
@@ -1396,6 +1403,7 @@ const Settings = () => {
       address: company?.address || "",
       phones_howcase: company?.phones_howcase || "",
       cashier_password: company?.cashier_password || "",
+      scale_barcode_mode: company?.scale_barcode_mode || "auto",
     });
   }, [company]);
 
@@ -1435,6 +1443,7 @@ const Settings = () => {
         delete payload.cashier_password;
       }
       await dispatch(updateUserCompanyName(payload)).unwrap();
+      await dispatch(getCompany());
       showAlert("success", "Данные компании успешно сохранены");
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка при сохранении данных компании");
@@ -1488,6 +1497,7 @@ const Settings = () => {
       address: company?.address || "",
       phones_howcase: company?.phones_howcase || "",
       cashier_password: company?.cashier_password || "",
+      scale_barcode_mode: company?.scale_barcode_mode || "auto",
     });
   };
 
@@ -1874,6 +1884,36 @@ const Settings = () => {
                     </div>
                   </div>
                 ))}
+
+                <div
+                  className="settings__form-group"
+                  style={{ marginTop: "15px" }}
+                >
+                  <label
+                    className="settings__label"
+                    htmlFor="scale_barcode_mode"
+                  >
+                    Режим штрихкода весов
+                  </label>
+                  <select
+                    id="scale_barcode_mode"
+                    name="scale_barcode_mode"
+                    className="settings__select"
+                    value={companyState.scale_barcode_mode || "auto"}
+                    onChange={handleCompanyChange}
+                  >
+                    {SCALE_BARCODE_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="settings__mutedText" style={{ marginTop: 8 }}>
+                    Если весы печатают вес в штрихкоде — выберите «По весу».
+                    Если печатают стоимость — «По сумме». «Авто» определяет тип
+                    по префиксу штрихкода (20 — вес, 25 — сумма).
+                  </p>
+                </div>
 
                 {isMarketSector && (
                   <div
