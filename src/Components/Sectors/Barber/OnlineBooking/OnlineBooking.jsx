@@ -11,12 +11,18 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaSearch,
-  FaCut,
+  FaConciergeBell,
+  FaCalendarCheck,
   FaSpinner,
   FaTimes,
   FaBan,
 } from "react-icons/fa";
 import api from "../../../../api";
+import {
+  buildMasterGroups,
+  assignmentsCoverAll,
+  remainingServices,
+} from "./masterGrouping";
 import "./OnlineBooking.scss";
 
 /* ===== helpers ===== */
@@ -74,6 +80,41 @@ async function fetchAll(url0) {
   return out;
 }
 
+/**
+ * Загружает услуги. Поддерживает два формата ответа:
+ *  - НОВЫЙ: { employees: {id:{...}}, services: [{..., employeeIds:[]}] }
+ *  - СТАРЫЙ: массив услуг (с пагинацией) — мастера грузятся отдельно.
+ * Возвращает { services, employeesById }.
+ */
+async function fetchServices(url0) {
+  const first = await api.get(url0).then((r) => r?.data).catch(() => null);
+  // Новый формат: объект с полем services
+  if (first && !Array.isArray(first) && Array.isArray(first.services)) {
+    const employeesById = {};
+    const emp = first.employees;
+    if (emp && typeof emp === "object" && !Array.isArray(emp)) {
+      Object.entries(emp).forEach(([id, e]) => {
+        employeesById[String(id)] = { id: String(id), ...e };
+      });
+    } else if (Array.isArray(emp)) {
+      emp.forEach((e) => {
+        const id = String(e?.id);
+        if (id) employeesById[id] = { id, ...e };
+      });
+    }
+    return { services: first.services, employeesById };
+  }
+  // Старый формат: первая страница + остальные через fetchAll
+  const out = asArray(first);
+  let next = first?.next || null;
+  for (let guard = 0; guard < 30 && next; guard += 1) {
+    const r = await api.get(next);
+    out.push(...asArray(r?.data));
+    next = r?.data?.next || null;
+  }
+  return { services: out, employeesById: {} };
+}
+
 /* ===== Parse duration from time field ===== */
 const parseDuration = (svc) => {
   const timeStr = String(svc.time || svc.duration_min || svc.duration || "30");
@@ -83,7 +124,7 @@ const parseDuration = (svc) => {
 
 /* ===== Step definitions ===== */
 const STEP_DEFS = {
-  services: { id: "services", label: "Услуги", icon: FaCut },
+  services: { id: "services", label: "Услуги", icon: FaConciergeBell },
   master: { id: "master", label: "Мастер", icon: FaUser },
   datetime: { id: "datetime", label: "Дата и время", icon: FaCalendarAlt },
   info: { id: "info", label: "Контакты", icon: FaPhone },
@@ -98,7 +139,7 @@ const STEP_ORDERS = {
 
 /* ===== Start options ===== */
 const START_OPTIONS = [
-  { id: "services", label: "Выбрать услугу", icon: FaCut, desc: "Начните с выбора услуги" },
+  { id: "services", label: "Выбрать услугу", icon: FaConciergeBell, desc: "Начните с выбора услуги" },
   { id: "master", label: "Выбрать мастера", icon: FaUser, desc: "Начните с выбора мастера" },
 ];
 
@@ -178,10 +219,16 @@ const OnlineBooking = () => {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [masters, setMasters] = useState([]);
+  // map { [employeeId]: { id, name, ... } } из нового формата services-эндпоинта
+  const [employeesById, setEmployeesById] = useState({});
+  // Разделённая бронь: назначения мастеров на под-наборы услуг
+  const [assignments, setAssignments] = useState([]);
+  const [splitMode, setSplitMode] = useState(false);
   const [availability, setAvailability] = useState(null); // данные о занятости мастеров
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [companyName, setCompanyName] = useState("");
 
   /* ===== Booking state ===== */
   const [stepIndex, setStepIndex] = useState(-1); // -1 = start screen
@@ -229,13 +276,29 @@ const OnlineBooking = () => {
       const categoriesUrl = `/barbershop/public/${slug}/service-categories/`;
       const mastersUrl = `/barbershop/public/${slug}/masters/`;
 
-      const [servicesData, categoriesData, mastersData] = await Promise.all([
-        fetchAll(servicesUrl).catch(() => []),
+      const [servicesResult, categoriesData, mastersData] = await Promise.all([
+        fetchServices(servicesUrl).catch(() => ({ services: [], employeesById: {} })),
         fetchAll(categoriesUrl).catch(() => []),
         fetchAll(mastersUrl).catch(() => []),
       ]);
+      const servicesData = servicesResult?.services || [];
+      const servicesEmployeesById = servicesResult?.employeesById || {};
+
+      api
+        .get("/users/company/")
+        .then((r) => {
+          const data = r?.data;
+          const company = Array.isArray(data?.results)
+            ? data.results[0]
+            : Array.isArray(data)
+              ? data[0]
+              : data;
+          if (company?.name) setCompanyName(company.name);
+        })
+        .catch(() => {});
 
       setServices(servicesData || []);
+      setEmployeesById(servicesEmployeesById || {});
       const normalizedMasters = (mastersData || []).map((m) => ({
         ...m,
         id: m.id ?? m.master_id ?? m.user_id ?? m.pk,
@@ -348,6 +411,95 @@ const OnlineBooking = () => {
       return name.includes(q);
     });
   }, [masters, searchMasters]);
+
+  /* ===== Группировка мастеров по покрытию выбранных услуг ===== */
+  const masterGrouping = useMemo(
+    () => buildMasterGroups(selectedServices, employeesById, masters),
+    [selectedServices, employeesById, masters],
+  );
+
+  // Есть ли связи услуга→мастера (новый формат). Если нет — старое поведение.
+  const hasMasterLinks = masterGrouping.mode !== "fallback";
+
+  // Группа, покрывающая ВСЕ выбранные услуги (для брони одним мастером)
+  const fullCoverageGroup = useMemo(() => {
+    if (selectedServices.length === 0) return null;
+    return (
+      masterGrouping.groups.find(
+        (g) => g.serviceIds.length === selectedServices.length,
+      ) || null
+    );
+  }, [masterGrouping, selectedServices.length]);
+
+  // Применяем поиск к мастерам внутри групп
+  const groupsForDisplay = useMemo(() => {
+    const q = searchMasters.trim().toLowerCase();
+    if (!q) return masterGrouping.groups;
+    return masterGrouping.groups
+      .map((g) => ({
+        ...g,
+        masters: g.masters.filter((m) => m.name.toLowerCase().includes(q)),
+      }))
+      .filter((g) => g.masters.length > 0);
+  }, [masterGrouping.groups, searchMasters]);
+
+  const remainingToAssign = useMemo(
+    () => remainingServices(selectedServices, assignments),
+    [selectedServices, assignments],
+  );
+  const splitCoversAll = useMemo(
+    () => assignmentsCoverAll(selectedServices, assignments),
+    [selectedServices, assignments],
+  );
+
+  // Назначить мастера на (ещё не назначенные) услуги его группы — режим разделения
+  const assignMasterToGroup = (group, master) => {
+    const ids = group.serviceIds.filter(
+      (id) => !assignments.some((a) => a.serviceIds.includes(id)),
+    );
+    if (ids.length === 0) return;
+    setAssignments((prev) => [
+      ...prev,
+      { serviceIds: ids, master, groupKey: group.key },
+    ]);
+    setSelectedMaster(null);
+  };
+
+  const removeAssignment = (index) => {
+    setAssignments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Выбрать одного мастера на все услуги (сбрасывает разделение)
+  const selectSingleMaster = (master) => {
+    setAssignments([]);
+    setSplitMode(false);
+    setSelectedMaster(master?.raw ? { ...master.raw, id: master.id } : master);
+  };
+
+  const serviceNameById = useMemo(() => {
+    const map = new Map();
+    selectedServices.forEach((s) => map.set(String(s.id), s.name || "Услуга"));
+    return map;
+  }, [selectedServices]);
+
+  // Список мастеров для одиночного пути (1 услуга или нет связей): нормализован к {id,name,raw}
+  const singleMasterList = useMemo(() => {
+    let base;
+    if (hasMasterLinks && selectedServices.length >= 1) {
+      base = masterGrouping.groups[0]?.masters || [];
+    } else {
+      base = (filteredMasters || []).map((m) => ({
+        id: String(m.id ?? m.master_id ?? m.user_id ?? m.pk),
+        name:
+          m.full_name ||
+          `${m.first_name || ""} ${m.last_name || ""}`.trim() ||
+          "Мастер",
+        raw: m,
+      }));
+    }
+    const q = searchMasters.trim().toLowerCase();
+    return q ? base.filter((m) => m.name.toLowerCase().includes(q)) : base;
+  }, [hasMasterLinks, selectedServices.length, masterGrouping.groups, filteredMasters, searchMasters]);
 
   /* ===== Summary ===== */
   const summary = useMemo(() => {
@@ -566,13 +718,32 @@ const OnlineBooking = () => {
     setSelectedServices((prev) => prev.filter((s) => s.id !== id));
   };
 
+  // Чистим назначения при изменении набора выбранных услуг
+  useEffect(() => {
+    const selectedIds = new Set(selectedServices.map((s) => String(s.id)));
+    setAssignments((prev) => {
+      const pruned = prev
+        .map((a) => ({
+          ...a,
+          serviceIds: a.serviceIds.filter((sid) => selectedIds.has(String(sid))),
+        }))
+        .filter((a) => a.serviceIds.length > 0);
+      return pruned.length === prev.length &&
+        pruned.every((a, i) => a.serviceIds.length === prev[i].serviceIds.length)
+        ? prev
+        : pruned;
+    });
+    if (selectedServices.length <= 1) setSplitMode(false);
+  }, [selectedServices]);
+
   /* ===== Validation ===== */
   const canProceed = useMemo(() => {
     switch (currentStepId) {
       case "services":
         return selectedServices.length > 0;
       case "master":
-        return true; // можно пропустить
+        // В режиме разделения нужно покрыть все услуги; иначе шаг можно пропустить
+        return splitMode ? splitCoversAll : true;
       case "datetime":
         return selectedDate && selectedTime;
       case "info":
@@ -582,7 +753,7 @@ const OnlineBooking = () => {
       default:
         return false;
     }
-  }, [currentStepId, selectedServices, selectedDate, selectedTime, clientName, clientPhone]);
+  }, [currentStepId, selectedServices, selectedDate, selectedTime, clientName, clientPhone, splitMode, splitCoversAll]);
 
   /* ===== Navigation ===== */
   const handleStartChoice = (choice) => {
@@ -615,33 +786,85 @@ const OnlineBooking = () => {
 
     try {
       const slug = normStr(company_slug);
+      const clientFields = {
+        client_name: clientName.trim(),
+        client_phone: clientPhone.trim(),
+        client_comment: clientComment.trim() || null,
+      };
+      const serviceById = new Map(
+        selectedServices.map((s) => [String(s.id), s]),
+      );
+      const buildServiceItem = (s) => ({
+        service_id: s.id,
+        title: s.name || "Услуга",
+        price: toNum(s.price),
+        duration_min: parseDuration(s),
+      });
+
+      if (splitMode && assignments.length > 0) {
+        // Разделённая бронь: атомарный POST с массивом assignments
+        // (бэкенд создаёт все записи всё-или-ничего, см. barbershop-booking-frontend.md).
+        // Услуги разных мастеров идут параллельно — все стартуют в выбранное время.
+        const assignmentsPayload = assignments.map((a) => {
+          const svcObjs = a.serviceIds
+            .map((id) => serviceById.get(String(id)))
+            .filter(Boolean);
+          const duration = svcObjs.reduce(
+            (sum, s) => sum + parseDuration(s),
+            0,
+          );
+          const end = addMinutes(selectedTime, duration || 30);
+          return {
+            master_id: a.master?.id ?? null,
+            services: svcObjs.map(buildServiceItem),
+            time_start: selectedTime + ":00",
+            time_end: end + ":00",
+          };
+        });
+        await api.post(`/barbershop/public/${slug}/bookings/`, {
+          ...clientFields,
+          date: selectedDate,
+          assignments: assignmentsPayload,
+        });
+        setSuccess(true);
+        return;
+      }
+
+      // Одиночная бронь (один мастер на все услуги) — без изменений
       const master = effectiveMaster;
       const masterId = master?.id ?? master?.master_id ?? master?.user_id ?? null;
       const masterName = master?.full_name ||
         (master ? `${[master.first_name, master.last_name].filter(Boolean).join(" ")}`.trim() : null) ||
         null;
       const payload = {
-        services: selectedServices.map((s) => ({
-          service_id: s.id,
-          title: s.name || "Услуга",
-          price: toNum(s.price),
-          duration_min: parseDuration(s),
-        })),
+        services: selectedServices.map(buildServiceItem),
         master_id: masterId,
         master_name: masterName,
         date: selectedDate,
         time_start: selectedTime + ":00",
         time_end: timeEnd + ":00",
-        client_name: clientName.trim(),
-        client_phone: clientPhone.trim(),
-        client_comment: clientComment.trim() || null,
-
+        ...clientFields,
       };
 
       await api.post(`/barbershop/public/${slug}/bookings/`, payload);
       setSuccess(true);
     } catch (e) {
-      const msg = e?.response?.data?.detail || e?.response?.data?.message || "Произошла ошибка при бронировании";
+      const data = e?.response?.data;
+      // Ошибка multi-master: { assignments: [{ index, detail }] }
+      const assignmentErrors = Array.isArray(data?.assignments)
+        ? data.assignments
+            .map((a) =>
+              a?.detail
+                ? `${a.master_name || `Мастер ${(a.index ?? 0) + 1}`}: ${a.detail}`
+                : null,
+            )
+            .filter(Boolean)
+        : [];
+      const msg =
+        assignmentErrors.join("; ") ||
+        data?.detail ||
+        data?.message ||
+        "Произошла ошибка при бронировании";
       setErr(msg);
     } finally {
       setSubmitting(false);
@@ -655,6 +878,8 @@ const OnlineBooking = () => {
     setStartChoice(null);
     setSelectedServices([]);
     setSelectedMaster(null);
+    setAssignments([]);
+    setSplitMode(false);
     setSelectedTime(null);
     setClientName("");
     setClientPhone("");
@@ -697,11 +922,11 @@ const OnlineBooking = () => {
         {/* Header */}
         <header className="ob__header">
           <div className="ob__logo">
-            <FaCut />
+            <FaCalendarCheck />
           </div>
           <div className="ob__headerText">
             <h1 className="ob__title">Онлайн-запись</h1>
-            <p className="ob__subtitle">Барбершоп</p>
+            <p className="ob__subtitle">{companyName || "Барбершоп"}</p>
           </div>
         </header>
 
@@ -890,7 +1115,11 @@ const OnlineBooking = () => {
             {currentStepId === "master" && (
               <div className="ob__section">
                 <h2 className="ob__sectionTitle">Выберите мастера</h2>
-                <p className="ob__hint">Можно пропустить — мы подберём свободного мастера</p>
+                <p className="ob__hint">
+                  {splitMode
+                    ? "Назначьте мастеров на услуги — можно разделить запись между несколькими"
+                    : "Можно пропустить — мы подберём свободного мастера"}
+                </p>
 
                 {/* Search masters - всегда показываем */}
                 <div className="ob__searchWrap">
@@ -904,58 +1133,250 @@ const OnlineBooking = () => {
                   />
                 </div>
 
-                <div className="ob__mastersList">
-                  <button
-                    type="button"
-                    className={`ob__masterCard ${!selectedMaster ? "is-selected" : ""}`}
-                    onClick={() => setSelectedMaster(null)}
-                  >
-                    <div className="ob__masterAvatar">
-                      <FaUser />
-                    </div>
-                    <div className="ob__masterInfo">
-                      <span className="ob__masterName">Любой мастер</span>
-                      <span className="ob__masterDesc">Мы подберём свободного</span>
-                    </div>
-                    <span className="ob__masterCheck">
-                      {!selectedMaster && <FaCheck />}
-                    </span>
-                  </button>
-
-                  {filteredMasters.map((master) => {
-                    const mid = master.id ?? master.master_id ?? master.user_id ?? master.pk;
-                    const isSelected = selectedMaster != null && (selectedMaster.id === mid || selectedMaster.id === master.id);
-                    const name = master.full_name ||
-                      `${master.first_name || ""} ${master.last_name || ""}`.trim() || "Мастер";
-
-                    return (
+                {hasMasterLinks && selectedServices.length > 1 ? (
+                  /* ===== Несколько услуг: группировка / разделение ===== */
+                  !splitMode ? (
+                    <div className="ob__mastersList">
                       <button
-                        key={mid ?? master.id ?? master.master_id ?? master.user_id ?? master.pk}
                         type="button"
-                        className={`ob__masterCard ${isSelected ? "is-selected" : ""}`}
-                        onClick={() => setSelectedMaster({ ...master, id: mid })}
+                        className={`ob__masterCard ${!selectedMaster ? "is-selected" : ""}`}
+                        onClick={() => {
+                          setSelectedMaster(null);
+                          setAssignments([]);
+                        }}
                       >
                         <div className="ob__masterAvatar">
-                          {master.avatar ? (
-                            <img src={master.avatar} alt={name} />
-                          ) : (
-                            <FaUser />
-                          )}
+                          <FaUser />
                         </div>
                         <div className="ob__masterInfo">
-                          <span className="ob__masterName">{name}</span>
+                          <span className="ob__masterName">Любой мастер</span>
+                          <span className="ob__masterDesc">Мы подберём свободного</span>
                         </div>
                         <span className="ob__masterCheck">
-                          {isSelected && <FaCheck />}
+                          {!selectedMaster && <FaCheck />}
                         </span>
                       </button>
-                    );
-                  })}
 
-                  {filteredMasters.length === 0 && searchMasters && (
-                    <div className="ob__empty">Мастеров не найдено</div>
-                  )}
-                </div>
+                      <div className="ob__masterGroupTitle">
+                        Может выполнить все услуги
+                      </div>
+                      {(fullCoverageGroup?.masters || [])
+                        .filter(
+                          (m) =>
+                            !searchMasters.trim() ||
+                            m.name
+                              .toLowerCase()
+                              .includes(searchMasters.trim().toLowerCase()),
+                        )
+                        .map((m) => {
+                          const isSelected =
+                            selectedMaster != null &&
+                            String(selectedMaster.id) === String(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className={`ob__masterCard ${isSelected ? "is-selected" : ""}`}
+                              onClick={() => selectSingleMaster(m)}
+                            >
+                              <div className="ob__masterAvatar">
+                                {m.raw?.avatar ? (
+                                  <img src={m.raw.avatar} alt={m.name} />
+                                ) : (
+                                  <FaUser />
+                                )}
+                              </div>
+                              <div className="ob__masterInfo">
+                                <span className="ob__masterName">{m.name}</span>
+                              </div>
+                              <span className="ob__masterCheck">
+                                {isSelected && <FaCheck />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      {(!fullCoverageGroup ||
+                        fullCoverageGroup.masters.length === 0) && (
+                        <div className="ob__empty">
+                          Нет мастера, выполняющего все выбранные услуги — разделите
+                          запись между мастерами.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        className="ob__splitToggle"
+                        onClick={() => {
+                          setSplitMode(true);
+                          setSelectedMaster(null);
+                        }}
+                      >
+                        Разделить услуги между мастерами
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="ob__split">
+                      {assignments.length > 0 && (
+                        <div className="ob__assignments">
+                          {assignments.map((a, i) => (
+                            <div className="ob__assignmentRow" key={i}>
+                              <div className="ob__assignmentInfo">
+                                <span className="ob__assignmentMaster">
+                                  {a.master.name}
+                                </span>
+                                <span className="ob__assignmentServices">
+                                  {a.serviceIds
+                                    .map((id) => serviceNameById.get(String(id)))
+                                    .join(", ")}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="ob__assignmentRemove"
+                                onClick={() => removeAssignment(i)}
+                                aria-label="Убрать назначение"
+                              >
+                                <FaTimes />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {remainingToAssign.length > 0 ? (
+                        <p className="ob__hint">
+                          Осталось назначить:{" "}
+                          {remainingToAssign.map((s) => s.name).join(", ")}
+                        </p>
+                      ) : (
+                        <p className="ob__hint ob__hint--ok">
+                          <FaCheck /> Все услуги назначены
+                        </p>
+                      )}
+
+                      {groupsForDisplay.map((group) => {
+                        const unassignedIds = group.serviceIds.filter(
+                          (id) =>
+                            !assignments.some((a) =>
+                              a.serviceIds.includes(id),
+                            ),
+                        );
+                        if (unassignedIds.length === 0) return null;
+                        return (
+                          <div className="ob__masterGroup" key={group.key}>
+                            <div className="ob__masterGroupTitle">
+                              {unassignedIds
+                                .map((id) => serviceNameById.get(String(id)))
+                                .join(" + ")}
+                            </div>
+                            <div className="ob__mastersList">
+                              {group.masters.map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  className="ob__masterCard"
+                                  onClick={() =>
+                                    assignMasterToGroup(
+                                      { ...group, serviceIds: unassignedIds },
+                                      m,
+                                    )
+                                  }
+                                >
+                                  <div className="ob__masterAvatar">
+                                    {m.raw?.avatar ? (
+                                      <img src={m.raw.avatar} alt={m.name} />
+                                    ) : (
+                                      <FaUser />
+                                    )}
+                                  </div>
+                                  <div className="ob__masterInfo">
+                                    <span className="ob__masterName">{m.name}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {masterGrouping.uncoveredServices.length > 0 && (
+                        <div className="ob__uncovered">
+                          Нет доступного мастера для:{" "}
+                          {masterGrouping.uncoveredServices
+                            .map((s) => s.name)
+                            .join(", ")}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        className="ob__splitToggle"
+                        onClick={() => {
+                          setSplitMode(false);
+                          setAssignments([]);
+                        }}
+                      >
+                        Отменить разделение
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  /* ===== Одна услуга или нет связей: обычный список ===== */
+                  <div className="ob__mastersList">
+                    <button
+                      type="button"
+                      className={`ob__masterCard ${!selectedMaster ? "is-selected" : ""}`}
+                      onClick={() => setSelectedMaster(null)}
+                    >
+                      <div className="ob__masterAvatar">
+                        <FaUser />
+                      </div>
+                      <div className="ob__masterInfo">
+                        <span className="ob__masterName">Любой мастер</span>
+                        <span className="ob__masterDesc">Мы подберём свободного</span>
+                      </div>
+                      <span className="ob__masterCheck">
+                        {!selectedMaster && <FaCheck />}
+                      </span>
+                    </button>
+
+                    {singleMasterList.map((m) => {
+                      const isSelected =
+                        selectedMaster != null &&
+                        String(selectedMaster.id) === String(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className={`ob__masterCard ${isSelected ? "is-selected" : ""}`}
+                          onClick={() => selectSingleMaster(m)}
+                        >
+                          <div className="ob__masterAvatar">
+                            {m.raw?.avatar ? (
+                              <img src={m.raw.avatar} alt={m.name} />
+                            ) : (
+                              <FaUser />
+                            )}
+                          </div>
+                          <div className="ob__masterInfo">
+                            <span className="ob__masterName">{m.name}</span>
+                          </div>
+                          <span className="ob__masterCheck">
+                            {isSelected && <FaCheck />}
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                    {singleMasterList.length === 0 && (
+                      <div className="ob__empty">
+                        {searchMasters
+                          ? "Мастеров не найдено"
+                          : "Нет доступных мастеров для выбранной услуги"}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1142,14 +1563,30 @@ const OnlineBooking = () => {
                     </span>
                   </div>
 
-                  <div className="ob__confirmRow">
-                    <span className="ob__confirmLabel">Мастер</span>
-                    <span className="ob__confirmValue">
-                      {effectiveMaster
-                        ? (effectiveMaster.full_name || `${[effectiveMaster.first_name, effectiveMaster.last_name].filter(Boolean).join(" ")}`.trim() || "Мастер")
-                        : "—"}
-                    </span>
-                  </div>
+                  {splitMode && assignments.length > 0 ? (
+                    <div className="ob__confirmRow ob__confirmRow--split">
+                      <span className="ob__confirmLabel">Мастера</span>
+                      <span className="ob__confirmValue">
+                        {assignments.map((a, i) => (
+                          <span className="ob__confirmSplitLine" key={i}>
+                            <strong>{a.master.name}</strong>:{" "}
+                            {a.serviceIds
+                              .map((id) => serviceNameById.get(String(id)))
+                              .join(", ")}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="ob__confirmRow">
+                      <span className="ob__confirmLabel">Мастер</span>
+                      <span className="ob__confirmValue">
+                        {effectiveMaster
+                          ? (effectiveMaster.full_name || `${[effectiveMaster.first_name, effectiveMaster.last_name].filter(Boolean).join(" ")}`.trim() || "Мастер")
+                          : "—"}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="ob__confirmRow">
                     <span className="ob__confirmLabel">Дата</span>

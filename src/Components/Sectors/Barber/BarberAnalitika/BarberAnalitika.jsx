@@ -8,7 +8,7 @@ import {
   FiPackage,
   FiBox,
   FiCalendar,
-  FiScissors,
+  FiTag,
   FiShoppingCart,
   FiDollarSign,
   FiTrendingUp,
@@ -262,7 +262,7 @@ const BarberAnalitika = () => {
       key: "services",
       title: "Услуг (всего)",
       value: fmtInt(totalServices),
-      icon: <FiScissors size={20} />,
+      icon: <FiTag size={20} />,
       iconMod: "purple",
     },
     {
@@ -707,7 +707,7 @@ const BarberAnalitika = () => {
                   <li key={r.id} className="barber-analitika__top-item">
                     <div className="barber-analitika__top-item-left">
                       <div className="barber-analitika__top-icon barber-analitika__top-icon--barber">
-                        <FiScissors size={18} />
+                        <FiTag size={18} />
                       </div>
                       <div className="barber-analitika__top-item-text">
                         <div className="barber-analitika__top-item-name">
@@ -736,7 +736,7 @@ const BarberAnalitika = () => {
                   <li key={r.id} className="barber-analitika__top-item">
                     <div className="barber-analitika__top-item-left">
                       <div className="barber-analitika__top-icon barber-analitika__top-icon--service">
-                        <FiScissors size={18} />
+                        <FiTag size={18} />
                       </div>
                       <div className="barber-analitika__top-item-text">
                         <div className="barber-analitika__top-item-name">

@@ -50,6 +50,7 @@ import Ko1PreviewModal from "./components/Ko1PreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import CommercialOfferPdfDocument from "./components/CommercialOfferPdfDocument";
 import Ko1PdfDocument from "./components/Ko1PdfDocument";
+import SummarySection from "./components/Summary/SummarySection";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
@@ -1381,7 +1382,18 @@ const Documents = () => {
           >
             ПКО (КО-1)
           </button>
+          {docType === "SALE" && (
+            <button
+              className={`documents__tab ${
+                activeTab === "summary" ? "documents__tab--active" : ""
+              }`}
+              onClick={() => setActiveTab("summary")}
+            >
+              Сводка
+            </button>
+          )}
         </div>
+        {activeTab !== "summary" && (
         <div className="documents__view-toggle">
           <button
             type="button"
@@ -1404,10 +1416,15 @@ const Documents = () => {
             <LayoutGrid size={18} />
           </button>
         </div>
+        )}
       </div>
       <DataContainer>
+        {/* Сводка */}
+        {activeTab === "summary" && <SummarySection />}
         {/* Table */}
-        {viewMode === "table" && activeTab !== "agent_sales" && (
+        {viewMode === "table" &&
+          activeTab !== "agent_sales" &&
+          activeTab !== "summary" && (
           <div className="documents__table-wrapper">
             <table className="documents__table">
               <thead>
@@ -1875,7 +1892,9 @@ const Documents = () => {
         )}
 
         {/* Карточки */}
-        {viewMode === "cards" && activeTab !== "agent_sales" && (
+        {viewMode === "cards" &&
+          activeTab !== "agent_sales" &&
+          activeTab !== "summary" && (
           <div className="documents__cards">
             {documentsLoading ? (
               <div className="documents__cards-empty">Загрузка...</div>
@@ -2194,7 +2213,9 @@ const Documents = () => {
       </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
-      {totalPages > 1 && activeTab !== "agent_sales" && (
+      {totalPages > 1 &&
+        activeTab !== "agent_sales" &&
+        activeTab !== "summary" && (
         <div className="documents__pagination">
           <button
             type="button"

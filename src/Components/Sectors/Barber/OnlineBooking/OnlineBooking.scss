@@ -690,6 +690,134 @@
     flex-shrink: 0;
   }
 
+  /* ===== Master groups / split booking ===== */
+  &__masterGroup {
+    margin-bottom: 6px;
+  }
+
+  &__masterGroupTitle {
+    margin: 14px 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &::before {
+      content: "";
+      width: 4px;
+      height: 16px;
+      border-radius: 2px;
+      background: var(--primary);
+    }
+  }
+
+  &__splitToggle {
+    margin-top: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px dashed rgba(0, 0, 0, 0.18);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: var(--primary);
+      background: rgba(247, 215, 79, 0.08);
+    }
+  }
+
+  &__split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__assignments {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  &__assignmentRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #fffef5 0%, #fefcf0 100%);
+  }
+
+  &__assignmentInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__assignmentMaster {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  &__assignmentServices {
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  &__assignmentRemove {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(0, 0, 0, 0.05);
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+  }
+
+  &__uncovered {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  &__hint--ok {
+    color: #16a34a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__confirmRow--split {
+    align-items: flex-start;
+  }
+
+  &__confirmSplitLine {
+    display: block;
+  }
+
   /* ===== Field Label ===== */
   &__fieldLabel {
     display: flex;

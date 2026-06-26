@@ -13,7 +13,7 @@
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 
   @media (max-width: 480px) {
     width: 90%;
@@ -74,9 +74,45 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 
   @media (max-height: 500px) {
     gap: 8px;
+  }
+}
+
+.footer {
+  flex-shrink: 0;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.markAllBtn {
+  width: 100%;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 10px;
+  background-color: #f7d74f;
+  color: #1a1505;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.18s ease, opacity 0.18s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 

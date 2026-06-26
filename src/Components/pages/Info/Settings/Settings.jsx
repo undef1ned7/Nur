@@ -1216,7 +1216,14 @@ import {
   updateUserCompanyName,
   updateUserData,
   getScalesToken,
+  getCompany,
 } from "../../../../store/creators/userCreators";
+import { checkSlug } from "../../../../api/auth";
+import {
+  normalizeSlug,
+  finalizeSlug,
+  validateSlug,
+} from "../../../../utils/slug";
 import { useNavigate } from "react-router-dom";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
@@ -1646,8 +1653,100 @@ const Settings = () => {
 
   const onlineBookingUrl = useMemo(() => {
     if (!company?.slug || !isBarberSector) return "";
-    return `${safeOrigin()}/barber/${company.slug}/booking`;
+    return `${safeOrigin()}/service/${company.slug}/booking`;
   }, [company?.slug, isBarberSector]);
+
+  /* ===== Редактирование slug компании (вкладка «Онлайн») ===== */
+  const canEditSlug = isOwner || profile?.role === "admin";
+  const [slugInput, setSlugInput] = useState(company?.slug || "");
+  const [slugError, setSlugError] = useState("");
+  const [slugChecking, setSlugChecking] = useState(false);
+  // null = не проверяли, true/false = результат проверки уникальности
+  const [slugAvailable, setSlugAvailable] = useState(null);
+  const [slugSaving, setSlugSaving] = useState(false);
+
+  // Синхронизируем поле с компанией при её загрузке/смене
+  useEffect(() => {
+    setSlugInput(company?.slug || "");
+    setSlugError("");
+    setSlugAvailable(null);
+  }, [company?.slug]);
+
+  const slugChanged = finalizeSlug(slugInput) !== (company?.slug || "");
+
+  const handleSlugChange = (e) => {
+    const next = normalizeSlug(e.target.value);
+    setSlugInput(next);
+    setSlugAvailable(null);
+    const { valid, error } = validateSlug(finalizeSlug(next));
+    setSlugError(next && !valid ? error : "");
+  };
+
+  // Дебаунс async-проверки уникальности slug
+  useEffect(() => {
+    if (!canEditSlug) return undefined;
+    const candidate = finalizeSlug(slugInput);
+    if (!slugChanged) {
+      setSlugAvailable(null);
+      return undefined;
+    }
+    const { valid } = validateSlug(candidate);
+    if (!valid) {
+      setSlugAvailable(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setSlugChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkSlug(candidate);
+        if (cancelled) return;
+        const available = Boolean(res?.available);
+        setSlugAvailable(available);
+        if (!available) setSlugError(res?.message || "Slug уже существует");
+        else setSlugError("");
+      } catch (_e) {
+        if (!cancelled) setSlugAvailable(null); // сеть/нет эндпоинта — не блокируем жёстко
+      } finally {
+        if (!cancelled) setSlugChecking(false);
+      }
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slugInput, slugChanged, canEditSlug]);
+
+  const canSaveSlug =
+    canEditSlug &&
+    slugChanged &&
+    !slugSaving &&
+    !slugChecking &&
+    validateSlug(finalizeSlug(slugInput)).valid &&
+    slugAvailable !== false;
+
+  const handleSaveSlug = async () => {
+    const candidate = finalizeSlug(slugInput);
+    const { valid, error } = validateSlug(candidate);
+    if (!valid) {
+      setSlugError(error);
+      return;
+    }
+    setSlugSaving(true);
+    try {
+      await dispatch(updateUserCompanyName({ slug: candidate })).unwrap();
+      await dispatch(getCompany());
+      setSlugAvailable(null);
+      showAlert("success", "Slug компании обновлён");
+    } catch (e) {
+      const msg = validateResErrors(e, "Не удалось сохранить slug");
+      setSlugError(typeof msg === "string" ? msg : "Slug уже существует");
+      showAlert("error", typeof msg === "string" ? msg : "Не удалось сохранить slug");
+    } finally {
+      setSlugSaving(false);
+    }
+  };
 
   const copyText = useCallback(
     async (text) => {
@@ -2167,9 +2266,47 @@ const Settings = () => {
 
                     <div className="settings__onlineRow">
                       <div className="settings__onlineLabel">Slug</div>
-                      <div className="settings__onlineValue">
-                        {company?.slug || "—"}
-                      </div>
+                      {canEditSlug ? (
+                        <div className="settings__onlineValue">
+                          <div className="settings__onlineLinkBox">
+                            <input
+                              className="settings__onlineInput"
+                              value={slugInput}
+                              onChange={handleSlugChange}
+                              placeholder="my-company"
+                              maxLength={50}
+                              spellCheck={false}
+                              autoCapitalize="none"
+                              autoCorrect="off"
+                            />
+                            <div className="settings__onlineBtns">
+                              <button
+                                type="button"
+                                className="settings__btnSmall settings__btnSmall--primary"
+                                onClick={handleSaveSlug}
+                                disabled={!canSaveSlug}
+                              >
+                                {slugSaving ? "Сохранение…" : "Сохранить"}
+                              </button>
+                            </div>
+                          </div>
+                          {slugError ? (
+                            <div className="settings__fieldError">{slugError}</div>
+                          ) : slugChecking ? (
+                            <div className="settings__fieldHint">Проверяем доступность…</div>
+                          ) : slugChanged && slugAvailable === true ? (
+                            <div className="settings__fieldOk">Slug доступен</div>
+                          ) : (
+                            <div className="settings__fieldHint">
+                              Латинские буквы, цифры и дефис. Напр.: my-company
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="settings__onlineValue">
+                          {company?.slug || "—"}
+                        </div>
+                      )}
                     </div>
 
                     <div className="settings__onlineRow">

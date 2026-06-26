@@ -9,6 +9,8 @@ import {
   useBuildingProjects,
 } from "../../store/slices/building/projectsSlice";
 import NotificationModal from "../NotificationModal/NotificationModal";
+import { fetchNotificationsAsync } from "../../store/creators/notificationCreators";
+import { useNotificationsSocket } from "../../hooks/useNotificationsSocket";
 import "./Header.scss";
 
 const pageTitles = {
@@ -225,9 +227,25 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const title = resolvePageTitle(location.pathname);
   const dispatch = useDispatch();
 
-  const { list: notifications } = useSelector((state) => state.notification);
-  const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
+  const { list: notifications, unreadCount: unreadCountState } = useSelector(
+    (state) => state.notification,
+  );
+  // Счётчик непрочитанных: real-time из слайса (WS), с фолбэком на фильтр списка.
+  const unreadCount =
+    typeof unreadCountState === "number"
+      ? unreadCountState
+      : notifications?.filter((n) => !n.is_read).length || 0;
   const { company, profile: userProfile } = useUser();
+
+  // Real-time уведомления через WebSocket (интеграция с колокольчиком).
+  useNotificationsSocket({ enabled: !!userProfile });
+
+  // Первичная загрузка списка/счётчика (один раз при появлении пользователя).
+  useEffect(() => {
+    if (userProfile) {
+      dispatch(fetchNotificationsAsync({ limit: 20, offset: 0 }));
+    }
+  }, [userProfile, dispatch]);
   const {
     items: buildingProjects,
     selectedProjectId,

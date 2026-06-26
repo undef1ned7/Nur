@@ -72,6 +72,28 @@ const DEFECTIVE_DETAIL_COLUMNS = [
   "returns_count",
 ];
 
+// Раздельный учёт возвратов и брака (Задача №1). Одинаковая форма строки.
+const RETURN_DEFECT_DETAIL_COLUMNS = [
+  "product_id",
+  "product_name",
+  "agent_name",
+  "client_name",
+  "qty",
+  "amount",
+  "returned_at",
+];
+
+// Инвентаризация — излишки/недостачи (Задача №5).
+const INVENTORY_DETAIL_COLUMNS = [
+  "product_name",
+  "qty_system",
+  "qty_fact",
+  "diff",
+  "user_name",
+  "created_at",
+  "comment",
+];
+
 const TRANSFERS_DETAIL_COLUMNS = [
   "id",
   "created_at",
@@ -166,6 +188,10 @@ const CARD_DETAIL_COLUMN_ORDER = {
   stock_retail_value: STOCK_DETAIL_COLUMNS,
   raw_material_value: RAW_MATERIAL_DETAIL_COLUMNS,
   defective_items: DEFECTIVE_DETAIL_COLUMNS,
+  returns: RETURN_DEFECT_DETAIL_COLUMNS,
+  defects: RETURN_DEFECT_DETAIL_COLUMNS,
+  inventory_surplus: INVENTORY_DETAIL_COLUMNS,
+  inventory_shortage: INVENTORY_DETAIL_COLUMNS,
   transfers_count: TRANSFERS_DETAIL_COLUMNS,
   items_transferred: TRANSFERS_DETAIL_COLUMNS,
   acceptances_count: ACCEPTANCES_DETAIL_COLUMNS,
@@ -211,6 +237,27 @@ const DEFECTIVE_COLUMN_LABELS = {
   product_name: "Товар",
   qty: "Количество",
   returns_count: "Возвратов",
+};
+
+// Раздельный учёт возвратов и брака (Задача №1).
+const RETURN_DEFECT_COLUMN_LABELS = {
+  product_id: "ID товара",
+  product_name: "Товар",
+  agent_name: "Агент",
+  client_name: "Клиент",
+  qty: "Количество",
+  amount: "Сумма (сом)",
+  returned_at: "Дата",
+};
+
+const INVENTORY_COLUMN_LABELS = {
+  product_name: "Товар",
+  qty_system: "Учётный остаток",
+  qty_fact: "Фактически",
+  diff: "Расхождение",
+  user_name: "Ответственный",
+  created_at: "Дата",
+  comment: "Комментарий",
 };
 
 const TRANSFERS_COLUMN_LABELS = {
@@ -312,6 +359,10 @@ export const CARD_DETAILS_COLUMN_LABELS = {
   stock_retail_value: STOCK_COLUMN_LABELS,
   raw_material_value: RAW_MATERIAL_COLUMN_LABELS,
   defective_items: DEFECTIVE_COLUMN_LABELS,
+  returns: RETURN_DEFECT_COLUMN_LABELS,
+  defects: RETURN_DEFECT_COLUMN_LABELS,
+  inventory_surplus: INVENTORY_COLUMN_LABELS,
+  inventory_shortage: INVENTORY_COLUMN_LABELS,
   transfers_count: TRANSFERS_COLUMN_LABELS,
   items_transferred: TRANSFERS_COLUMN_LABELS,
   acceptances_count: ACCEPTANCES_COLUMN_LABELS,
