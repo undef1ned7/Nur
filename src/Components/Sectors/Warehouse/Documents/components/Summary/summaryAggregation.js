@@ -112,7 +112,34 @@ export const aggregateProducts = (documents = []) => {
   return rows;
 };
 
-/** Приводит накладные к строкам таблицы №2. */
+/**
+ * Нормализует позиции (товары) одной накладной к единому виду для PDF/просмотра.
+ * Принимает как «сырые» items накладной, так и уже готовые позиции из снапшота бэкенда.
+ * Идемпотентна: повторный прогон не меняет результат.
+ */
+export const mapDocumentItems = (items = []) =>
+  (Array.isArray(items) ? items : []).map((it) => {
+    const quantity = pickQty(it);
+    const price = pickPrice(it);
+    const amount =
+      toNum(it?.amount ?? it?.total ?? it?.line_total) || quantity * price;
+    const discountPercent = toNum(
+      it?.discount_percent ?? it?.effective_discount_percent ?? it?.discount,
+    );
+    const discountAmount = toNum(it?.discount_amount);
+    return {
+      name: pickName(it),
+      unit: pickUnit(it),
+      quantity,
+      price,
+      discount_percent: discountPercent,
+      discount_amount: discountAmount,
+      amount,
+      weight: pickWeight(it),
+    };
+  });
+
+/** Приводит накладные к строкам таблицы №2 (с детализацией позиций в `items`). */
 export const mapDocuments = (documents = []) =>
   documents.map((doc) => ({
     id: doc.id,
@@ -124,6 +151,7 @@ export const mapDocuments = (documents = []) =>
     quantity: docQuantity(doc),
     weight: docWeight(doc),
     amount: docAmount(doc),
+    items: mapDocumentItems(doc.items),
   }));
 
 /** Считает итоги из products и documents. */
@@ -154,7 +182,12 @@ export const normalizeSummary = (summary = {}, rawDocuments = null) => {
     if (!products) products = aggregateProducts(rawDocuments);
   }
 
-  documents = documents || [];
+  // Детализация позиций по каждой накладной (documents[].items): бэкенд может
+  // прислать их в снапшоте — нормализуем к единому виду; при их отсутствии получится [].
+  documents = (documents || []).map((d) => ({
+    ...d,
+    items: mapDocumentItems(d?.items),
+  }));
   products = products || [];
 
   const totals =

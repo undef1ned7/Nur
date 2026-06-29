@@ -38,8 +38,35 @@ Web и Mobile.
 ### document (накладная в сводке)
 ```jsonc
 { "id", "number", "date", "agent", "client", "address",
-  "quantity", "weight", "amount" }
+  "quantity", "weight", "amount",
+  "items": [ /* позиции этой накладной, см. document item */ ] }
 ```
+
+### document item (позиция внутри накладной) — **NEW**
+Детализация по каждой накладной: какие товары и в каком количестве в неё вошли.
+Используется фронтом для секции **«Таблица №3. Детализация по накладным»** в PDF.
+```jsonc
+{ "name", "unit", "quantity", "price",
+  "discount_percent", "discount_amount", "amount", "weight" }
+```
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `name` | string | Наименование товара |
+| `unit` | string | Единица измерения (`шт`, `кг`, …) |
+| `quantity` | number | Количество в этой накладной |
+| `price` | number | Цена за единицу (до скидки) |
+| `discount_percent` | number | Скидка по позиции в процентах (0 если нет) |
+| `discount_amount` | number | Скидка по позиции в деньгах (0 если нет) |
+| `amount` | number | Сумма строки **с учётом скидки** (`quantity × price − скидка`) |
+| `weight` | number | Вес строки (кол-во × вес единицы; 0 если неизвестен) |
+
+> Скидки отдаём по каждой позиции (`discount_percent` и/или `discount_amount`), чтобы фронт
+> показал их отдельной колонкой «Скидка». Если скидки нет — оба поля `0`. `amount` уже
+> посчитан после скидки.
+
+> **Важно:** `items` — это позиции **конкретной** накладной (НЕ агрегированные).
+> Агрегированная по всем накладным таблица товаров остаётся в `products` (без изменений).
+> Снапшот `items` фиксируется при создании сводки вместе с остальными данными.
 
 ### product (строка агрегированной товарной таблицы — уже готова для PDF)
 ```jsonc
@@ -78,7 +105,13 @@ Web и Mobile.
   "documents": [
     { "id": "…", "number": "НАКЛ-001", "date": "2026-06-26",
       "agent": "Петров П.", "client": "ООО Ромашка",
-      "address": "ул. Ленина 1", "quantity": 120, "weight": 240.5, "amount": 35000 }
+      "address": "ул. Ленина 1", "quantity": 120, "weight": 240.5, "amount": 35000,
+      "items": [
+        { "name": "Мука в/с", "unit": "кг", "quantity": 100, "price": 60,
+          "discount_percent": 0, "discount_amount": 0, "amount": 6000, "weight": 100 },
+        { "name": "Сахар", "unit": "кг", "quantity": 20, "price": 90,
+          "discount_percent": 10, "discount_amount": 180, "amount": 1620, "weight": 20 }
+      ] }
   ],
   "products": [
     { "name": "Мука в/с", "unit": "кг", "packages": 10, "per_package": 50,
@@ -139,8 +172,10 @@ Web и Mobile.
 ```
 - `type=general` → в снапшот попадают **все** накладные продаж за `date`.
 - `type=by_agents` → только накладные выбранных агентов за `date`.
-- Бэкенд формирует снапшот (`documents`, `products`, `totals`), присваивает `number`, `created_by`.
-- **Response:** `201` + полный объект Summary (как в GET by id).
+- Бэкенд формирует снапшот (`documents` c вложенными `items`, `products`, `totals`),
+  присваивает `number`, `created_by`.
+- **Response:** `201` + полный объект Summary (как в GET by id) — **уже с `documents[].items`**,
+  чтобы фронт сразу построил детализацию в PDF без дополнительного запроса.
 
 ### 4. Одна сводка — `GET /warehouse/summaries/{id}/`
 Полный объект (структура выше).
@@ -172,9 +207,13 @@ Web и Mobile.
   - `summary(company, type)`, `summary(company, created_by)` — фильтры,
   - `summary(company, name)` (или trigram) — поиск,
   - M2M `summary_agents(summary_id, agent_id)`,
-  - снапшот-таблицы `summary_document(summary_id)`, `summary_product(summary_id)`.
+  - снапшот-таблицы `summary_document(summary_id)`, `summary_product(summary_id)`,
+    `summary_document_item(summary_document_id)` — позиции накладных.
+- Снапшот `documents[].items` фиксируется при создании/`regenerate` (как и `products`),
+  отдаётся через `prefetch_related` без N+1.
 - Календарь — единый агрегирующий запрос `GROUP BY date` за месяц.
-- Пагинация обязательна (`page_size` ≤ 100). Тяжёлые `documents`/`products` отдаются только в `GET by id`.
+- Пагинация обязательна (`page_size` ≤ 100). Тяжёлые `documents` (с `items`)/`products`
+  отдаются только в `GET by id` и в ответе на создание — **в списке их по-прежнему нет**.
 
 ---
 

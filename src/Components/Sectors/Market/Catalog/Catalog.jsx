@@ -61,10 +61,51 @@ const getQuery = (search) => {
     q: sp.get("q") || "",
     category: sp.get("category") || "",
     page: sp.get("page") || "1",
+    sort: sp.get("sort") || "",
   };
 };
 
 const PAGE_SIZE = 100;
+
+/* =======================
+   Сортировка витрины
+======================= */
+const SORT_OPTIONS = [
+  { value: "", label: "По умолчанию" },
+  { value: "name_asc", label: "Название: А–Я" },
+  { value: "name_desc", label: "Название: Я–А" },
+  { value: "price_asc", label: "Цена: дешевле сначала" },
+  { value: "price_desc", label: "Цена: дороже сначала" },
+  { value: "discount_desc", label: "Скидка: больше сначала" },
+  { value: "discount_asc", label: "Скидка: меньше сначала" },
+];
+
+// Значения для бэкенда (?ordering=...). Фронт также сортирует локально как fallback.
+const SORT_TO_ORDERING = {
+  name_asc: "name",
+  name_desc: "-name",
+  price_asc: "final_price",
+  price_desc: "-final_price",
+  discount_asc: "discount_percent",
+  discount_desc: "-discount_percent",
+};
+
+const sortShowcaseItems = (arr, sort) => {
+  if (!sort || !Array.isArray(arr)) return arr;
+  const name = (x) => String(x?.name || x?.title || "");
+  const price = (x) => toNum(x?.final_price ?? x?.price);
+  const disc = (x) => toNum(x?.discount_percent);
+  const comparators = {
+    name_asc: (a, b) => name(a).localeCompare(name(b), "ru"),
+    name_desc: (a, b) => name(b).localeCompare(name(a), "ru"),
+    price_asc: (a, b) => price(a) - price(b),
+    price_desc: (a, b) => price(b) - price(a),
+    discount_asc: (a, b) => disc(a) - disc(b),
+    discount_desc: (a, b) => disc(b) - disc(a),
+  };
+  const cmp = comparators[sort];
+  return cmp ? [...arr].sort(cmp) : arr;
+};
 
 const setQuery = (locationSearch, patch) => {
   const sp = new URLSearchParams(locationSearch);
@@ -628,6 +669,9 @@ const Catalog = () => {
     paramsQ.page = pageNum;
     if (qState.category) paramsQ.category = qState.category;
     if (qState.q) paramsQ.search = qState.q;
+    if (qState.sort && SORT_TO_ORDERING[qState.sort]) {
+      paramsQ.ordering = SORT_TO_ORDERING[qState.sort];
+    }
 
     api
       .get(`/main/public/companies/${encodeURIComponent(slug)}/showcase/`, {
@@ -664,7 +708,7 @@ const Catalog = () => {
     return () => {
       alive = false;
     };
-  }, [slug, qState.category, qState.q, qState.page]);
+  }, [slug, qState.category, qState.q, qState.page, qState.sort]);
 
   /* categories: из текущих items (для пустого фильтра — полный список) */
   const categoriesFromItems = useMemo(() => {
@@ -691,6 +735,12 @@ const Catalog = () => {
 
   const categories =
     allCategories.length > 0 ? allCategories : categoriesFromItems;
+
+  // Локальная сортировка как fallback (если бэкенд ещё не учитывает ?ordering)
+  const visibleItems = useMemo(
+    () => sortShowcaseItems(items, qState.sort),
+    [items, qState.sort],
+  );
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const currentPage = Math.max(
@@ -972,14 +1022,33 @@ const Catalog = () => {
               </div>
             )}
           </div>
-          <div className="sfhead__count">
-            {companyErr ? (
-              <span className="sfhead__err">{companyErr}</span>
-            ) : loading ? (
-              "Загрузка..."
-            ) : (
-              `${count} ${count === 1 ? "товар" : count < 5 ? "товара" : "товаров"}`
-            )}
+          <div className="sfhead__right">
+            <div className="sfsort">
+              <label className="sfsort__label" htmlFor="sf-sort">
+                Сортировка
+              </label>
+              <select
+                id="sf-sort"
+                className="sfsort__select"
+                value={qState.sort}
+                onChange={(e) => setQS({ sort: e.target.value, page: "" })}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value || "default"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sfhead__count">
+              {companyErr ? (
+                <span className="sfhead__err">{companyErr}</span>
+              ) : loading ? (
+                "Загрузка..."
+              ) : (
+                `${count} ${count === 1 ? "товар" : count < 5 ? "товара" : "товаров"}`
+              )}
+            </div>
           </div>
         </div>
 
@@ -1014,7 +1083,7 @@ const Catalog = () => {
           ) : null}
 
           {!loading &&
-            items.map((p) => (
+            visibleItems.map((p) => (
               <ShowcaseCard
                 key={p.id}
                 item={p}

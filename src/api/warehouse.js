@@ -2901,6 +2901,20 @@ export const unpostMoneyDocument = async (id) => {
   }
 };
 
+/** Отказать денежный документ (POSTED → REJECTED, откат кассы). См. docs/warehouse-money-documents-actions-backend.md */
+export const rejectMoneyDocument = async (id) => {
+  try {
+    const response = await api.post(`warehouse/money/documents/${id}/reject/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 /**
  * 5.3 Денежные операции по контрагенту
  * GET /api/warehouse/money/counterparties/{counterparty_id}/operations/
@@ -2923,6 +2937,33 @@ export const getCounterpartyMoneyOperations = async (
     if (error.response) {
       console.error(
         "Get Counterparty Money Operations Error:",
+        error.response.data
+      );
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Сводные показатели по контрагентам за период (Сальдо/Оборот) для вкладки Клиент/Поставщик.
+ * GET /api/warehouse/counterparties/balance-summary/
+ * Params: type ("client" | "supplier"), date_from (YYYY-MM-DD), date_to (YYYY-MM-DD)
+ * См. docs/warehouse-counterparties-balance-summary-backend.md
+ */
+export const getCounterpartiesBalanceSummary = async (params = {}) => {
+  try {
+    const response = await api.get(
+      "warehouse/counterparties/balance-summary/",
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    // Бэкенд может быть ещё не готов — отдаём null, фронт покажет нули
+    if (error.response?.status === 404) return null;
+    if (error.response) {
+      console.error(
+        "Get Counterparties Balance Summary Error:",
         error.response.data
       );
       return Promise.reject(error.response.data);
@@ -3224,7 +3265,9 @@ export default {
   deleteMoneyDocument,
   postMoneyDocument,
   unpostMoneyDocument,
+  rejectMoneyDocument,
   getCounterpartyMoneyOperations,
+  getCounterpartiesBalanceSummary,
   getReconciliationJson,
   getReconciliationPdf,
   // Касса (5.0)

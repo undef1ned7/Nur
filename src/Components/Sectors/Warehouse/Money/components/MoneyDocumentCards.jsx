@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Check, X, Printer } from "lucide-react";
+import { Check, X, Printer, Pencil, Trash2, Ban } from "lucide-react";
 import "./MoneyDocumentCards.scss";
 
 const fmtMoney = (v) =>
@@ -16,11 +16,30 @@ const fmtDate = (v) => {
 };
 
 const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
+  s === "POSTED"
+    ? "Проведён"
+    : s === "DRAFT"
+      ? "Черновик"
+      : s === "REJECTED"
+        ? "Отказан"
+        : (s ?? "—");
 
 const MoneyDocumentCard = React.memo(
-  ({ doc, rowNumber, onPost, onUnpost, onPrintKo1, postingId, printingId }) => {
+  ({
+    doc,
+    rowNumber,
+    onPost,
+    onUnpost,
+    onReject,
+    onEdit,
+    onDelete,
+    onPrintKo1,
+    postingId,
+    printingId,
+  }) => {
     const isDraft = doc.status === "DRAFT";
+    const isRejected = doc.status === "REJECTED";
+    const canEditDelete = isDraft || isRejected;
     const isBusy = postingId === doc.id;
     const isPrinting = printingId === doc.id;
 
@@ -61,31 +80,68 @@ const MoneyDocumentCard = React.memo(
               onClick={() => onPrintKo1(doc)}
               disabled={isPrinting}
               title="Печать КО-1"
+              aria-label="Печать КО-1"
             >
               <Printer size={16} />
-              {isPrinting ? "Печатается…" : "Печать"}
             </button>
-            {isDraft ? (
+            {isDraft && (
               <button
                 type="button"
                 className="money-document-card__btn money-document-card__btn--post"
                 onClick={() => onPost(doc)}
                 disabled={isBusy}
                 title="Провести документ"
+                aria-label="Провести документ"
               >
                 <Check size={16} />
-                {isBusy ? "…" : "Провести"}
               </button>
-            ) : (
+            )}
+            {!isDraft && !isRejected && (
               <button
                 type="button"
                 className="money-document-card__btn money-document-card__btn--unpost"
                 onClick={() => onUnpost(doc)}
                 disabled={isBusy}
                 title="Отменить проведение"
+                aria-label="Отменить проведение"
               >
                 <X size={16} />
-                {isBusy ? "…" : "Отменить"}
+              </button>
+            )}
+            {!isDraft && !isRejected && onReject && (
+              <button
+                type="button"
+                className="money-document-card__btn money-document-card__btn--reject"
+                onClick={() => onReject(doc)}
+                disabled={isBusy}
+                title="Отказать"
+                aria-label="Отказать"
+              >
+                <Ban size={16} />
+              </button>
+            )}
+            {canEditDelete && onEdit && (
+              <button
+                type="button"
+                className="money-document-card__btn money-document-card__btn--edit"
+                onClick={() => onEdit(doc)}
+                disabled={isBusy}
+                title="Редактировать"
+                aria-label="Редактировать"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+            {canEditDelete && onDelete && (
+              <button
+                type="button"
+                className="money-document-card__btn money-document-card__btn--delete"
+                onClick={() => onDelete(doc)}
+                disabled={isBusy}
+                title="Удалить"
+                aria-label="Удалить"
+              >
+                <Trash2 size={16} />
               </button>
             )}
           </div>
@@ -106,6 +162,9 @@ const MoneyDocumentCards = ({
   getRowNumber,
   onPost,
   onUnpost,
+  onReject,
+  onEdit,
+  onDelete,
   onPrintKo1,
   postingId,
   printingId,
@@ -142,6 +201,9 @@ const MoneyDocumentCards = ({
             rowNumber={rowNumber}
             onPost={onPost}
             onUnpost={onUnpost}
+            onReject={onReject}
+            onEdit={onEdit}
+            onDelete={onDelete}
             onPrintKo1={onPrintKo1}
             postingId={postingId}
             printingId={printingId}

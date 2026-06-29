@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Tags, Check, X, Save, Printer } from "lucide-react";
+import { Plus, Tags, Check, X, Save, Printer, Pencil, Trash2, Ban } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useConfirm } from "../../../../hooks/useDialog";
@@ -57,7 +57,15 @@ const fmtDate = (v) => {
 };
 
 const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
+  s === "POSTED"
+    ? "Проведён"
+    : s === "DRAFT"
+      ? "Черновик"
+      : s === "REJECTED"
+        ? "Отказан"
+        : (s ?? "—");
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const initialForm = {
   cash_register: "",
@@ -65,6 +73,7 @@ const initialForm = {
   payment_category: "",
   amount: "",
   comment: "",
+  date: "",
 };
 
 const MoneyDocumentsPage = () => {
@@ -82,6 +91,7 @@ const MoneyDocumentsPage = () => {
   const [categories, setCategories] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState(initialForm);
+  const [editingId, setEditingId] = useState(null); // id редактируемого документа (null = создание)
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
@@ -262,17 +272,43 @@ const MoneyDocumentsPage = () => {
   };
 
   const openCreateModal = () => {
-    setForm(initialForm);
+    setForm({ ...initialForm, date: todayStr() });
     setCreateError("");
     setCreateAsPosted(true);
+    setEditingId(null);
     setShowCreateModal(true);
   };
 
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setForm(initialForm);
+    setEditingId(null);
     setCreateError("");
   };
+
+  // Редактирование доступно только для черновика или отказанного документа
+  const handleEdit = useCallback(async (row) => {
+    if (!row?.id) return;
+    try {
+      const doc = (await warehouseAPI.getMoneyDocumentById(row.id)) || row;
+      setForm({
+        cash_register: String(doc.cash_register?.id ?? doc.cash_register ?? ""),
+        counterparty: String(doc.counterparty?.id ?? doc.counterparty ?? ""),
+        payment_category: String(
+          doc.payment_category?.id ?? doc.payment_category ?? "",
+        ),
+        amount: String(doc.amount ?? ""),
+        comment: doc.comment ?? "",
+        date: formatKo1Date(doc.date ?? doc.created_at),
+      });
+      setEditingId(doc.id);
+      setCreateAsPosted((doc.status ?? "DRAFT") === "POSTED");
+      setCreateError("");
+      setShowCreateModal(true);
+    } catch {
+      window.alert("Не удалось загрузить документ для редактирования");
+    }
+  }, []);
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -296,16 +332,23 @@ const MoneyDocumentsPage = () => {
     }
     setCreating(true);
     try {
-      const created = await warehouseAPI.createMoneyDocument({
+      const payload = {
         doc_type: apiDocType,
         cash_register,
         counterparty: counterparty || null,
         payment_category,
         amount: amountNum,
         comment: form.comment?.trim() || "",
-      });
-      if (createAsPosted && created?.id) {
-        await warehouseAPI.postMoneyDocument(created.id);
+        // Дата операции (редактируемая). Бэкенд должен принимать `date`; см. доку.
+        ...(form.date && { date: form.date }),
+      };
+      if (editingId) {
+        await warehouseAPI.patchMoneyDocument(editingId, payload);
+      } else {
+        const created = await warehouseAPI.createMoneyDocument(payload);
+        if (createAsPosted && created?.id) {
+          await warehouseAPI.postMoneyDocument(created.id);
+        }
       }
       closeCreateModal();
       load();
@@ -372,6 +415,59 @@ const MoneyDocumentsPage = () => {
           }
         },
       );
+    },
+    [confirm, load],
+  );
+
+  // Отказать (POSTED → REJECTED, бэкенд откатывает кассу)
+  const handleReject = useCallback(
+    (row) => {
+      if (!row?.id) return;
+      confirm(
+        `Отказать документ ${docDisplayLabel(row)}? Касса будет откатана.`,
+        async (result) => {
+          if (!result) return;
+          setPostingId(row.id);
+          try {
+            await warehouseAPI.rejectMoneyDocument(row.id);
+            window.alert("Документ отклонён");
+            load();
+          } catch (err) {
+            const msg =
+              err?.message ||
+              err?.detail ||
+              (typeof err === "string" ? err : "Ошибка при отказе документа");
+            window.alert("Ошибка: " + msg);
+          } finally {
+            setPostingId(null);
+          }
+        },
+      );
+    },
+    [confirm, load],
+  );
+
+  // Удаление доступно только для черновика или отказанного документа
+  const handleDelete = useCallback(
+    (row) => {
+      if (!row?.id) return;
+      confirm(`Удалить документ ${docDisplayLabel(row)}?`, async (result) => {
+        if (!result) return;
+        setPostingId(row.id);
+        try {
+          await warehouseAPI.deleteMoneyDocument(row.id);
+          window.alert("Документ удалён");
+          load();
+        } catch (err) {
+          const msg =
+            err?.message ||
+            err?.detail ||
+            (typeof err === "string" ? err : "Ошибка при удалении документа");
+          window.alert("Ошибка: " + msg);
+        } finally {
+          setPostingId(null);
+        }
+      });
     },
     [confirm, load],
   );
@@ -539,6 +635,8 @@ const MoneyDocumentsPage = () => {
               <tbody>
                 {displayRows.map((row, index) => {
                   const isDraft = row.status === "DRAFT";
+                  const isRejected = row.status === "REJECTED";
+                  const canEditDelete = isDraft || isRejected;
                   const isBusy = postingId === row.id;
                   return (
                     <tr key={row.id || Math.random()}>
@@ -560,31 +658,68 @@ const MoneyDocumentsPage = () => {
                           onClick={() => handlePrintKo1(row)}
                           disabled={printingId === row.id}
                           title="Печать КО-1"
+                          aria-label="Печать КО-1"
                         >
                           <Printer size={18} />
-                          {printingId === row.id ? "Печатается…" : "Печать"}
                         </button>
-                        {isDraft ? (
+                        {isDraft && (
                           <button
                             type="button"
                             className="money-documents-page__action-btn money-documents-page__action-btn--post"
                             onClick={() => handlePost(row)}
                             disabled={isBusy}
                             title="Провести документ"
+                            aria-label="Провести документ"
                           >
                             <Check size={18} />
-                            {isBusy ? "…" : "Провести"}
                           </button>
-                        ) : (
+                        )}
+                        {!isDraft && !isRejected && (
                           <button
                             type="button"
                             className="money-documents-page__action-btn money-documents-page__action-btn--unpost"
                             onClick={() => handleUnpost(row)}
                             disabled={isBusy}
                             title="Отменить проведение"
+                            aria-label="Отменить проведение"
                           >
                             <X size={18} />
-                            {isBusy ? "…" : "Отменить"}
+                          </button>
+                        )}
+                        {!isDraft && !isRejected && (
+                          <button
+                            type="button"
+                            className="money-documents-page__action-btn money-documents-page__action-btn--reject"
+                            onClick={() => handleReject(row)}
+                            disabled={isBusy}
+                            title="Отказать"
+                            aria-label="Отказать"
+                          >
+                            <Ban size={18} />
+                          </button>
+                        )}
+                        {canEditDelete && (
+                          <button
+                            type="button"
+                            className="money-documents-page__action-btn money-documents-page__action-btn--edit"
+                            onClick={() => handleEdit(row)}
+                            disabled={isBusy}
+                            title="Редактировать"
+                            aria-label="Редактировать"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        )}
+                        {canEditDelete && (
+                          <button
+                            type="button"
+                            className="money-documents-page__action-btn money-documents-page__action-btn--delete"
+                            onClick={() => handleDelete(row)}
+                            disabled={isBusy}
+                            title="Удалить"
+                            aria-label="Удалить"
+                          >
+                            <Trash2 size={18} />
                           </button>
                         )}
                       </td>
@@ -601,6 +736,9 @@ const MoneyDocumentsPage = () => {
             getRowNumber={getRowNumber}
             onPost={handlePost}
             onUnpost={handleUnpost}
+            onReject={handleReject}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
             onPrintKo1={handlePrintKo1}
             postingId={postingId}
             printingId={printingId}
@@ -722,7 +860,7 @@ const MoneyDocumentsPage = () => {
                 id="money-doc-modal-title"
                 className="money-documents-page__modal-title money-documents-page__modal-title--operation"
               >
-                {docTypeParam === "receipt" ? "Приход" : "Расход"}
+                {editingId ? "Редактировать" : docTypeParam === "receipt" ? "Приход" : "Расход"}
               </h2>
               <button
                 type="button"
@@ -756,7 +894,7 @@ const MoneyDocumentsPage = () => {
                 </span>
               </div>
               <span className="money-documents-page__modal-status-date">
-                {fmtDate(new Date())}
+                {fmtDate(form.date || new Date())}
               </span>
             </div>
             <form
@@ -822,6 +960,15 @@ const MoneyDocumentsPage = () => {
                 </select>
               </div>
               <div className="money-documents-page__field">
+                <label htmlFor="money-doc-date">Дата</label>
+                <input
+                  id="money-doc-date"
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => handleFormChange("date", e.target.value)}
+                />
+              </div>
+              <div className="money-documents-page__field">
                 <label htmlFor="money-doc-amount">Сумма, сом *</label>
                 <div className="money-documents-page__amount-wrap">
                   <span className="money-documents-page__amount-prefix">
@@ -856,7 +1003,11 @@ const MoneyDocumentsPage = () => {
                   disabled={creating}
                 >
                   <Save size={20} />
-                  {creating ? "Сохранение…" : "Сохранить"}
+                  {creating
+                    ? "Сохранение…"
+                    : editingId
+                      ? "Сохранить изменения"
+                      : "Сохранить"}
                 </button>
                 {/* <button type="button" className="money-documents-page__btn-cancel-round" onClick={closeCreateModal} aria-label="Отмена">
                   <X size={20} strokeWidth={2} />

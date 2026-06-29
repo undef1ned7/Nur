@@ -22,7 +22,7 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: "row", fontSize: 8.5 },
   metaLabel: { fontWeight: "bold", width: 110, flexShrink: 0 },
   metaValue: { flex: 1 },
-  comment: { marginTop: 4, fontSize: 8.5, fontStyle: "italic" },
+  comment: { marginTop: 4, fontSize: 8.5, color: "#333" },
 
   table: { borderWidth: 1, borderColor: "#000", marginTop: 2 },
   row: {
@@ -53,6 +53,18 @@ const s = StyleSheet.create({
     fontSize: 7.5,
     fontWeight: "bold",
     justifyContent: "center",
+  },
+
+  docBlock: { marginTop: 8 },
+  docBlockHead: {
+    fontSize: 8.5,
+    fontWeight: "bold",
+    borderWidth: 1,
+    borderColor: "#000",
+    borderBottomWidth: 0,
+    backgroundColor: "#f7f7f7",
+    paddingVertical: 2.5,
+    paddingHorizontal: 3,
   },
 
   totalsBlock: { marginTop: 8, alignSelf: "flex-end", minWidth: 220, gap: 2 },
@@ -133,6 +145,38 @@ const D_HEAD = [
   "Сумма",
 ];
 
+// Колонки таблицы №3 — Позиции внутри накладной (детализация)
+const DI_COLS = [
+  { w: "5%", a: "center" }, // №
+  { w: "33%", a: "left" }, // Номенклатура
+  { w: "9%", a: "center" }, // Ед.изм
+  { w: "12%", a: "right" }, // Количество
+  { w: "11%", a: "right" }, // Цена
+  { w: "11%", a: "right" }, // Скидка
+  { w: "12%", a: "right" }, // Сумма
+  { w: "7%", a: "right" }, // Вес
+];
+const DI_HEAD = [
+  "№",
+  "Номенклатура",
+  "Ед. изм.",
+  "Кол-во",
+  "Цена",
+  "Скидка",
+  "Сумма",
+  "Вес",
+];
+
+/** Скидка по позиции: «12%» / «150.00» / «150.00 (12%)» / «—». */
+const fmtItemDiscount = (it) => {
+  const pct = toNum(it?.discount_percent);
+  const amt = toNum(it?.discount_amount);
+  if (amt && pct) return `${n2(amt)} (${pct}%)`;
+  if (amt) return n2(amt);
+  if (pct) return `${pct}%`;
+  return "—";
+};
+
 const n2 = (v) =>
   new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 2,
@@ -202,6 +246,13 @@ export default function SummaryPdfDocument({ summary }) {
   const totalAmount = toNum(totals.total_amount);
   const totalWeight = toNum(totals.total_weight);
   const totalQty = toNum(totals.total_quantity);
+
+  // Детализация по накладным (Таблица №3) показывается, только если бэкенд прислал
+  // позиции внутри документов (documents[].items). Иначе секция не рендерится.
+  const documentsWithItems = documents.filter(
+    (d) => Array.isArray(d.items) && d.items.length > 0,
+  );
+  const hasDocItems = documentsWithItems.length > 0;
 
   return (
     <Document>
@@ -334,6 +385,73 @@ export default function SummaryPdfDocument({ summary }) {
             </View>
           </View>
         </View>
+
+        {/* Таблица №3 — Детализация по накладным (позиции внутри каждой накладной).
+            Рендерится только если бэкенд прислал documents[].items. */}
+        {hasDocItems && (
+          <>
+            <Text style={s.sectionTitle} break>
+              Таблица №3. Детализация по накладным
+            </Text>
+            {documentsWithItems.map((d, di) => {
+              const items = d.items || [];
+              const docQty = items.reduce((s2, it) => s2 + toNum(it.quantity), 0);
+              const docAmt = items.reduce((s2, it) => s2 + toNum(it.amount), 0);
+              const docWgt = items.reduce((s2, it) => s2 + toNum(it.weight), 0);
+              return (
+                <View key={d.id || di} style={s.docBlock} wrap>
+                  <Text style={s.docBlockHead}>
+                    {`${d.number || "—"}  ·  ${fmtDate(d.date)}  ·  ${
+                      d.agent || "—"
+                    }  ·  ${d.client || "—"}`}
+                  </Text>
+                  <View style={s.table}>
+                    <TableHead cols={DI_COLS} heads={DI_HEAD} />
+                    {items.map((it, ii) => {
+                      const cells = [
+                        String(ii + 1),
+                        it.name,
+                        it.unit,
+                        nInt(it.quantity),
+                        n2(it.price),
+                        fmtItemDiscount(it),
+                        n2(it.amount),
+                        nInt(it.weight),
+                      ];
+                      return (
+                        <View key={ii} style={s.row} wrap={false}>
+                          {DI_COLS.map((c, ci) => (
+                            <Cell key={ci} col={c} last={ci === DI_COLS.length - 1}>
+                              {cells[ci]}
+                            </Cell>
+                          ))}
+                        </View>
+                      );
+                    })}
+                    {/* Итог по накладной */}
+                    <View style={[s.row, s.rowLast, s.headRow]} wrap={false}>
+                      <View style={[s.footCell, { width: "47%" }]}>
+                        <Text>Итого по накладной</Text>
+                      </View>
+                      <View style={[s.footCell, s.cRight, { width: "12%" }]}>
+                        <Text>{nInt(docQty)}</Text>
+                      </View>
+                      <View style={[s.footCell, s.cRight, { width: "22%" }]}>
+                        <Text />
+                      </View>
+                      <View style={[s.footCell, s.cRight, { width: "12%" }]}>
+                        <Text>{n2(docAmt)}</Text>
+                      </View>
+                      <View style={[s.footCell, s.cellLast, s.cRight, { width: "7%" }]}>
+                        <Text>{nInt(docWgt)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
 
         {/* Итоги */}
         <View style={s.totalsBlock}>

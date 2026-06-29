@@ -655,9 +655,36 @@ const CashierPage = () => {
     }
   }, [multiCart, setSearchParams, alert]);
 
+  const normalizeMgmtRole = (raw) => {
+    const l = String(raw || "").trim().toLowerCase();
+    if (["owner", "владелец"].includes(l)) return "owner";
+    if (["admin", "administrator", "админ", "администратор"].includes(l))
+      return "admin";
+    return l;
+  };
+  const permissionsSource = profile || currentUser || {};
+  const mgmtRole = normalizeMgmtRole(permissionsSource?.role);
+  const isPrivilegedRole = mgmtRole === "owner" || mgmtRole === "admin";
+  const canMarketDiscount =
+    isPrivilegedRole || permissionsSource?.can_view_market_discount === true;
+  const canMarketEditPrice =
+    isPrivilegedRole || permissionsSource?.can_view_market_edit_price === true;
+  const canMarketDeleteCartItem =
+    isPrivilegedRole ||
+    permissionsSource?.can_view_market_delete_cart_item === true;
+
   const handleDeleteCashierCart = useCallback(
     async (saleId) => {
       if (!saleId) return;
+      // Удаление корзины целиком доступно только при праве на удаление позиций.
+      if (!canMarketDeleteCartItem) {
+        showAlert(
+          "warning",
+          "Нет доступа",
+          "У вас нет доступа на удаление корзины",
+        );
+        return;
+      }
       confirm("Удалить эту корзину?", async (ok) => {
         if (!ok) return;
 
@@ -698,7 +725,14 @@ const CashierPage = () => {
         }
       });
     },
-    [confirm, currentSale?.id, multiCart.deleteCart, setSearchParams, urlSaleId],
+    [
+      confirm,
+      currentSale?.id,
+      multiCart.deleteCart,
+      setSearchParams,
+      urlSaleId,
+      canMarketDeleteCartItem,
+    ],
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -781,23 +815,6 @@ const CashierPage = () => {
   const [favoriteLoadingMap, setFavoriteLoadingMap] = useState({});
   const hotkeyProductsRequestIdRef = React.useRef(0);
 
-  const normalizeMgmtRole = (raw) => {
-    const l = String(raw || "").trim().toLowerCase();
-    if (["owner", "владелец"].includes(l)) return "owner";
-    if (["admin", "administrator", "админ", "администратор"].includes(l))
-      return "admin";
-    return l;
-  };
-  const permissionsSource = profile || currentUser || {};
-  const mgmtRole = normalizeMgmtRole(permissionsSource?.role);
-  const isPrivilegedRole = mgmtRole === "owner" || mgmtRole === "admin";
-  const canMarketDiscount =
-    isPrivilegedRole || permissionsSource?.can_view_market_discount === true;
-  const canMarketEditPrice =
-    isPrivilegedRole || permissionsSource?.can_view_market_edit_price === true;
-  const canMarketDeleteCartItem =
-    isPrivilegedRole ||
-    permissionsSource?.can_view_market_delete_cart_item === true;
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     () => window.innerWidth > 768,
   );
@@ -3247,7 +3264,9 @@ const CashierPage = () => {
                 switching={multiCart.switching}
                 onSelect={handleSelectCashierCart}
                 onNewCart={handleNewCashierCart}
-                onDelete={handleDeleteCashierCart}
+                onDelete={
+                  canMarketDeleteCartItem ? handleDeleteCashierCart : undefined
+                }
               />
             </div>
           )}

@@ -72,11 +72,21 @@ export const getCounterpartyAnalyticsView = (counterparty) => {
     debts?.period_start_credit
   );
 
-  const turnoverDebit = toNumber(cash?.received);
-  const turnoverCredit = toNumber(cash?.paid);
+  // Оборот за период: приоритет явных полей оборота, иначе движение по кассе
+  const turnoverDebit = toNumber(
+    pickFirstDefined(debts?.turnover_debit, debts?.period_debit, cash?.received)
+  );
+  const turnoverCredit = toNumber(
+    pickFirstDefined(debts?.turnover_credit, debts?.period_credit, cash?.paid)
+  );
 
-  let closingDebit = toNumber(debts?.counterparty_owes_company);
-  let closingCredit = toNumber(debts?.company_owes_counterparty);
+  // Сальдо на конец: явные closing-поля → owes-поля → разбор баланса по знаку
+  let closingDebit = toNumber(
+    pickFirstDefined(debts?.closing_debit, debts?.counterparty_owes_company)
+  );
+  let closingCredit = toNumber(
+    pickFirstDefined(debts?.closing_credit, debts?.company_owes_counterparty)
+  );
 
   if (!closingDebit && !closingCredit) {
     const byBalance = splitBySign(debts?.balance);
