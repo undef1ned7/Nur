@@ -236,6 +236,34 @@
         background: #e5e7eb;
       }
     }
+
+    &--reject {
+      color: #fff;
+      background: #d97706;
+
+      &:hover:not(:disabled) {
+        background: #b45309;
+      }
+    }
+
+    &--edit {
+      color: #111827;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+
+      &:hover:not(:disabled) {
+        background: #fde68a;
+      }
+    }
+
+    &--delete {
+      color: #fff;
+      background: #b91c1c;
+
+      &:hover:not(:disabled) {
+        background: #991b1b;
+      }
+    }
   }
 
   &__loading,

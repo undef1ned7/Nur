@@ -25,13 +25,21 @@
   "created_at": "2026-06-26T07:40:11Z",
   "updated_at": "2026-06-26T07:40:11Z",
   "agents":   [ { "id": "uuid", "full_name": "Петров П.", "code": "A-01" } ],
-  "documents":[ { "id","number","date","agent","client","address","quantity","weight","amount" } ],
+  "documents":[ { "id","number","date","agent","client","address","quantity","weight","amount",
+                  "items":[ { "name","unit","quantity","price",
+                              "discount_percent","discount_amount","amount","weight" } ] } ],
   "products": [ { "name","unit","packages","per_package","quantity","price","amount","weight" } ],
   "totals":   { "documents_count","products_count","total_quantity","total_weight","total_amount" }
 }
 ```
 
-`documents`/`products` отдаются **только** в GET by id (в списке их нет).
+`documents`/`products` отдаются **только** в GET by id (и в ответе на создание); в списке их нет.
+
+**`documents[].items`** — позиции **конкретной** накладной (не агрегированные). Фронт строит из
+них в PDF секцию «Таблица №3. Детализация по накладным» (с колонкой «Скидка» из
+`discount_percent`/`discount_amount`; `amount` уже с учётом скидки). Если бэкенд не прислал
+`items`, секция просто не рендерится (обратная совместимость). Агрегированная по всем накладным
+таблица — `products`.
 
 ---
 

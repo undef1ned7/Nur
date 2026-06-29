@@ -74,6 +74,17 @@ const DOC_TYPE_FROM_PARAM = {
   commercial_offer: "COMMERCIAL_OFFER",
 };
 
+// Табы, которые сохраняются в URL (?tab=...). agent_sales/summary доступны только для SALE.
+const ALL_TABS = ["receipts", "invoices", "esf_xml", "agent_sales", "ko1", "summary"];
+const SALE_ONLY_TABS = ["agent_sales", "summary"];
+const DEFAULT_TAB = "invoices";
+
+const resolveTabFromParam = (tab, docType) => {
+  if (!ALL_TABS.includes(tab)) return DEFAULT_TAB;
+  if (SALE_ONLY_TABS.includes(tab) && docType !== "SALE") return DEFAULT_TAB;
+  return tab;
+};
+
 /** Проведение/отмена проведения на складе недоступны для КП (POST …/post/ вернёт 400). */
 const documentAllowsWarehousePosting = (doc) =>
   doc?.doc_type !== "COMMERCIAL_OFFER";
@@ -132,7 +143,9 @@ const Documents = () => {
   // Тип документа из URL (sidebar): all, sale, purchase, ...
   const docType = DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
 
-  const [activeTab, setActiveTab] = useState("invoices");
+  const [activeTab, setActiveTab] = useState(() =>
+    resolveTabFromParam(searchParams.get("tab"), docType),
+  );
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -479,11 +492,18 @@ const Documents = () => {
     });
   }, [filteredDocuments, activeTab, currentPage]);
 
-  // Обновление URL только при изменении страницы (без поиска)
+  // Обновление URL при изменении страницы и активного таба (без поиска)
   useEffect(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
     if (currentPage > 1) {
       params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    if (activeTab && activeTab !== DEFAULT_TAB) {
+      params.set("tab", activeTab);
+    } else {
+      params.delete("tab");
     }
     const newSearchString = params.toString();
     const currentSearchString = searchParams.toString();
@@ -492,12 +512,19 @@ const Documents = () => {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, activeTab]);
 
   // Сброс страницы и фильтра по агенту при смене таба или типа документа
   useEffect(() => {
     setCurrentPage(1);
     if (docType !== "SALE") setAgentFilterId("");
+  }, [activeTab, docType]);
+
+  // SALE-only таб (Сводка/Продажи по заявкам) недоступен вне SALE — откатываем на дефолт
+  useEffect(() => {
+    if (SALE_ONLY_TABS.includes(activeTab) && docType !== "SALE") {
+      setActiveTab(DEFAULT_TAB);
+    }
   }, [activeTab, docType]);
 
   useEffect(() => {

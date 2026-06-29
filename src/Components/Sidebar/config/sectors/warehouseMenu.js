@@ -24,7 +24,7 @@ export const warehouseMenu = [
         implemented: true,
         children: [
           { label: "Продажа", to: "/crm/warehouse/documents/sale" },
-          { label: "Покупка", to: "/crm/warehouse/documents/purchase" },
+          { label: "Закуп", to: "/crm/warehouse/documents/purchase" },
           {
             label: "Возврат продажи",
             to: "/crm/warehouse/documents/sale_return",
@@ -34,7 +34,6 @@ export const warehouseMenu = [
             to: "/crm/warehouse/documents/purchase_return",
           },
           { label: "Инвентаризация", to: "/crm/warehouse/documents/inventory" },
-          { label: "Приход", to: "/crm/warehouse/documents/receipt" },
           { label: "Списание", to: "/crm/warehouse/documents/write_off" },
           { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
           {

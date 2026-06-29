@@ -777,6 +777,66 @@ body::-webkit-scrollbar-thumb:hover {
     font-weight: 700;
     font-size: 16px;
   }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    @media (max-width: 480px) {
+      width: 100%;
+      justify-content: space-between;
+    }
+  }
+}
+
+/* ===== Сортировка витрины ===== */
+.sfsort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  &__label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b7280;
+
+    @media (max-width: 480px) {
+      display: none;
+    }
+  }
+
+  &__select {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding: 8px 34px 8px 14px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+
+    &:hover {
+      border-color: #cbd5e1;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    @media (max-width: 480px) {
+      font-size: 13px;
+      padding: 6px 30px 6px 12px;
+    }
+  }
 }
 
 /* ===== Алерт ===== */

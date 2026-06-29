@@ -3793,7 +3793,7 @@ const CreateSaleDocument = () => {
               <div className="create-sale-document__header-titles">
                 <h1 className="create-sale-document__doc-title">
                   {docType === "SALE" && "Продажа"}
-                  {docType === "PURCHASE" && "Покупка"}
+                  {docType === "PURCHASE" && "Закуп"}
                   {docType === "SALE_RETURN" && "Возврат продажи"}
                   {docType === "PURCHASE_RETURN" && "Возврат покупки"}
                   {docType === "INVENTORY" && "Инвентаризация"}

@@ -23,10 +23,37 @@ import {
 } from "./constants";
 import { getAgentDisplay } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
+import CounterpartyBalanceBar from "./components/CounterpartyBalanceBar";
+import warehouseAPI from "../../../../api/warehouse";
 
 /** Показывать колонку «Агент» для владельца и админа */
 const showAgentColumn = (profile) =>
   profile?.role === "owner" || profile?.role === "admin";
+
+// --- Период: месяц / год / кастом ---
+const pad2 = (n) => String(n).padStart(2, "0");
+const currentYM = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+};
+/** Диапазон месяца "YYYY-MM" → { from: 1-е число, to: последнее число }. */
+const monthRange = (ym) => {
+  const [y, m] = (ym || currentYM()).split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(last)}` };
+};
+const yearRange = (y) => ({ from: `${y}-01-01`, to: `${y}-12-31` });
+const normalizeBalanceSummary = (data) => {
+  const g = (x) => ({
+    debit: Number(x?.debit) || 0,
+    credit: Number(x?.credit) || 0,
+  });
+  return {
+    opening: g(data?.opening),
+    turnover: g(data?.turnover),
+    closing: g(data?.closing),
+  };
+};
 
 const Counterparties = () => {
   const navigate = useNavigate();
@@ -40,8 +67,15 @@ const Counterparties = () => {
 
   // Состояние фильтров и модальных окон
   const [filters, setFilters] = useState({});
-  const [period, setPeriod] = useState({ from: "", to: "" });
-  const [periodFilterActive, setPeriodFilterActive] = useState(false);
+  // Период: по умолчанию текущий месяц (от начала до конца месяца)
+  const [periodMode, setPeriodMode] = useState("month"); // month | year | custom
+  const [monthValue, setMonthValue] = useState(currentYM);
+  const [yearValue, setYearValue] = useState(() =>
+    String(new Date().getFullYear()),
+  );
+  const [customRange, setCustomRange] = useState(() => monthRange(currentYM()));
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -50,6 +84,13 @@ const Counterparties = () => {
     const isSmall = window.matchMedia("(max-width: 1199px)").matches;
     return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
   });
+
+  // Итоговый диапазон дат из выбранного режима периода
+  const period = useMemo(() => {
+    if (periodMode === "month") return monthRange(monthValue);
+    if (periodMode === "year") return yearRange(yearValue);
+    return customRange;
+  }, [periodMode, monthValue, yearValue, customRange]);
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
@@ -61,18 +102,11 @@ const Counterparties = () => {
     if (debouncedSearchTerm?.trim()) {
       params.search = debouncedSearchTerm.trim();
     }
-    if (periodFilterActive && period.from && period.to) {
+    if (period.from && period.to) {
       params._periodRange = { from: period.from, to: period.to };
     }
     return params;
-  }, [
-    typeTab,
-    filters,
-    debouncedSearchTerm,
-    periodFilterActive,
-    period.from,
-    period.to,
-  ]);
+  }, [typeTab, filters, debouncedSearchTerm, period.from, period.to]);
 
   // Загрузка контрагентов
   const { counterparties: rawCounterparties, loading } =
@@ -140,17 +174,33 @@ const Counterparties = () => {
   }, [typeTab]);
 
   useEffect(() => {
-    if (periodFilterActive) resetToFirstPage();
-  }, [periodFilterActive, period.from, period.to, resetToFirstPage]);
+    resetToFirstPage();
+  }, [period.from, period.to, resetToFirstPage]);
 
-  const applyPeriodFilter = useCallback(() => {
-    if (period.from && period.to) setPeriodFilterActive(true);
-  }, [period.from, period.to]);
-
-  const clearPeriodFilter = useCallback(() => {
-    setPeriodFilterActive(false);
-    setPeriod({ from: "", to: "" });
-  }, []);
+  // Загрузка сводных показателей (Сальдо/Оборот) за период по типу контрагента
+  useEffect(() => {
+    if (!period.from || !period.to) return undefined;
+    let cancelled = false;
+    setSummaryLoading(true);
+    warehouseAPI
+      .getCounterpartiesBalanceSummary({
+        type: typeTab,
+        date_from: period.from,
+        date_to: period.to,
+      })
+      .then((data) => {
+        if (!cancelled) setSummary(data ? normalizeBalanceSummary(data) : null);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [typeTab, period.from, period.to]);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -249,57 +299,21 @@ const Counterparties = () => {
             </select>
           </div>
         )}
-        <div
-          className={`counterparties-period-filter ${
-            periodFilterActive ? "counterparties-period-filter--active" : ""
-          }`}
-        >
-          <label
-            htmlFor="counterparties-period-from"
-            className="counterparties-period-filter__label"
-          >
-            Период:
-          </label>
-          <input
-            id="counterparties-period-from"
-            type="date"
-            className="counterparties-period-filter__input"
-            value={period.from}
-            onChange={(e) =>
-              setPeriod((prev) => ({ ...prev, from: e.target.value }))
-            }
-            max={period.to || undefined}
-          />
-          <span className="counterparties-period-filter__dash">-</span>
-          <input
-            id="counterparties-period-to"
-            type="date"
-            className="counterparties-period-filter__input"
-            value={period.to}
-            onChange={(e) =>
-              setPeriod((prev) => ({ ...prev, to: e.target.value }))
-            }
-            min={period.from || undefined}
-          />
-          <button
-            type="button"
-            className="counterparties-period-filter__btn"
-            onClick={applyPeriodFilter}
-            disabled={!period.from || !period.to}
-          >
-            Применить
-          </button>
-          {periodFilterActive && (
-            <button
-              type="button"
-              className="counterparties-period-filter__btn counterparties-period-filter__btn--reset"
-              onClick={clearPeriodFilter}
-            >
-              Сбросить
-            </button>
-          )}
-        </div>
       </section>
+
+      <CounterpartyBalanceBar
+        mode={periodMode}
+        onModeChange={setPeriodMode}
+        monthValue={monthValue}
+        onMonthChange={setMonthValue}
+        yearValue={yearValue}
+        onYearChange={setYearValue}
+        customRange={customRange}
+        onCustomChange={setCustomRange}
+        period={period}
+        summary={summary}
+        loading={summaryLoading}
+      />
 
       <CounterpartySearchSection
         searchTerm={searchTerm}
