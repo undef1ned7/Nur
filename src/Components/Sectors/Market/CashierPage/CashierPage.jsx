@@ -7,6 +7,8 @@ import {
   Star,
   Trash2,
   UserPlus,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useStore } from "react-redux";
@@ -811,6 +813,21 @@ const CashierPage = () => {
 
   const [pieceSaleModal, setPieceSaleModal] = useState(null);
   const [mobileProductsList, setMobileProductsList] = useState(false);
+  // Полноэкранный режим корзины: скрываем каталог и шапку, корзина на весь экран
+  const [cartFull, setCartFull] = useState(() => {
+    try {
+      return localStorage.getItem("market_cashier_cart_full") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("market_cashier_cart_full", cartFull ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [cartFull]);
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
   const [favoriteLoadingMap, setFavoriteLoadingMap] = useState({});
   const hotkeyProductsRequestIdRef = React.useRef(0);
@@ -3163,7 +3180,7 @@ const CashierPage = () => {
   }
 
   return (
-    <div className="cashier-page">
+    <div className={`cashier-page ${cartFull ? "cashier-page--cart-full" : ""}`}>
       <div className="cashier-page__header">
         <div className="cashier-page__header-left">
           <button
@@ -3513,25 +3530,65 @@ const CashierPage = () => {
           aria-label="Изменить ширину панелей"
         />
         <div
-          className={`cashier-page__cart ${isCompactCart ? "cashier-page__cart--compact" : ""}`}
+          className={`cashier-page__cart ${isCompactCart && !cartFull ? "cashier-page__cart--compact" : ""}`}
           style={
             isDesktopLayout
-              ? {
-                  flex: "0 0 auto",
-                  width: `calc(${100 - desktopProductsWidth}% - 12px)`,
-                  minWidth: 340,
-                }
+              ? cartFull
+                ? { flex: "1 1 auto", width: "100%", minWidth: 0 }
+                : {
+                    flex: "0 0 auto",
+                    width: `calc(${100 - desktopProductsWidth}% - 12px)`,
+                    minWidth: 340,
+                  }
               : undefined
           }
         >
+          {/* Мультикорзина видна и в полноэкранном режиме */}
+          {openShiftId && cartFull && (
+            <div className="cashier-page__carts-bar-wrap cashier-page__carts-bar-wrap--in-cart">
+              <CashierCartsBar
+                layout="toolbar"
+                alwaysShow
+                carts={multiCart.carts}
+                activeSaleId={multiCart.activeSaleId}
+                switching={multiCart.switching}
+                onSelect={handleSelectCashierCart}
+                onNewCart={handleNewCashierCart}
+                onDelete={
+                  canMarketDeleteCartItem ? handleDeleteCashierCart : undefined
+                }
+              />
+            </div>
+          )}
+
           <div className="cashier-page__cart-header">
             <h2 className="cashier-page__cart-title">Корзина</h2>
-            <button
-              className="cashier-page__cart-customer-btn"
-              onClick={() => setShowCustomerModal(true)}
-            >
-              <UserPlus size={20} />
-            </button>
+            <div className="cashier-page__cart-header-actions">
+              <button
+                type="button"
+                className="cashier-page__cart-fullscreen-btn"
+                onClick={() => setCartFull((v) => !v)}
+                title={
+                  cartFull
+                    ? "Показать список товаров"
+                    : "Развернуть корзину на весь экран"
+                }
+                aria-label={
+                  cartFull
+                    ? "Показать список товаров"
+                    : "Развернуть корзину на весь экран"
+                }
+                aria-pressed={cartFull}
+              >
+                {cartFull ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
+              <button
+                className="cashier-page__cart-customer-btn"
+                onClick={() => setShowCustomerModal(true)}
+              >
+                <UserPlus size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Кнопки для скидки и доп. услуг */}
