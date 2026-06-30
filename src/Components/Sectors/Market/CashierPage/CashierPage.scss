@@ -408,7 +408,14 @@
     color: #111827;
   }
 
-  &__cart-customer-btn {
+  &__cart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__cart-customer-btn,
+  &__cart-fullscreen-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -418,11 +425,26 @@
     background: #f5f5f5;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, color 0.2s;
+    color: #374151;
 
     &:hover {
       background: #e5e5e5;
     }
+  }
+
+  &__cart-fullscreen-btn[aria-pressed="true"] {
+    background: #f7d617;
+    color: #111827;
+
+    &:hover {
+      background: #f0cd00;
+    }
+  }
+
+  // Мультикорзина внутри панели корзины (в полноэкранном режиме)
+  &__carts-bar-wrap--in-cart {
+    margin-bottom: 12px;
   }
 
   &__cart-actions {
@@ -883,6 +905,109 @@
 
     &:hover {
       background: #dc2626;
+    }
+  }
+}
+
+// Полноэкранный режим корзины: каталог и шапка скрыты, корзина на весь экран
+.cashier-page--cart-full {
+  .cashier-page__header,
+  .cashier-page__products,
+  .cashier-page__splitter {
+    display: none !important;
+  }
+
+  .cashier-page__content {
+    padding-top: 12px;
+  }
+
+  .cashier-page__cart {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  // Больше места под список товаров корзины
+  .cashier-page__cart-items {
+    flex: 1 1 auto;
+  }
+
+  // Содержимое позиции — в одну строку, с переносом на узких экранах (адаптивно)
+  .cashier-page__cart-item {
+    padding: 8px 12px;
+    margin-bottom: 6px;
+  }
+
+  .cashier-page__cart-item-main {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  // Левая часть: название + итог/режимы скидки — тянется
+  .cashier-page__cart-item-head {
+    flex: 1 1 260px;
+    min-width: 200px;
+    gap: 10px;
+  }
+
+  .cashier-page__cart-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Правая часть: цена / скидка / количество — компактно в одну строку
+  .cashier-page__cart-item-row {
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  // Подпись поля слева от инпута, чтобы строка была ниже по высоте
+  .cashier-page__cart-item-field {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .cashier-page__cart-item-field-label {
+    white-space: nowrap;
+  }
+
+  // Кнопка удаления отделена от количества (отступ + разделитель + рамка),
+  // чтобы её не нажали случайно
+  .cashier-page__cart-item-remove {
+    position: relative;
+    margin-left: 20px;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #fecaca;
+    background: #fff5f5;
+    color: #dc2626;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: -10px;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: #e5e7eb;
+    }
+
+    &:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+  }
+
+  // На очень узких — позволяем строке поджиматься
+  @media (max-width: 640px) {
+    .cashier-page__cart-item-head {
+      flex-basis: 100%;
     }
   }
 }

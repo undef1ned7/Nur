@@ -66,6 +66,9 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
 
   const openingCash = parseFloat(shift.opening_cash || 0);
   const expectedCash = parseFloat(shift.expected_cash || 0);
+  const salesTotal = parseFloat(shift.sales_total || 0);
+  const cashSalesTotal = parseFloat(shift.cash_sales_total || 0);
+  const noncashSalesTotal = parseFloat(shift.noncash_sales_total || 0);
   const closingCashNum = parseFloat(closingCash || 0);
   const cashDiff = closingCashNum - expectedCash;
 
@@ -135,6 +138,31 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
               </span>
               <span className="close-shift-page__info-value">
                 {openingCash.toFixed(2)} сом
+              </span>
+            </div>
+
+            <div className="close-shift-page__info-item">
+              <span className="close-shift-page__info-label">
+                Продажи всего:
+              </span>
+              <span className="close-shift-page__info-value">
+                {salesTotal.toFixed(2)} сом
+              </span>
+            </div>
+
+            <div className="close-shift-page__info-item">
+              <span className="close-shift-page__info-label">Наличными:</span>
+              <span className="close-shift-page__info-value">
+                {cashSalesTotal.toFixed(2)} сом
+              </span>
+            </div>
+
+            <div className="close-shift-page__info-item">
+              <span className="close-shift-page__info-label">
+                Безналичными:
+              </span>
+              <span className="close-shift-page__info-value">
+                {noncashSalesTotal.toFixed(2)} сом
               </span>
             </div>
 
