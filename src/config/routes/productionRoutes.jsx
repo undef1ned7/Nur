@@ -1,4 +1,7 @@
 import { lazy } from "react";
+import { Route } from "react-router-dom";
+import ProtectedRoute from "../../ProtectedRoute";
+const ProductionSuppliers = lazy(() => import("../../Components/Sectors/Market/Clients/Clients"));
 const ProductionWarehouse = lazy(() => import("../../Components/Sectors/Production/Warehouse/ProductionWarehouse"));
 const ProductionWarehouseProductDetail = lazy(() => import("../../Components/Sectors/Production/Warehouse/ProductionWarehouseProductDetail"));
 const ProductionAgents = lazy(() => import("../../Components/Sectors/Production/ProductionAgents/ProductionAgents"));
@@ -39,4 +42,13 @@ export const productionRoutes = () => [
   createProductionAgentProtectedRoute("production/request", ProductionRequest),
   createProtectedRoute("production/sell", ProductionSell),
   createProtectedRoute("production/sell/start", ProductionSellStartPage),
+  <Route
+    key="production/suppliers"
+    path="production/suppliers"
+    element={
+      <ProtectedRoute>
+        <ProductionSuppliers forcedTab="suppliers" hideTabs />
+      </ProtectedRoute>
+    }
+  />,
 ];

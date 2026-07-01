@@ -14,6 +14,7 @@ import {
   FaUniversity,
   FaExchangeAlt,
   FaClock,
+  FaThLarge,
 } from "react-icons/fa";
 import api from "../../../../api";
 import { getAll as getAllClients, createClient } from "../Clients/clientStore";
@@ -31,6 +32,7 @@ import {
 } from "./OrdersPrintService";
 
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
+import TablesBoard from "./components/TablesBoard";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
@@ -450,6 +452,21 @@ const Orders = () => {
     [tariff, company?.subscription_plan?.name],
   );
   const [tables, setTables] = useState([]);
+  // Режим «Столы»: доска столов вместо списка заказов (сохраняется в localStorage)
+  const [tablesView, setTablesView] = useState(() => {
+    try {
+      return localStorage.getItem("cafe_orders_tables_view") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("cafe_orders_tables_view", tablesView ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [tablesView]);
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
@@ -1493,9 +1510,10 @@ const Orders = () => {
     }
   };
 
-  const openCreate = () => {
+  const openCreate = (presetTable = "") => {
     setForm({
-      table: "",
+      table:
+        presetTable && typeof presetTable !== "object" ? String(presetTable) : "",
       guests: 2,
       waiter: "",
       client: "",
@@ -2470,8 +2488,24 @@ const Orders = () => {
 
           {userRole === "повара" ? null : (
             <button
+              className={`cafeOrders__btn ${
+                tablesView
+                  ? "cafeOrders__btn--primary"
+                  : "cafeOrders__btn--secondary"
+              }`}
+              onClick={() => setTablesView((v) => !v)}
+              type="button"
+              aria-pressed={tablesView}
+              title="Показать столы"
+            >
+              <FaThLarge /> Столы
+            </button>
+          )}
+
+          {userRole === "повара" ? null : (
+            <button
               className="cafeOrders__btn cafeOrders__btn--primary"
-              onClick={openCreate}
+              onClick={() => openCreate()}
               type="button"
             >
               <FaPlus /> Новый заказ
@@ -2490,6 +2524,14 @@ const Orders = () => {
         </div>
       </div>
       <DataContainer>
+        {tablesView ? (
+          <TablesBoard
+            tables={tables}
+            orders={visibleOrders}
+            onCreate={(tableId) => openCreate(tableId)}
+            onOpen={(order) => openEdit(order)}
+          />
+        ) : (
         <div className="cafeOrders__list">
           {loading && <div className="cafeOrders__alert">Загрузка…</div>}
           {visibleOrders.map((o) => {
@@ -2649,6 +2691,7 @@ const Orders = () => {
             </div>
           )}
         </div>
+        )}
       </DataContainer>
 
       <Pagination

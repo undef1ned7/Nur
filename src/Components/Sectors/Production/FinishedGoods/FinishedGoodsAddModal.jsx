@@ -214,7 +214,8 @@ const FinishedGoodsAddModal = ({
 
   useEffect(() => {
     dispatch(getProcessedItemsMake());
-    dispatch(fetchClientsAsync());
+    // Поставщиков грузим тем же запросом, что и страница /crm/production/suppliers
+    dispatch(fetchClientsAsync({ type: "suppliers" }));
     dispatch(fetchCategoriesAsync());
     dispatch(fetchBrandsAsync());
   }, [dispatch]);
@@ -356,7 +357,7 @@ const FinishedGoodsAddModal = ({
     }
     try {
       await dispatch(createClientAsync(supplier)).unwrap();
-      await dispatch(fetchClientsAsync()).unwrap();
+      await dispatch(fetchClientsAsync({ type: "suppliers" })).unwrap();
       setShowSupplierForm(false);
       setSupplier({
         full_name: "",
