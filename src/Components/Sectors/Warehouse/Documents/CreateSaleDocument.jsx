@@ -2785,6 +2785,7 @@ const CreateSaleDocument = () => {
     warehouse_from: data.warehouse_from,
     counterparty: data.counterparty ?? null,
     comment: data.comment ?? "",
+    date: data.date,
     discount_percent: data.discount_percent,
     discount_amount: data.discount_amount,
     items: (data.items || []).map((it) => ({
@@ -2904,6 +2905,7 @@ const CreateSaleDocument = () => {
           ? { date: new Date(documentDateValue).toISOString() }
           : {}),
         comment: resolvedComment,
+        date: documentDateValue,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
         items: buildDocumentLineItems(cartItems),
@@ -3082,6 +3084,7 @@ const CreateSaleDocument = () => {
           ? { date: new Date(documentDateValue).toISOString() }
           : {}),
         comment: resolvedCommentPrint,
+        date: documentDateValue,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
         items: buildDocumentLineItems(cartItems),
