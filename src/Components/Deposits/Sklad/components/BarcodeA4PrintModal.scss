@@ -1,0 +1,375 @@
+.barcode-a4-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 16px;
+  overflow: auto;
+}
+
+.barcode-a4-modal {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  max-width: 1100px;
+  margin: auto;
+  align-items: flex-start;
+
+  &__panel {
+    flex: 0 0 300px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+
+  &__panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  &__close {
+    border: none;
+    background: #f1f5f9;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    color: #334155;
+
+    &:hover {
+      background: #e2e8f0;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+
+    input[type="text"],
+    input[type="number"] {
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f172a;
+
+      &:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+    }
+  }
+
+  &__row {
+    display: flex;
+    gap: 10px;
+
+    .barcode-a4-modal__field {
+      flex: 1;
+    }
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0 12px;
+  }
+
+  &__summary {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 14px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  &__btn {
+    flex: 1;
+    height: 40px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+
+    &--ghost {
+      background: #f1f5f9;
+      color: #334155;
+    }
+    &--primary {
+      background: #2563eb;
+      color: #fff;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__previewWrap {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* Лист A4 */
+.barcode-a4-sheet {
+  --a4-page-h: 277mm; /* печатная высота листа (297 − поля) */
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  padding: 10mm;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transform-origin: top center;
+
+  &--landscape {
+    --a4-page-h: 190mm; /* печатная высота альбомного листа (210 − поля) */
+    width: 297mm;
+    min-height: 210mm;
+  }
+
+  &__header {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8mm;
+    padding-bottom: 3mm;
+    border-bottom: 1px solid #cbd5e1;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--a4-cols, 3), 1fr);
+    /* Высота этикетки = высота печатной области / кол-во строк:
+       меньше строк — крупнее этикетки (напр. 2 строки на весь лист). */
+    grid-auto-rows: calc(
+      (var(--a4-page-h, 277mm) - 6mm * (var(--a4-rows, 8) - 1)) /
+        var(--a4-rows, 8)
+    );
+    gap: 6mm;
+  }
+
+  &__empty {
+    padding: 24px;
+    text-align: center;
+    color: #94a3b8;
+  }
+}
+
+.barcode-a4__label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  text-align: center;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.barcode-a4__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+/* Область штрих-кода занимает свободное место в этикетке,
+   штрих-код масштабируется РАВНОМЕРНО (contain) и не выходит за поле. */
+.barcode-a4__bc {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.barcode-a4__canvas {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain; /* равномерное масштабирование без искажений */
+}
+
+.barcode-a4__price {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.barcode-a4__plu {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.barcode-a4__desc {
+  font-size: 10px;
+  color: #475569;
+  line-height: 1.2;
+}
+
+/* Скидка: старая цена зачёркнута, новая цена + бейдж */
+.barcode-a4__price-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 6px;
+}
+
+.barcode-a4__old {
+  color: #94a3b8;
+}
+
+.barcode-a4__badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* Строка настройки поля (панель, не печатается) */
+.barcode-a4-fs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+
+  &__head {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+  }
+
+  &__ctrls {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__size {
+    width: 46px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  &__btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    color: #334155;
+    font-size: 13px;
+    line-height: 1;
+
+    &:hover {
+      background: #f1f5f9;
+    }
+    &.is-on {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+  }
+}
+
+/* Уменьшенный превью листа на экране (чтобы влезал), при печати — реальный размер */
+@media screen and (max-width: 1200px) {
+  .barcode-a4-sheet {
+    transform: scale(0.8);
+  }
+}
+
+/* ==== Печать: только лист A4 ==== */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .barcode-a4-print-area,
+  .barcode-a4-print-area * {
+    visibility: visible !important;
+  }
+  .barcode-a4-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .barcode-a4-no-print {
+    display: none !important;
+  }
+  .barcode-a4-overlay {
+    position: static;
+    background: none;
+    padding: 0;
+    overflow: visible;
+  }
+  .barcode-a4-sheet {
+    box-shadow: none;
+    transform: none;
+    width: auto;
+    min-height: auto;
+    padding: 0;
+  }
+  /* размер/ориентация @page задаётся динамически из компонента */
+  @page {
+    margin: 10mm;
+  }
+}

@@ -7,6 +7,7 @@ import {
   connectXp365bManually,
 } from "../services/xp365bPrintService";
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
+import BarcodeA4PrintModal from "./BarcodeA4PrintModal";
 import Loading from "../../../common/Loading/Loading";
 import JsBarcode from "jsbarcode";
 import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
@@ -37,6 +38,7 @@ const BarcodePrintTab = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showA4Modal, setShowA4Modal] = useState(false);
   const [labelSize, setLabelSize] = useState("30x20"); // размер этикетки по умолчанию
   const [didTouchTextScale, setDidTouchTextScale] = useState(false);
   const barcodeCanvasRef = useRef(null);
@@ -810,6 +812,14 @@ const BarcodePrintTab = ({
                 </button>
                 <button
                   type="button"
+                  className="barcode-print-tab__selection-btn"
+                  onClick={() => setShowA4Modal(true)}
+                  title="Печать штрих-кодов на листе A4 (обычный принтер)"
+                >
+                  🖨️ Печать на A4
+                </button>
+                <button
+                  type="button"
                   className="barcode-print-tab__batch-print-btn"
                   onClick={handlePrintSelected}
                   disabled={
@@ -936,6 +946,17 @@ const BarcodePrintTab = ({
           </>
         )}
       </div>
+
+      {showA4Modal && (
+        <BarcodeA4PrintModal
+          products={
+            selectedWithBarcode.length > 0
+              ? selectedWithBarcode
+              : filteredProducts.filter((p) => String(p.barcode || "").trim())
+          }
+          onClose={() => setShowA4Modal(false)}
+        />
+      )}
 
       {previewProduct && (
         <UniversalModal title="Предпросмотр этикетки" onClose={handleClosePreview}>
