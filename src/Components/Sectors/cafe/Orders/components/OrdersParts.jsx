@@ -300,10 +300,73 @@ export const RightMenuPanel = ({
     }
   }, [viewMode]);
   const [categories, setCategories] = useState([]);
+  // Раскрытая категория аккордеона (null = все закрыты по умолчанию)
+  const [expandedCat, setExpandedCat] = useState(null);
   const fetchCategories = useCallback(async () => {
     const res = await api.get("/cafe/categories/");
     setCategories(getListFromResponse(res));
   }, []);
+
+  // Всё меню грузим один раз при открытии панели и раскладываем по категориям
+  // локально — при раскрытии категории новых запросов нет.
+  const [allMenu, setAllMenu] = useState([]);
+  const [allLoading, setAllLoading] = useState(false);
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    (async () => {
+      setAllLoading(true);
+      try {
+        const acc = [];
+        let page = 1;
+        for (let i = 0; i < 100; i += 1) {
+          const res = await api.get("/cafe/menu-items/", {
+            params: { page, page_size: 200 },
+          });
+          const data = res?.data || {};
+          const arr = Array.isArray(data) ? data : data.results || [];
+          acc.push(...arr);
+          if (Array.isArray(data) || !data.next) break;
+          page += 1;
+        }
+        if (!cancelled) setAllMenu(acc);
+      } catch {
+        if (!cancelled) setAllMenu([]);
+      } finally {
+        if (!cancelled) setAllLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const normalizeMenuItem = useCallback((raw) => {
+    const cat = raw.category ?? raw.category_id ?? raw.category?.id ?? "";
+    return {
+      id: raw.id,
+      title: raw.title ?? raw.name ?? "",
+      price: raw.price,
+      category: cat === null || cat === undefined ? "" : String(cat),
+      image_url: raw.image_url || "",
+      kitchen: raw.kitchen ?? null,
+      is_sold_by_weight: raw.is_sold_by_weight ?? false,
+      sale_unit: raw.sale_unit ?? null,
+      is_available: raw.is_available,
+    };
+  }, []);
+
+  const itemsByCategory = useMemo(() => {
+    const map = new Map();
+    for (const raw of allMenu) {
+      const m = normalizeMenuItem(raw);
+      if (m.is_available === false) continue;
+      const key = m.category || "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(m);
+    }
+    return map;
+  }, [allMenu, normalizeMenuItem]);
   useEffect(() => {
     (async () => {
       await fetchCategories();
@@ -319,31 +382,31 @@ export const RightMenuPanel = ({
 
     return [{ value: "", label: "Все категории" }, ...baseOptions];
   }, [categories]);
-  // Debounce для поиска - отправляем запрос на бэкенд через 500ms после остановки ввода
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+
+  // Поиск теперь локальный (по загруженному меню) — без запросов на бэкенд.
+  // Группы категорий с их блюдами; при поиске оставляем только совпавшие.
+  const menuGroups = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    const match = (it) =>
+      !query || String(it.title || "").toLowerCase().includes(query);
+
+    const base = (Array.isArray(categories) ? categories : [])
+      .map((c) => ({ id: String(c.id), title: c.title }))
+      .filter((g) => g.id && g.title);
+
+    const groups = base.map((g) => ({
+      ...g,
+      items: (itemsByCategory.get(g.id) || []).filter(match),
+    }));
+
+    const uncategorized = (itemsByCategory.get("") || []).filter(match);
+    if (uncategorized.length) {
+      groups.push({ id: "__none__", title: "Без категории", items: uncategorized });
     }
 
-    const timeoutId = setTimeout(() => {
-      const trimmedQuery = q.trim();
-      if (trimmedQuery !== searchQuery) {
-        setSearchQuery(trimmedQuery);
-        // Сбрасываем на первую страницу при новом поиске
-        if (onPageChange) {
-          onPageChange(1, trimmedQuery);
-        }
-      }
-    }, 500);
-
-    searchTimeoutRef.current = timeoutId;
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [q, searchQuery, onPageChange]);
+    // При поиске прячем пустые категории
+    return query ? groups.filter((g) => g.items.length) : groups;
+  }, [categories, itemsByCategory, q]);
 
   // Извлекаем массив блюд из объекта пагинации или используем как массив
   const itemsArray = useMemo(() => {
@@ -407,9 +470,9 @@ export const RightMenuPanel = ({
     </span>
   );
 
-  const renderMenuItems = () =>
-    paginatedItems.map((m) => {
-      const img = menuImageUrl?.(m.id);
+  const renderMenuItems = (items) =>
+    (items || []).map((m) => {
+      const img = m.image_url || menuImageUrl?.(m.id);
       const cartItem = isCart(m.id);
       const isWeight = !!m?.is_sold_by_weight;
       const rawQty = cartItem?.quantity;
@@ -515,52 +578,57 @@ export const RightMenuPanel = ({
           placeholder="Поиск блюд…"
         />
       </div>
-      <div className="cafeOrdersRpanel__search mt-0! pt-0!">
-        <SearchableCombobox
-          value={selectedCategoryFilter}
-          onChange={(val) => setSelectedCategoryFilter(val || "")}
-          options={categoryOptions}
-          placeholder="Фильтр по категории…"
-          disabled={!categoryOptions.length}
-          classNamePrefix="cafeMenuCombo"
-        />
-      </div>
-
-      <div
-        className={`cafeOrdersRpanel__list cafeOrdersRpanel__list--${viewMode}`}
-      >
-        {loading && <div className="cafeOrdersRpanel__empty">Загрузка…</div>}
-        {!loading && renderMenuItems()}
-        {!loading && !paginatedItems.length && (
+      {/* Категории-аккордеон: всё меню загружено, раскрытие без запросов */}
+      <div className="cafeMenuAcc">
+        {allLoading && !allMenu.length && (
+          <div className="cafeOrdersRpanel__empty">Загрузка меню…</div>
+        )}
+        {!allLoading && !menuGroups.length && (
           <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
         )}
+        {menuGroups.map((g) => {
+          const searching = q.trim().length > 0;
+          const open2 =
+            searching ||
+            (expandedCat !== null && String(expandedCat) === String(g.id));
+          return (
+            <div
+              key={g.id}
+              className={`cafeMenuAcc__group${open2 ? " cafeMenuAcc__group--open" : ""}`}
+            >
+              <button
+                type="button"
+                className="cafeMenuAcc__head"
+                onClick={() =>
+                  setExpandedCat((prev) =>
+                    String(prev) === String(g.id) ? null : g.id,
+                  )
+                }
+                aria-expanded={open2}
+              >
+                <span className="cafeMenuAcc__title">
+                  {g.title}
+                  <span className="cafeMenuAcc__count"> ({g.items.length})</span>
+                </span>
+                <FaChevronDown className="cafeMenuAcc__chevron" aria-hidden />
+              </button>
+              {open2 && (
+                <div className="cafeMenuAcc__body">
+                  <div
+                    className={`cafeOrdersRpanel__list cafeOrdersRpanel__list--${viewMode}`}
+                  >
+                    {g.items.length ? (
+                      renderMenuItems(g.items)
+                    ) : (
+                      <div className="cafeOrdersRpanel__empty">Пусто</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-
-      {/* Пагинация */}
-      {totalPages > 1 && (
-        <div className="cafeOrdersRpanel__pagination">
-          <button
-            type="button"
-            className="cafeOrdersRpanel__pagination-btn"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={!hasPrevPage || loading}
-          >
-            Назад
-          </button>
-          {/* <span className="cafeOrdersRpanel__pagination-info">
-            Страница {currentPage} из {totalPages}
-            {menuItems?.count ? ` (${menuItems.count} блюд)` : filtered.length ? ` (${filtered.length} блюд)` : ""}
-          </span> */}
-          <button
-            type="button"
-            className="cafeOrdersRpanel__pagination-btn"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={!hasNextPage || loading}
-          >
-            Вперед
-          </button>
-        </div>
-      )}
 
       <div className="cafeOrdersRpanel__footer">
         <button

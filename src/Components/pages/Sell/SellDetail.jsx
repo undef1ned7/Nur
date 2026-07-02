@@ -749,6 +749,23 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
                   {formatDateTime(filterField?.created_at)}
                 </span>
               </div>
+              <div className="sellDetail__metaCard">
+                <span className="sellDetail__metaLabel">Кассир</span>
+                <span className="sellDetail__metaValue">
+                  {filterField?.user_display ||
+                    filterField?.cashier_name ||
+                    filterField?.user_name ||
+                    "—"}
+                </span>
+              </div>
+              {filterField?.cashbox_name && (
+                <div className="sellDetail__metaCard">
+                  <span className="sellDetail__metaLabel">Касса</span>
+                  <span className="sellDetail__metaValue">
+                    {filterField.cashbox_name}
+                  </span>
+                </div>
+              )}
             </div>
 
             <section className="sellDetail__section" aria-label="Позиции продажи">

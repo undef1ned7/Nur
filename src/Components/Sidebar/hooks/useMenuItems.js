@@ -117,7 +117,11 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
           "/crm/production/request",
         ]);
         return sectorConfig.filter(
-          (item) => !skip.has(item.to) && hasPermission(item.permission),
+          (item) =>
+            !skip.has(item.to) &&
+            (hasPermission(item.permission) ||
+              (item.permission === "can_view_market_supplier" &&
+                profile?.role === "owner")),
         );
       }
       if (configKey === "warehouse") {
@@ -144,6 +148,14 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       if (
         "production" === configKey &&
         item.permission === "can_view_catalog" &&
+        profile?.role === "owner"
+      ) {
+        return true;
+      }
+      // Владельцу показываем «Поставщики» в Производстве даже без права
+      if (
+        "production" === configKey &&
+        item.permission === "can_view_market_supplier" &&
         profile?.role === "owner"
       ) {
         return true;

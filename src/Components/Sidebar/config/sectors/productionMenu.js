@@ -31,6 +31,13 @@ export const productionMenu = [
         implemented: true,
       },
       {
+        label: "Поставщики",
+        to: "/crm/production/suppliers",
+        icon: menuIcons.filePerson,
+        permission: "can_view_market_supplier",
+        implemented: true,
+      },
+      {
         label: "Каталог",
         to: "/crm/production/catalog",
         icon: menuIcons.layers,
