@@ -15,6 +15,7 @@ import {
 import "../Kassa/kassa.scss";
 import "./Vitrina.scss";
 import { useUser } from "../../../store/slices/userSlice";
+import { isMarketSectorName } from "../../../utils/subscriptionPlan";
 import { addCashFlows } from "../../../store/slices/cashSlice";
 import PendingModal from "../Kassa/PendingModal/PendingModal";
 import Pending from "../../pages/Pending/Pending";
@@ -35,6 +36,9 @@ const KassaDet = () => {
   const { company } = useUser();
   const navigate = useNavigate();
   const { profile } = useUser();
+  // На сфере Магазин операцию может добавить любой сотрудник (сразу approved, без запроса на одобрение)
+  const isMarket = isMarketSectorName(company?.sector?.name);
+  const canApproveDirectly = profile?.role === "owner" || isMarket;
   const [cashboxDetails, setCashboxDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -59,7 +63,7 @@ const KassaDet = () => {
   const [newCashbox, setNewCashbox] = useState({
     name: "",
     amount: 0,
-    status: profile.role === 'owner' ? 'approved' : 'pending',
+    status: canApproveDirectly ? 'approved' : 'pending',
     type: "expense", // Дефолтный тип для новой операции
   });
 
@@ -215,7 +219,7 @@ const KassaDet = () => {
           amount: newCashbox.amount,
           cashbox: cashboxId,
           type: newCashbox.type,
-          status: profile.role === "owner" ? "approved" : "pending",
+          status: canApproveDirectly ? "approved" : "pending",
         })
       ).unwrap();
 

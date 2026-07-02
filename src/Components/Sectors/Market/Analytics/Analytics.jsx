@@ -111,11 +111,24 @@ const Analytics = () => {
   const { list: branches } = useSelector(
     (state) => state.branches || { list: [] },
   );
-  const [activeTab, setActiveTab] = useState("sales");
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem("market_analytics_tab") || "sales";
+    } catch {
+      return "sales";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  // Модалка «Выручка»: себестоимость / валовая прибыль / маржа
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
+  // Модалка «Транзакции»: продажи по настроенному фильтру аналитики
+  const [showTxModal, setShowTxModal] = useState(false);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txError, setTxError] = useState("");
+  const [txSales, setTxSales] = useState([]);
   const [openProductTable, setOpenProductTable] = useState("topByRevenue");
   const [openFinanceTable, setOpenFinanceTable] = useState("expenseBreakdown");
   // Сортировка блока «Остатки товаров» на вкладке «Склад».
@@ -125,6 +138,19 @@ const Analytics = () => {
   const [expandedUserPerformanceId, setExpandedUserPerformanceId] =
     useState(null);
   const [period, setPeriod] = useState(() => {
+    try {
+      const raw = localStorage.getItem("market_analytics_period");
+      if (raw) {
+        const p = JSON.parse(raw);
+        const from = new Date(p.from);
+        const to = new Date(p.to);
+        if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+          return { from, to };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -174,7 +200,7 @@ const Analytics = () => {
   }, [isStartTariff, openProductTable]);
 
   // Фильтры для всех вкладок
-  const [filters, setFilters] = useState({
+  const DEFAULT_FILTERS = {
     branch: "",
     include_global: false,
     // Sales filters
@@ -196,7 +222,42 @@ const Analytics = () => {
     status: "",
     // Common
     limit: "",
+  };
+  const [filters, setFilters] = useState(() => {
+    try {
+      const raw = localStorage.getItem("market_analytics_filters");
+      if (raw) return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_FILTERS;
   });
+
+  // Сохраняем фильтры/период/вкладку в localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("market_analytics_tab", activeTab);
+    } catch {
+      /* ignore */
+    }
+  }, [activeTab]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "market_analytics_period",
+        JSON.stringify({ from: period.from, to: period.to }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [period]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("market_analytics_filters", JSON.stringify(filters));
+    } catch {
+      /* ignore */
+    }
+  }, [filters]);
 
   const currentDate = new Date();
   const monthName = currentDate.toLocaleDateString("ru-RU", {
@@ -242,6 +303,82 @@ const Analytics = () => {
       return { ...prev, cashbox: mainCashboxId };
     });
   }, [mainCashboxId]);
+
+  // Открыть модалку транзакций: продажи по настроенному фильтру аналитики
+  const openTransactions = React.useCallback(async () => {
+    setShowTxModal(true);
+    setTxLoading(true);
+    setTxError("");
+    try {
+      const toYmd = (d) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate(),
+        ).padStart(2, "0")}`;
+
+      // Фильтр аналитики уходит на сервер через query-параметры
+      const params = {
+        date_from: toYmd(period.from),
+        date_to: toYmd(period.to),
+      };
+      if (filters.payment_method) params.payment_method = filters.payment_method;
+      if (filters.cashbox) params.cashbox = filters.cashbox;
+      if (filters.cashier) params.cashier = filters.cashier;
+      if (filters.min_total !== "") params.min_total = filters.min_total;
+      if (filters.max_total !== "") params.max_total = filters.max_total;
+
+      const res = await api.get("/main/pos/sales/", { params });
+      const list = Array.isArray(res.data?.results)
+        ? res.data.results
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
+
+      // Клиентский фильтр как fallback (если бэкенд ещё не учитывает params)
+      const fromT = period.from.getTime();
+      const toT = period.to.getTime();
+      const pm = filters.payment_method;
+      const cb = filters.cashbox ? String(filters.cashbox) : "";
+      const minT = filters.min_total !== "" ? Number(filters.min_total) : null;
+      const maxT = filters.max_total !== "" ? Number(filters.max_total) : null;
+      const filtered = list.filter((s) => {
+        const t = new Date(s.created_at || s.paid_at || s.date).getTime();
+        if (Number.isFinite(t) && (t < fromT || t > toT)) return false;
+        if (pm && String(s.payment_method || "") !== String(pm)) return false;
+        if (cb && String(s.cashbox || "") !== cb) return false;
+        const total = Number(s.total || 0);
+        if (minT != null && Number.isFinite(minT) && total < minT) return false;
+        if (maxT != null && Number.isFinite(maxT) && total > maxT) return false;
+        return true;
+      });
+      filtered.sort(
+        (a, b) =>
+          new Date(b.created_at || b.paid_at || 0) -
+          new Date(a.created_at || a.paid_at || 0),
+      );
+      setTxSales(filtered);
+    } catch {
+      setTxError("Не удалось загрузить продажи");
+      setTxSales([]);
+    } finally {
+      setTxLoading(false);
+    }
+  }, [period, filters]);
+
+  // Статус/тип продажи для бейджа: Оплачено / Отменено / Долг
+  const saleStatusInfo = (sale) => {
+    const s = String(sale?.status || "").toLowerCase();
+    const pm = String(sale?.payment_method || "").toLowerCase();
+    if (["canceled", "cancelled", "refunded", "returned"].includes(s)) {
+      return { label: "Отменено", variant: "canceled" };
+    }
+    if (pm === "debt" || s === "debt" || s === "unpaid" || s === "credit") {
+      return { label: "Долг", variant: "debt" };
+    }
+    if (s === "partial" || s === "partially_paid") {
+      return { label: "Частично", variant: "debt" };
+    }
+    return { label: "Оплачено", variant: "paid" };
+  };
 
   // Форматирование даты для API (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)
   const formatDateForAPI = (date, includeTime = true) => {
@@ -492,26 +629,6 @@ const Analytics = () => {
             color: "#f7d617",
           },
           {
-            title: "Себестоимость",
-            value: "0",
-            currency: "сом",
-            icon: Package,
-            color: "#f7d617",
-          },
-          {
-            title: "Валовая прибыль",
-            value: "0",
-            currency: "сом",
-            icon: TrendingUp,
-            color: "#f7d617",
-          },
-          {
-            title: "Маржа",
-            value: "0%",
-            icon: HelpCircle,
-            color: "#f7d617",
-          },
-          {
             title: "Транзакции",
             value: "0",
             icon: ShoppingCart,
@@ -561,30 +678,6 @@ const Analytics = () => {
           value: formatNumber(cards.revenue || "0"),
           currency: "сом",
           icon: DollarSign,
-          color: "#f7d617",
-        },
-        {
-          title: "Себестоимость",
-          value: formatNumber(cards.cogs || "0"),
-          currency: "сом",
-          subtitle: cards.cogs_warning ? String(cards.cogs_warning) : "",
-          icon: Package,
-          color: "#f7d617",
-        },
-        {
-          title: "Валовая прибыль",
-          value: formatNumber(cards.gross_profit || "0"),
-          currency: "сом",
-          icon: TrendingUp,
-          color: "#f7d617",
-        },
-        {
-          title: "Маржа",
-          value: `${Number(cards.margin_percent || 0).toLocaleString("ru-RU", {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-          })}%`,
-          icon: HelpCircle,
           color: "#f7d617",
         },
         {
@@ -1858,8 +1951,38 @@ const Analytics = () => {
           <div className="analytics-page__kpis">
             {salesData.kpis.map((kpi, index) => {
               const Icon = kpi.icon;
+              const isRevenue = kpi.title === "Выручка";
+              const isTx = kpi.title === "Транзакции";
+              const clickable = isRevenue || isTx;
+              const handleOpen = isRevenue
+                ? () => setShowRevenueModal(true)
+                : isTx
+                  ? openTransactions
+                  : undefined;
               return (
-                <div key={index} className="analytics-page__kpi-card">
+                <div
+                  key={index}
+                  className={`analytics-page__kpi-card${
+                    clickable ? " analytics-page__kpi-card--clickable" : ""
+                  }`}
+                  role={clickable ? "button" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={handleOpen}
+                  onKeyDown={
+                    clickable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") handleOpen();
+                        }
+                      : undefined
+                  }
+                  title={
+                    isRevenue
+                      ? "Себестоимость, валовая прибыль, маржа"
+                      : isTx
+                        ? "Показать продажи по фильтру"
+                        : undefined
+                  }
+                >
                   <div className="analytics-page__kpi-header">
                     <span className="analytics-page__kpi-title">
                       {kpi.title}
@@ -1884,6 +2007,200 @@ const Analytics = () => {
               );
             })}
           </div>
+
+          {showRevenueModal && (
+            <div
+              className="analytics-revenue-modal__overlay"
+              role="presentation"
+              onClick={() => setShowRevenueModal(false)}
+            >
+              <div
+                className="analytics-revenue-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Детализация выручки"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="analytics-revenue-modal__head">
+                  <div className="analytics-revenue-modal__head-left">
+                    <span className="analytics-revenue-modal__head-icon">
+                      <DollarSign size={20} />
+                    </span>
+                    <div>
+                      <h3 className="analytics-revenue-modal__title">
+                        Выручка
+                      </h3>
+                      <p className="analytics-revenue-modal__subtitle">
+                        {formatNumber(analyticsData?.cards?.revenue || 0)} сом за
+                        период
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="analytics-revenue-modal__close"
+                    onClick={() => setShowRevenueModal(false)}
+                    aria-label="Закрыть"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="analytics-revenue-modal__grid">
+                  <div className="analytics-revenue-modal__tile analytics-revenue-modal__tile--cost">
+                    <span className="analytics-revenue-modal__tile-icon">
+                      <Package size={18} />
+                    </span>
+                    <span className="analytics-revenue-modal__tile-label">
+                      Себестоимость
+                    </span>
+                    <span className="analytics-revenue-modal__tile-value">
+                      {formatNumber(analyticsData?.cards?.cogs || 0)}
+                      <em>сом</em>
+                    </span>
+                  </div>
+
+                  <div className="analytics-revenue-modal__tile analytics-revenue-modal__tile--profit">
+                    <span className="analytics-revenue-modal__tile-icon">
+                      <TrendingUp size={18} />
+                    </span>
+                    <span className="analytics-revenue-modal__tile-label">
+                      Валовая прибыль
+                    </span>
+                    <span className="analytics-revenue-modal__tile-value">
+                      {formatNumber(analyticsData?.cards?.gross_profit || 0)}
+                      <em>сом</em>
+                    </span>
+                  </div>
+
+                  <div className="analytics-revenue-modal__tile analytics-revenue-modal__tile--margin">
+                    <span className="analytics-revenue-modal__tile-icon">
+                      <BarChart3 size={18} />
+                    </span>
+                    <span className="analytics-revenue-modal__tile-label">
+                      Маржа
+                    </span>
+                    <span className="analytics-revenue-modal__tile-value">
+                      {Number(
+                        analyticsData?.cards?.margin_percent || 0,
+                      ).toLocaleString("ru-RU", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
+                      <em>%</em>
+                    </span>
+                  </div>
+                </div>
+
+                {analyticsData?.cards?.cogs_warning && (
+                  <div className="analytics-revenue-modal__warn">
+                    {analyticsData.cards.cogs_warning}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showTxModal && (
+            <div
+              className="analytics-revenue-modal__overlay"
+              role="presentation"
+              onClick={() => setShowTxModal(false)}
+            >
+              <div
+                className="analytics-revenue-modal analytics-tx-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Продажи по фильтру"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="analytics-revenue-modal__head">
+                  <div className="analytics-revenue-modal__head-left">
+                    <span className="analytics-revenue-modal__head-icon">
+                      <ShoppingCart size={20} />
+                    </span>
+                    <div>
+                      <h3 className="analytics-revenue-modal__title">
+                        Транзакции
+                      </h3>
+                      <p className="analytics-revenue-modal__subtitle">
+                        {txLoading
+                          ? "Загрузка…"
+                          : `Продаж: ${txSales.length}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="analytics-revenue-modal__close"
+                    onClick={() => setShowTxModal(false)}
+                    aria-label="Закрыть"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="analytics-tx-modal__body">
+                  {txLoading ? (
+                    <div className="analytics-tx-modal__state">Загрузка…</div>
+                  ) : txError ? (
+                    <div className="analytics-tx-modal__state analytics-tx-modal__state--error">
+                      {txError}
+                    </div>
+                  ) : txSales.length === 0 ? (
+                    <div className="analytics-tx-modal__state">
+                      Нет продаж по выбранному фильтру
+                    </div>
+                  ) : (
+                    <div className="analytics-tx-modal__list">
+                      {txSales.map((s, i) => {
+                        const pmLabel =
+                          { cash: "Наличные", card: "Карта", transfer: "Перевод" }[
+                            String(s.payment_method || "")
+                          ] || s.payment_method || "—";
+                        const dt = s.created_at || s.paid_at;
+                        const dtLabel = dt
+                          ? new Date(dt).toLocaleString("ru-RU", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—";
+                        const st = saleStatusInfo(s);
+                        return (
+                          <div className="analytics-tx-modal__row" key={s.id || i}>
+                            <div className="analytics-tx-modal__row-main">
+                              <span className="analytics-tx-modal__row-no">
+                                № {i + 1}
+                                <span
+                                  className={`analytics-tx-modal__badge analytics-tx-modal__badge--${st.variant}`}
+                                >
+                                  {st.label}
+                                </span>
+                              </span>
+                              <span className="analytics-tx-modal__row-date">
+                                {dtLabel}
+                              </span>
+                            </div>
+                            <div className="analytics-tx-modal__row-meta">
+                              <span className="analytics-tx-modal__row-pm">
+                                {pmLabel}
+                              </span>
+                              <span className="analytics-tx-modal__row-total">
+                                {formatNumber(s.total || 0)} сом
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="analytics-page__chart-card analytics-page__chart-card--fit">
             <h3 className="analytics-page__chart-title">Динамика продаж</h3>

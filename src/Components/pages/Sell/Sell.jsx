@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, Fragment } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 // import "./Sklad.scss";
@@ -263,8 +263,7 @@ const Sell = () => {
     const isStartPlanCompany = planName === "старт";
     const hidden = hiddenIds;
     const filterSell = (Array.isArray(history) ? history : []).filter(
-      (item) =>
-        item.status !== "canceled" && !hidden.has(String(item?.id ?? "")),
+      (item) => !hidden.has(String(item?.id ?? "")),
     );
     const filterObjects = (
       Array.isArray(historyObjects) ? historyObjects : []
@@ -493,6 +492,35 @@ const Sell = () => {
     } catch {
       return String(dateString);
     }
+  };
+
+  // Ключ дня (YYYY-MM-DD) для группировки позиций по дате
+  const dayKeyOf = (v) => {
+    if (!v) return "";
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+
+  // Человекочитаемая подпись дня для разделителя (Сегодня/Вчера · дата)
+  const dayLabelOf = (v) => {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v || "").slice(0, 10);
+    const base = d.toLocaleDateString("ru-RU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dd = new Date(d);
+    dd.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - dd) / 86400000);
+    if (diff === 0) return `Сегодня · ${base}`;
+    if (diff === 1) return `Вчера · ${base}`;
+    return base;
   };
 
   const getSaleThumb = (sale) => {
@@ -890,9 +918,18 @@ const Sell = () => {
                           kindTranslate[item.status] || item.status || "-";
                         const statusVariant = getStatusVariant(item.status);
                         const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                        const curDay = dayKeyOf(item.created_at);
+                        const prevDay =
+                          idx > 0 ? dayKeyOf(filterField[idx - 1].created_at) : null;
+                        const showDaySep = curDay && curDay !== prevDay;
                         return (
+                          <Fragment key={item.id}>
+                          {showDaySep && (
+                            <tr className="sellTable__daySep">
+                              <td colSpan={11}>{dayLabelOf(item.created_at)}</td>
+                            </tr>
+                          )}
                           <tr
-                            key={item.id}
                             className="sellTable__row"
                             role="button"
                             tabIndex={0}
@@ -963,6 +1000,7 @@ const Sell = () => {
                               )}
                             </td>
                           </tr>
+                          </Fragment>
                         );
                       })}
                     </tbody>
@@ -977,10 +1015,19 @@ const Sell = () => {
                       kindTranslate[item.status] || item.status || "-";
                     const statusVariant = getStatusVariant(item.status);
                     const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                    const curDay = dayKeyOf(item.created_at);
+                    const prevDay =
+                      idx > 0 ? dayKeyOf(filterField[idx - 1].created_at) : null;
+                    const showDaySep = curDay && curDay !== prevDay;
 
                     return (
+                      <Fragment key={item.id}>
+                      {showDaySep && (
+                        <div className="sell__cards-daySep">
+                          {dayLabelOf(item.created_at)}
+                        </div>
+                      )}
                       <div
-                        key={item.id}
                         className="sellCard"
                         role="button"
                         tabIndex={0}
@@ -1079,6 +1126,7 @@ const Sell = () => {
                           </div>
                         </div>
                       </div>
+                      </Fragment>
                     );
                   })}
                 </div>

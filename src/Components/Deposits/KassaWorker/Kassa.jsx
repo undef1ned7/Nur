@@ -14,13 +14,37 @@ import PendingModal from "../Kassa/PendingModal/PendingModal";
 import { useDispatch } from "react-redux";
 import { getCashFlows } from "../../../store/slices/cashSlice";
 import { useUser } from "../../../store/slices/userSlice";
+import { isMarketSectorName } from "../../../utils/subscriptionPlan";
+import { useAlert } from "../../../hooks/useDialog";
 import { useNavigate } from "react-router-dom";
 import Pending from "../../pages/Pending/Pending";
 
+/** Человекочитаемый текст ошибки из ответа API. */
+const formatApiError = (e, fallback = "Произошла ошибка") => {
+  if (!e) return fallback;
+  if (typeof e === "string") return e;
+  if (Array.isArray(e)) return e.join("; ");
+  if (typeof e === "object") {
+    try {
+      return (
+        Object.entries(e)
+          .map(
+            ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`,
+          )
+          .join("\n") || fallback
+      );
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+};
+
 const Kassa = () => {
+  const alert = useAlert();
   const [cashboxes, setCashboxes] = useState([]); // Now storing cashbox summaries
+  const [cashboxId, setCashboxId] = useState(""); // UUID кассы для новой операции
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("Расход"); // This tab will now filter cashboxes if applicable, or be a UI placeholder
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -61,15 +85,43 @@ const Kassa = () => {
       setCashboxes(data.results || []); // Ensure it's an array
     } catch (err) {
       console.error("Failed to fetch cashboxes:", err);
-      setError(
-        "Не удалось загрузить данные кассы. Пожалуйста, попробуйте еще раз."
+      alert(
+        "Не удалось загрузить данные кассы. Пожалуйста, попробуйте еще раз.",
+        true,
       );
     } finally {
       setLoading(false);
     }
   };
+  // Получаем список касс компании, чтобы привязать новую операцию (cashbox — обязательное поле)
+  const fetchCashboxId = async () => {
+    try {
+      const response = await fetch(
+        "https://app.nurcrm.kg/api/construction/cashboxes/",
+        {
+          headers: {
+            Authorization: "Bearer " + localStorage.getItem("accessToken"),
+          },
+        },
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+          ? data
+          : [];
+      const first = list?.[0];
+      const id = first?.id || first?.uuid || "";
+      if (id) setCashboxId(String(id));
+    } catch {
+      /* ignore */
+    }
+  };
+
   // Effect to fetch cashboxes data
   useEffect(() => {
+    fetchCashboxId();
     fetchCashboxes();
   }, []); // Empty dependency array means this runs once on component mount
 
@@ -107,6 +159,14 @@ const Kassa = () => {
 
   // Handle adding a new cashbox
   const handleAddCashbox = async () => {
+    if (!cashboxId) {
+      alert("Касса не определена. Обновите страницу и попробуйте снова.", true);
+      return;
+    }
+    if (!String(newCashbox.name || "").trim() || !newCashbox.amount) {
+      alert("Заполните название и сумму операции.", true);
+      return;
+    }
     try {
       const response = await fetch(
         "https://app.nurcrm.kg/api/construction/cashflows/",
@@ -117,6 +177,7 @@ const Kassa = () => {
             Authorization: "Bearer " + localStorage.getItem("accessToken"),
           },
           body: JSON.stringify({
+            cashbox: cashboxId,
             name: newCashbox.name,
             amount: newCashbox.amount,
             type: activeTab === "Приход" ? "income" : "expense",
@@ -125,25 +186,23 @@ const Kassa = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => null);
         console.error("Error adding cashbox:", errorData);
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${JSON.stringify(
-            errorData
-          )}`
-        );
+        alert(formatApiError(errorData, "Не удалось добавить операцию"), true);
+        return;
       }
 
       const addedCashbox = await response.json();
       setCashboxes((prev) => [...prev, addedCashbox]);
       setShowAddCashboxModal(false);
-      setNewCashbox({ department: "", department_name: "", balance: 0 }); // Reset form
+      setNewCashbox({ cashbox: "", name: "", amount: 0 }); // Reset form
       // Re-fetch all cashboxes to ensure updated data, especially for analytics
       fetchCashboxes(); // This will re-trigger the useEffect to get fresh data
     } catch (err) {
       console.error("Failed to add cashbox:", err);
-      setError(
-        "Не удалось добавить кассу. Пожалуйста, проверьте данные и попробуйте еще раз."
+      alert(
+        "Не удалось добавить операцию. Проверьте данные и попробуйте ещё раз.",
+        true,
       );
     }
   };
@@ -196,8 +255,9 @@ const Kassa = () => {
       fetchCashboxes(); // Re-fetch to ensure data consistency
     } catch (err) {
       console.error("Failed to edit cashbox:", err);
-      setError(
-        "Не удалось обновить кассу. Пожалуйста, проверьте данные и попробуйте еще раз."
+      alert(
+        "Не удалось обновить кассу. Проверьте данные и попробуйте ещё раз.",
+        true,
       );
     }
   };
@@ -240,7 +300,7 @@ const Kassa = () => {
       setSelectedCashbox(null);
     } catch (err) {
       console.error("Failed to delete cashbox:", err);
-      setError("Не удалось удалить кассу. Пожалуйста, попробуйте еще раз.");
+      alert("Не удалось удалить кассу. Пожалуйста, попробуйте еще раз.", true);
     }
   };
   const navigate = useNavigate();
@@ -248,10 +308,6 @@ const Kassa = () => {
 
   if (loading) {
     return <div className="vitrina">Загрузка данных...</div>;
-  }
-
-  if (error) {
-    return <div className="vitrina vitrina--error">{error}</div>;
   }
 
   return (
@@ -275,15 +331,6 @@ const Kassa = () => {
           >
             Приход
           </span>
-          <button
-            onClick={() => setActiveTab("pending")}
-            style={{ cursor: "pointer" }}
-            className={`vitrina__tab ${
-              activeTab === "pending" ? "vitrina__tab--active" : ""
-            }`}
-          >
-            Запросы
-          </button>
         </div>
         <div className="vitrina__actions">
           <div class="vitrina__controls">
@@ -330,7 +377,8 @@ const Kassa = () => {
               </svg>
             </button>
           </div>
-          {company?.sector?.name === "Консалтинг" && (
+          {(company?.sector?.name === "Консалтинг" ||
+            isMarketSectorName(company?.sector?.name)) && (
             <button
               className="vitrina__add-expense-button  sklad__add vitrina__add-expense-button vitrina__button vitrina__button--delete "
               onClick={() => setShowAddCashboxModal(true)}
