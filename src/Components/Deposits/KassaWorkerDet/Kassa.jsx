@@ -28,6 +28,35 @@ import DataContainer from "../../common/DataContainer/DataContainer";
 
 const CASHFLOWS_PAGE_SIZE = 100;
 
+// Ключ дня (YYYY-MM-DD) для группировки операций по дате
+const dayKeyOf = (v) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+// Подпись дня для разделителя: «Сегодня/Вчера · дата»
+const dayLabelOf = (v) => {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v || "").slice(0, 10);
+  const base = d.toLocaleDateString("ru-RU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dd = new Date(d);
+  dd.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - dd) / 86400000);
+  if (diff === 0) return `Сегодня · ${base}`;
+  if (diff === 1) return `Вчера · ${base}`;
+  return base;
+};
+
 const KassaDet = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -856,21 +885,53 @@ const KassaDet = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCashflows.map((flow) => (
-                      <tr key={flow.id}>
-                        <td>{flow.type === "income" ? "Приход" : "Расход"}</td>
-                        <td>{flow.name}</td>
-                        <td>{flow.amount}</td>
-                        <td>{new Date(flow.created_at).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
+                    {filteredCashflows.map((flow, idx) => {
+                      const curDay = dayKeyOf(flow.created_at);
+                      const prevDay =
+                        idx > 0
+                          ? dayKeyOf(filteredCashflows[idx - 1].created_at)
+                          : null;
+                      const showDaySep = curDay && curDay !== prevDay;
+                      return (
+                        <React.Fragment key={flow.id}>
+                          {showDaySep && (
+                            <tr className="kassa-day-sep">
+                              <td colSpan={4}>{dayLabelOf(flow.created_at)}</td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td>
+                              {flow.type === "income" ? "Приход" : "Расход"}
+                            </td>
+                            <td>{flow.name}</td>
+                            <td>{flow.amount}</td>
+                            <td>
+                              {new Date(flow.created_at).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               ) : (
                 <div className="kassa-cards-wrapper">
                   <div className="kassa-cards">
-                    {filteredCashflows.map((flow) => (
-                      <div key={flow.id} className="kassa-card">
+                    {filteredCashflows.map((flow, idx) => {
+                      const curDay = dayKeyOf(flow.created_at);
+                      const prevDay =
+                        idx > 0
+                          ? dayKeyOf(filteredCashflows[idx - 1].created_at)
+                          : null;
+                      const showDaySep = curDay && curDay !== prevDay;
+                      return (
+                      <React.Fragment key={flow.id}>
+                      {showDaySep && (
+                        <div className="kassa-day-sep kassa-day-sep--cards">
+                          {dayLabelOf(flow.created_at)}
+                        </div>
+                      )}
+                      <div className="kassa-card">
                         <div className="kassa-card__header">
                           <span
                             className={`kassa-card__num ${flow.type === "income"
@@ -908,7 +969,9 @@ const KassaDet = () => {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      </React.Fragment>
+                      );
+                    })}
                   </div>
                 </div>
               )}

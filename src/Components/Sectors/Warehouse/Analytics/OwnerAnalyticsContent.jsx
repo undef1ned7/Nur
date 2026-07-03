@@ -172,6 +172,12 @@ const OwnerAnalyticsContent = ({
       ? Number(moneyCounterpartyNetRaw)
       : moneyCounterpartyReceiptAmount - moneyCounterpartyExpenseAmount;
 
+  // Итого по всем графам (обычная касса + долги + контрагенты)
+  const moneyTotalReceiptAmount =
+    moneyReceiptAmount + moneyDebtReceiptAmount + moneyCounterpartyReceiptAmount;
+  const moneyTotalExpenseAmount =
+    moneyExpenseAmount + moneyDebtExpenseAmount + moneyCounterpartyExpenseAmount;
+
   const areaFillId = `${idPrefix}AreaFill`;
 
   return (
@@ -264,6 +270,18 @@ const OwnerAnalyticsContent = ({
               label="Нетто по контрагентам"
               value={`${formatNum(moneyCounterpartyNetAmount)} сом`}
               description="Приход − расход по контрагентам"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Всего пришло в кассу"
+              value={`${formatNum(moneyTotalReceiptAmount)} сом`}
+              description="Касса + долги + контрагенты"
+              icon={Wallet}
+            />
+            <KpiCard
+              label="Всего вышло из кассы"
+              value={`${formatNum(moneyTotalExpenseAmount)} сом`}
+              description="Касса + долги + контрагенты"
               icon={Wallet}
             />
           </>
