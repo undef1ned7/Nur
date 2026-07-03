@@ -101,6 +101,11 @@
       border-color: var(--primary-dark);
       box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
     }
+
+    &--time {
+      min-width: 110px;
+      padding: 10px 8px;
+    }
   }
 
   &__btn {
@@ -137,6 +142,18 @@
       border-radius: 10px;
       font-size: 13px;
       gap: 6px;
+    }
+
+    &--ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+      font-size: 13px;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.04);
+        border-color: var(--border);
+      }
     }
   }
 

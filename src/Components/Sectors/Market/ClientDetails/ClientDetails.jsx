@@ -85,6 +85,11 @@ export default function MarketClientDetails() {
   const [supplierProductsErr, setSupplierProductsErr] = useState("");
   const [supplierProductSearch, setSupplierProductSearch] = useState("");
 
+  // История продаж клиента (POS)
+  const [clientSales, setClientSales] = useState([]);
+  const [clientSalesLoading, setClientSalesLoading] = useState(false);
+  const [clientSalesErr, setClientSalesErr] = useState("");
+
   const [alert, setAlert] = useState({
     open: false,
     type: "error",
@@ -164,9 +169,54 @@ export default function MarketClientDetails() {
     }
   }, []);
 
+  // История POS-продаж клиента. Пробуем серверную фильтрацию (?client=<id>),
+  // и на всякий случай дофильтровываем на фронте (если бэк параметр игнорирует).
+  // Контракт: docs/market-pos-sales-client-filter-backend.md
+  const loadClientSales = useCallback(async (clientId) => {
+    const cid = String(clientId || "").trim();
+    if (!cid) {
+      setClientSales([]);
+      return;
+    }
+    setClientSalesLoading(true);
+    setClientSalesErr("");
+    try {
+      const res = await api.get("/main/pos/sales/", {
+        params: { client: cid, page: 1, limit: 100 },
+      });
+      const list = Array.isArray(res.data?.results)
+        ? res.data.results
+        : Array.isArray(res.data)
+          ? res.data
+          : [];
+      const own = list.filter((s) => {
+        const c = s?.client;
+        const sid =
+          c && typeof c === "object" ? (c.id ?? c.uuid ?? "") : (c ?? "");
+        return String(sid) === cid;
+      });
+      own.sort(
+        (a, b) =>
+          new Date(b.created_at || b.paid_at || 0) -
+          new Date(a.created_at || a.paid_at || 0),
+      );
+      setClientSales(own);
+    } catch (e) {
+      console.error(e);
+      setClientSales([]);
+      setClientSalesErr(msgFromError(e, "Не удалось загрузить историю продаж"));
+    } finally {
+      setClientSalesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (client?.id) loadDeals(client.id);
   }, [client?.id]);
+
+  useEffect(() => {
+    if (client?.id) void loadClientSales(client.id);
+  }, [client?.id, loadClientSales]);
 
   useEffect(() => {
     const isSupplier = String(client?.type || "").toLowerCase() === "suppliers";
@@ -227,6 +277,39 @@ export default function MarketClientDetails() {
     if (!dateFrom && !dateTo) return deals;
     return deals.filter((d) => inRange(getDealDateISO(d), dateFrom, dateTo));
   }, [deals, dateFrom, dateTo]);
+
+  // История продаж клиента с учётом фильтра дат из тулбара
+  const filteredClientSales = useMemo(() => {
+    if (!dateFrom && !dateTo) return clientSales;
+    return clientSales.filter((s) =>
+      inRange(
+        String(s?.created_at || s?.paid_at || "").slice(0, 10),
+        dateFrom,
+        dateTo,
+      ),
+    );
+  }, [clientSales, dateFrom, dateTo]);
+
+  const saleStatusRu = (s) => {
+    const v = String(s || "").toLowerCase();
+    if (["canceled", "cancelled", "refunded", "returned"].includes(v))
+      return { label: "Отменена", mod: "debt" };
+    if (v === "paid") return { label: "Оплачена", mod: "status" };
+    return { label: s || "—", mod: "neutral" };
+  };
+
+  const fmtSaleDate = (v) => {
+    if (!v) return "—";
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+    return d.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const applyPreset = (preset) => {
     const now = new Date();
@@ -873,6 +956,78 @@ export default function MarketClientDetails() {
           })}
         </div>
       </div>
+
+      {/* ===== История продаж (POS) ===== */}
+      <div className="cdx__deals">
+        <div className="cdx__deals-head">
+          <h3 className="cdx__deals-title">
+            <ReceiptText /> История продаж
+          </h3>
+          <span className="cdx__deals-count">{filteredClientSales.length}</span>
+        </div>
+
+        <div className="cdx__deals-body">
+          {clientSalesLoading && <div className="cdx__state">Загрузка…</div>}
+          {clientSalesErr && <div className="cdx__alert">{clientSalesErr}</div>}
+          {!clientSalesLoading &&
+            !clientSalesErr &&
+            filteredClientSales.length === 0 && (
+              <div className="cdx__state">Продаж нет</div>
+            )}
+
+          {filteredClientSales.map((sale, idx) => {
+            const st = saleStatusRu(sale.status);
+            const items = Array.isArray(sale.items) ? sale.items : [];
+            const itemsLabel = items
+              .slice(0, 3)
+              .map(
+                (it) =>
+                  `${it.product_name || it.name_snapshot || "Товар"} ×${Number(
+                    it.quantity || 0,
+                  )}`,
+              )
+              .join(", ");
+            const moreCount = Math.max(0, items.length - 3);
+            return (
+              <div key={sale.id || idx} className="cdx__deal">
+                <div className="cdx__deal-main">
+                  <span className="cdx__deal-name">
+                    Продажа №{filteredClientSales.length - idx}
+                  </span>
+                  <div className="cdx__deal-meta">
+                    <span className={`cdx__badge cdx__badge--${st.mod}`}>
+                      {st.label}
+                    </span>
+                    <span className="cdx__deal-meta-item">
+                      <CalendarDays />
+                      {fmtSaleDate(sale.created_at || sale.paid_at)}
+                    </span>
+                    {itemsLabel && (
+                      <span className="cdx__deal-meta-item" title={itemsLabel}>
+                        {itemsLabel}
+                        {moreCount > 0 ? ` +${moreCount}` : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="cdx__deal-money">
+                  <div className="cdx__deal-amount">
+                    {Number(sale.total || 0).toFixed(2)}
+                    <span className="cdx__deal-amount-cur">сом</span>
+                  </div>
+                  {Number(sale.discount_total || 0) > 0 && (
+                    <div className="cdx__deal-remaining">
+                      Скидка: {Number(sale.discount_total).toFixed(2)} сом
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {isSupplierClient && company?.sector?.name === "Магазин" && (
         <div className="cdx__card">
           <div className="cdx__supplier-head">

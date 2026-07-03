@@ -1320,3 +1320,27 @@
 .kassa__content .reports__tableWrap {
   margin-top: 8px;
 }
+
+/* Разделитель по дате в списке движений кассы */
+.kassa-day-sep td {
+  padding: 8px 14px;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: capitalize;
+}
+
+.kassa-day-sep--cards {
+  grid-column: 1 / -1;
+  margin: 4px 0 -6px;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: capitalize;
+}

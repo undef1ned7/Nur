@@ -182,6 +182,7 @@ const addDays = (d, days) => {
 const CAFE_ANALYTICS_DATE_FILTER_LS_KEY = "cafe_analytics_date_filter_v1";
 
 const isIsoDateString = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || "").trim());
+const isTimeString = (v) => /^\d{2}:\d{2}$/.test(String(v || "").trim());
 
 const readSavedCafeAnalyticsDateFilter = () => {
   try {
@@ -191,7 +192,14 @@ const readSavedCafeAnalyticsDateFilter = () => {
     const from = String(parsed?.dateFrom || "").trim();
     const to = String(parsed?.dateTo || "").trim();
     if (!isIsoDateString(from) || !isIsoDateString(to)) return null;
-    return { dateFrom: from, dateTo: to };
+    const timeFrom = String(parsed?.timeFrom || "").trim();
+    const timeTo = String(parsed?.timeTo || "").trim();
+    return {
+      dateFrom: from,
+      dateTo: to,
+      timeFrom: isTimeString(timeFrom) ? timeFrom : "",
+      timeTo: isTimeString(timeTo) ? timeTo : "",
+    };
   } catch {
     return null;
   }
@@ -663,6 +671,15 @@ const CafeAnalytics = () => {
     const saved = readSavedCafeAnalyticsDateFilter();
     return saved?.dateTo || isoDate(new Date());
   });
+  // Время (опционально): сужает период внутри дат, напр. 08:00–16:00
+  const [timeFrom, setTimeFrom] = useState(() => {
+    const saved = readSavedCafeAnalyticsDateFilter();
+    return saved?.timeFrom || "";
+  });
+  const [timeTo, setTimeTo] = useState(() => {
+    const saved = readSavedCafeAnalyticsDateFilter();
+    return saved?.timeTo || "";
+  });
 
   // данные
   const [salesSummary, setSalesSummary] = useState({
@@ -746,8 +763,11 @@ const CafeAnalytics = () => {
     const p = {};
     if (dateFrom) p.date_from = dateFrom;
     if (dateTo) p.date_to = dateTo;
+    // Время (HH:MM) — см. docs/cafe-analytics-time-filter-backend.md
+    if (timeFrom) p.time_from = timeFrom;
+    if (timeTo) p.time_to = timeTo;
     return p;
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, timeFrom, timeTo]);
 
   const fetchAllMenuItems = useCallback(
     async (from, to) => {
@@ -970,12 +990,12 @@ const CafeAnalytics = () => {
     try {
       localStorage.setItem(
         CAFE_ANALYTICS_DATE_FILTER_LS_KEY,
-        JSON.stringify({ dateFrom, dateTo })
+        JSON.stringify({ dateFrom, dateTo, timeFrom, timeTo })
       );
     } catch {
       // ignore localStorage write errors
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, timeFrom, timeTo]);
 
   // Chart.js mount/update
   useEffect(() => {
@@ -1279,6 +1299,13 @@ const CafeAnalytics = () => {
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                 />
+                <input
+                  type="time"
+                  className="cafeAnalytics__input cafeAnalytics__input--time"
+                  value={timeFrom}
+                  onChange={(e) => setTimeFrom(e.target.value)}
+                  title="Время «от» (необязательно)"
+                />
               </label>
 
               <label className="cafeAnalytics__rangeField">
@@ -1289,7 +1316,28 @@ const CafeAnalytics = () => {
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                 />
+                <input
+                  type="time"
+                  className="cafeAnalytics__input cafeAnalytics__input--time"
+                  value={timeTo}
+                  onChange={(e) => setTimeTo(e.target.value)}
+                  title="Время «до» (необязательно)"
+                />
               </label>
+
+              {(timeFrom || timeTo) && (
+                <button
+                  type="button"
+                  className="cafeAnalytics__btn cafeAnalytics__btn--ghost"
+                  onClick={() => {
+                    setTimeFrom("");
+                    setTimeTo("");
+                  }}
+                  title="Сбросить время"
+                >
+                  ✕ время
+                </button>
+              )}
 
               <button
                 className="cafeAnalytics__btn"
