@@ -346,7 +346,7 @@ const SECTOR_ACCESS_TYPES = {
       label: "Контрагенты",
       backendKey: "can_view_clients",
     },
-    // {va}
+    { value: "Товары", label: "Товары", backendKey: "can_view_products" },
   ],
 };
 

@@ -380,6 +380,18 @@ const SearchSelect = ({
   );
 };
 
+// Значение для input[type="datetime-local"] в локальном времени: "YYYY-MM-DDTHH:mm"
+const toDateTimeLocalInput = (value) => {
+  const source =
+    typeof value === "string" && value && !value.includes("T")
+      ? `${value}T00:00`
+      : value;
+  const date = source ? new Date(source) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -429,9 +441,11 @@ const CreateSaleDocument = () => {
     () => initialDocType !== "COMMERCIAL_OFFER",
   );
   const [isOrder, setIsOrder] = useState(false);
-  const [documentDateValue, setDocumentDateValue] = useState(
-    new Date().toISOString().split("T")[0],
+  const [documentDateValue, setDocumentDateValue] = useState(() =>
+    toDateTimeLocalInput(new Date()),
   );
+  // Статус редактируемого документа (null — создание нового)
+  const [editedDocStatus, setEditedDocStatus] = useState(null);
   const [showSavePrintMenu, setShowSavePrintMenu] = useState(false);
   const dateInputRef = useRef(null);
   const contentRef = useRef(null);
@@ -485,6 +499,10 @@ const CreateSaleDocument = () => {
     location.state?.editDocumentId ||
     null;
   const [loadingDraft, setLoadingDraft] = useState(!!editDocumentId);
+
+  // Дату и время можно менять при создании документа и при редактировании черновика
+  const isDocumentDateEditable =
+    !editDocumentId || !editedDocStatus || editedDocStatus === "DRAFT";
 
   // Путь к списку документов текущего типа (продажи, покупки и т.д.)
   const documentsListPath = `/crm/warehouse/documents/${(docType || "SALE").toLowerCase()}`;
@@ -1697,18 +1715,11 @@ const CreateSaleDocument = () => {
             : "",
         );
         setIsWholesale(Boolean(doc.is_wholesale));
-        if (doc.date) {
-          const d =
-            typeof doc.date === "string" && doc.date.includes("T")
-              ? doc.date.split("T")[0]
-              : doc.date;
-          setDocumentDateValue(d);
-        } else if (doc.created_at) {
-          const d =
-            typeof doc.created_at === "string" && doc.created_at.includes("T")
-              ? doc.created_at.split("T")[0]
-              : doc.created_at;
-          setDocumentDateValue(d);
+        setEditedDocStatus(doc.status || null);
+        if (doc.date || doc.created_at) {
+          setDocumentDateValue(
+            toDateTimeLocalInput(doc.date || doc.created_at),
+          );
         }
         const items = Array.isArray(doc.items)
           ? doc.items.map((it, idx) => {
@@ -2770,6 +2781,7 @@ const CreateSaleDocument = () => {
   /** Тело для КП: обязательные поля API + без лишних полей (payment_kind, agent, line_total…). */
   const toCommercialOfferPayload = (data) => ({
     doc_type: "COMMERCIAL_OFFER",
+    ...(data.date ? { date: data.date } : {}),
     warehouse_from: data.warehouse_from,
     counterparty: data.counterparty ?? null,
     comment: data.comment ?? "",
@@ -2888,6 +2900,9 @@ const CreateSaleDocument = () => {
             : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
         ...(docType === "SALE" && { is_wholesale: Boolean(isWholesale) }),
+        ...(isDocumentDateEditable && documentDateValue
+          ? { date: new Date(documentDateValue).toISOString() }
+          : {}),
         comment: resolvedComment,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -3063,6 +3078,9 @@ const CreateSaleDocument = () => {
             : {}),
         ...(applyAgentFilter && { agent: agentId || null }),
         ...(docType === "SALE" && { is_wholesale: Boolean(isWholesale) }),
+        ...(isDocumentDateEditable && documentDateValue
+          ? { date: new Date(documentDateValue).toISOString() }
+          : {}),
         comment: resolvedCommentPrint,
         discount_percent: String(discountPercentNum.toFixed(2)),
         discount_amount: String(discountAmountNum.toFixed(2)),
@@ -3816,9 +3834,18 @@ const CreateSaleDocument = () => {
                 <div
                   className="create-sale-document__date"
                   onClick={() => {
+                    if (!isDocumentDateEditable) return;
                     const input = dateInputRef.current;
                     if (input) input.showPicker?.() || input.click();
                   }}
+                  style={
+                    isDocumentDateEditable ? undefined : { cursor: "default" }
+                  }
+                  title={
+                    isDocumentDateEditable
+                      ? "Изменить дату и время документа"
+                      : "Дату можно менять только у черновика"
+                  }
                 >
                   <Calendar size={18} />
                   {displayDate}
@@ -3994,11 +4021,12 @@ const CreateSaleDocument = () => {
               </div>
               <input
                 ref={dateInputRef}
-                type="date"
+                type="datetime-local"
                 id="document-date-picker"
                 className="create-sale-document__date-input"
                 value={documentDateValue}
                 onChange={(e) => setDocumentDateValue(e.target.value)}
+                disabled={!isDocumentDateEditable}
                 aria-hidden
               />
             </div>
