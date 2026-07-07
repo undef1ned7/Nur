@@ -39,12 +39,14 @@ const initialState = {
   itemsMakeLoading: false,
 
   brands: [],
+  brandsCount: 0,
   brandsLoading: false,
   brandsError: null,
   creatingBrand: false,
   createBrandError: null,
 
   categories: [],
+  categoriesCount: 0,
   categoriesLoading: false,
   categoriesError: null,
   creatingCategory: false,
@@ -173,6 +175,12 @@ const productSlice = createSlice({
       .addCase(fetchBrandsAsync.fulfilled, (state, action) => {
         state.brandsLoading = false;
         state.brands = action.payload.results || action.payload;
+        state.brandsCount =
+          typeof action.payload.count === "number"
+            ? action.payload.count
+            : Array.isArray(action.payload)
+              ? action.payload.length
+              : 0;
       })
       .addCase(fetchBrandsAsync.rejected, (state, action) => {
         state.brandsLoading = false;
@@ -286,6 +294,12 @@ const productSlice = createSlice({
       .addCase(fetchCategoriesAsync.fulfilled, (state, action) => {
         state.categoriesLoading = false;
         state.categories = action.payload.results || action.payload;
+        state.categoriesCount =
+          typeof action.payload.count === "number"
+            ? action.payload.count
+            : Array.isArray(action.payload)
+              ? action.payload.length
+              : 0;
       })
       .addCase(fetchCategoriesAsync.rejected, (state, action) => {
         state.categoriesLoading = false;

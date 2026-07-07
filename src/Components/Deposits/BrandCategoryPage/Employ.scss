@@ -1,3 +1,64 @@
+/* Табы «Бренды / Категории» — собственные стили страницы,
+   не зависят от vitrina__* из чанков других страниц */
+.bcp-tabs {
+  display: flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: #f1f3f5;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+
+  &__tab {
+    padding: 9px 22px;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: #6b7280;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      box-shadow 0.18s ease;
+
+    &:hover {
+      color: #1a1a1a;
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    &:focus-visible {
+      outline: 2px solid #ffcd00;
+      outline-offset: 1px;
+    }
+
+    &--active,
+    &--active:hover {
+      background: #ffcd00;
+      color: #1a1a1a;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .bcp-tabs {
+    width: 100%;
+
+    &__tab {
+      flex: 1;
+      padding: 9px 12px;
+      text-align: center;
+    }
+  }
+}
+
 .employee {
   padding: 24px;
   // background: white;

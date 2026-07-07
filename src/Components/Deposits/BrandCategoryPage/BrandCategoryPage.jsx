@@ -4,8 +4,9 @@
 // Требует redux‑thunk'и: fetchBrandsAsync, createBrandAsync, updateBrandAsync, deleteBrandAsync
 // и fetchCategoriesAsync, createCategoryAsync, updateCategoryAsync, deleteCategoryAsync, уже описанные ранее.
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { Search, MoreVertical, Plus, X } from "lucide-react";
 import {
   fetchBrandsAsync,
@@ -61,6 +62,9 @@ const TextModal = ({
 };
 
 /* ------------------------------------------------------------------ */
+const PAGE_SIZE_OPTIONS = [50, 75, 100, 200];
+const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
+
 const Section = ({
   title,
   items,
@@ -70,6 +74,11 @@ const Section = ({
   onEdit,
   search,
   setSearch,
+  page,
+  pageSize,
+  totalCount,
+  onPageChange,
+  onPageSizeChange,
 }) => (
   <div className="employee__card">
     <div className="employee__card-header">
@@ -115,7 +124,7 @@ const Section = ({
           <tbody>
             {items.map((it, idx) => (
               <tr key={it.id}>
-                <td>{idx + 1}</td>
+                <td>{(page - 1) * pageSize + idx + 1}</td>
                 <td className="employee__name">{it.name}</td>
                 <td>
                   <MoreVertical
@@ -130,6 +139,45 @@ const Section = ({
         </table>
       </div>
     )}
+
+    {!loading && !error && totalCount > 0 && (
+      <div className="employee__pagination">
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          На странице:
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            style={{ padding: "4px 8px" }}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+          >
+            ←
+          </button>
+          <span>
+            {page} из {Math.max(1, Math.ceil(totalCount / pageSize))} (всего:{" "}
+            {totalCount})
+          </span>
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= Math.ceil(totalCount / pageSize)}
+          >
+            →
+          </button>
+        </span>
+      </div>
+    )}
   </div>
 );
 
@@ -139,14 +187,14 @@ export default function BrandCategoryPage() {
   const {
     brands,
     categories,
-    loadingBrands,
-    loadingCategories,
-    errorBrands,
-    errorCategories,
-    creating,
-    updating,
+    brandsCount,
+    categoriesCount,
+    brandsLoading,
+    categoriesLoading,
+    brandsError,
+    categoriesError,
     deleting,
-  } = useSelector((s) => s.product); // предположительно brands & categories лежат в productSlice
+  } = useSelector((s) => s.product); // brands & categories лежат в productSlice
 
   const confirm = useConfirm();
   const alert = useAlert();
@@ -157,20 +205,57 @@ export default function BrandCategoryPage() {
   const debouncedSearchBrand = useDebouncedValue(searchBrand, 500);
   const debouncedSearchCat = useDebouncedValue(searchCat, 500);
 
+  /* пагинация и активный таб — через URL params */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "brands" ? 0 : 1;
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const rawPageSize = Number(searchParams.get("page_size"));
+  const pageSize = PAGE_SIZE_OPTIONS.includes(rawPageSize)
+    ? rawPageSize
+    : DEFAULT_PAGE_SIZE;
+
+  const updateParams = useCallback(
+    (updates) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === undefined || value === "") {
+              next.delete(key);
+            } else {
+              next.set(key, String(value));
+            }
+          });
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setActiveTab = (index) =>
+    updateParams({ tab: index === 0 ? "brands" : "categories", page: 1 });
+  const setPage = (nextPage) => updateParams({ page: Math.max(1, nextPage) });
+  const setPageSize = (size) => updateParams({ page_size: size, page: 1 });
+
   const refreshBrands = useCallback(() => {
     const params = {
       search: debouncedSearchBrand,
+      page,
+      page_size: pageSize,
     };
     dispatch(fetchBrandsAsync(params));
-  }, [dispatch, debouncedSearchBrand]);
-
+  }, [dispatch, debouncedSearchBrand, page, pageSize]);
 
   const refreshCategories = useCallback(() => {
     const params = {
       search: debouncedSearchCat,
+      page,
+      page_size: pageSize,
     };
     dispatch(fetchCategoriesAsync(params));
-  }, [dispatch, debouncedSearchCat]);
+  }, [dispatch, debouncedSearchCat, page, pageSize]);
   /* fetch */
 
 
@@ -232,18 +317,30 @@ export default function BrandCategoryPage() {
 
     });
   };
-  const [activeTab, setActiveTab] = useState(1);
+  // При смене поиска возвращаемся на 1-ю страницу (без лишнего запроса со старой страницей)
+  const prevBrandSearchRef = useRef(debouncedSearchBrand);
   useEffect(() => {
-    if (activeTab === 0) {
-      refreshBrands();
+    if (activeTab !== 0) return;
+    const searchChanged = prevBrandSearchRef.current !== debouncedSearchBrand;
+    prevBrandSearchRef.current = debouncedSearchBrand;
+    if (searchChanged && page !== 1) {
+      setPage(1);
+      return;
     }
-  }, [debouncedSearchBrand, activeTab]);
+    refreshBrands();
+  }, [debouncedSearchBrand, activeTab, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const prevCatSearchRef = useRef(debouncedSearchCat);
   useEffect(() => {
-    if (activeTab === 1) {
-      refreshCategories();
+    if (activeTab !== 1) return;
+    const searchChanged = prevCatSearchRef.current !== debouncedSearchCat;
+    prevCatSearchRef.current = debouncedSearchCat;
+    if (searchChanged && page !== 1) {
+      setPage(1);
+      return;
     }
-  }, [debouncedSearchCat, activeTab]);
+    refreshCategories();
+  }, [debouncedSearchCat, activeTab, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabs = [
     {
@@ -252,10 +349,15 @@ export default function BrandCategoryPage() {
         <Section
           title="Бренды"
           items={brands}
-          loading={loadingBrands}
-          error={errorBrands}
+          loading={brandsLoading}
+          error={brandsError}
           search={searchBrand}
           setSearch={setSearchBrand}
+          page={page}
+          pageSize={pageSize}
+          totalCount={brandsCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
           onCreate={() => setModalCfg({ type: "brand", mode: "add" })}
           onEdit={(item) => setModalCfg({ type: "brand", mode: "edit", item })}
         />
@@ -267,10 +369,15 @@ export default function BrandCategoryPage() {
         <Section
           title="Категории"
           items={categories}
-          loading={loadingCategories}
-          error={errorCategories}
+          loading={categoriesLoading}
+          error={categoriesError}
           search={searchCat}
           setSearch={setSearchCat}
+          page={page}
+          pageSize={pageSize}
+          totalCount={categoriesCount}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
           onCreate={() => setModalCfg({ type: "category", mode: "add" })}
           onEdit={(item) =>
             setModalCfg({ type: "category", mode: "edit", item })
@@ -283,22 +390,21 @@ export default function BrandCategoryPage() {
 
   return (
     <div className="employee grid-two-cols brandSection">
-      <div className="vitrina__header" style={{ marginBottom: "15px" }}>
-        <div className="vitrina__tabs">
-          {tabs.map((tab, index) => {
-            return (
-              <span
-                key={tab.label}
-                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
-                  }`}
-                onClick={() => setActiveTab(index)}
-              >
-                {tab.label}
-              </span>
-              // <button onClick={() => setActiveTab(index)}>{tab.label}</button>
-            );
-          })}
-        </div>
+      <div className="bcp-tabs" role="tablist" aria-label="Бренды и категории">
+        {tabs.map((tab, index) => (
+          <button
+            key={tab.label}
+            type="button"
+            role="tab"
+            aria-selected={index === activeTab}
+            className={`bcp-tabs__tab ${
+              index === activeTab ? "bcp-tabs__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab(index)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
       {tabs[activeTab].content}
       {/* переисп. контейнер */}
