@@ -1,12 +1,18 @@
-// src/pages/catalog/BrandCategoryPage.jsx
-// Компонент выводит **бренды** и **категории** на одной странице.
-// Полностью повторяет стили employee (employee__*) и использует modals edit-modal / add-modal.
-// Требует redux‑thunk'и: fetchBrandsAsync, createBrandAsync, updateBrandAsync, deleteBrandAsync
-// и fetchCategoriesAsync, createCategoryAsync, updateCategoryAsync, deleteCategoryAsync, уже описанные ранее.
-
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Search, MoreVertical, Plus, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import {
+  Search,
+  Plus,
+  X,
+  LayoutGrid,
+  Table2,
+  Pencil,
+  Tag,
+  FolderOpen,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   fetchBrandsAsync,
   createBrandAsync,
@@ -16,14 +22,32 @@ import {
   createCategoryAsync,
   updateCategoryAsync,
   deleteCategoryAsync,
-} from "../../../store/creators/productCreators"; // поправьте путь при необходимости
-import "./Employ.scss"; // ⚠️ тот же файл стилей
+} from "../../../store/creators/productCreators";
+import "./Employ.scss";
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../hooks/useDebounce";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 
-/* ------------------------------------------------------------------ */
-// Универсальный модал (создание / редактирование)
+const TABS = {
+  BRANDS: "brands",
+  CATEGORIES: "categories",
+};
+
+const VIEW_MODES = {
+  TABLE: "table",
+  CARDS: "cards",
+};
+
+const VIEW_MODE_STORAGE_KEY = "crm_brand_category_view_mode";
+const PAGE_SIZE = 20;
+
+const getInitialViewMode = () => {
+  if (typeof window === "undefined") return VIEW_MODES.TABLE;
+  const saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+  if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
+  return VIEW_MODES.TABLE;
+};
+
 const TextModal = ({
   title,
   initial,
@@ -31,8 +55,10 @@ const TextModal = ({
   onClose,
   deleting,
   onDelete,
+  saving,
 }) => {
   const [value, setValue] = useState(initial?.name || "");
+
   return (
     <div className="edit-modal brand">
       <div className="edit-modal__overlay" onClick={onClose} />
@@ -43,16 +69,31 @@ const TextModal = ({
         </div>
         <div className="edit-modal__section">
           <label>Название *</label>
-          <input value={value} onChange={(e) => setValue(e.target.value)} />
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Введите название"
+            autoFocus
+          />
         </div>
-        <div className="edit-modal__footer cbp">
-          {initial && (
-            <button onClick={onDelete} disabled={deleting}>
+        <div className="edit-modal__footer">
+          {initial && onDelete && (
+            <button
+              type="button"
+              className="edit-modal__reset"
+              onClick={onDelete}
+              disabled={deleting || saving}
+            >
               {deleting ? "Удаление…" : "Удалить"}
             </button>
           )}
-          <button onClick={() => onSubmit(value)}>
-            {initial ? "Сохранить" : "Добавить"}
+          <button
+            type="button"
+            className="edit-modal__save"
+            onClick={() => onSubmit(value)}
+            disabled={deleting || saving}
+          >
+            {saving ? "Сохранение…" : initial ? "Сохранить" : "Добавить"}
           </button>
         </div>
       </div>
@@ -60,158 +101,351 @@ const TextModal = ({
   );
 };
 
-/* ------------------------------------------------------------------ */
-const Section = ({
-  title,
-  items,
-  loading,
-  error,
-  onCreate,
-  onEdit,
-  search,
-  setSearch,
-}) => (
-  <div className="employee__card">
-    <div className="employee__card-header">
-      <h4>{title}</h4>
-      <button className="employee__add" onClick={onCreate}>
-        <Plus size={14} style={{ marginRight: 4 }} />
-        Добавить
-      </button>
-      <div className="employee__search" style={{ marginBottom: 8 }}>
-        <Search size={16} className="employee__search-icon" />
-        <input
-          className="cbp employee__search-input"
-          placeholder="Поиск"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search && (
-          <X
-            size={16}
-            className="employee__clear-search"
-            onClick={() => setSearch("")}
-          />
-        )}
-      </div>
-    </div>
-
-    {loading ? (
-      <p className="employee__loading-message">Загрузка…</p>
-    ) : error ? (
-      <p className="employee__error-message">{String(error)}</p>
-    ) : items.length === 0 ? (
-      <p className="employee__no-employees-message">Нет элементов.</p>
-    ) : (
-      <div className="table-wrapper">
-        <table className="employee__table small">
-          <thead>
-            <tr>
-              <th>№</th>
-              <th>Название</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it, idx) => (
-              <tr key={it.id}>
-                <td>{idx + 1}</td>
-                <td className="employee__name">{it.name}</td>
-                <td>
-                  <MoreVertical
-                    size={18}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onEdit(it)}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
+const ItemsTable = ({ items, onEdit, startIndex = 0 }) => (
+  <div className="brand-category-page__table-wrap">
+    <table className="brand-category-page__table">
+      <thead>
+        <tr>
+          <th>№</th>
+          <th>Название</th>
+          <th className="brand-category-page__table-actions-col">Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item, idx) => (
+          <tr key={item.id} onClick={() => onEdit(item)}>
+            <td>{startIndex + idx + 1}</td>
+            <td>{item.name}</td>
+            <td className="brand-category-page__table-actions-col">
+              <button
+                type="button"
+                className="brand-category-page__row-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(item);
+                }}
+                aria-label="Редактировать"
+              >
+                <Pencil size={16} />
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 );
 
-/* ------------------------------------------------------------------ */
+const ItemsCards = ({ items, onEdit, startIndex = 0 }) => (
+  <div className="brand-category-page__cards">
+    {items.map((item, idx) => (
+      <article
+        key={item.id}
+        className="brand-category-page__card"
+        onClick={() => onEdit(item)}
+      >
+        <span className="brand-category-page__card-index">
+          {startIndex + idx + 1}
+        </span>
+        <h3 className="brand-category-page__card-title">{item.name}</h3>
+        <button
+          type="button"
+          className="brand-category-page__card-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(item);
+          }}
+          aria-label="Редактировать"
+        >
+          <Pencil size={15} />
+        </button>
+      </article>
+    ))}
+  </div>
+);
+
+const BrandCategoryPagination = ({
+  currentPage,
+  totalPages,
+  totalCount,
+  countLabel,
+  loading,
+  hasNextPage,
+  hasPrevPage,
+  onPageChange,
+}) => {
+  if (totalPages <= 1 && !hasNextPage && !hasPrevPage) return null;
+
+  const pages = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const result = [1];
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    if (start > 2) result.push("ellipsis-start");
+    for (let p = start; p <= end; p += 1) result.push(p);
+    if (end < totalPages - 1) result.push("ellipsis-end");
+    result.push(totalPages);
+
+    return result;
+  }, [currentPage, totalPages]);
+
+  return (
+    <nav
+      className="brand-category-page__pagination"
+      aria-label="Навигация по страницам"
+    >
+      <button
+        type="button"
+        className="brand-category-page__pagination-btn brand-category-page__pagination-btn--nav"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage <= 1 || loading || !hasPrevPage}
+        aria-label="Предыдущая страница"
+      >
+        <ChevronLeft size={18} />
+        Назад
+      </button>
+
+      <div className="brand-category-page__pagination-pages">
+        {pages.map((page) =>
+          typeof page === "string" ? (
+            <span
+              key={page}
+              className="brand-category-page__pagination-ellipsis"
+            >
+              …
+            </span>
+          ) : (
+            <button
+              key={page}
+              type="button"
+              className={`brand-category-page__pagination-page${
+                page === currentPage
+                  ? " brand-category-page__pagination-page--active"
+                  : ""
+              }`}
+              onClick={() => onPageChange(page)}
+              disabled={loading || page === currentPage}
+              aria-label={`Страница ${page}`}
+              aria-current={page === currentPage ? "page" : undefined}
+            >
+              {page}
+            </button>
+          ),
+        )}
+      </div>
+
+      <span className="brand-category-page__pagination-info">
+        {totalCount > 0 && (
+          <>
+            {totalCount} {countLabel}
+            {" · "}
+          </>
+        )}
+        {currentPage} из {totalPages}
+      </span>
+
+      <button
+        type="button"
+        className="brand-category-page__pagination-btn brand-category-page__pagination-btn--nav"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={loading || !hasNextPage || currentPage >= totalPages}
+        aria-label="Следующая страница"
+      >
+        Вперёд
+        <ChevronRight size={18} />
+      </button>
+    </nav>
+  );
+};
+
 export default function BrandCategoryPage() {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const {
     brands,
     categories,
-    loadingBrands,
-    loadingCategories,
-    errorBrands,
-    errorCategories,
-    creating,
+    brandsLoading,
+    categoriesLoading,
+    brandsError,
+    categoriesError,
+    brandsCount,
+    brandsNext,
+    brandsPrevious,
+    categoriesCount,
+    categoriesNext,
+    categoriesPrevious,
+    creatingBrand,
+    creatingCategory,
     updating,
     deleting,
-  } = useSelector((s) => s.product); // предположительно brands & categories лежат в productSlice
+  } = useSelector((s) => s.product);
 
   const confirm = useConfirm();
   const alert = useAlert();
-  /* local state */
-  const [modalCfg, setModalCfg] = useState(null); // { type: 'brand'|'category', mode: 'add'|'edit', item?: obj }
+
+  const activeTab = useMemo(() => {
+    const tab = searchParams.get("tab");
+    return tab === TABS.CATEGORIES ? TABS.CATEGORIES : TABS.BRANDS;
+  }, [searchParams]);
+
+  const currentPage = useMemo(() => {
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    return Number.isFinite(page) && page > 0 ? page : 1;
+  }, [searchParams]);
+
+  const [modalCfg, setModalCfg] = useState(null);
   const [searchBrand, setSearchBrand] = useState("");
   const [searchCat, setSearchCat] = useState("");
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const prevDebouncedSearchRef = useRef(null);
+
   const debouncedSearchBrand = useDebouncedValue(searchBrand, 500);
   const debouncedSearchCat = useDebouncedValue(searchCat, 500);
 
-  const refreshBrands = useCallback(() => {
-    const params = {
-      search: debouncedSearchBrand,
-    };
-    dispatch(fetchBrandsAsync(params));
-  }, [dispatch, debouncedSearchBrand]);
+  const isBrandsTab = activeTab === TABS.BRANDS;
+  const items = isBrandsTab ? brands : categories;
+  const loading = isBrandsTab ? brandsLoading : categoriesLoading;
+  const error = isBrandsTab ? brandsError : categoriesError;
+  const totalCount = isBrandsTab ? brandsCount : categoriesCount;
+  const hasNextPage = isBrandsTab ? !!brandsNext : !!categoriesNext;
+  const hasPrevPage = isBrandsTab ? !!brandsPrevious : !!categoriesPrevious;
+  const search = isBrandsTab ? searchBrand : searchCat;
+  const setSearch = isBrandsTab ? setSearchBrand : setSearchCat;
+  const debouncedSearch = isBrandsTab
+    ? debouncedSearchBrand
+    : debouncedSearchCat;
+  const saving = creatingBrand || creatingCategory || updating;
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((totalCount || 0) / PAGE_SIZE)),
+    [totalCount],
+  );
+
+  const countLabel = isBrandsTab ? "брендов" : "категорий";
+  const rowStartIndex = (currentPage - 1) * PAGE_SIZE;
+
+  const handlePageChange = useCallback(
+    (newPage) => {
+      if (newPage < 1 || newPage > totalPages) return;
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (newPage <= 1) next.delete("page");
+        else next.set("page", String(newPage));
+        return next;
+      });
+    },
+    [setSearchParams, totalPages],
+  );
+
+  const setActiveTab = useCallback(
+    (tab) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        next.delete("page");
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const refreshBrands = useCallback(() => {
+    dispatch(
+      fetchBrandsAsync({
+        search: debouncedSearchBrand || undefined,
+        page: currentPage,
+      }),
+    );
+  }, [dispatch, debouncedSearchBrand, currentPage]);
 
   const refreshCategories = useCallback(() => {
-    const params = {
-      search: debouncedSearchCat,
-    };
-    dispatch(fetchCategoriesAsync(params));
-  }, [dispatch, debouncedSearchCat]);
-  /* fetch */
+    dispatch(
+      fetchCategoriesAsync({
+        search: debouncedSearchCat || undefined,
+        page: currentPage,
+      }),
+    );
+  }, [dispatch, debouncedSearchCat, currentPage]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
+  useEffect(() => {
+    if (!searchParams.get("tab")) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", TABS.BRANDS);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (isBrandsTab) refreshBrands();
+    else refreshCategories();
+  }, [
+    isBrandsTab,
+    debouncedSearchBrand,
+    debouncedSearchCat,
+    currentPage,
+    refreshBrands,
+    refreshCategories,
+  ]);
 
-  /* helpers */
+  useEffect(() => {
+    if (prevDebouncedSearchRef.current === null) {
+      prevDebouncedSearchRef.current = debouncedSearch;
+      return;
+    }
+    if (prevDebouncedSearchRef.current === debouncedSearch) return;
+    prevDebouncedSearchRef.current = debouncedSearch;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [debouncedSearch, setSearchParams]);
 
-
-  // modal submit
   const handleSubmit = async (name) => {
     const { type, mode, item } = modalCfg;
     if (!name.trim()) return alert("Введите название");
     try {
       if (type === "brand") {
-        if (mode === "add") {
-          await dispatch(createBrandAsync({ name })).unwrap();
-          refreshBrands();
-        }
+        if (mode === "add") await dispatch(createBrandAsync({ name })).unwrap();
         else
           await dispatch(
-            updateBrandAsync({ brandId: item.id, updatedData: { name } })
+            updateBrandAsync({ brandId: item.id, updatedData: { name } }),
           ).unwrap();
         refreshBrands();
       } else {
-        if (mode === "add") {
+        if (mode === "add")
           await dispatch(createCategoryAsync({ name })).unwrap();
-          refreshCategories();
-        }
         else
           await dispatch(
-            updateCategoryAsync({ categoryId: item.id, updatedData: { name } })
+            updateCategoryAsync({ categoryId: item.id, updatedData: { name } }),
           ).unwrap();
         refreshCategories();
       }
       setModalCfg(null);
     } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при сохранении. ")
-      alert(errorMessage);
+      alert(validateResErrors(e, "Ошибка при сохранении. "));
       console.error(e);
     }
   };
+
   const handleDelete = async () => {
     const { type, item } = modalCfg;
     confirm("Удалить?", async (result) => {
@@ -226,84 +460,196 @@ export default function BrandCategoryPage() {
         }
         setModalCfg(null);
       } catch (e) {
-        const errorMessage = validateResErrors(e, "Ошибка при удалении. ")
-        alert(errorMessage);
+        alert(validateResErrors(e, "Ошибка при удалении. "));
       }
-
     });
   };
-  const [activeTab, setActiveTab] = useState(1);
-  useEffect(() => {
-    if (activeTab === 0) {
-      refreshBrands();
-    }
-  }, [debouncedSearchBrand, activeTab]);
 
-  useEffect(() => {
-    if (activeTab === 1) {
-      refreshCategories();
-    }
-  }, [debouncedSearchCat, activeTab]);
+  const handleCreate = () => {
+    setModalCfg({
+      type: isBrandsTab ? "brand" : "category",
+      mode: "add",
+    });
+  };
 
-  const tabs = [
-    {
-      label: "Бренды",
-      content: (
-        <Section
-          title="Бренды"
-          items={brands}
-          loading={loadingBrands}
-          error={errorBrands}
-          search={searchBrand}
-          setSearch={setSearchBrand}
-          onCreate={() => setModalCfg({ type: "brand", mode: "add" })}
-          onEdit={(item) => setModalCfg({ type: "brand", mode: "edit", item })}
-        />
-      ),
-    },
-    {
-      label: "Категории",
-      content: (
-        <Section
-          title="Категории"
-          items={categories}
-          loading={loadingCategories}
-          error={errorCategories}
-          search={searchCat}
-          setSearch={setSearchCat}
-          onCreate={() => setModalCfg({ type: "category", mode: "add" })}
-          onEdit={(item) =>
-            setModalCfg({ type: "category", mode: "edit", item })
-          }
-        />
-      ),
-    },
-  ];
-  const [activeFlowType, setActiveFlowType] = useState("all"); // 'all', 'income', 'expense'
+  const handleEdit = (item) => {
+    setModalCfg({
+      type: isBrandsTab ? "brand" : "category",
+      mode: "edit",
+      item,
+    });
+  };
+
+  const tabMeta = isBrandsTab
+    ? {
+        title: "Бренды",
+        subtitle: "Справочник брендов для товаров",
+        icon: Tag,
+        createLabel: "Добавить бренд",
+        emptyText: "Брендов пока нет",
+        searchPlaceholder: "Поиск по брендам",
+      }
+    : {
+        title: "Категории",
+        subtitle: "Справочник категорий для товаров",
+        icon: FolderOpen,
+        createLabel: "Добавить категорию",
+        emptyText: "Категорий пока нет",
+        searchPlaceholder: "Поиск по категориям",
+      };
+
+  const TabIcon = tabMeta.icon;
+  const list = Array.isArray(items) ? items : [];
 
   return (
-    <div className="employee grid-two-cols brandSection">
-      <div className="vitrina__header" style={{ marginBottom: "15px" }}>
-        <div className="vitrina__tabs">
-          {tabs.map((tab, index) => {
-            return (
-              <span
-                key={tab.label}
-                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
-                  }`}
-                onClick={() => setActiveTab(index)}
-              >
-                {tab.label}
-              </span>
-              // <button onClick={() => setActiveTab(index)}>{tab.label}</button>
-            );
-          })}
+    <div className="brand-category-page brandSection">
+      <header className="brand-category-page__header">
+        <div className="brand-category-page__heading">
+          <div className="brand-category-page__icon">
+            <TabIcon size={20} />
+          </div>
+          <div>
+            <h1 className="brand-category-page__title">Бренд и категория</h1>
+            <p className="brand-category-page__subtitle">{tabMeta.subtitle}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="brand-category-page__create-btn"
+          onClick={handleCreate}
+        >
+          <Plus size={16} />
+          {tabMeta.createLabel}
+        </button>
+      </header>
+
+      <nav className="brand-category-page__tabs" aria-label="Разделы">
+        <button
+          type="button"
+          className={`brand-category-page__tab${
+            isBrandsTab ? " brand-category-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab(TABS.BRANDS)}
+        >
+          Бренды
+        </button>
+        <button
+          type="button"
+          className={`brand-category-page__tab${
+            !isBrandsTab ? " brand-category-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab(TABS.CATEGORIES)}
+        >
+          Категории
+        </button>
+      </nav>
+
+      <div className="brand-category-page__toolbar">
+        <div className="brand-category-page__search">
+          <Search size={16} className="brand-category-page__search-icon" />
+          <input
+            className="brand-category-page__search-input"
+            placeholder={tabMeta.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              type="button"
+              className="brand-category-page__search-clear"
+              onClick={() => setSearch("")}
+              aria-label="Очистить поиск"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        <div className="brand-category-page__toolbar-meta">
+          <span className="brand-category-page__count">
+            Всего: {totalCount}
+          </span>
+
+          <div
+            className="brand-category-page__view-toggle"
+            role="group"
+            aria-label="Режим отображения"
+          >
+            <button
+              type="button"
+              className={`brand-category-page__view-btn${
+                viewMode === VIEW_MODES.TABLE
+                  ? " brand-category-page__view-btn--active"
+                  : ""
+              }`}
+              onClick={() => setViewMode(VIEW_MODES.TABLE)}
+            >
+              <Table2 size={16} />
+              Список
+            </button>
+            <button
+              type="button"
+              className={`brand-category-page__view-btn${
+                viewMode === VIEW_MODES.CARDS
+                  ? " brand-category-page__view-btn--active"
+                  : ""
+              }`}
+              onClick={() => setViewMode(VIEW_MODES.CARDS)}
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
+          </div>
         </div>
       </div>
-      {tabs[activeTab].content}
-      {/* переисп. контейнер */}
-      {/* Бренды */}
-      {/* Категории */}
+
+      <section className="brand-category-page__content">
+        {loading ? (
+          <p className="brand-category-page__status">Загрузка…</p>
+        ) : error ? (
+          <p className="brand-category-page__status brand-category-page__status--error">
+            {String(error?.message || error)}
+          </p>
+        ) : list.length === 0 ? (
+          <div className="brand-category-page__empty">
+            <p>{tabMeta.emptyText}</p>
+            <button
+              type="button"
+              className="brand-category-page__empty-btn"
+              onClick={handleCreate}
+            >
+              <Plus size={16} />
+              {tabMeta.createLabel}
+            </button>
+          </div>
+        ) : viewMode === VIEW_MODES.TABLE ? (
+          <ItemsTable
+            items={list}
+            onEdit={handleEdit}
+            startIndex={rowStartIndex}
+          />
+        ) : (
+          <ItemsCards
+            items={list}
+            onEdit={handleEdit}
+            startIndex={rowStartIndex}
+          />
+        )}
+      </section>
+
+      {!loading && !error && list.length > 0 && (
+        <BrandCategoryPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          countLabel={countLabel}
+          loading={loading}
+          hasNextPage={hasNextPage}
+          hasPrevPage={hasPrevPage}
+          onPageChange={handlePageChange}
+        />
+      )}
+
       {modalCfg && (
         <TextModal
           title={
@@ -311,25 +657,16 @@ export default function BrandCategoryPage() {
               ? modalCfg.type === "brand"
                 ? "Новый бренд"
                 : "Новая категория"
-              : "Редактирование"
+              : `Редактирование: ${modalCfg.item?.name || ""}`
           }
           initial={modalCfg.item}
           onSubmit={handleSubmit}
           onClose={() => setModalCfg(null)}
           deleting={deleting}
+          saving={saving}
           onDelete={modalCfg.mode === "edit" ? handleDelete : undefined}
         />
       )}
     </div>
   );
 }
-
-/* --------------------------------------------------------------- */
-// Доп. замечания:
-// 1. Предполагается, что productSlice держит состояния:
-//    - brands (array)
-//    - categories (array)
-//    - loadingBrands, loadingCategories, errorBrands, errorCategories, creating, updating, deleting
-//    Если ваши имена другие — замените.
-// 2. grid-two-cols — просто CSS‑utility (display:grid; grid-template-columns:1fr 1fr; gap:24px;)
-// 3. Используются те же стилевые классы, что и у Employee: employee__, edit-modal, add-modal.
