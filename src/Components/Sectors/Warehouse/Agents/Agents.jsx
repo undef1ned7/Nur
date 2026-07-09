@@ -2771,9 +2771,29 @@ const AgentCartModal = ({
       setCart(res);
       onChanged?.();
       await load();
+      if (res?.status === "approved") {
+        setAlertModal({
+          ...INITIAL_ALERT_MODAL,
+          open: true,
+          type: "success",
+          title: "Заявка одобрена автоматически",
+          message:
+            "У вас есть право продажи без одобрения — товар списан со склада и зачислен на ваш остаток.",
+          okText: "Понятно",
+        });
+      }
     } catch (e) {
       console.error(e);
-      setError(e?.detail || "Не удалось отправить");
+      const payload = getApiErrorPayload(e) ?? e;
+      if (Array.isArray(payload?.items) && payload.items.length > 0) {
+        setAlertModal(
+          getCartActionErrorAlert(e, {
+            errorTitle: "Не удалось отправить заявку",
+          }),
+        );
+      } else {
+        setError(e?.detail || "Не удалось отправить");
+      }
     } finally {
       setBusy(false);
     }
@@ -3756,6 +3776,8 @@ const Agents = () => {
     useState(false);
   const [newMembershipCanSellWholesale, setNewMembershipCanSellWholesale] =
     useState(false);
+  const [newMembershipCanSellNoApproval, setNewMembershipCanSellNoApproval] =
+    useState(false);
   const [newMembershipAssignedWarehouse, setNewMembershipAssignedWarehouse] =
     useState("");
   const [newMembershipWarehouse, setNewMembershipWarehouse] = useState("");
@@ -4260,6 +4282,26 @@ const Agents = () => {
     }
   };
 
+  const handleCompanyNoApprovalChange = async (request, nextValue) => {
+    if (!request?.id || companyActionBusyId) return;
+    setCompanyActionBusyId(request.id);
+    try {
+      await patchCompanyAgentCommonAccess(request.id, {
+        can_sell_without_approval: Boolean(nextValue),
+      });
+      await loadCompanyRequests();
+    } catch (e) {
+      console.error(e);
+      openErrorAlert(
+        setAlertModal,
+        e,
+        "Не удалось обновить право продажи без одобрения",
+      );
+    } finally {
+      setCompanyActionBusyId(null);
+    }
+  };
+
   const handleCreateMembership = async () => {
     if (!newMembershipUserId.trim() || newMembershipBusy) return;
     const assignedWarehouse = newMembershipAssignedWarehouse || null;
@@ -4275,6 +4317,7 @@ const Agents = () => {
         user: newMembershipUserId.trim(),
         assigned_warehouse: assignedWarehouse,
         can_sell_wholesale: Boolean(newMembershipCanSellWholesale),
+        can_sell_without_approval: Boolean(newMembershipCanSellNoApproval),
       };
       if (newMembershipCommonEnabled) {
         payload.common_access_enabled = true;
@@ -4287,6 +4330,7 @@ const Agents = () => {
       setNewMembershipUserId("");
       setNewMembershipCommonEnabled(false);
       setNewMembershipCanSellWholesale(false);
+      setNewMembershipCanSellNoApproval(false);
       setNewMembershipAssignedWarehouse("");
       setNewMembershipWarehouse("");
       await loadCompanyRequests();
@@ -5479,6 +5523,17 @@ const Agents = () => {
                         />
                         Разрешить опт
                       </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newMembershipCanSellNoApproval}
+                          onChange={(e) =>
+                            setNewMembershipCanSellNoApproval(e.target.checked)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        Продажа без одобрения
+                      </label>
                       <select
                         className="warehouse-search__input"
                         style={{ minWidth: 220 }}
@@ -5533,6 +5588,7 @@ const Agents = () => {
                             <th>Склад</th>
                             <th>Общий прайс</th>
                             <th>Оптовые продажи</th>
+                            <th>Продажа без одобрения</th>
                             <th>Склад общего прайса</th>
                             <th>Создан</th>
                             <th>Обновлён</th>
@@ -5543,7 +5599,7 @@ const Agents = () => {
                           {companyRequestsLoading ? (
                             <tr>
                               <td
-                                colSpan={10}
+                                colSpan={11}
                                 className="warehouse-table__loading"
                               >
                                 Загрузка…
@@ -5552,7 +5608,7 @@ const Agents = () => {
                           ) : activeCompanyAgents.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={10}
+                                colSpan={11}
                                 className="warehouse-table__empty"
                               >
                                 Активных агентов нет
@@ -5597,6 +5653,26 @@ const Agents = () => {
                                       disabled={companyActionBusyId === r.id}
                                     />
                                     {r.can_sell_wholesale
+                                      ? "Разрешено"
+                                      : "Запрещено"}
+                                  </label>
+                                </td>
+                                <td>
+                                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(
+                                        r.can_sell_without_approval,
+                                      )}
+                                      onChange={(e) =>
+                                        handleCompanyNoApprovalChange(
+                                          r,
+                                          e.target.checked,
+                                        )
+                                      }
+                                      disabled={companyActionBusyId === r.id}
+                                    />
+                                    {r.can_sell_without_approval
                                       ? "Разрешено"
                                       : "Запрещено"}
                                   </label>

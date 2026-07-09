@@ -421,8 +421,8 @@ const Analytics = () => {
         const apiTab = mapTabToAPI(tab);
         const params = {
           tab: apiTab,
-          period_start: formatDateForAPI(period.from, false),
-          period_end: formatDateForAPI(period.to, false),
+          period_start: formatDateForAPI(period.from, true),
+          period_end: formatDateForAPI(period.to, true),
         };
 
         // Добавляем branch и include_global если branch выбран
@@ -483,8 +483,8 @@ const Analytics = () => {
           try {
             const salaryParams = {
               tab: "salary",
-              period_start: formatDateForAPI(period.from, false),
-              period_end: formatDateForAPI(period.to, false),
+              period_start: formatDateForAPI(period.from, true),
+              period_end: formatDateForAPI(period.to, true),
             };
             if (filters.branch) {
               salaryParams.branch = filters.branch;
@@ -1638,20 +1638,22 @@ const Analytics = () => {
               <label>Период</label>
               <div className="analytics-page__filter-row">
                 <input
-                  type="date"
-                  value={formatDateForAPI(period.from, false)}
+                  type="datetime-local"
+                  value={formatDateForAPI(period.from, true).slice(0, 16)}
                   onChange={(e) => {
                     const date = new Date(e.target.value);
+                    if (Number.isNaN(date.getTime())) return;
                     setPeriod((prev) => ({ ...prev, from: date }));
                   }}
                 />
                 <span>—</span>
                 <input
-                  type="date"
-                  value={formatDateForAPI(period.to, false)}
+                  type="datetime-local"
+                  value={formatDateForAPI(period.to, true).slice(0, 16)}
                   onChange={(e) => {
                     const date = new Date(e.target.value);
-                    date.setHours(23, 59, 59);
+                    if (Number.isNaN(date.getTime())) return;
+                    date.setSeconds(59, 999);
                     setPeriod((prev) => ({ ...prev, to: date }));
                   }}
                 />
