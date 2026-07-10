@@ -79,6 +79,9 @@ const WarehouseKassa = lazy(
 const WarehouseAgents = lazy(
   () => import("../../Components/Sectors/Warehouse/Agents/Agents"),
 );
+const WarehouseSalary = lazy(
+  () => import("../../Components/Sectors/Warehouse/Salary/Salary"),
+);
 const Counterparties = lazy(
   () => import("../../Components/Sectors/Market/Counterparties/Counterparties"),
 );
@@ -155,6 +158,7 @@ export const warehouseRoutes = (profile) => [
     />
   </Route>,
   createWarehouseAgentProtectedRoute("warehouse/agents", WarehouseAgents),
+  createProtectedRoute("warehouse/salary", WarehouseSalary),
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),

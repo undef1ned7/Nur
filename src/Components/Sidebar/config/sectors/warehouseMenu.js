@@ -85,6 +85,13 @@ export const warehouseMenu = [
         permission: "can_view_agent",
         implemented: true,
       },
+      {
+        label: "Зарплата",
+        to: "/crm/warehouse/salary",
+        icon: menuIcons.wallet,
+        permission: "can_view_salary",
+        implemented: true,
+      },
 
       // {
       //   label: "Справочники",

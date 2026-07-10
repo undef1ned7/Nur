@@ -347,6 +347,7 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_clients",
     },
     { value: "Товары", label: "Товары", backendKey: "can_view_products" },
+    { value: "Зарплата", label: "Зарплата", backendKey: "can_view_salary" },
   ],
 };
 
