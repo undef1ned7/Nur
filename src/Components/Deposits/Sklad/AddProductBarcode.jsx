@@ -20,6 +20,7 @@ import {
 import { useClient } from "../../../store/slices/ClientSlice";
 import { createDeal } from "../../../store/creators/saleThunk";
 import api from "../../../api";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 import "./AddProductBarcode.scss";
 import { PromotionRulesEditor } from "./AddProductPage/components";
 import {
@@ -250,9 +251,8 @@ const AddProductBarcode = ({
         onShowSupplierCreated("Поставщик успешно создан!");
       }
     } catch (err) {
-      const msg = err?.message || err?.detail || JSON.stringify(err);
-      if (onShowErrorAlert)
-        onShowErrorAlert(`Ошибка при создании поставщика: ${msg}`);
+      const msg = validateResErrors(err, "Ошибка при создании поставщика");
+      if (onShowErrorAlert) onShowErrorAlert(msg);
     } finally {
       setCreatingSupplier(false);
     }
@@ -316,9 +316,10 @@ const AddProductBarcode = ({
     // Проверяем, не обрабатывали ли мы уже эту ошибку
     if (lastScanErrorRef.current !== errorId && onShowErrorAlertRef.current) {
       lastScanErrorRef.current = errorId;
-      const errorMsg =
-        scanProductError?.response?.data?.barcode ||
-        "Произошла ошибка при добавлении товара в склад";
+      const errorMsg = validateResErrors(
+        scanProductError,
+        "Произошла ошибка при добавлении товара в склад",
+      );
 
       // Используем setTimeout, чтобы избежать синхронных обновлений состояния
       setTimeout(() => {
@@ -343,9 +344,10 @@ const AddProductBarcode = ({
     // Проверяем, не обрабатывали ли мы уже эту ошибку
     if (lastAddErrorRef.current !== errorId && onShowErrorAlertRef.current) {
       lastAddErrorRef.current = errorId;
-      const errorMsg =
-        addToWarehouseError?.response?.data?.barcode ||
-        "Произошла ошибка при добавлении товара в склад";
+      const errorMsg = validateResErrors(
+        addToWarehouseError,
+        "Произошла ошибка при добавлении товара в склад",
+      );
 
       // Используем setTimeout, чтобы избежать синхронных обновлений состояния
       setTimeout(() => {
@@ -380,9 +382,13 @@ const AddProductBarcode = ({
         const parts = [];
         if (Array.isArray(data.category)) parts.push(`Категория: ${data.category[0] ?? "Обязательное поле."}`);
         if (Array.isArray(data.warehouse)) parts.push(`Склад: ${data.warehouse[0] ?? "Обязательное поле."}`);
-        errorMsg = parts.length > 0 ? parts.join(". ") : "Произошла ошибка при добавлении товара в склад";
+        if (parts.length > 0) errorMsg = parts.join(". ");
       }
-      if (!errorMsg) errorMsg = "Произошла ошибка при добавлении товара в склад";
+      if (!errorMsg)
+        errorMsg = validateResErrors(
+          barcodeError,
+          "Произошла ошибка при добавлении товара в склад",
+        );
 
       setTimeout(() => {
         if (onShowErrorAlertRef.current) {
@@ -662,9 +668,10 @@ const AddProductBarcode = ({
       console.error("Ошибка при добавлении товара в склад:", err);
 
       // Показываем модалку ошибки через колбэк (закрывает AddModal и показывает ошибку)
-      const errorMsg =
-        err?.response?.data?.barcode ||
-        "Произошла ошибка при добавлении товара в склад";
+      const errorMsg = validateResErrors(
+        err,
+        "Произошла ошибка при добавлении товара в склад",
+      );
       console.log(errorMsg);
 
       if (onShowErrorAlert) {

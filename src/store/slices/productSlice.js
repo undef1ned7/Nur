@@ -41,12 +41,18 @@ const initialState = {
   brands: [],
   brandsLoading: false,
   brandsError: null,
+  brandsCount: 0,
+  brandsNext: null,
+  brandsPrevious: null,
   creatingBrand: false,
   createBrandError: null,
 
   categories: [],
   categoriesLoading: false,
   categoriesError: null,
+  categoriesCount: 0,
+  categoriesNext: null,
+  categoriesPrevious: null,
   creatingCategory: false,
   createCategoryError: null,
 
@@ -172,7 +178,18 @@ const productSlice = createSlice({
       })
       .addCase(fetchBrandsAsync.fulfilled, (state, action) => {
         state.brandsLoading = false;
-        state.brands = action.payload.results || action.payload;
+        const results = Array.isArray(action.payload?.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+            ? action.payload
+            : [];
+        state.brands = results;
+        state.brandsCount =
+          typeof action.payload?.count === "number"
+            ? action.payload.count
+            : results.length;
+        state.brandsNext = action.payload?.next ?? null;
+        state.brandsPrevious = action.payload?.previous ?? null;
       })
       .addCase(fetchBrandsAsync.rejected, (state, action) => {
         state.brandsLoading = false;
@@ -285,7 +302,18 @@ const productSlice = createSlice({
       })
       .addCase(fetchCategoriesAsync.fulfilled, (state, action) => {
         state.categoriesLoading = false;
-        state.categories = action.payload.results || action.payload;
+        const results = Array.isArray(action.payload?.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+            ? action.payload
+            : [];
+        state.categories = results;
+        state.categoriesCount =
+          typeof action.payload?.count === "number"
+            ? action.payload.count
+            : results.length;
+        state.categoriesNext = action.payload?.next ?? null;
+        state.categoriesPrevious = action.payload?.previous ?? null;
       })
       .addCase(fetchCategoriesAsync.rejected, (state, action) => {
         state.categoriesLoading = false;

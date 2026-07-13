@@ -112,6 +112,55 @@
     }
   }
 
+  &__custom-size-input {
+    width: 72px;
+    padding: 8px 10px;
+    border: 1px solid #d6d6d6;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    transition: all 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: $color-primary;
+      box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.12);
+    }
+  }
+
+  &__display-settings {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+
+  &__display-settings-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+    white-space: nowrap;
+  }
+
+  &__display-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a1a;
+    white-space: nowrap;
+    cursor: pointer;
+
+    input {
+      cursor: pointer;
+    }
+  }
+
   &__printer-status {
     display: flex;
     align-items: center;

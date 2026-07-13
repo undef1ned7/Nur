@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useDispatch } from "react-redux";
 import api from "../../../../../api";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 import * as utils from "../utils";
 import { NAVIGATION_DELAY } from "../constants";
 import {
@@ -339,16 +340,11 @@ export const useProductSubmit = ({
       }, NAVIGATION_DELAY);
     } catch (err) {
       console.error("Failed to create/update product:", err);
-      const errorMessage =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Неизвестная ошибка";
-      showAlert(
-        `Ошибка при ${isEditMode ? "обновлении" : "добавлении"} товара: ${errorMessage}`,
-        "error",
-        "Ошибка"
+      const errorMessage = validateResErrors(
+        err,
+        `Ошибка при ${isEditMode ? "обновлении" : "добавлении"} товара`
       );
+      showAlert(errorMessage, "error", "Ошибка");
     }
   }, [
     validateForm,

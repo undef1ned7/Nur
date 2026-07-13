@@ -27,6 +27,7 @@ import { useOutletContext } from "react-router-dom";
 import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { getKitchenDeleteErrorMessage } from "../../../../utils/kitchenDeleteError";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { useNetworkStatus } from "../../../../hooks/useNetworkStatus";
 import {
@@ -551,8 +552,7 @@ const Cook = () => {
           showNotice("ok", "Кухня удалена");
         } catch (e) {
           if (suppressOfflineError(e)) return;
-          const errorMessage = validateResErrors(e, "Ошибка при удалении кухни");
-          showNotice("error", errorMessage);
+          showNotice("error", getKitchenDeleteErrorMessage(e, name));
         } finally {
           setKitchenSaving(false);
         }

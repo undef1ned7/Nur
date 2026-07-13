@@ -5,6 +5,19 @@
 const MAX_PROMOTION_TIERS = 30;
 
 /**
+ * Убирает только нули после дробного разделителя: "10.500" → "10.5", "10.000" → "10".
+ * Значения без дробной части не меняются.
+ * @param {number|string|null|undefined} value
+ * @returns {string}
+ */
+export const stripTrailingZeros = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const s = String(value);
+  if (!/[.,]/.test(s)) return s;
+  return s.replace(/0+$/, "").replace(/[.,]$/, "");
+};
+
+/**
  * Доп. штрихкоды для API: разделители перенос/запятая/;; пустые и дубли отбрасываются;
  * совпадение с основным barcode не отправляем (валидация бэкенда).
  * @param {string|undefined|null} text

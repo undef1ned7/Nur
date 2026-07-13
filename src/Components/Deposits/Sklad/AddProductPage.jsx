@@ -57,6 +57,12 @@ import {
 import { MARKET_WAREHOUSE_KIND } from "../../../tools/marketWarehouseFilters";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
+import { useDebouncedValue } from "../../../hooks/useDebounce";
+
+const normalizeName = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
 
 const AddProductPage = ({
   embedded = false,
@@ -272,6 +278,28 @@ const AddProductPage = ({
     name: "",
   });
 
+  // Проверка уникальности названий бренда/категории с задержкой при вводе
+  const debouncedBrandName = useDebouncedValue(newBrand.name, 400);
+  const debouncedCategoryName = useDebouncedValue(newCategory.name, 400);
+
+  const isBrandNameTaken = useMemo(() => {
+    const name = normalizeName(debouncedBrandName);
+    return (
+      name !== "" &&
+      (brands || []).some((brand) => normalizeName(brand?.name) === name)
+    );
+  }, [debouncedBrandName, brands]);
+
+  const isCategoryNameTaken = useMemo(() => {
+    const name = normalizeName(debouncedCategoryName);
+    return (
+      name !== "" &&
+      (categories || []).some(
+        (category) => normalizeName(category?.name) === name,
+      )
+    );
+  }, [debouncedCategoryName, categories]);
+
   const [cashData, setCashData] = useState({
     cashbox: "",
     type: "expense",
@@ -347,7 +375,7 @@ const AddProductPage = ({
             category_name: product.category_name || "",
             price: formatPrice3Decimals(product.price),
             wholesale_price: formatPrice3Decimals(product.wholesale_price),
-            quantity: product.quantity || "",
+            quantity: utils.stripTrailingZeros(product.quantity) || "",
             client: product.client || "",
             purchase_price: formatPrice3Decimals(product.purchase_price),
             plu: product.plu || "",
@@ -363,15 +391,18 @@ const AddProductPage = ({
             isWeightProduct: product.is_weight || false,
             isFractionalService: product.is_weight || false,
             plu: product.plu ? String(product.plu) : "",
-            height: product.characteristics?.height_cm || "0",
-            width: product.characteristics?.width_cm || "0",
-            depth: product.characteristics?.depth_cm || "0",
-            weight: product.characteristics?.factual_weight_kg || "0",
+            height: utils.stripTrailingZeros(product.characteristics?.height_cm) || "0",
+            width: utils.stripTrailingZeros(product.characteristics?.width_cm) || "0",
+            depth: utils.stripTrailingZeros(product.characteristics?.depth_cm) || "0",
+            weight:
+              utils.stripTrailingZeros(
+                product.characteristics?.factual_weight_kg,
+              ) || "0",
             description: product.characteristics?.description || "",
             country: product.country || "",
             purchasePrice: formatPrice3Decimals(product.purchase_price) || "",
-            markup: product.markup_percent || "0",
-            discount: product.discount_percent || "0",
+            markup: utils.stripTrailingZeros(product.markup_percent) || "0",
+            discount: utils.stripTrailingZeros(product.discount_percent) || "0",
             supplier: product.client || "",
             minStock: "0", // Нет в API
             expiryDate: product.expiration_date || "",
@@ -381,7 +412,7 @@ const AddProductPage = ({
             packagings: (product.packages || []).map((pkg, idx) => ({
               id: Date.now() + idx,
               name: pkg.name || "",
-              quantity: String(pkg.quantity_in_package || 1),
+              quantity: utils.stripTrailingZeros(pkg.quantity_in_package) || "1",
               pieceUnitPrice: formatPrice3Decimals(pkg.piece_unit_price || ""),
             })),
             stock: Boolean(product.stock),
@@ -479,15 +510,17 @@ const AddProductPage = ({
         isWeightProduct: product.is_weight || false,
         isFractionalService: product.is_weight || false,
         plu: product.plu ? String(product.plu) : "",
-        height: product.characteristics?.height_cm || "0",
-        width: product.characteristics?.width_cm || "0",
-        depth: product.characteristics?.depth_cm || "0",
-        weight: product.characteristics?.factual_weight_kg || "0",
+        height: utils.stripTrailingZeros(product.characteristics?.height_cm) || "0",
+        width: utils.stripTrailingZeros(product.characteristics?.width_cm) || "0",
+        depth: utils.stripTrailingZeros(product.characteristics?.depth_cm) || "0",
+        weight:
+          utils.stripTrailingZeros(product.characteristics?.factual_weight_kg) ||
+          "0",
         description: product.characteristics?.description || "",
         country: product.country || "",
-        purchasePrice: product.purchase_price || "",
-        markup: product.markup_percent || "0",
-        discount: product.discount_percent || "0",
+        purchasePrice: formatPrice3DecimalsDup(product.purchase_price) || "",
+        markup: utils.stripTrailingZeros(product.markup_percent) || "0",
+        discount: utils.stripTrailingZeros(product.discount_percent) || "0",
         supplier: product.client || "",
         minStock: "0",
         expiryDate: product.expiration_date || "",
@@ -497,7 +530,7 @@ const AddProductPage = ({
         packagings: (product.packages || []).map((pkg, idx) => ({
           id: Date.now() + idx,
           name: pkg.name || "",
-          quantity: String(pkg.quantity_in_package || 1),
+          quantity: utils.stripTrailingZeros(pkg.quantity_in_package) || "1",
           pieceUnitPrice: formatPrice3DecimalsDup(pkg.piece_unit_price || ""),
         })),
         stock: Boolean(product.stock),
@@ -846,7 +879,9 @@ const AddProductPage = ({
       console.error("Failed to create product:", err);
       const errorMessage = validateResErrors(
         err,
-        "Ошибка при добавлении товара. ",
+        isEditMode
+          ? "Ошибка при обновлении товара."
+          : "Ошибка при добавлении товара.",
       );
       showAlert(errorMessage, "error", "Ошибка");
     }
@@ -882,7 +917,7 @@ const AddProductPage = ({
     } catch (e) {
       console.log(e);
       showAlert(
-        `Ошибка при создании поставщика: ${e.message || JSON.stringify(e)}`,
+        validateResErrors(e, "Ошибка при создании поставщика"),
         "error",
         "Ошибка",
       );
@@ -893,6 +928,14 @@ const AddProductPage = ({
     e.preventDefault();
     if (!newBrand.name || !newBrand.name.trim()) {
       showAlert("Введите название бренда", "error", "Ошибка");
+      return;
+    }
+    if (
+      (brands || []).some(
+        (brand) => normalizeName(brand?.name) === normalizeName(newBrand.name),
+      )
+    ) {
+      showAlert("Бренд с таким названием уже существует", "error", "Ошибка");
       return;
     }
     try {
@@ -911,7 +954,7 @@ const AddProductPage = ({
     } catch (e) {
       console.log(e);
       showAlert(
-        `Ошибка при создании бренда: ${e.message || JSON.stringify(e)}`,
+        validateResErrors(e, "Ошибка при создании бренда"),
         "error",
         "Ошибка",
       );
@@ -922,6 +965,19 @@ const AddProductPage = ({
     e.preventDefault();
     if (!newCategory.name || !newCategory.name.trim()) {
       showAlert("Введите название категории", "error", "Ошибка");
+      return;
+    }
+    if (
+      (categories || []).some(
+        (category) =>
+          normalizeName(category?.name) === normalizeName(newCategory.name),
+      )
+    ) {
+      showAlert(
+        "Категория с таким названием уже существует",
+        "error",
+        "Ошибка",
+      );
       return;
     }
     try {
@@ -940,7 +996,7 @@ const AddProductPage = ({
     } catch (e) {
       console.log(e);
       showAlert(
-        `Ошибка при создании категории: ${e.message || JSON.stringify(e)}`,
+        validateResErrors(e, "Ошибка при создании категории"),
         "error",
         "Ошибка",
       );
@@ -1168,6 +1224,8 @@ const AddProductPage = ({
               newBrand={newBrand}
               setNewBrand={setNewBrand}
               onSubmitBrand={onSubmitBrand}
+              isBrandNameTaken={isBrandNameTaken}
+              isCategoryNameTaken={isCategoryNameTaken}
               showCategoryInputs={showCategoryInputs}
               setShowCategoryInputs={setShowCategoryInputs}
               newCategory={newCategory}
@@ -1352,6 +1410,11 @@ const AddProductPage = ({
                               value={newBrand.name}
                               required
                             />
+                            {isBrandNameTaken && (
+                              <p className="add-product-page__error">
+                                Бренд с таким названием уже существует
+                              </p>
+                            )}
                             <div className="add-product-page__form-actions">
                               <button
                                 type="button"
@@ -1366,6 +1429,7 @@ const AddProductPage = ({
                               <button
                                 type="submit"
                                 className="add-product-page__save-btn"
+                                disabled={isBrandNameTaken}
                               >
                                 Создать
                               </button>
@@ -1425,6 +1489,11 @@ const AddProductPage = ({
                               value={newCategory.name}
                               required
                             />
+                            {isCategoryNameTaken && (
+                              <p className="add-product-page__error">
+                                Категория с таким названием уже существует
+                              </p>
+                            )}
                             <div className="add-product-page__form-actions">
                               <button
                                 type="button"
@@ -1439,6 +1508,7 @@ const AddProductPage = ({
                               <button
                                 type="submit"
                                 className="add-product-page__save-btn"
+                                disabled={isCategoryNameTaken}
                               >
                                 Создать
                               </button>
@@ -1839,11 +1909,13 @@ const MarketProductForm = ({
   newBrand,
   setNewBrand,
   onSubmitBrand,
+  isBrandNameTaken = false,
   showCategoryInputs,
   setShowCategoryInputs,
   newCategory,
   setNewCategory,
   onSubmitCategory,
+  isCategoryNameTaken = false,
   showInputs,
   setShowInputs,
   state,
@@ -2210,6 +2282,11 @@ const MarketProductForm = ({
                   value={newCategory.name}
                   required
                 />
+                {isCategoryNameTaken && (
+                  <p className="add-product-page__error">
+                    Категория с таким названием уже существует
+                  </p>
+                )}
                 <div className="add-product-page__form-actions">
                   <button
                     type="button"
@@ -2221,7 +2298,11 @@ const MarketProductForm = ({
                   >
                     Отмена
                   </button>
-                  <button type="submit" className="add-product-page__save-btn">
+                  <button
+                    type="submit"
+                    className="add-product-page__save-btn"
+                    disabled={isCategoryNameTaken}
+                  >
                     Создать
                   </button>
                 </div>
@@ -2270,6 +2351,11 @@ const MarketProductForm = ({
                   value={newBrand.name}
                   required
                 />
+                {isBrandNameTaken && (
+                  <p className="add-product-page__error">
+                    Бренд с таким названием уже существует
+                  </p>
+                )}
                 <div className="add-product-page__form-actions">
                   <button
                     type="button"
@@ -2281,7 +2367,11 @@ const MarketProductForm = ({
                   >
                     Отмена
                   </button>
-                  <button type="submit" className="add-product-page__save-btn">
+                  <button
+                    type="submit"
+                    className="add-product-page__save-btn"
+                    disabled={isBrandNameTaken}
+                  >
                     Создать
                   </button>
                 </div>

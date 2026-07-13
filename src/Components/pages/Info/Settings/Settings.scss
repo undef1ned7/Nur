@@ -772,6 +772,13 @@
     justify-content: center;
     min-width: 160px;
 
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
     &--primary {
       background: #ffd600;
       color: #000;
@@ -840,9 +847,45 @@
     color: #666;
     font-weight: 400;
     line-height: 1.6;
+    margin: 0 0 1rem;
+
+    code {
+      font-size: 13px;
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
 
     &--indent {
       margin-left: 32px;
+    }
+  }
+
+  &__notice {
+    margin: 12px 0 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+
+    &--success {
+      background: #ecfdf5;
+      color: #065f46;
+      border-color: #a7f3d0;
+    }
+
+    &--error {
+      background: #fef2f2;
+      color: #991b1b;
+      border-color: #fecaca;
+    }
+
+    &--info {
+      background: #eff6ff;
+      color: #1e40af;
+      border-color: #bfdbfe;
     }
   }
 
@@ -1048,7 +1091,7 @@
   }
 
   &__input--plain {
-    padding-left: 1rem;
+    padding: 12px 14px;
   }
 
   &__usbRow {
@@ -1081,6 +1124,11 @@
     justify-content: space-between;
     gap: 12px;
     flex-wrap: wrap;
+    margin-bottom: 1rem;
+
+    .settings__section-title {
+      margin-bottom: 0;
+    }
   }
 
   &__sectionHeadBtns {

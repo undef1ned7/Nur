@@ -1,20 +1,35 @@
 // Утилиты форматирования для компонента Warehouse
 
 /**
- * Форматирует цену с двумя знаками после запятой
+ * Убирает только нули после дробного разделителя: "10.500" → "10.5", "10.00" → "10"
+ * @param {number|string} value - Значение для обработки
+ * @returns {string} Значение без хвостовых нулей в дробной части
+ */
+const stripTrailingZeros = (value) => {
+  const s = String(value);
+  if (!/[.,]/.test(s)) return s;
+  return s.replace(/0+$/, "").replace(/[.,]$/, "");
+};
+
+/**
+ * Форматирует цену: до двух знаков после запятой, хвостовые нули убираются
  * @param {number|string} price - Цена для форматирования
  * @returns {string} Отформатированная цена
  */
-export const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+export const formatPrice = (price) =>
+  stripTrailingZeros(parseFloat(price || 0).toFixed(2));
 
 /**
- * Форматирует остатки товара с разделителями тысяч
+ * Форматирует остатки товара с разделителями тысяч, без хвостовых нулей в дробной части
  * @param {number|null|undefined} stock - Количество товара
  * @returns {string} Отформатированное количество или "—"
  */
 export const formatStock = (stock) => {
   if (stock === null || stock === undefined) return "—";
-  return stock.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const trimmed = stripTrailingZeros(stock);
+  const [intPart, decPart] = trimmed.split(/[.,]/);
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return decPart ? `${grouped}.${decPart}` : grouped;
 };
 
 /**

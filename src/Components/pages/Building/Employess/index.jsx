@@ -1044,6 +1044,11 @@ const Masters = () => {
             backendKey: "can_view_document",
           },
           { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+          {
+            value: "Зарплата",
+            label: "Зарплата",
+            backendKey: "can_view_salary",
+          },
           // {
           //   value: "Контрагенты",
           //   label: "Контрагенты",
