@@ -40,7 +40,13 @@ const BarcodePrintTab = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [showA4Modal, setShowA4Modal] = useState(false);
   const [labelSize, setLabelSize] = useState("30x20"); // размер этикетки по умолчанию
+  const [customWidthMm, setCustomWidthMm] = useState(40);
+  const [customHeightMm, setCustomHeightMm] = useState(30);
   const [didTouchTextScale, setDidTouchTextScale] = useState(false);
+  const [didTouchBarcodeSize, setDidTouchBarcodeSize] = useState(false);
+  // Что отображать на этикетке (как в печати на A4)
+  const [showName, setShowName] = useState(true);
+  const [showPrice, setShowPrice] = useState(true);
   const barcodeCanvasRef = useRef(null);
 
   // ====== Настройки/утилиты ======
@@ -117,10 +123,26 @@ const BarcodePrintTab = ({
     []
   );
 
-  const currentLabel = sizeMap[labelSize] || sizeMap["30x20"];
   const isRasterFont = String(fontId || "") === "__RASTER__";
 
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  const clampMm = (value, min, max, fallback) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return fallback;
+    return clamp(n, min, max);
+  };
+
+  const currentLabel = useMemo(() => {
+    if (labelSize === "custom") {
+      return {
+        widthMm: clampMm(customWidthMm, 15, 110, 30),
+        heightMm: clampMm(customHeightMm, 10, 110, 20),
+      };
+    }
+    return sizeMap[labelSize] || sizeMap["30x20"];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelSize, customWidthMm, customHeightMm, sizeMap]);
 
   const getAutoPrintSettingsBySize = useCallback(
     ({ heightMm, fontId: currentFontId }) => {
@@ -172,8 +194,14 @@ const BarcodePrintTab = ({
         gapAfterTitle: auto.gapAfterTitle,
         gapAfterPrice: auto.gapAfterPrice,
         barcodeRaise: auto.barcodeRaise,
-        barcodeHeight: auto.barcodeHeight,
-        barcodeBarWidth: auto.barcodeBarWidth,
+
+        // размеры штрих-кода авто-масштабируем, только если пользователь их не менял
+        ...(didTouchBarcodeSize
+          ? null
+          : {
+              barcodeHeight: auto.barcodeHeight,
+              barcodeBarWidth: auto.barcodeBarWidth,
+            }),
 
         // textScale меняем автоматически только если пользователь сам не трогал масштаб
         ...(didTouchTextScale ? null : { textScale: auto.textScale }),
@@ -184,6 +212,7 @@ const BarcodePrintTab = ({
     currentLabel.heightMm,
     getAutoPrintSettingsBySize,
     didTouchTextScale,
+    didTouchBarcodeSize,
   ]);
 
   const previewLayout = useMemo(() => {
@@ -249,8 +278,11 @@ const BarcodePrintTab = ({
 
   const previewWrapWidth = Math.max(6, Math.round(16 / textScaleValue));
   const previewLines = useMemo(
-    () => wrapPreviewText(previewProduct?.name || "Товар", previewWrapWidth, 2),
-    [previewProduct, previewWrapWidth]
+    () =>
+      showName
+        ? wrapPreviewText(previewProduct?.name || "Товар", previewWrapWidth, 2)
+        : [],
+    [previewProduct, previewWrapWidth, showName]
   );
 
   const formatPrice = (value) => {
@@ -260,6 +292,7 @@ const BarcodePrintTab = ({
   };
 
   const previewPriceText =
+    showPrice &&
     previewProduct?.price !== undefined &&
     previewProduct?.price !== null &&
     String(previewProduct?.price).trim() !== ""
@@ -268,7 +301,7 @@ const BarcodePrintTab = ({
 
   const previewPositions = useMemo(() => {
     const fontBase = fontBaseMap[Number(fontId)] ?? 6;
-    const lineCount = Math.max(1, previewLines.length);
+    const lineCount = previewLines.length;
     const gapTitle = Math.max(0, Math.round(gapAfterTitle));
     const gapPrice = Math.max(0, Math.round(gapAfterPrice));
     const barcodeRaiseDots = Math.max(0, Math.round(barcodeRaise));
@@ -453,8 +486,8 @@ const BarcodePrintTab = ({
     try {
       await printXp365bBarcodeLabel({
         barcode: String(previewProduct.barcode),
-        title: previewProduct.name || "Товар",
-        price: previewProduct.price,
+        title: showName ? previewProduct.name || "Товар" : "",
+        price: showPrice ? previewProduct.price : "",
         copies: copiesForPrint,
         widthMm,
         heightMm,
@@ -527,8 +560,8 @@ const BarcodePrintTab = ({
       for (const product of selectedWithBarcode) {
         await printXp365bBarcodeLabel({
           barcode: String(product.barcode),
-          title: product.name || "Товар",
-          price: product.price,
+          title: showName ? product.name || "Товар" : "",
+          price: showPrice ? product.price : "",
           copies: copiesForPrint,
           widthMm,
           heightMm,
@@ -600,6 +633,8 @@ const BarcodePrintTab = ({
     barcodeHeight,
     barcodeBarWidth,
     fontId,
+    showName,
+    showPrice,
   ]);
 
   // Генерация визуализации штрих-кода для предпросмотра
@@ -718,13 +753,46 @@ const BarcodePrintTab = ({
                   onChange={(e) => {
                     setLabelSize(e.target.value);
                     setDidTouchTextScale(false);
+                    setDidTouchBarcodeSize(false);
                   }}
               >
                 <option value="30x20">30×20 мм</option>
                 <option value="58x40">58×40 мм</option>
                 <option value="58x30">58×30 мм</option>
+                <option value="custom">Свой размер…</option>
               </select>
             </label>
+
+            {labelSize === "custom" && (
+              <>
+                <label className="barcode-print-tab__size-label">
+                  Ширина (мм):
+                  <input
+                    className="barcode-print-tab__custom-size-input"
+                    type="number"
+                    min={15}
+                    max={110}
+                    step={1}
+                    value={customWidthMm}
+                    onChange={(e) => setCustomWidthMm(e.target.value)}
+                    title="Ширина этикетки в миллиметрах (15–110)"
+                  />
+                </label>
+                <label className="barcode-print-tab__size-label">
+                  Высота (мм):
+                  <input
+                    className="barcode-print-tab__custom-size-input"
+                    type="number"
+                    min={10}
+                    max={110}
+                    step={1}
+                    value={customHeightMm}
+                    onChange={(e) => setCustomHeightMm(e.target.value)}
+                    title="Высота этикетки в миллиметрах (10–110)"
+                  />
+                </label>
+              </>
+            )}
 
             <label className="barcode-print-tab__size-label">
               Копий:
@@ -769,7 +837,70 @@ const BarcodePrintTab = ({
           </button>
         </div>
 
+        <div className="barcode-print-tab__display-settings">
+          <span className="barcode-print-tab__display-settings-title">
+            Отображать на этикетке:
+          </span>
 
+          <label className="barcode-print-tab__display-checkbox">
+            <input
+              type="checkbox"
+              checked={showName}
+              onChange={(e) => setShowName(e.target.checked)}
+            />
+            Название
+          </label>
+
+          <label className="barcode-print-tab__display-checkbox">
+            <input
+              type="checkbox"
+              checked={showPrice}
+              onChange={(e) => setShowPrice(e.target.checked)}
+            />
+            Цена
+          </label>
+
+          <label className="barcode-print-tab__size-label">
+            Высота штрих-кода:
+            <input
+              className="barcode-print-tab__custom-size-input"
+              type="number"
+              min={20}
+              max={200}
+              step={2}
+              value={Math.round(barcodeHeight)}
+              onChange={(e) => {
+                setDidTouchBarcodeSize(true);
+                setPrintSettings((prev) => ({
+                  ...prev,
+                  barcodeHeight: clamp(Number(e.target.value) || 44, 20, 200),
+                }));
+              }}
+              title="Высота штрих-кода в точках (203 DPI ≈ 8 точек/мм)"
+            />
+          </label>
+
+          <label className="barcode-print-tab__size-label">
+            Толщина штриха:
+            <select
+              className="barcode-print-tab__size-select"
+              value={String(Math.max(1, Math.round(barcodeBarWidth)))}
+              onChange={(e) => {
+                setDidTouchBarcodeSize(true);
+                setPrintSettings((prev) => ({
+                  ...prev,
+                  barcodeBarWidth: Number(e.target.value) || 2,
+                }));
+              }}
+              title="Ширина минимального штриха в точках"
+            >
+              <option value="1">1 (тонкий)</option>
+              <option value="2">2 (стандарт)</option>
+              <option value="3">3 (толстый)</option>
+              <option value="4">4 (очень толстый)</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="barcode-print-tab__content">
@@ -1026,6 +1157,24 @@ const BarcodePrintTab = ({
                   style={{ width: 80 }}
                   title="Сколько раз печатать одну и ту же этикетку"
                 />
+              </label>
+
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={showName}
+                  onChange={(e) => setShowName(e.target.checked)}
+                />
+                Название
+              </label>
+
+              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={showPrice}
+                  onChange={(e) => setShowPrice(e.target.checked)}
+                />
+                Цена
               </label>
             </div>
 

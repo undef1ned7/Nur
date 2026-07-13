@@ -509,7 +509,8 @@ function buildLabel({
   barcodeHeight = 44,
   barcodeBarWidth = 2,
 }) {
-  const t0 = safeTsplText(title || "ТОВАР");
+  // title === "" — печатать без названия; null/undefined — фолбэк "ТОВАР"
+  const t0 = safeTsplText(title ?? "ТОВАР");
   const rawCode = safeTsplText(barcode || "");
   const { code, format: bcType } = normalizeBarcode(rawCode);
 
@@ -584,8 +585,8 @@ function buildLabel({
   }
 
   const wrapWidth = Math.max(6, Math.round(16 / textScaleInt));
-  const lines = wrap(t0, wrapWidth, 2);
-  const lineCount = Math.max(1, lines.filter(Boolean).length);
+  const lines = t0 ? wrap(t0, wrapWidth, 2) : [];
+  const lineCount = lines.filter(Boolean).length;
   const lineWidth = (line) => (line ? line.length * charWidth : 0);
 
   // TSPL: EAN13/EAN8 как есть, CODE128 → "128"
@@ -657,9 +658,9 @@ function buildLabel({
     "CLS",
     `CODEPAGE ${getTsplCodepageToken()}`,
     ...border,
-    `TEXT ${titleX1},${titleY},"${font}",0,${textScaleInt},${textScaleInt},"${
-      lines[0] || ""
-    }"`,
+    lines[0]
+      ? `TEXT ${titleX1},${titleY},"${font}",0,${textScaleInt},${textScaleInt},"${lines[0]}"`
+      : "",
     lines[1]
       ? `TEXT ${titleX2},${
           titleY + lineGapDots
@@ -731,7 +732,8 @@ async function buildRasterLabelBytes({
   barcodeHeight = 44,
   barcodeBarWidth = 2,
 }) {
-  const t0 = safeTsplText(title || "ТОВАР");
+  // title === "" — печатать без названия; null/undefined — фолбэк "ТОВАР"
+  const t0 = safeTsplText(title ?? "ТОВАР");
   const rawCode = safeTsplText(barcode || "");
   const { code, format: barcodeFormat } = normalizeBarcode(rawCode);
 
@@ -816,8 +818,8 @@ async function buildRasterLabelBytes({
     ctx.fillRect(rightX, y, thick, bh);
   }
 
-  const lines = wrapByPixelWidth(ctx, t0, safeW, 2);
-  const lineCount = Math.max(1, lines.length);
+  const lines = t0 ? wrapByPixelWidth(ctx, t0, safeW, 2) : [];
+  const lineCount = lines.length;
   const textBlockHeight = lineGapDots * lineCount;
   const priceBlockHeight = priceText ? gapAfterTitleDots + lineGapDots : 0;
   const gapToBarcode = priceText ? gapAfterPriceDots : gapAfterTitleDots;
