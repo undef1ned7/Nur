@@ -1,88 +1,45 @@
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { useUser } from "./store/slices/userSlice";
-import { useEffect, useMemo } from "react";
-import { MENU_CONFIG } from "./Components/Sidebar/config/menuConfig";
-import { useMenuPermissions } from "./Components/Sidebar/hooks/useMenuPermissions";
-import { useDebounce } from "./hooks/useDebounce";
 import { useAlert } from "./hooks/useDialog";
+import { getCompanySubscriptionStatus } from "./utils/companySubscription";
 
-const BASE_ROUTES = ["/srm/set"];
+const SUBSCRIPTION_FALLBACK_PATH = "/";
 
 const ProtectedRoute = ({ children }) => {
-  const { company, companyLoading, profile, tariff, sector } = useUser();
+  const { company, companyLoading } = useUser();
   const alert = useAlert();
-  // const { hasPermission, isAllowed } = useMenuPermissions();
-  // const { pathname } = useLocation()
-  // const navigate = useNavigate()
-  // const getSectorMenuItems = useMemo(() => {
-  //   const currentSector = sector || company?.sector?.name;
-  //   if (!currentSector) return [];
-  //   const sectorName = currentSector.toLowerCase();
-  //   const sectorKey = sectorName.replace(/\s+/g, "_");
-  //   const sectorMapping = {
-  //     строительная_компания: "building",
-  //     ремонтные_и_отделочные_работы: "building",
-  //     архитектура_и_дизайн: "building",
-  //     барбершоп: "barber",
-  //     гостиница: "hostel",
-  //     школа: "school",
-  //     магазин: "market",
-  //     кафе: "cafe",
-  //     "Цветочный магазин": "market",
-  //     производство: "production",
-  //     консалтинг: "consulting",
-  //     склад: "warehouse",
-  //     пилорама: "pilorama",
-  //     логистика: "logistics",
-  //   };
+  const notifiedRef = useRef(null);
 
-  //   const configKey = sectorMapping[sectorKey] || sectorKey;
-  //   const sectorConfig = MENU_CONFIG.sector[configKey] || [];
-  //   if (tariff === "Старт") {
-  //     const filteredItems = sectorConfig.filter((item) => {
-  //       // Показываем только аналитику маркета
-  //       if (item.to === "/crm/market/analytics") {
-  //         return hasPermission(item.permission);
-  //       }
-  //       return false;
-  //     });
-  //     return filteredItems;
-  //   }
-  //   const filteredItems = sectorConfig.filter((item) => {
-  //     if ('production' === configKey && item.permission === 'can_view_catalog' && profile?.role === 'owner') return true;
-  //     return hasPermission(item.permission)
-  //   }
-  //   );
+  const subscription = getCompanySubscriptionStatus(company);
 
-  //   return filteredItems;
-  // }, [sector, company, hasPermission, profile, tariff]);
-  // useEffect(() => {
-  //   if (pathname.split('/').length > 2) return;
-  //   if (BASE_ROUTES.includes(pathname)) return;
-  //   if (!getSectorMenuItems.some(el => el.to.includes(pathname))) {
-  //     navigate(-1)
-  //   }
-  // }, [profile])
-  // Пока грузим компанию — ждём
+  useEffect(() => {
+    if (companyLoading || !company) return;
+    if (subscription.ok || !subscription.message) return;
+    if (notifiedRef.current === subscription.reason) return;
+
+    notifiedRef.current = subscription.reason;
+    alert(subscription.message, true);
+  }, [
+    company,
+    companyLoading,
+    subscription.ok,
+    subscription.reason,
+    subscription.message,
+    alert,
+  ]);
+
   if (companyLoading) {
     return <div>Загрузка...</div>;
   }
-  // Если компания не пришла → редирект
-  if (!company?.end_date) {
-    alert("Срок действия компании не установлен", true);
-    return <Navigate to="/" replace />;
+
+  // Компания ещё не загружена — не блокируем (AuthGuard/Layout подтянут)
+  if (!company) {
+    return children;
   }
 
-  // Сравниваем только по датам (исключаем баг с часовыми поясами)
-  const endDate = new Date(company.end_date);
-  const now = new Date();
-
-  endDate.setHours(0, 0, 0, 0);
-  now.setHours(0, 0, 0, 0);
-
-  if (endDate < now) {
-    alert("Срок действия компании истек", true);
-    return <Navigate to="/" replace />;
+  if (!subscription.ok) {
+    return <Navigate to={SUBSCRIPTION_FALLBACK_PATH} replace />;
   }
 
   return children;

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 
@@ -28,7 +28,7 @@ const pastDate = () => {
 
 const renderProtected = () =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/crm"]}>
       <ProtectedRoute>
         <div data-testid="protected-content">CRM Content</div>
       </ProtectedRoute>
@@ -38,6 +38,10 @@ const renderProtected = () =>
 describe("ProtectedRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("shows loading state while company is loading", () => {
@@ -53,7 +57,7 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Загрузка...")).toBeInTheDocument();
   });
 
-  it("redirects when company end_date is missing", () => {
+  it("redirects when company end_date is missing", async () => {
     mockUseUser.mockReturnValue({
       company: {},
       companyLoading: false,
@@ -63,14 +67,16 @@ describe("ProtectedRoute", () => {
     });
 
     renderProtected();
-    expect(mockAlert).toHaveBeenCalledWith(
-      "Срок действия компании не установлен",
-      true,
-    );
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockAlert).toHaveBeenCalledWith(
+        "Срок действия компании не установлен",
+        true,
+      );
+    });
   });
 
-  it("redirects when company subscription expired", () => {
+  it("redirects when company subscription expired", async () => {
     mockUseUser.mockReturnValue({
       company: { end_date: pastDate() },
       companyLoading: false,
@@ -80,11 +86,13 @@ describe("ProtectedRoute", () => {
     });
 
     renderProtected();
-    expect(mockAlert).toHaveBeenCalledWith(
-      "Срок действия компании истек",
-      true,
-    );
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockAlert).toHaveBeenCalledWith(
+        "Срок действия компании истек",
+        true,
+      );
+    });
   });
 
   it("renders children when company subscription is active", () => {
@@ -99,5 +107,18 @@ describe("ProtectedRoute", () => {
     renderProtected();
     expect(screen.getByTestId("protected-content")).toBeInTheDocument();
     expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  it("renders children while company is not yet loaded", () => {
+    mockUseUser.mockReturnValue({
+      company: null,
+      companyLoading: false,
+      profile: null,
+      tariff: "",
+      sector: "",
+    });
+
+    renderProtected();
+    expect(screen.getByTestId("protected-content")).toBeInTheDocument();
   });
 });
