@@ -51,4 +51,11 @@ export const productionMenu = [
         permission: "can_view_request",
         implemented: true,
       },
+      {
+        label: "Зарплата",
+        to: "/crm/production/salary",
+        icon: menuIcons.wallet,
+        permission: "can_view_salary",
+        implemented: true,
+      },
     ];

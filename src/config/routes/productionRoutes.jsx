@@ -13,6 +13,7 @@ const ProductionSell = lazy(() => import("../../Components/Sectors/Production/Se
 const ProductionSellStartPage = lazy(() => import("../../Components/Sectors/Production/Sell/ProductionSellStartPage"));
 const ProductionFinishedGoodsAddPage = lazy(() => import("../../Components/Sectors/Production/FinishedGoods/ProductionFinishedGoodsAddPage"));
 const RawMaterialProcessPage = lazy(() => import("../../Components/Sectors/Production/RawMaterialsWarehouse/RawMaterialProcessPage"));
+const ProductionSalary = lazy(() => import("../../Components/Sectors/Production/Salary/ProductionSalary"));
 import {
   createProtectedRoute,
   createProductionAgentProtectedRoute,
@@ -42,6 +43,7 @@ export const productionRoutes = () => [
   createProductionAgentProtectedRoute("production/request", ProductionRequest),
   createProtectedRoute("production/sell", ProductionSell),
   createProtectedRoute("production/sell/start", ProductionSellStartPage),
+  createProtectedRoute("production/salary", ProductionSalary),
   <Route
     key="production/suppliers"
     path="production/suppliers"

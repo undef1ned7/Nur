@@ -194,6 +194,7 @@ const pageTitles = {
   "/crm/production/request": "Заявки",
   "/crm/production/sell": "Продажа",
   "/crm/production/sell/start": "Продажа",
+  "/crm/production/salary": "Зарплата",
 
   "/crm/pilorama/warehouse": "Склад",
 
