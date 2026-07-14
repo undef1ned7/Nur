@@ -2578,7 +2578,7 @@ const CashierPage = () => {
       }
 
       const qtyNum = normalizeQuantity(
-        Math.max(0, parseFloat(pendingRaw) || 0),
+        Math.max(0, parseDecimalInput(pendingRaw) || 0),
       );
       pendingQtyLineInputRef.current.delete(idKey);
 

@@ -85,6 +85,14 @@ export default function MarketClientDetails() {
   const [supplierProductsErr, setSupplierProductsErr] = useState("");
   const [supplierProductSearch, setSupplierProductSearch] = useState("");
 
+  // История закупок у поставщика (см. docs/production/supplier-purchases.md)
+  const [supplierPurchases, setSupplierPurchases] = useState([]);
+  const [supplierPurchasesLoading, setSupplierPurchasesLoading] =
+    useState(false);
+  const [supplierPurchasesErr, setSupplierPurchasesErr] = useState("");
+  const [supplierPurchasesApiMissing, setSupplierPurchasesApiMissing] =
+    useState(false);
+
   // История продаж клиента (POS)
   const [clientSales, setClientSales] = useState([]);
   const [clientSalesLoading, setClientSalesLoading] = useState(false);
@@ -169,6 +177,41 @@ export default function MarketClientDetails() {
     }
   }, []);
 
+  const loadSupplierPurchases = useCallback(async (supplierId) => {
+    const normalizedSupplierId = String(supplierId || "").trim();
+    if (!normalizedSupplierId) {
+      setSupplierPurchases([]);
+      return;
+    }
+
+    try {
+      setSupplierPurchasesLoading(true);
+      setSupplierPurchasesErr("");
+      const res = await api.get(
+        `/main/suppliers/${encodeURIComponent(normalizedSupplierId)}/purchases/`,
+      );
+      const list = Array.isArray(res?.data?.results)
+        ? res.data.results
+        : Array.isArray(res?.data)
+          ? res.data
+          : [];
+      setSupplierPurchases(list);
+      setSupplierPurchasesApiMissing(false);
+    } catch (e) {
+      setSupplierPurchases([]);
+      if (e?.response?.status === 404) {
+        setSupplierPurchasesApiMissing(true);
+      } else {
+        console.error(e);
+        setSupplierPurchasesErr(
+          msgFromError(e, "Не удалось загрузить историю закупок"),
+        );
+      }
+    } finally {
+      setSupplierPurchasesLoading(false);
+    }
+  }, []);
+
   // История POS-продаж клиента. Пробуем серверную фильтрацию (?client=<id>),
   // и на всякий случай дофильтровываем на фронте (если бэк параметр игнорирует).
   // Контракт: docs/market-pos-sales-client-filter-backend.md
@@ -225,10 +268,14 @@ export default function MarketClientDetails() {
       setSupplierProducts([]);
       setSupplierProductsErr("");
       setSupplierProductsLoading(false);
+      setSupplierPurchases([]);
+      setSupplierPurchasesErr("");
+      setSupplierPurchasesLoading(false);
       return;
     }
     void loadSupplierProducts(client.id);
-  }, [client?.id, client?.type, loadSupplierProducts]);
+    void loadSupplierPurchases(client.id);
+  }, [client?.id, client?.type, loadSupplierProducts, loadSupplierPurchases]);
 
   const persistClient = (next) => {
     if (!next) return;
@@ -502,8 +549,6 @@ export default function MarketClientDetails() {
   };
 
   const clientTypeLabel = typeLabel(client?.type);
-  const isSupplierClient =
-    String(client?.type || "").toLowerCase() === "suppliers";
 
   const filteredSupplierProducts = useMemo(() => {
     const query = String(supplierProductSearch || "")
@@ -520,6 +565,21 @@ export default function MarketClientDetails() {
     () => filteredSupplierProducts.length,
     [filteredSupplierProducts.length],
   );
+
+  const supplierPurchasesTotals = useMemo(() => {
+    return supplierPurchases.reduce(
+      (acc, row) => {
+        acc.amount += Number(row?.amount ?? row?.total ?? 0);
+        acc.count += 1;
+        return acc;
+      },
+      { amount: 0, count: 0 },
+    );
+  }, [supplierPurchases]);
+
+  const showSupplierSections =
+    String(client?.type || "").toLowerCase() === "suppliers" &&
+    ["Магазин", "Производство"].includes(company?.sector?.name);
 
   // ---- UI-only derived values (no API / no data-model changes) ----
   const dealKindCounts = useMemo(() => {
@@ -1028,7 +1088,7 @@ export default function MarketClientDetails() {
         </div>
       </div>
 
-      {isSupplierClient && company?.sector?.name === "Магазин" && (
+      {showSupplierSections && (
         <div className="cdx__card">
           <div className="cdx__supplier-head">
             <div>
@@ -1157,6 +1217,113 @@ export default function MarketClientDetails() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {showSupplierSections && (
+        <div className="cdx__card">
+          <div className="cdx__supplier-head">
+            <div>
+              <h3 className="cdx__card-title">
+                <Package /> История закупок
+              </h3>
+              <div className="cdx__supplier-subtitle">
+                Сколько и когда закуплено у этого поставщика
+              </div>
+            </div>
+            <div className="cdx__supplier-actions">
+              <button
+                type="button"
+                className="cdx__btn cdx__btn--secondary"
+                onClick={() => loadSupplierPurchases(client?.id)}
+                disabled={!client?.id || supplierPurchasesLoading}
+              >
+                <RefreshCw />
+                {supplierPurchasesLoading ? "Обновляем..." : "Обновить"}
+              </button>
+            </div>
+          </div>
+
+          <div className="cdx__supplier-summary">
+            <div className="cdx__supplier-chip">
+              Закупок: <b>{supplierPurchasesTotals.count}</b>
+            </div>
+            <div className="cdx__supplier-chip">
+              На сумму:{" "}
+              <b>
+                {supplierPurchasesTotals.amount.toLocaleString("ru-RU", {
+                  maximumFractionDigits: 2,
+                })}{" "}
+                сом
+              </b>
+            </div>
+          </div>
+
+          {supplierPurchasesErr && (
+            <div style={{ padding: "16px 22px 0" }}>
+              <div className="cdx__alert">{supplierPurchasesErr}</div>
+            </div>
+          )}
+
+          {supplierPurchasesApiMissing ? (
+            <div className="cdx__state">
+              История закупок станет доступна после обновления сервера
+            </div>
+          ) : supplierPurchasesLoading ? (
+            <div className="cdx__state">Загрузка…</div>
+          ) : supplierPurchases.length === 0 ? (
+            <div className="cdx__state">
+              Закупок у этого поставщика пока не было
+            </div>
+          ) : (
+            <div className="cdx__supplier-table-wrap">
+              <table className="cdx__supplier-table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Товар</th>
+                    <th>Кол-во</th>
+                    <th>Ед.</th>
+                    <th>Сумма</th>
+                    <th>Оплата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplierPurchases.map((row, idx) => (
+                    <tr key={row?.id || idx}>
+                      <td>
+                        {row?.purchased_at || row?.created_at
+                          ? new Date(
+                              row.purchased_at || row.created_at,
+                            ).toLocaleString("ru-RU")
+                          : "—"}
+                      </td>
+                      <td>{row?.product_name || row?.name || "—"}</td>
+                      <td>{row?.quantity ?? "—"}</td>
+                      <td>{row?.unit || "—"}</td>
+                      <td>
+                        {Number(
+                          row?.amount ?? row?.total ?? 0,
+                        ).toLocaleString("ru-RU", {
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        сом
+                      </td>
+                      <td>
+                        {row?.payment_type === "debt"
+                          ? "Долг"
+                          : row?.payment_type === "prepayment"
+                            ? "Предоплата"
+                            : row?.payment_type
+                              ? "Оплачено"
+                              : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

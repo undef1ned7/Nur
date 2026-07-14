@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Filter,
   TrendingUp,
+  TrendingDown,
   Warehouse,
   Wallet,
   Receipt,
@@ -1509,6 +1510,42 @@ const ProductionAnalytics = () => {
             </span>
           </div>
         </div>
+
+        {/* Прочие расходы и чистая прибыль (Задача №5 фидбека, июль 2026).
+            Поля появятся после обновления бэка — см.
+            docs/production/analytics-other-expenses.md */}
+        {summary.other_expenses_total !== undefined && (
+          <div className="agent-analytics__metric-card">
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+              <TrendingDown size={24} />
+            </div>
+            <div>
+              <h3>Прочие расходы</h3>
+              <p>{formatMoney(summary.other_expenses_total || 0)} сом</p>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Расходы кассы за период, кроме закупок сырья и товаров
+              </span>
+            </div>
+          </div>
+        )}
+
+        {summary.net_profit !== undefined && (
+          <div className="agent-analytics__metric-card">
+            <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <h3>Чистая прибыль</h3>
+              <p>{formatMoney(summary.net_profit || 0)} сом</p>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Валовая прибыль − прочие расходы
+                {summary.net_margin_percent !== undefined
+                  ? ` · рентабельность ${formatPercent(summary.net_margin_percent)}`
+                  : ""}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div
           className="agent-analytics__metric-card agent-analytics__metric-card--clickable"

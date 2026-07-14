@@ -5,6 +5,7 @@ import FinishedGoods from "../FinishedGoods/FinishedGoods";
 import RawMaterialsWarehouse from "../RawMaterialsWarehouse/RawMaterialsWarehouse";
 import ProductionInventoryTab from "./ProductionInventoryTab";
 import ProductionMovementsTab from "./ProductionMovementsTab";
+import ProductionReportTab from "./ProductionReportTab";
 import TransferStatusModal from "../TransferStatus/TransferStatus";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -1255,6 +1256,10 @@ const ProductionWarehouse = () => {
     {
       label: "Перемещение",
       content: <ProductionMovementsTab />,
+    },
+    {
+      label: "Производство",
+      content: <ProductionReportTab />,
     },
   ];
   useEffect(() => {

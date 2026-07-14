@@ -39,7 +39,7 @@ const VIEW_MODES = {
 };
 
 const VIEW_MODE_STORAGE_KEY = "crm_brand_category_view_mode";
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 100;
 
 const getInitialViewMode = () => {
   if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -174,8 +174,6 @@ const BrandCategoryPagination = ({
   hasPrevPage,
   onPageChange,
 }) => {
-  if (totalPages <= 1 && !hasNextPage && !hasPrevPage) return null;
-
   const pages = useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -192,6 +190,8 @@ const BrandCategoryPagination = ({
 
     return result;
   }, [currentPage, totalPages]);
+
+  if (totalPages <= 1 && !hasNextPage && !hasPrevPage) return null;
 
   return (
     <nav
@@ -359,6 +359,7 @@ export default function BrandCategoryPage() {
       fetchBrandsAsync({
         search: debouncedSearchBrand || undefined,
         page: currentPage,
+        page_size: PAGE_SIZE,
       }),
     );
   }, [dispatch, debouncedSearchBrand, currentPage]);
@@ -368,6 +369,7 @@ export default function BrandCategoryPage() {
       fetchCategoriesAsync({
         search: debouncedSearchCat || undefined,
         page: currentPage,
+        page_size: PAGE_SIZE,
       }),
     );
   }, [dispatch, debouncedSearchCat, currentPage]);
