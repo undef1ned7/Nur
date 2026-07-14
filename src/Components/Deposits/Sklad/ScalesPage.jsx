@@ -9,7 +9,11 @@ import { validateResErrors } from "../../../../tools/validateResErrors";
 const isWeightProduct = (p) =>
   Boolean(p?.is_weight) || p?.scale_type === "weight";
 
-/** Собирает весовые товары со всех страниц каталога */
+/**
+ * Собирает весовые товары: бэкенд фильтрует по is_weight=true
+ * (см. docs/market/scales-weight-products.md), клиентский фильтр —
+ * подстраховка на случай, если параметр проигнорирован.
+ */
 const fetchAllWeightProducts = async () => {
   const collected = [];
   let page = 1;
@@ -17,7 +21,7 @@ const fetchAllWeightProducts = async () => {
 
   while (page <= MAX_PAGES) {
     const { data } = await api.get("main/products/list/", {
-      params: { page },
+      params: { page, is_weight: true },
     });
     const results = Array.isArray(data?.results)
       ? data.results
