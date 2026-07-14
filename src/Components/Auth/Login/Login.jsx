@@ -4,9 +4,10 @@ import { useDispatch, useSelector } from "react-redux";
 import {  loginUserAsync, getCompany } from "../../../store/creators/userCreators";
 import {  logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
-import { isBuildingSector } from "../../../utils/sectorMapping";
-import { redirectToBuildingApp } from "../../../utils/crossAppAuth";
+import { tryRedirectToBuildingApp } from "../../../utils/crossAppAuth";
+import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
+import { useAlert } from "../../../hooks/useDialog";
 import "./Login.scss";
 
 // Блокировка входа после подряд неудачных попыток
@@ -54,6 +55,7 @@ const formatLockTime = (ms) => {
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const alert = useAlert();
   const { loading, error, currentUser, isAuthenticated } = useSelector(
     (state) => state.user
   );
@@ -62,6 +64,7 @@ const Login = () => {
   const [showPass, setShowPass] = useState(false);
   const [lockState, setLockState] = useState(readLockState);
   const [now, setNow] = useState(() => Date.now());
+  const [localError, setLocalError] = useState("");
 
   const lockRemainingMs = Math.max(0, (lockState.lockUntil || 0) - now);
   const isLocked = lockRemainingMs > 0;
@@ -145,37 +148,47 @@ const Login = () => {
     }
   };
 
-  const errText = getErrorMessage(error);
+  const errText = localError || getErrorMessage(error);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
+    if (localError) setLocalError("");
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // ← НЕ ДАДИМ БРАУЗЕРУ ПЕРЕЗАГРУЗИТЬ СТРАНИЦУ
+    e.preventDefault();
     if (isLocked) return;
+    setLocalError("");
+
     try {
       await dispatch(loginUserAsync(formData)).unwrap();
-    } catch (e) {
-      // Ошибка уже попадёт в Redux -> error, и покажется в errText
+    } catch {
       registerFailedAttempt();
       return;
     }
 
-    // Логин успешен — сбрасываем счётчик неудачных попыток
     resetLockState();
 
     try {
       const company = await dispatch(getCompany()).unwrap();
-      if (isBuildingSector(company?.sector?.name)) {
-        redirectToBuildingApp();
+      const subscription = getCompanySubscriptionStatus(company);
+
+      if (!subscription.ok && subscription.message) {
+        setLocalError(subscription.message);
+        alert(subscription.message, true);
+        navigate("/", { replace: true });
         return;
       }
 
-      navigate("/crm/"); // навигация SPA, без reload
-    } catch (e) {
-      // Не считаем неудачной попыткой входа: авторизация уже прошла
+      if (tryRedirectToBuildingApp(company) === "redirected") {
+        return;
+      }
+
+      navigate("/crm/");
+    } catch {
+      // Авторизация уже прошла; компанию подтянет AuthGuard
+      navigate("/crm/");
     }
   };
 
@@ -227,14 +240,20 @@ const Login = () => {
                 className="login__message login__message--error"
                 role="alert"
               >
-                Неправильный логин или пароль
-                {lockState.attempts > 0 && (
-                  <>
-                    {" "}
-                    (осталось попыток:{" "}
-                    {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
-                  </>
-                )}
+                {localError
+                  ? localError
+                  : (
+                    <>
+                      Неправильный логин или пароль
+                      {lockState.attempts > 0 && (
+                        <>
+                          {" "}
+                          (осталось попыток:{" "}
+                          {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
+                        </>
+                      )}
+                    </>
+                  )}
               </div>
             )
           )}
