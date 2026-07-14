@@ -11,10 +11,7 @@ import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import api from "../../../../api";
-import {
-  updateItemsMake,
-  updateProductAsync,
-} from "../../../../store/creators/productCreators";
+import { purchaseItemMake } from "../../../../store/creators/productCreators";
 import { toDecimal2, toDecimal3 } from "../itemMakeHelpers";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -131,14 +128,15 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     setError("");
 
     try {
-      // обновляем существующий товар: увеличиваем остаток и цены
+      // докупка: бэк сам увеличивает остаток, обновляет цену
+      // и пишет строку в историю закупок поставщика
       await dispatch(
-        updateItemsMake({
+        purchaseItemMake({
           id: itemId,
-          updatedData: {
-            quantity: toDecimal3(stockQty + q),
-            price: toDecimal2(rp),
-          },
+          quantity: toDecimal3(q),
+          unit_price: toDecimal2(rp),
+          payment_type: paymentType,
+          supplier: supplierId || undefined,
         })
       ).unwrap();
 

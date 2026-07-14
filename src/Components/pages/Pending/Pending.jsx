@@ -1,5 +1,5 @@
 import { useDispatch } from "react-redux";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   Search,
   LayoutGrid,
@@ -16,11 +16,10 @@ import {
   fetchProductsAsync,
 } from "../../../store/creators/productCreators";
 import {
-  getCashFlows,
   updateCashFlows,
   bulkUpdateCashFlowsStatus,
-  useCash,
 } from "../../../store/slices/cashSlice";
+import api from "../../../api";
 import "./Pending.scss";
 import { useLocation, useParams } from "react-router-dom";
 import { HeaderTabs } from "../../Sectors/Hostel/kassa/kassa";
@@ -30,6 +29,7 @@ import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import Loading from "../../common/Loading/Loading";
 
 const STORAGE_KEY = "pending_view_mode";
+const CASHFLOWS_PAGE_SIZE = 100;
 
 const getInitialViewMode = () => {
   if (typeof window === "undefined") return "table";
@@ -45,7 +45,6 @@ const Pending = () => {
   const dispatch = useDispatch();
   const alert = useAlert();
   const confirm = useConfirm();
-  const { cashFlows, loading: cashFlowsLoading } = useCash();
 
   // --- selection state ---
   const [selected, setSelected] = useState(() => new Set());
@@ -56,16 +55,68 @@ const Pending = () => {
   const [viewMode, setViewMode] = useState(getInitialViewMode);
   const debounceTimerRef = useRef(null);
 
-  // Формируем параметры для API запроса (только фильтрация по кассе через UUID из URL)
-  const apiParams = useMemo(() => {
-    const params = {};
-    if (cashboxId) {
-      params.cashbox = cashboxId;
-    }
-    return params;
-  }, [cashboxId]);
+  // --- список с сервера, пагинация page/page_size ---
+  const [cashFlows, setCashFlows] = useState([]);
+  const [cashFlowsLoading, setCashFlowsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [totalCount, setTotalCount] = useState(null);
 
-  // Фильтрация по статусу на фронте
+  const loadCashFlows = useCallback(
+    async (pageArg) => {
+      const pageNum = Math.max(1, pageArg);
+      setCashFlowsLoading(true);
+      try {
+        const params = {
+          page: pageNum,
+          page_size: CASHFLOWS_PAGE_SIZE,
+        };
+        if (cashboxId) params.cashbox = cashboxId;
+        const search = (debouncedSearchTerm || "").trim();
+        if (search) params.search = search;
+        const { data } = await api.get("/construction/cashflows/", { params });
+        const flows = Array.isArray(data) ? data : data?.results || [];
+        const count = typeof data?.count === "number" ? data.count : null;
+        setCashFlows(flows);
+        setTotalCount(count);
+        setHasNext(
+          Boolean(data?.next) ||
+            (count != null && pageNum * CASHFLOWS_PAGE_SIZE < count) ||
+            (count == null && flows.length === CASHFLOWS_PAGE_SIZE),
+        );
+      } catch (e) {
+        console.error(e);
+        setCashFlows([]);
+        setTotalCount(null);
+        setHasNext(false);
+        alert("Не удалось загрузить запросы", true);
+      } finally {
+        setCashFlowsLoading(false);
+      }
+    },
+    [cashboxId, debouncedSearchTerm, alert],
+  );
+
+  // Загрузка страницы; при смене кассы или поиска возвращаемся на первую.
+  // setTimeout(0) — чтобы не звать setState синхронно в эффекте
+  // (react-hooks/set-state-in-effect) и не делать лишний запрос со старой страницей.
+  const filtersSigRef = useRef("");
+  useEffect(() => {
+    const sig = `${cashboxId || ""}|${(debouncedSearchTerm || "").trim()}`;
+    const timer = setTimeout(() => {
+      if (filtersSigRef.current !== sig) {
+        filtersSigRef.current = sig;
+        if (page !== 1) {
+          setPage(1); // эффект перезапустится уже с page=1
+          return;
+        }
+      }
+      void loadCashFlows(page);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [cashboxId, debouncedSearchTerm, page, loadCashFlows]);
+
+  // Фильтрация по статусу на фронте (страница содержит операции всех статусов)
   const basePending = useMemo(
     () =>
       (cashFlows || []).filter(
@@ -108,10 +159,8 @@ const Pending = () => {
     });
   }, [filteredPending]);
 
-  // гарантированное обновление стора + колбэк родителя
-  const refresh = () => {
-    dispatch(getCashFlows(apiParams));
-  };
+  // перезагрузка текущей страницы списка
+  const refresh = () => loadCashFlows(page);
 
   const applyRejectSideEffects = (item) => {
     if (item.source_business_operation_id === "Склад") {
@@ -328,10 +377,6 @@ const Pending = () => {
     };
   }, [searchTerm]);
 
-  useEffect(() => {
-    dispatch(getCashFlows(apiParams));
-  }, [dispatch, apiParams]);
-
   return (
     <div className="pending-page">
       {location.pathname === "/crm/hostel/kassa/requests" && <HeaderTabs />}
@@ -366,7 +411,7 @@ const Pending = () => {
 
         <div className="pending-search__info flex flex-wrap items-center gap-2">
           <span>
-            Всего: {pending.length} • Найдено: {filteredPending.length}
+            На странице: {pending.length} • Найдено: {filteredPending.length}
             {selected.size > 0 && ` • Выбрано: ${selected.size}`}
           </span>
 
@@ -465,7 +510,7 @@ const Pending = () => {
         <div className="pending-footer">
           <button
             className="pending-footer__refresh-btn"
-            onClick={() => dispatch(getCashFlows(apiParams))}
+            onClick={() => loadCashFlows(page)}
             disabled={isActionLocked}
           >
             <RefreshCw
@@ -739,7 +784,35 @@ const Pending = () => {
         )}
       </div>
 
-      {/* Footer Actions */}
+      {/* Пагинация: /construction/cashflows/?page=&page_size= */}
+      {!cashFlowsLoading && (page > 1 || hasNext) && (
+        <div
+          className="pending-pagination mt-4 flex items-center justify-center gap-3"
+          role="navigation"
+          aria-label="Страницы запросов"
+        >
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={page <= 1 || cashFlowsLoading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Назад
+          </button>
+          <span className="text-sm text-slate-600">
+            Страница {page}
+            {totalCount != null ? ` · ${totalCount} операций` : ""}
+          </span>
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!hasNext || cashFlowsLoading}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Вперёд
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -108,6 +108,24 @@ export const calcRecipePurchasePrice = (recipeItems, materials, getPrice = (m) =
   }, 0);
 };
 
+/**
+ * Тип оплаты для журнала закупок бэка: cash | transfer | debt | prepayment.
+ * В формах фронта «полная оплата» = "full" — бэк такого значения не знает
+ * и молча записал бы cash, поэтому маппим явно.
+ */
+export const toBackendPaymentType = (paymentType) => {
+  switch (paymentType) {
+    case "debt":
+      return "debt";
+    case "prepayment":
+      return "prepayment";
+    case "transfer":
+      return "transfer";
+    default:
+      return "cash";
+  }
+};
+
 export const buildItemMakeCreatePayload = (form) => {
   const payload = {
     name: String(form.name || "").trim(),
@@ -118,6 +136,20 @@ export const buildItemMakeCreatePayload = (form) => {
   const supplier = form.supplier || form.client;
   if (supplier) payload.supplier = supplier;
   payload.needs_processing = Boolean(form.needs_processing);
+  payload.payment_type = toBackendPaymentType(form.payment_type);
+  return payload;
+};
+
+/** Докупка сырья: POST /main/items-make/{id}/purchase/ */
+export const buildItemMakePurchasePayload = (form) => {
+  const payload = {
+    quantity: toDecimal3(form.quantity),
+    payment_type: toBackendPaymentType(form.payment_type),
+  };
+  if (form.unit_price != null && form.unit_price !== "")
+    payload.unit_price = toDecimal2(form.unit_price);
+  const supplier = form.supplier ?? form.client;
+  if (supplier) payload.supplier = supplier;
   return payload;
 };
 

@@ -188,7 +188,9 @@ const RawMaterialAddModal = ({ onClose, selectCashBox, onSaved }) => {
         }
       }
 
-      const result = await dispatch(createItemMake(state)).unwrap();
+      const result = await dispatch(
+        createItemMake({ ...state, payment_type: paymentType }),
+      ).unwrap();
 
       if (
         (paymentType === "debt" || paymentType === "prepayment") &&
