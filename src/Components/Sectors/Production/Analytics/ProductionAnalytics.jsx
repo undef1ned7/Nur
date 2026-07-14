@@ -1512,10 +1512,20 @@ const ProductionAnalytics = () => {
         </div>
 
         {/* Прочие расходы и чистая прибыль (Задача №5 фидбека, июль 2026).
-            Поля появятся после обновления бэка — см.
-            docs/production/analytics-other-expenses.md */}
+            Деталка card=other_expenses доступна только владельцу/админу (403 сотруднику). */}
         {summary.other_expenses_total !== undefined && (
-          <div className="agent-analytics__metric-card">
+          <div
+            className="agent-analytics__metric-card agent-analytics__metric-card--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardDetails("other_expenses", "Прочие расходы")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openCardDetails("other_expenses", "Прочие расходы");
+              }
+            }}
+          >
             <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
               <TrendingDown size={24} />
             </div>

@@ -621,6 +621,13 @@ const FinishedGoodsAddModal = ({
         calc_purchase_price_from_recipe: calcPurchasePriceFromRecipe,
         recipe,
         item_make,
+        // для истории закупок поставщика (пишется бэком только при закупке ГП без рецепта)
+        payment_type:
+          dealStatus === "Долги"
+            ? "debt"
+            : dealStatus === "Предоплата"
+              ? "prepayment"
+              : "cash",
       };
 
       if (String(product.brand_name ?? "").trim()) {

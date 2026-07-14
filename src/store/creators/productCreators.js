@@ -196,6 +196,7 @@ export const deleteCategoryAsync = createAsyncThunk(
 
 import {
   buildItemMakeCreatePayload,
+  buildItemMakePurchasePayload,
   buildItemMakeUpdatePayload,
   buildProcessPayload,
   parseItemsMakeResponse,
@@ -300,6 +301,22 @@ export const deleteItemsMake = createAsyncThunk(
     try {
       const { data: response } = await api.delete(`/main/items-make/${id}/`);
       return response;
+    } catch (error) {
+      return handleThunkError(error, rejectWithValue);
+    }
+  }
+);
+
+// докупка сырья: увеличивает остаток, пишет запись в историю закупок поставщика
+export const purchaseItemMake = createAsyncThunk(
+  "itemsMake/purchase",
+  async ({ id, ...form }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `/main/items-make/${id}/purchase/`,
+        buildItemMakePurchasePayload(form)
+      );
+      return data;
     } catch (error) {
       return handleThunkError(error, rejectWithValue);
     }

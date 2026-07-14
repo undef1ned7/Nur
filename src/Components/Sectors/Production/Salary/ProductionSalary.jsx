@@ -584,7 +584,12 @@ const ProductionSalary = () => {
       await loadPayouts();
     } catch (err) {
       console.error(err);
-      setPayoutFormError(errorText(err));
+      // 400 «выплата больше начисленного» приходит с остатком в поле balance
+      const balanceNote =
+        err?.balance != null
+          ? ` Остаток к выплате: ${Number(err.balance).toLocaleString("ru-RU", { minimumFractionDigits: 2 })} сом.`
+          : "";
+      setPayoutFormError(errorText(err) + balanceNote);
     } finally {
       setPayoutSubmitting(false);
     }

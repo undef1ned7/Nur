@@ -90,6 +90,8 @@ export default function MarketClientDetails() {
   const [supplierPurchasesLoading, setSupplierPurchasesLoading] =
     useState(false);
   const [supplierPurchasesErr, setSupplierPurchasesErr] = useState("");
+  const [supplierPurchasesSummary, setSupplierPurchasesSummary] =
+    useState(null);
   const [supplierPurchasesApiMissing, setSupplierPurchasesApiMissing] =
     useState(false);
 
@@ -181,6 +183,7 @@ export default function MarketClientDetails() {
     const normalizedSupplierId = String(supplierId || "").trim();
     if (!normalizedSupplierId) {
       setSupplierPurchases([]);
+      setSupplierPurchasesSummary(null);
       return;
     }
 
@@ -196,9 +199,12 @@ export default function MarketClientDetails() {
           ? res.data
           : [];
       setSupplierPurchases(list);
+      // summary бэка считается по всему периоду (не по странице)
+      setSupplierPurchasesSummary(res?.data?.summary || null);
       setSupplierPurchasesApiMissing(false);
     } catch (e) {
       setSupplierPurchases([]);
+      setSupplierPurchasesSummary(null);
       if (e?.response?.status === 404) {
         setSupplierPurchasesApiMissing(true);
       } else {
@@ -567,6 +573,12 @@ export default function MarketClientDetails() {
   );
 
   const supplierPurchasesTotals = useMemo(() => {
+    if (supplierPurchasesSummary) {
+      return {
+        amount: Number(supplierPurchasesSummary.total_amount || 0),
+        count: Number(supplierPurchasesSummary.total_count || 0),
+      };
+    }
     return supplierPurchases.reduce(
       (acc, row) => {
         acc.amount += Number(row?.amount ?? row?.total ?? 0);
@@ -575,7 +587,7 @@ export default function MarketClientDetails() {
       },
       { amount: 0, count: 0 },
     );
-  }, [supplierPurchases]);
+  }, [supplierPurchases, supplierPurchasesSummary]);
 
   const showSupplierSections =
     String(client?.type || "").toLowerCase() === "suppliers" &&

@@ -710,6 +710,13 @@ export default function SupplierReceiptPage() {
         `/main/suppliers/${encodeURIComponent(selectedSupplierId)}/receipt/`,
         {
           items: receiptItems,
+          // журнал закупок поставщика: full → cash, иначе бэк запишет cash по умолчанию
+          payment_type:
+            paymentType === "debt"
+              ? "debt"
+              : paymentType === "prepayment"
+                ? "prepayment"
+                : "cash",
         },
       );
 

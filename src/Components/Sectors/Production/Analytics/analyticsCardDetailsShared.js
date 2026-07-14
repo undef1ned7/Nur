@@ -32,6 +32,7 @@ export const CARD_DETAILS_USES_PERIOD = new Set([
   "cost_of_goods_sold",
   "gross_profit",
   "gross_margin_percent",
+  "other_expenses",
 ]);
 
 export function parseCardDetailsRows(payload) {
@@ -156,6 +157,17 @@ const SALE_ITEM_AGG_COLUMNS = [
   "gross_margin_percent",
 ];
 
+/** Approved-расходы кассы за период (кроме закупок). Доступ: владелец/админ. */
+const OTHER_EXPENSES_COLUMNS = [
+  "id",
+  "created_at",
+  "name",
+  "amount",
+  "category",
+  "cashbox",
+  "cashier",
+];
+
 const TOTAL_DEBT_COLUMNS = [
   "id",
   "title",
@@ -205,6 +217,7 @@ const CARD_DETAIL_COLUMN_ORDER = {
   cost_of_goods_sold: SALE_ITEM_AGG_COLUMNS,
   gross_profit: SALE_ITEM_AGG_COLUMNS,
   gross_margin_percent: SALE_ITEM_AGG_COLUMNS,
+  other_expenses: OTHER_EXPENSES_COLUMNS,
   total_debt: TOTAL_DEBT_COLUMNS,
   accounts_receivable: ACCOUNTS_RECEIVABLE_COLUMNS,
   accounts_payable: ACCOUNTS_PAYABLE_COLUMNS,
@@ -324,6 +337,16 @@ const SALE_ITEM_AGG_LABELS = {
   gross_margin_percent: "Маржа %",
 };
 
+const OTHER_EXPENSES_LABELS = {
+  id: "ID",
+  created_at: "Дата",
+  name: "Назначение",
+  amount: "Сумма",
+  category: "Категория",
+  cashbox: "Касса",
+  cashier: "Кассир",
+};
+
 const TOTAL_DEBT_LABELS = {
   id: "ID",
   title: "Сделка",
@@ -376,6 +399,7 @@ export const CARD_DETAILS_COLUMN_LABELS = {
   cost_of_goods_sold: SALE_ITEM_AGG_LABELS,
   gross_profit: SALE_ITEM_AGG_LABELS,
   gross_margin_percent: SALE_ITEM_AGG_LABELS,
+  other_expenses: OTHER_EXPENSES_LABELS,
   total_debt: TOTAL_DEBT_LABELS,
   accounts_receivable: ACCOUNTS_RECEIVABLE_LABELS,
   accounts_payable: ACCOUNTS_PAYABLE_LABELS,
@@ -396,6 +420,7 @@ export const TOTALS_VALUE_LABELS = {
   cost_of_goods_sold: "Себестоимость",
   gross_profit: "Валовая прибыль",
   gross_margin_percent: "Маржа %",
+  other_expenses_total: "Прочие расходы",
   accounts_receivable: "Дебиторская",
   accounts_receivable_client_deals: "Сделки (рассрочка)",
   accounts_receivable_pos_sales: "POS в долг",
@@ -439,6 +464,7 @@ const TOTALS_DECIMAL_KEYS = new Set([
   "cost_of_goods_sold",
   "gross_profit",
   "gross_margin_percent",
+  "other_expenses_total",
   "accounts_receivable",
   "accounts_receivable_client_deals",
   "accounts_receivable_pos_sales",
@@ -476,7 +502,10 @@ export function formatDetailsCell(value, column) {
       column === "user" ||
       column === "client" ||
       column === "product" ||
-      column === "accepted_by") &&
+      column === "accepted_by" ||
+      column === "category" ||
+      column === "cashbox" ||
+      column === "cashier") &&
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value)
