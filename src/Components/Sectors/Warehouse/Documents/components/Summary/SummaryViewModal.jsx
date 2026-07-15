@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, FileText, Edit2, Trash2, RefreshCw } from "lucide-react";
+import { X, FileText, Edit2, Trash2, RefreshCw, Printer } from "lucide-react";
 import {
   getSummary,
   deleteSummary,
@@ -8,6 +8,7 @@ import {
 import { useAlert, useConfirm } from "../../../../../../hooks/useDialog";
 import { normalizeSummary, toNum } from "./summaryAggregation";
 import SummaryPreviewModal from "./SummaryPreviewModal";
+import InvoicePreviewModal from "../InvoicePreviewModal";
 import "./Summary.scss";
 
 const TYPE_LABEL = { general: "Общая", by_agents: "По агентам" };
@@ -40,6 +41,8 @@ const SummaryViewModal = ({ id, onClose, onEdit, onDeleted, onChanged }) => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
+  // Просмотр одной накладной — тот же модальник, что в «Накладных» продажи
+  const [invoiceId, setInvoiceId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -227,6 +230,7 @@ const SummaryViewModal = ({ id, onClose, onEdit, onDeleted, onChanged }) => {
                       <th>Контрагент</th>
                       <th>Кол-во</th>
                       <th>Сумма</th>
+                      <th>Накладная</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -239,11 +243,25 @@ const SummaryViewModal = ({ id, onClose, onEdit, onDeleted, onChanged }) => {
                         <td>{d.client}</td>
                         <td className="ar">{nInt(d.quantity)}</td>
                         <td className="ar">{n2(d.amount)}</td>
+                        <td>
+                          {d.id ? (
+                            <button
+                              type="button"
+                              className="summary-btn summary-btn--ghost summary-btn--sm"
+                              title="Открыть накладную (формат продажи)"
+                              onClick={() => setInvoiceId(d.id)}
+                            >
+                              <Printer size={14} /> Открыть
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {documents.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="summary-table__empty">
+                        <td colSpan={8} className="summary-table__empty">
                           Нет накладных
                         </td>
                       </tr>
@@ -292,6 +310,13 @@ const SummaryViewModal = ({ id, onClose, onEdit, onDeleted, onChanged }) => {
 
       {showPdf && summary && (
         <SummaryPreviewModal summary={summary} onClose={() => setShowPdf(false)} />
+      )}
+
+      {invoiceId && (
+        <InvoicePreviewModal
+          invoiceId={invoiceId}
+          onClose={() => setInvoiceId(null)}
+        />
       )}
     </div>
   );

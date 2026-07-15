@@ -1,6 +1,7 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerPdfFonts } from "@/pdf/registerFonts";
+import { InvoicePdfPage } from "../InvoicePdfDocument";
 import { normalizeSummary, toNum } from "./summaryAggregation";
 
 registerPdfFonts();
@@ -226,11 +227,19 @@ const TableHead = ({ cols, heads }) => (
   </View>
 );
 
-export default function SummaryPdfDocument({ summary }) {
+/**
+ * @param {Object} summary — сводка (normalizeSummary-совместимая)
+ * @param {Array} invoices — данные накладных в формате InvoicePdfDocument
+ *   (transformWarehouseDocumentToInvoiceData). Если переданы, после сводных
+ *   таблиц каждая накладная печатается в формате продажи «точь-в-точь»,
+ *   в двух экземплярах; табличная детализация №3 при этом не рендерится.
+ */
+export default function SummaryPdfDocument({ summary, invoices = [] }) {
   const data = normalizeSummary(summary || {});
   const products = data.products || [];
   const documents = data.documents || [];
   const totals = data.totals || {};
+  const hasInvoicePages = Array.isArray(invoices) && invoices.length > 0;
 
   const created = fmtDateTime(data.created_at);
   const typeLabel = TYPE_LABEL[data.type] || data.type || "—";
@@ -387,8 +396,9 @@ export default function SummaryPdfDocument({ summary }) {
         </View>
 
         {/* Таблица №3 — Детализация по накладным (позиции внутри каждой накладной).
-            Рендерится только если бэкенд прислал documents[].items. */}
-        {hasDocItems && (
+            Fallback: рендерится, только если не переданы полноформатные накладные
+            (invoices) и бэкенд прислал documents[].items. */}
+        {!hasInvoicePages && hasDocItems && (
           <>
             <Text style={s.sectionTitle} break>
               Таблица №3. Детализация по накладным
@@ -497,6 +507,16 @@ export default function SummaryPdfDocument({ summary }) {
           fixed
         />
       </Page>
+
+      {/* Накладные в формате продажи «точь-в-точь», каждая в двух экземплярах
+          (для клиента и для склада). */}
+      {hasInvoicePages &&
+        invoices.map((inv, i) => (
+          <React.Fragment key={inv?.document?.id || i}>
+            <InvoicePdfPage data={inv} />
+            <InvoicePdfPage data={inv} />
+          </React.Fragment>
+        ))}
     </Document>
   );
 }

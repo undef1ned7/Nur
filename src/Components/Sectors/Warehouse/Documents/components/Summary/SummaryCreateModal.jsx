@@ -13,12 +13,23 @@ const empName = (e) =>
   e?.email ||
   "Без имени";
 
+/** Роль сотрудника из любого доступного поля (как в CreateSaleDocument). */
+const empRole = (e) =>
+  String(
+    e?.role ?? e?.role_name ?? e?.role_display ?? e?.position ?? e?.post ?? "",
+  )
+    .trim()
+    .toLowerCase();
+
 const asList = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
 /**
  * Модалка создания/редактирования сводки.
- * Создание: нужен warehouse + date. Редактирование (summary передан): name/comment/type/agents.
+ * Агенты — все сотрудники, кроме admin/owner (тот же список, что в «Агент»
+ * при создании продажи). Склады — все или выбранные; новый контракт
+ * warehouses/all_warehouses описан в docs/warehouse/summary-agents-warehouses.md,
+ * legacy-поле warehouse шлём для совместимости, пока бэк не перешёл.
  */
 const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
   const alert = useAlert();
@@ -27,7 +38,17 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
   const [name, setName] = useState(summary?.name || "");
   const [comment, setComment] = useState(summary?.comment || "");
   const [type, setType] = useState(summary?.type || "general");
-  const [warehouse, setWarehouse] = useState(summary?.warehouse?.id || "");
+  const initialWarehouseIds = (
+    Array.isArray(summary?.warehouses) && summary.warehouses.length
+      ? summary.warehouses
+      : summary?.warehouse
+        ? [summary.warehouse]
+        : []
+  ).map((w) => String(w?.id ?? w));
+  const [allWarehouses, setAllWarehouses] = useState(
+    isEdit ? Boolean(summary?.all_warehouses) : true,
+  );
+  const [warehouseIds, setWarehouseIds] = useState(initialWarehouseIds);
   const [agentIds, setAgentIds] = useState(
     (summary?.agents || []).map((a) => String(a.id)),
   );
@@ -44,16 +65,17 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
       if (cancelled) return;
       const whs = asList(whData).map((w) => ({ id: String(w.id), name: w.name }));
       setWarehouses(whs);
-      if (!isEdit && !warehouse && whs.length) setWarehouse(whs[0].id);
       const ags = asList(empData)
-        .filter((e) => String(e.role || "").toLowerCase() === "agent")
+        .filter((e) => {
+          const role = empRole(e);
+          return role !== "admin" && role !== "owner";
+        })
         .map((e) => ({ id: String(e.id), name: empName(e) }));
       setAgents(ags);
     });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleAgent = (id) =>
@@ -64,17 +86,35 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
   const toggleAll = () =>
     setAgentIds(allSelected ? [] : agents.map((a) => a.id));
 
+  const toggleWarehouse = (id) =>
+    setWarehouseIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  const allWhSelected =
+    warehouses.length > 0 && warehouseIds.length === warehouses.length;
+  const toggleAllWarehouses = () =>
+    setWarehouseIds(allWhSelected ? [] : warehouses.map((w) => w.id));
+
   const canSave = useMemo(() => {
     if (!name.trim()) return false;
-    if (!isEdit && !warehouse) return false;
+    if (!allWarehouses && warehouseIds.length === 0) return false;
     if (type === "by_agents" && agentIds.length === 0) return false;
     return true;
-  }, [name, warehouse, type, agentIds, isEdit]);
+  }, [name, allWarehouses, warehouseIds, type, agentIds]);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
     setSaving(true);
     try {
+      // Новый контракт: all_warehouses + warehouses[]; legacy warehouse —
+      // для совместимости, пока бэк не поддержал списки складов.
+      const warehousePayload = {
+        all_warehouses: allWarehouses,
+        warehouses: allWarehouses ? [] : warehouseIds,
+        warehouse: allWarehouses
+          ? warehouses[0]?.id || summary?.warehouse?.id || ""
+          : warehouseIds[0],
+      };
       let result;
       if (isEdit) {
         result = await updateSummary(summary.id, {
@@ -82,6 +122,8 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
           comment: comment.trim(),
           type,
           agents: type === "by_agents" ? agentIds : [],
+          all_warehouses: warehousePayload.all_warehouses,
+          warehouses: warehousePayload.warehouses,
         });
       } else {
         result = await createSummary({
@@ -89,7 +131,7 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
           comment: comment.trim(),
           type,
           date,
-          warehouse,
+          ...warehousePayload,
           agents: type === "by_agents" ? agentIds : [],
         });
       }
@@ -139,22 +181,62 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
             />
           </label>
 
-          {!isEdit && (
-            <label className="summary-field">
-              <span className="summary-field__label">Склад</span>
-              <select
-                className="summary-field__input"
-                value={warehouse}
-                onChange={(e) => setWarehouse(e.target.value)}
+          <div className="summary-field">
+            <span className="summary-field__label">Склады</span>
+            <div className="summary-typeToggle">
+              <button
+                type="button"
+                className={`summary-typeToggle__btn ${allWarehouses ? "is-active" : ""}`}
+                onClick={() => setAllWarehouses(true)}
               >
-                {warehouses.length === 0 && <option value="">—</option>}
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Все склады
+                <small>Накладные всех складов</small>
+              </button>
+              <button
+                type="button"
+                className={`summary-typeToggle__btn ${!allWarehouses ? "is-active" : ""}`}
+                onClick={() => setAllWarehouses(false)}
+              >
+                Выбранные
+                <small>Только выбранные склады</small>
+              </button>
+            </div>
+          </div>
+
+          {!allWarehouses && (
+            <div className="summary-field">
+              <div className="summary-agents__head">
+                <span className="summary-field__label">Выберите склады</span>
+                <button
+                  type="button"
+                  className="summary-agents__all"
+                  onClick={toggleAllWarehouses}
+                >
+                  {allWhSelected ? "Снять все" : "Выбрать все"}
+                </button>
+              </div>
+              <div className="summary-agents__list">
+                {warehouses.length === 0 && (
+                  <div className="summary-agents__empty">Склады не найдены</div>
+                )}
+                {warehouses.map((w) => {
+                  const checked = warehouseIds.includes(w.id);
+                  return (
+                    <button
+                      type="button"
+                      key={w.id}
+                      className={`summary-agents__item ${checked ? "is-checked" : ""}`}
+                      onClick={() => toggleWarehouse(w.id)}
+                    >
+                      <span className="summary-agents__check">
+                        {checked && <Check size={14} />}
+                      </span>
+                      <span>{w.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <div className="summary-field">

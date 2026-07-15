@@ -51,7 +51,6 @@ import {
   rejectCompanyAgentRequest,
   removeCompanyAgent,
   patchCompanyAgentCommonAccess,
-  createCompanyMembership,
 } from "../../../../api/warehouse";
 import { VIEW_MODES } from "../../Market/Warehouse/constants";
 
@@ -334,7 +333,8 @@ const mapAgentStockProductRow = (row) => {
     unit: row.product_unit || row.unit,
     qty: row.qty,
     qty_available: row.qty_available,
-    warehouse: row.warehouse,
+    // при нескольких складах общего доступа бэк шлёт склад строки в warehouse_id
+    warehouse: row.warehouse_id || row.warehouse,
   };
 };
 
@@ -3771,18 +3771,6 @@ const Agents = () => {
   const [companyRequests, setCompanyRequests] = useState([]);
   const [companyStatusFilter, setCompanyStatusFilter] = useState("");
   const [companyActionBusyId, setCompanyActionBusyId] = useState(null);
-  const [newMembershipUserId, setNewMembershipUserId] = useState("");
-  const [newMembershipCommonEnabled, setNewMembershipCommonEnabled] =
-    useState(false);
-  const [newMembershipCanSellWholesale, setNewMembershipCanSellWholesale] =
-    useState(false);
-  const [newMembershipCanSellNoApproval, setNewMembershipCanSellNoApproval] =
-    useState(false);
-  const [newMembershipAssignedWarehouse, setNewMembershipAssignedWarehouse] =
-    useState("");
-  const [newMembershipWarehouse, setNewMembershipWarehouse] = useState("");
-  const [newMembershipBusy, setNewMembershipBusy] = useState(false);
-  const [newMembershipError, setNewMembershipError] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [companySearchLoading, setCompanySearchLoading] = useState(false);
   const [companySearchError, setCompanySearchError] = useState("");
@@ -4231,35 +4219,44 @@ const Agents = () => {
     });
   };
 
-  const handleCompanyCommonAccessChange = async (request, warehouseId) => {
+  /**
+   * Общий доступ агента к складам: несколько складов через common_warehouses
+   * (контракт бэка, июль 2026). Пустой набор = общий доступ выключен.
+   * assigned_warehouse на набор больше не влияет.
+   */
+  const handleCompanyCommonWarehousesChange = async (request, nextIds) => {
     if (!request?.id || companyActionBusyId) return;
     setCompanyActionBusyId(request.id);
     try {
-      const assignedWarehouse = request.assigned_warehouse || null;
-      const effectiveWarehouse = assignedWarehouse || warehouseId || null;
-      if (!effectiveWarehouse) {
-        await patchCompanyAgentCommonAccess(request.id, {
-          common_access_enabled: false,
-          assigned_warehouse: assignedWarehouse,
-        });
-      } else {
-        await patchCompanyAgentCommonAccess(request.id, {
-          common_access_enabled: true,
-          common_warehouse: effectiveWarehouse,
-          assigned_warehouse: assignedWarehouse,
-        });
-      }
+      const ids = Array.from(
+        new Set((nextIds || []).filter(Boolean).map(String)),
+      );
+      await patchCompanyAgentCommonAccess(request.id, {
+        common_access_enabled: ids.length > 0,
+        common_warehouses: ids,
+      });
       await loadCompanyRequests();
     } catch (e) {
       console.error(e);
       openErrorAlert(
         setAlertModal,
         e,
-        "Не удалось обновить общий доступ к складу для агента",
+        "Не удалось обновить общий доступ к складам для агента",
       );
     } finally {
       setCompanyActionBusyId(null);
     }
+  };
+
+  /** Текущий набор складов общего доступа с fallback на legacy common_warehouse. */
+  const getCommonWarehouseIds = (request) => {
+    if (
+      Array.isArray(request?.common_warehouses) &&
+      request.common_warehouses.length
+    ) {
+      return request.common_warehouses.map(String);
+    }
+    return request?.common_warehouse ? [String(request.common_warehouse)] : [];
   };
 
   const handleCompanyWholesaleChange = async (request, nextValue) => {
@@ -4301,56 +4298,6 @@ const Agents = () => {
       setCompanyActionBusyId(null);
     }
   };
-
-  const handleCreateMembership = async () => {
-    if (!newMembershipUserId.trim() || newMembershipBusy) return;
-    const assignedWarehouse = newMembershipAssignedWarehouse || null;
-    const commonWarehouse = assignedWarehouse || newMembershipWarehouse || null;
-    if (newMembershipCommonEnabled && !commonWarehouse) {
-      setNewMembershipError("Выберите склад для общего прайса.");
-      return;
-    }
-    setNewMembershipBusy(true);
-    setNewMembershipError("");
-    try {
-      const payload = {
-        user: newMembershipUserId.trim(),
-        assigned_warehouse: assignedWarehouse,
-        can_sell_wholesale: Boolean(newMembershipCanSellWholesale),
-        can_sell_without_approval: Boolean(newMembershipCanSellNoApproval),
-      };
-      if (newMembershipCommonEnabled) {
-        payload.common_access_enabled = true;
-        payload.common_warehouse = commonWarehouse;
-      }
-      if (newMembershipCanSellWholesale) {
-        payload.can_sell_wholesale = true;
-      }
-      await createCompanyMembership(payload);
-      setNewMembershipUserId("");
-      setNewMembershipCommonEnabled(false);
-      setNewMembershipCanSellWholesale(false);
-      setNewMembershipCanSellNoApproval(false);
-      setNewMembershipAssignedWarehouse("");
-      setNewMembershipWarehouse("");
-      await loadCompanyRequests();
-    } catch (e) {
-      console.error(e);
-      setNewMembershipError(
-        e?.detail ||
-          e?.message ||
-          "Не удалось назначить пользователя агентом склада",
-      );
-    } finally {
-      setNewMembershipBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    if (newMembershipAssignedWarehouse && newMembershipCommonEnabled) {
-      setNewMembershipWarehouse(newMembershipAssignedWarehouse);
-    }
-  }, [newMembershipAssignedWarehouse, newMembershipCommonEnabled]);
 
   return (
     <div className="warehouse-page agents-page">
@@ -5395,188 +5342,6 @@ const Agents = () => {
                     Управляйте доступом агентов к складам компании и общему
                     прайсу.
                   </p> */}
-                  {/* <div
-                    className="warehouse-search-section"
-                    style={{ marginBottom: 12 }}
-                  >
-                    <div
-                      className="warehouse-search__info flex flex-wrap items-center gap-2"
-                      style={{ width: "100%" }}
-                    >
-                      <div
-                        className="flex flex-wrap items-center gap-2"
-                        style={{ maxWidth: "100%" }}
-                      >
-                        <input
-                          type="text"
-                          className="warehouse-search__input"
-                          style={{ minWidth: 220 }}
-                          placeholder="UUID пользователя"
-                          value={newMembershipUserId}
-                          onChange={(e) =>
-                            setNewMembershipUserId(e.target.value)
-                          }
-                          disabled={newMembershipBusy}
-                        />
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={newMembershipCommonEnabled}
-                            onChange={(e) =>
-                              setNewMembershipCommonEnabled(e.target.checked)
-                            }
-                            disabled={newMembershipBusy}
-                          />
-                          Общий прайс
-                        </label>
-                        <select
-                          className="warehouse-search__input"
-                          style={{ minWidth: 220 }}
-                          value={newMembershipWarehouse}
-                          onChange={(e) =>
-                            setNewMembershipWarehouse(e.target.value)
-                          }
-                          disabled={
-                            newMembershipBusy || !newMembershipCommonEnabled
-                          }
-                        >
-                          <option value="">Склад общего прайса</option>
-                          {Object.values(warehousesById || {}).map((w) => (
-                            <option value={w.id} key={w.id}>
-                              {w.name || w.title || shortId(w.id)}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          className="agents-action-btn agents-action-btn--approve"
-                          onClick={handleCreateMembership}
-                          disabled={
-                            newMembershipBusy || !newMembershipUserId.trim()
-                          }
-                        >
-                          <Check size={16} />
-                          Назначить агентом
-                        </button>
-                      </div>
-                    </div>
-                    {newMembershipError && (
-                      <div className="agents-error" style={{ marginTop: 8 }}>
-                        {newMembershipError}
-                      </div>
-                    )}
-                  </div> */}
-                  <div
-                    className="warehouse-search-section"
-                    style={{ marginBottom: 12 }}
-                  >
-                    <div
-                      className="warehouse-search__info flex flex-wrap items-center gap-2"
-                      style={{ width: "100%" }}
-                    >
-                      <input
-                        type="text"
-                        className="warehouse-search__input"
-                        style={{ minWidth: 220 }}
-                        placeholder="UUID пользователя"
-                        value={newMembershipUserId}
-                        onChange={(e) => setNewMembershipUserId(e.target.value)}
-                        disabled={newMembershipBusy}
-                      />
-                      <select
-                        className="warehouse-search__input"
-                        style={{ minWidth: 260 }}
-                        value={newMembershipAssignedWarehouse}
-                        onChange={(e) =>
-                          setNewMembershipAssignedWarehouse(e.target.value)
-                        }
-                        disabled={newMembershipBusy}
-                      >
-                        <option value="">
-                          Ограничить доступ одним складом (не выбрано)
-                        </option>
-                        {Object.values(warehousesById || {}).map((w) => (
-                          <option value={w.id} key={w.id}>
-                            {w.name || w.title || shortId(w.id)}
-                          </option>
-                        ))}
-                      </select>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newMembershipCommonEnabled}
-                          onChange={(e) =>
-                            setNewMembershipCommonEnabled(e.target.checked)
-                          }
-                          disabled={newMembershipBusy}
-                        />
-                        Общий прайс
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newMembershipCanSellWholesale}
-                          onChange={(e) =>
-                            setNewMembershipCanSellWholesale(e.target.checked)
-                          }
-                          disabled={newMembershipBusy}
-                        />
-                        Разрешить опт
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={newMembershipCanSellNoApproval}
-                          onChange={(e) =>
-                            setNewMembershipCanSellNoApproval(e.target.checked)
-                          }
-                          disabled={newMembershipBusy}
-                        />
-                        Продажа без одобрения
-                      </label>
-                      <select
-                        className="warehouse-search__input"
-                        style={{ minWidth: 220 }}
-                        value={
-                          newMembershipAssignedWarehouse
-                            ? newMembershipAssignedWarehouse
-                            : newMembershipWarehouse
-                        }
-                        onChange={(e) =>
-                          setNewMembershipWarehouse(e.target.value)
-                        }
-                        disabled={
-                          newMembershipBusy ||
-                          !newMembershipCommonEnabled ||
-                          Boolean(newMembershipAssignedWarehouse)
-                        }
-                      >
-                        <option value="">Склад общего прайса</option>
-                        {Object.values(warehousesById || {}).map((w) => (
-                          <option value={w.id} key={w.id}>
-                            {w.name || w.title || shortId(w.id)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="agents-action-btn agents-action-btn--approve"
-                        onClick={handleCreateMembership}
-                        disabled={
-                          newMembershipBusy || !newMembershipUserId.trim()
-                        }
-                      >
-                        <Check size={16} />
-                        Назначить агентом
-                      </button>
-                    </div>
-                    {newMembershipError && (
-                      <div className="agents-error" style={{ marginTop: 8 }}>
-                        {newMembershipError}
-                      </div>
-                    )}
-                  </div>
-
                   <div className="warehouse-table-container w-full">
                     <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <table className="warehouse-table w-full min-w-[900px]">
@@ -5589,7 +5354,7 @@ const Agents = () => {
                             <th>Общий прайс</th>
                             <th>Оптовые продажи</th>
                             <th>Продажа без одобрения</th>
-                            <th>Склад общего прайса</th>
+                            <th>Склады общего прайса</th>
                             <th>Создан</th>
                             <th>Обновлён</th>
                             <th>Действия</th>
@@ -5678,34 +5443,93 @@ const Agents = () => {
                                   </label>
                                 </td>
                                 <td>
-                                  <select
-                                    className="warehouse-search__input"
-                                    style={{ minWidth: 220 }}
-                                    value={
-                                      r.assigned_warehouse ||
-                                      r.common_warehouse ||
-                                      ""
-                                    }
-                                    onChange={(e) =>
-                                      handleCompanyCommonAccessChange(
-                                        r,
-                                        e.target.value || null,
-                                      )
-                                    }
-                                    disabled={
-                                      companyActionBusyId === r.id ||
-                                      Boolean(r.assigned_warehouse)
-                                    }
-                                  >
-                                    <option value="">Без общего доступа</option>
-                                    {Object.values(warehousesById || {}).map(
-                                      (w) => (
-                                        <option value={w.id} key={w.id}>
-                                          {w.name || w.title || shortId(w.id)}
-                                        </option>
-                                      ),
-                                    )}
-                                  </select>
+                                  {(() => {
+                                    const selectedIds = getCommonWarehouseIds(r);
+                                    const selectedSet = new Set(selectedIds);
+                                    const allWh = Object.values(
+                                      warehousesById || {},
+                                    );
+                                    const label = selectedIds.length
+                                      ? allWh
+                                          .filter((w) =>
+                                            selectedSet.has(String(w.id)),
+                                          )
+                                          .map(
+                                            (w) =>
+                                              w.name ||
+                                              w.title ||
+                                              shortId(w.id),
+                                          )
+                                          .join(", ") ||
+                                        `Складов: ${selectedIds.length}`
+                                      : "Без общего доступа";
+                                    return (
+                                      <details className="agents-wh-multi">
+                                        <summary
+                                          className="agents-wh-multi__summary"
+                                          title={label}
+                                        >
+                                          {label}
+                                        </summary>
+                                        <div className="agents-wh-multi__list">
+                                          {allWh.map((w) => {
+                                            const wid = String(w.id);
+                                            const checked =
+                                              selectedSet.has(wid);
+                                            return (
+                                              <label
+                                                key={wid}
+                                                className="agents-wh-multi__item"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={checked}
+                                                  disabled={
+                                                    companyActionBusyId === r.id
+                                                  }
+                                                  onChange={() =>
+                                                    handleCompanyCommonWarehousesChange(
+                                                      r,
+                                                      checked
+                                                        ? selectedIds.filter(
+                                                            (x) => x !== wid,
+                                                          )
+                                                        : [
+                                                            ...selectedIds,
+                                                            wid,
+                                                          ],
+                                                    )
+                                                  }
+                                                />
+                                                <span>
+                                                  {w.name ||
+                                                    w.title ||
+                                                    shortId(w.id)}
+                                                </span>
+                                              </label>
+                                            );
+                                          })}
+                                          {selectedIds.length > 0 && (
+                                            <button
+                                              type="button"
+                                              className="agents-wh-multi__clear"
+                                              disabled={
+                                                companyActionBusyId === r.id
+                                              }
+                                              onClick={() =>
+                                                handleCompanyCommonWarehousesChange(
+                                                  r,
+                                                  [],
+                                                )
+                                              }
+                                            >
+                                              Отключить общий доступ
+                                            </button>
+                                          )}
+                                        </div>
+                                      </details>
+                                    );
+                                  })()}
                                 </td>
                                 <td>{fmtDateTime(r.created_at)}</td>
                                 <td>{fmtDateTime(r.updated_at)}</td>

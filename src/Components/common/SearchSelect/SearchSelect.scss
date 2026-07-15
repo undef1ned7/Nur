@@ -1,0 +1,98 @@
+/* Общий селект с поиском (cmn-searchselect) */
+.cmn-searchselect {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto; /* во flex-строках (например, рядом с кнопкой «Создать») */
+  min-width: 0;
+
+  &__input {
+    width: 100%;
+    padding: 10px 30px 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.12s ease;
+
+    &::placeholder {
+      color: #94a3b8;
+    }
+
+    &:focus {
+      border-color: #f9cf00;
+    }
+
+    &:disabled {
+      background: #f8fafc;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+  }
+
+  &__arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  &__menu {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 4px;
+  }
+
+  &__item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #0f172a;
+    cursor: pointer;
+
+    &:hover {
+      background: #f8fafc;
+    }
+
+    &--active {
+      background: #fef9e7;
+      font-weight: 600;
+    }
+  }
+
+  &__empty,
+  &__more {
+    padding: 10px;
+    font-size: 13px;
+    color: #64748b;
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    &__menu {
+      max-height: 45vh;
+    }
+
+    &__item {
+      padding: 12px 10px; /* крупнее цель нажатия на мобильных */
+    }
+  }
+}

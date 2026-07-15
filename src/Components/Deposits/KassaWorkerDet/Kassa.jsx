@@ -183,6 +183,7 @@ const KassaDet = () => {
         const search = (debouncedFilterSearch || "").trim();
         const params = new URLSearchParams();
         params.set("cashbox", cashboxId);
+        params.set("status", "approved"); // заявки (pending) — на отдельной вкладке
         params.set("page_size", String(CASHFLOWS_PAGE_SIZE));
         params.set("page", String(Math.max(1, page)));
         if (search) params.set("search", search);
@@ -320,7 +321,8 @@ const KassaDet = () => {
   };
 
   // --- ЛОГИКА ФИЛЬТРАЦИИ ---
-  // Список движений — с API (пагинация page_size=100); фильтр по статусу на клиенте
+  // Статус и тип фильтрует сервер (?status=approved&type=…);
+  // клиентский фильтр оставлен как страховка от старого формата status: "true"
   const rawFlows = flowsList;
   const filteredCashflows = rawFlows.filter(
     (flow) =>
@@ -374,30 +376,17 @@ const KassaDet = () => {
     setReportLoading(true);
     try {
       const [year, month] = selectedMonth.split("-");
-      // Вычисляем начало и конец месяца для фильтрации на фронтенде
-      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(parseInt(year), parseInt(month), 0);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Загружаем все страницы без фильтрации по дате (бэкенд не поддерживает)
-      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?cashbox=${cashboxId}&page_size=1000`;
-      let flows = await fetchAllPages(initialUrl);
-
-      // Фильтруем по дате на фронтенде
-      flows = flows.filter((flow) => {
-        if (!flow.created_at) return false;
-        const flowDate = new Date(flow.created_at);
-        return flowDate >= startDate && flowDate <= endDate;
+      // Период и статус фильтрует сервер (date_from/date_to включительно)
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const params = new URLSearchParams({
+        cashbox: cashboxId,
+        status: "approved",
+        date_from: `${selectedMonth}-01`,
+        date_to: `${selectedMonth}-${String(lastDay).padStart(2, "0")}`,
+        page_size: "200",
       });
-
-      // Фильтруем только approved операции
-      flows = flows.filter(
-        (flow) =>
-          flow.status === "approved" ||
-          flow.status === "true" ||
-          flow.status === true
-      );
+      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
+      const flows = await fetchAllPages(initialUrl);
 
       // Группировка по дням
       const dailyGroups = {};
@@ -442,30 +431,16 @@ const KassaDet = () => {
     if (!cashboxId) return;
     setReportLoading(true);
     try {
-      // Вычисляем начало и конец дня для фильтрации на фронтенде
-      const startDate = new Date(selectedDate);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(selectedDate);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Загружаем все страницы без фильтрации по дате (бэкенд не поддерживает)
-      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?cashbox=${cashboxId}&page_size=1000`;
-      let flows = await fetchAllPages(initialUrl);
-
-      // Фильтруем по дате на фронтенде
-      flows = flows.filter((flow) => {
-        if (!flow.created_at) return false;
-        const flowDate = new Date(flow.created_at);
-        return flowDate >= startDate && flowDate <= endDate;
+      // Период и статус фильтрует сервер (date_from/date_to включительно)
+      const params = new URLSearchParams({
+        cashbox: cashboxId,
+        status: "approved",
+        date_from: selectedDate,
+        date_to: selectedDate,
+        page_size: "200",
       });
-
-      // Фильтруем только approved операции
-      flows = flows.filter(
-        (flow) =>
-          flow.status === "approved" ||
-          flow.status === "true" ||
-          flow.status === true
-      );
+      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
+      const flows = await fetchAllPages(initialUrl);
 
       const totalIncome = flows
         .filter((f) => f.type === "income")

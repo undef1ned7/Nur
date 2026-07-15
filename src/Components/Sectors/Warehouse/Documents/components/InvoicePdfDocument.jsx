@@ -17,7 +17,12 @@ import InvoicePdfTotalsSection from "./InvoicePdfTotalsSection";
 
 registerPdfFonts();
 
-export default function InvoicePdfDocument({ data }) {
+/**
+ * Одна страница накладной. Вынесена из InvoicePdfDocument, чтобы тот же
+ * формат «точь-в-точь» можно было вкладывать в другие Document
+ * (например, накладные внутри PDF сводки).
+ */
+export function InvoicePdfPage({ data }) {
   const doc = data?.document || {};
   const seller = data?.seller || {};
   const buyer = data?.buyer || null;
@@ -44,7 +49,6 @@ export default function InvoicePdfDocument({ data }) {
   const titleLine = `${documentTitle} № ${invoiceNumber || "—"} от ${fmtTitleDateTime(invoiceDate)}`;
 
   return (
-    <Document>
       <Page size="A4" style={s.page}>
         <Text style={s.title}>{titleLine}</Text>
 
@@ -115,6 +119,13 @@ export default function InvoicePdfDocument({ data }) {
 
         {!isInventory && <InvoicePdfSignatures />}
       </Page>
+  );
+}
+
+export default function InvoicePdfDocument({ data }) {
+  return (
+    <Document>
+      <InvoicePdfPage data={data} />
     </Document>
   );
 }

@@ -347,6 +347,12 @@ $s-accent-strong: var(--primary-dark, #d4b800);
     color: #dc2626;
     &:hover { background: #fef2f2; }
   }
+  &--sm {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
   &:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 

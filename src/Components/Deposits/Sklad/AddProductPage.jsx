@@ -55,6 +55,7 @@ import {
   filterKitPickerList,
 } from "./AddProductPage/utils/kitPickerUtils";
 import { MARKET_WAREHOUSE_KIND } from "../../../tools/marketWarehouseFilters";
+import SearchSelect from "../../common/SearchSelect/SearchSelect";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import { useDebouncedValue } from "../../../hooks/useDebounce";
@@ -625,6 +626,22 @@ const AddProductPage = ({
     if (!newItemData.client) return null;
     return list.find((x) => String(x.id) === String(newItemData.client));
   }, [list, newItemData.client]);
+
+  // Опции для поисковых селектов «Бренд» / «Категория»
+  const brandOptions = useMemo(
+    () =>
+      (brands || [])
+        .filter((b) => b?.name)
+        .map((b) => ({ value: b.name, label: b.name })),
+    [brands],
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (categories || [])
+        .filter((c) => c?.name)
+        .map((c) => ({ value: c.name, label: c.name })),
+    [categories],
+  );
 
   // Автоматическое заполнение телефона при выборе поставщика в тарифе "Старт"
   useEffect(() => {
@@ -1369,20 +1386,17 @@ const AddProductPage = ({
                           Бренд *
                         </label>
                         <div className="add-product-page__supplier-row">
-                          <select
-                            name="brand_name"
-                            className="add-product-page__input"
+                          <SearchSelect
                             value={newItemData.brand_name}
-                            onChange={handleChange}
-                            required
-                          >
-                            <option value="">Выберите бренд</option>
-                            {brands.map((brand, idx) => (
-                              <option key={brand.id ?? idx} value={brand.name}>
-                                {brand.name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(v) =>
+                              handleChange({
+                                target: { name: "brand_name", value: v },
+                              })
+                            }
+                            options={brandOptions}
+                            placeholder="Выберите бренд"
+                            emptyText="Бренды не найдены"
+                          />
                           <button
                             className="add-product-page__create-supplier"
                             onClick={() => setShowBrandInputs(!showBrandInputs)}
@@ -1443,23 +1457,17 @@ const AddProductPage = ({
                           Категория *
                         </label>
                         <div className="add-product-page__supplier-row">
-                          <select
-                            name="category_name"
-                            className="add-product-page__input"
+                          <SearchSelect
                             value={newItemData.category_name}
-                            onChange={handleChange}
-                            required
-                          >
-                            <option value="">Выберите категорию</option>
-                            {categories.map((category, idx) => (
-                              <option
-                                key={category.id ?? idx}
-                                value={category.name}
-                              >
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(v) =>
+                              handleChange({
+                                target: { name: "category_name", value: v },
+                              })
+                            }
+                            options={categoryOptions}
+                            placeholder="Выберите категорию"
+                            emptyText="Категории не найдены"
+                          />
                           <button
                             className="add-product-page__create-supplier"
                             onClick={() =>
@@ -1937,6 +1945,21 @@ const MarketProductForm = ({
 }) => {
   const dispatch = useDispatch();
   const [showPluTooltip, setShowPluTooltip] = useState(false);
+  // Опции для поисковых селектов «Бренд» / «Категория»
+  const brandOptions = useMemo(
+    () =>
+      (brands || [])
+        .filter((b) => b?.name)
+        .map((b) => ({ value: b.name, label: b.name })),
+    [brands],
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (categories || [])
+        .filter((c) => c?.name)
+        .map((c) => ({ value: c.name, label: c.name })),
+    [categories],
+  );
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
@@ -2244,20 +2267,17 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Категория</label>
             <div className="add-product-page__supplier-row">
-              <select
-                name="category_name"
-                className="market-product-form__input"
+              <SearchSelect
                 value={newItemData.category_name}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Выберите категорию</option>
-                {categories.map((category, idx) => (
-                  <option key={category.id ?? idx} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) =>
+                  handleChange({
+                    target: { name: "category_name", value: v },
+                  })
+                }
+                options={categoryOptions}
+                placeholder="Выберите категорию"
+                emptyText="Категории не найдены"
+              />
               <button
                 className="add-product-page__create-supplier"
                 onClick={() => setShowCategoryInputs(!showCategoryInputs)}
@@ -2313,20 +2333,17 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Бренд</label>
             <div className="add-product-page__supplier-row">
-              <select
-                name="brand_name"
-                className="market-product-form__input"
+              <SearchSelect
                 value={newItemData.brand_name}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Выберите бренд</option>
-                {brands.map((brand, idx) => (
-                  <option key={brand.id ?? idx} value={brand.name}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) =>
+                  handleChange({
+                    target: { name: "brand_name", value: v },
+                  })
+                }
+                options={brandOptions}
+                placeholder="Выберите бренд"
+                emptyText="Бренды не найдены"
+              />
               <button
                 className="add-product-page__create-supplier"
                 onClick={() => setShowBrandInputs(!showBrandInputs)}
