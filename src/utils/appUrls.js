@@ -2,10 +2,10 @@ const trimTrailingSlash = (value) => String(value || "").replace(/\/$/, "");
 
 const isLocalhostUrl = (value) => {
   try {
-    const host = new URL(value).hostname;
+    const host = new URL(value, "https://dummy.local").hostname;
     return host === "localhost" || host === "127.0.0.1";
   } catch {
-    return false;
+    return /localhost|127\.0\.0\.1/i.test(String(value || ""));
   }
 };
 
@@ -22,30 +22,49 @@ const BUILDING_APP_BY_HOST = {
   "www.nurcrm.kg": "https://stroy.nurcrm.kg",
 };
 
-const LOCAL_BUILDING_APP_URL = "http://localhost:3001";
+const DEFAULT_BUILDING_APP_URL = "https://stroy.nurcrm.kg";
+
+const BUILDING_APP_URL_STORAGE_KEY = "buildingAppUrl";
+
+const getCurrentHostname = () =>
+  typeof window !== "undefined" ? window.location.hostname : "";
+
+const getMappedBuildingAppUrl = () => {
+  const hostname = getCurrentHostname();
+  return hostname ? BUILDING_APP_BY_HOST[hostname] || null : null;
+};
+
+const clearStoredBuildingAppUrl = () => {
+  try {
+    sessionStorage.removeItem(BUILDING_APP_URL_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+};
 
 export const getMainAppUrl = () =>
-  trimTrailingSlash(import.meta.env.VITE_MAIN_APP_URL || window.location.origin);
+  trimTrailingSlash(
+    import.meta.env.VITE_MAIN_APP_URL || window.location.origin,
+  );
 
 export const getMainAppLoginUrl = () => `${getMainAppUrl()}/login`;
 
 export const getMainAppCrmUrl = () => `${getMainAppUrl()}/crm`;
 
-const BUILDING_APP_URL_STORAGE_KEY = "buildingAppUrl";
-
 export const getBuildingAppUrl = () => {
   const fromEnv = trimTrailingSlash(import.meta.env.VITE_BUILDING_APP_URL);
-  const hostname =
-    typeof window !== "undefined" ? window.location.hostname : "";
+  const mapped = getMappedBuildingAppUrl();
 
-  const mapped = hostname ? BUILDING_APP_BY_HOST[hostname] : null;
+  // На stage/prod всегда stroy; localhost из env/сборки игнорируем
   if (mapped) {
-    // На stage/prod localhost из .env не должен ломать редирект
     if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
     return mapped;
   }
 
-  return fromEnv || LOCAL_BUILDING_APP_URL;
+  if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
+  if (fromEnv) return fromEnv;
+
+  return DEFAULT_BUILDING_APP_URL;
 };
 
 export const captureBuildingAppUrlFromSearch = () => {
@@ -53,24 +72,61 @@ export const captureBuildingAppUrlFromSearch = () => {
   const fromUrl = params.get(BUILDING_APP_URL_STORAGE_KEY);
   if (!fromUrl) return null;
 
-  const normalized = fromUrl.replace(/\/$/, "");
+  const normalized = trimTrailingSlash(fromUrl);
+
+  // Не сохраняем localhost, если мы уже на stage/prod
+  if (getMappedBuildingAppUrl() && isLocalhostUrl(normalized)) {
+    clearStoredBuildingAppUrl();
+    params.delete(BUILDING_APP_URL_STORAGE_KEY);
+    const search = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      (search ? `?${search}` : "") +
+      window.location.hash;
+    window.history.replaceState({}, "", cleanUrl);
+    return null;
+  }
+
   try {
     sessionStorage.setItem(BUILDING_APP_URL_STORAGE_KEY, normalized);
   } catch {
     // sessionStorage may be unavailable in private mode
   }
+
+  params.delete(BUILDING_APP_URL_STORAGE_KEY);
+  const search = params.toString();
+  const cleanUrl =
+    window.location.pathname +
+    (search ? `?${search}` : "") +
+    window.location.hash;
+  window.history.replaceState({}, "", cleanUrl);
+
   return normalized;
 };
 
 export const getResolvedBuildingAppUrl = () => {
+  const mapped = getMappedBuildingAppUrl();
+
   try {
     const stored = sessionStorage.getItem(BUILDING_APP_URL_STORAGE_KEY);
     if (stored) {
-      return stored.replace(/\/$/, "");
+      const normalized = trimTrailingSlash(stored);
+
+      // Старый local building мог записать localhost в sessionStorage —
+      // на stage/prod это нельзя использовать.
+      if (mapped && isLocalhostUrl(normalized)) {
+        clearStoredBuildingAppUrl();
+        return mapped;
+      }
+
+      if (!isLocalhostUrl(normalized) || !mapped) {
+        return normalized;
+      }
     }
   } catch {
     // ignore
   }
+
   return getBuildingAppUrl();
 };
 
