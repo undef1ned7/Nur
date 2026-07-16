@@ -1,8 +1,11 @@
 // src/components/Education/Login.jsx
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {  loginUserAsync, getCompany } from "../../../store/creators/userCreators";
-import {  logoutUser } from "../../../store/slices/userSlice";
+import {
+  loginUserAsync,
+  getCompany,
+} from "../../../store/creators/userCreators";
+import { logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
 import { tryRedirectToBuildingApp } from "../../../utils/crossAppAuth";
 import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
@@ -58,7 +61,7 @@ const Login = () => {
   const navigate = useNavigate();
   const alert = useAlert();
   const { loading, error, currentUser, isAuthenticated } = useSelector(
-    (state) => state.user
+    (state) => state.user,
   );
 
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -84,7 +87,7 @@ const Login = () => {
       if (attempts >= MAX_LOGIN_ATTEMPTS) {
         const level = Math.min(
           prev.lockLevel || 0,
-          LOCK_DURATIONS_MIN.length - 1
+          LOCK_DURATIONS_MIN.length - 1,
         );
         next = {
           attempts: 0,
@@ -117,7 +120,9 @@ const Login = () => {
       window.history.replaceState(
         {},
         "",
-        window.location.pathname + (search ? `?${search}` : "") + window.location.hash,
+        window.location.pathname +
+          (search ? `?${search}` : "") +
+          window.location.hash,
       );
     }
     captureBuildingAppUrlFromSearch();
@@ -255,20 +260,20 @@ const Login = () => {
                 className="login__message login__message--error"
                 role="alert"
               >
-                {localError
-                  ? localError
-                  : (
-                    <>
-                      Неправильный логин или пароль
-                      {lockState.attempts > 0 && (
-                        <>
-                          {" "}
-                          (осталось попыток:{" "}
-                          {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
-                        </>
-                      )}
-                    </>
-                  )}
+                {localError ? (
+                  localError
+                ) : (
+                  <>
+                    Неправильный логин или пароль
+                    {lockState.attempts > 0 && (
+                      <>
+                        {" "}
+                        (осталось попыток:{" "}
+                        {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             )
           )}
@@ -280,7 +285,7 @@ const Login = () => {
                 Email
               </label>
               <input
-                className="login__input"
+                className="login__input text-black"
                 type="email"
                 id="email"
                 name="email"
@@ -300,7 +305,7 @@ const Login = () => {
               </label>
               <div className="login__password">
                 <input
-                  className="login__input login__input--password"
+                  className="login__input login__input--password text-black"
                   type={showPass ? "text" : "password"}
                   id="password"
                   name="password"
@@ -314,7 +319,7 @@ const Login = () => {
                 />
                 <button
                   type="button" // ← ВАЖНО: не submit
-                  className="login__toggle"
+                  className="login__toggle text-black"
                   onClick={() => setShowPass((s) => !s)}
                   aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
                 >
