@@ -183,7 +183,20 @@ const productSlice = createSlice({
           : Array.isArray(action.payload)
             ? action.payload
             : [];
-        state.brands = results;
+        if (action.meta?.arg?.append) {
+          // Догрузка следующей страницы («Смотреть ещё») — дописываем без дублей
+          const existingIds = new Set(
+            state.brands.map((b) => String(b?.id ?? b?.name)),
+          );
+          state.brands = [
+            ...state.brands,
+            ...results.filter(
+              (b) => !existingIds.has(String(b?.id ?? b?.name)),
+            ),
+          ];
+        } else {
+          state.brands = results;
+        }
         state.brandsCount =
           typeof action.payload?.count === "number"
             ? action.payload.count
@@ -307,7 +320,20 @@ const productSlice = createSlice({
           : Array.isArray(action.payload)
             ? action.payload
             : [];
-        state.categories = results;
+        if (action.meta?.arg?.append) {
+          // Догрузка следующей страницы («Смотреть ещё») — дописываем без дублей
+          const existingIds = new Set(
+            state.categories.map((c) => String(c?.id ?? c?.name)),
+          );
+          state.categories = [
+            ...state.categories,
+            ...results.filter(
+              (c) => !existingIds.has(String(c?.id ?? c?.name)),
+            ),
+          ];
+        } else {
+          state.categories = results;
+        }
         state.categoriesCount =
           typeof action.payload?.count === "number"
             ? action.payload.count

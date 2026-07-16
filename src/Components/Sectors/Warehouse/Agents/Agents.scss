@@ -1274,3 +1274,87 @@
     color: #64748b;
   }
 }
+
+/* Мультивыбор складов общего доступа агента (common_warehouses) */
+.agents-wh-multi {
+  min-width: 220px;
+
+  &__summary {
+    cursor: pointer;
+    list-style: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: #fff;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &:hover {
+      border-color: #cbd5e1;
+    }
+  }
+
+  &[open] &__summary {
+    border-color: #f9cf00;
+  }
+
+  &__list {
+    margin-top: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #334155;
+    padding: 4px 6px;
+    border-radius: 8px;
+    cursor: pointer;
+
+    &:hover {
+      background: #f8fafc;
+    }
+
+    input {
+      cursor: pointer;
+    }
+  }
+
+  &__clear {
+    margin-top: 4px;
+    border: none;
+    background: transparent;
+    color: #dc2626;
+    font-size: 12px;
+    text-align: left;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 8px;
+
+    &:hover {
+      background: #fef2f2;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+}

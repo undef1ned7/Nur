@@ -55,6 +55,7 @@ import {
   filterKitPickerList,
 } from "./AddProductPage/utils/kitPickerUtils";
 import { MARKET_WAREHOUSE_KIND } from "../../../tools/marketWarehouseFilters";
+import SearchSelect from "../../common/SearchSelect/SearchSelect";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import { useDebouncedValue } from "../../../hooks/useDebounce";
@@ -63,6 +64,9 @@ const normalizeName = (value) =>
   String(value || "")
     .trim()
     .toLowerCase();
+
+// Размер страницы для брендов/категорий (пагинация на бэкенде)
+const DICT_PAGE_LIMIT = 100;
 
 const AddProductPage = ({
   embedded = false,
@@ -82,7 +86,13 @@ const AddProductPage = ({
     updating,
     createError,
     brands,
+    brandsNext,
+    brandsCount,
+    brandsLoading,
     categories,
+    categoriesNext,
+    categoriesCount,
+    categoriesLoading,
     scannedProduct,
     list: products,
     count,
@@ -278,6 +288,64 @@ const AddProductPage = ({
     name: "",
   });
 
+  // Серверный поиск по брендам/категориям (params: search, limit, offset)
+  const [brandQuery, setBrandQuery] = useState("");
+  const [categoryQuery, setCategoryQuery] = useState("");
+  const debouncedBrandQuery = useDebouncedValue(brandQuery, 350);
+  const debouncedCategoryQuery = useDebouncedValue(categoryQuery, 350);
+
+  useEffect(() => {
+    dispatch(
+      fetchBrandsAsync({
+        search: debouncedBrandQuery.trim() || undefined,
+        page: 1,
+        page_size: DICT_PAGE_LIMIT,
+      }),
+    );
+  }, [dispatch, debouncedBrandQuery]);
+
+  useEffect(() => {
+    dispatch(
+      fetchCategoriesAsync({
+        search: debouncedCategoryQuery.trim() || undefined,
+        page: 1,
+        page_size: DICT_PAGE_LIMIT,
+      }),
+    );
+  }, [dispatch, debouncedCategoryQuery]);
+
+  // Догрузка следующей страницы («Смотреть ещё»): номер следующей страницы
+  // считаем от уже загруженного количества
+  const handleLoadMoreBrands = useCallback(() => {
+    dispatch(
+      fetchBrandsAsync({
+        search: debouncedBrandQuery.trim() || undefined,
+        page: Math.floor((brands || []).length / DICT_PAGE_LIMIT) + 1,
+        page_size: DICT_PAGE_LIMIT,
+        append: true,
+      }),
+    );
+  }, [dispatch, debouncedBrandQuery, brands]);
+
+  const handleLoadMoreCategories = useCallback(() => {
+    dispatch(
+      fetchCategoriesAsync({
+        search: debouncedCategoryQuery.trim() || undefined,
+        page: Math.floor((categories || []).length / DICT_PAGE_LIMIT) + 1,
+        page_size: DICT_PAGE_LIMIT,
+        append: true,
+      }),
+    );
+  }, [dispatch, debouncedCategoryQuery, categories]);
+
+  // Есть ли ещё страницы на сервере (next из ответа или по общему count)
+  const hasMoreBrands =
+    Boolean(brandsNext) ||
+    (Number(brandsCount) || 0) > (brands || []).length;
+  const hasMoreCategories =
+    Boolean(categoriesNext) ||
+    (Number(categoriesCount) || 0) > (categories || []).length;
+
   // Проверка уникальности названий бренда/категории с задержкой при вводе
   const debouncedBrandName = useDebouncedValue(newBrand.name, 400);
   const debouncedCategoryName = useDebouncedValue(newCategory.name, 400);
@@ -333,8 +401,7 @@ const AddProductPage = ({
   useEffect(() => {
     dispatch(fetchClientsAsync());
     dispatch(getCashBoxes());
-    dispatch(fetchBrandsAsync());
-    dispatch(fetchCategoriesAsync());
+    // Бренды/категории грузятся эффектами серверного поиска выше
     // Загружаем все товары для точного подсчета весовых товаров
     // Оптимизация: загружаем только необходимое количество товаров
     dispatch(fetchProductsAsync({ page_size: 100 }));
@@ -625,6 +692,22 @@ const AddProductPage = ({
     if (!newItemData.client) return null;
     return list.find((x) => String(x.id) === String(newItemData.client));
   }, [list, newItemData.client]);
+
+  // Опции для поисковых селектов «Бренд» / «Категория»
+  const brandOptions = useMemo(
+    () =>
+      (brands || [])
+        .filter((b) => b?.name)
+        .map((b) => ({ value: b.name, label: b.name })),
+    [brands],
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (categories || [])
+        .filter((c) => c?.name)
+        .map((c) => ({ value: c.name, label: c.name })),
+    [categories],
+  );
 
   // Автоматическое заполнение телефона при выборе поставщика в тарифе "Старт"
   useEffect(() => {
@@ -942,7 +1025,7 @@ const AddProductPage = ({
       const brand = await dispatch(
         createBrandAsync({ name: newBrand.name.trim() }),
       ).unwrap();
-      dispatch(fetchBrandsAsync());
+      dispatch(fetchBrandsAsync({ page: 1, page_size: DICT_PAGE_LIMIT }));
       setShowBrandInputs(false);
       // Автоматически выбираем созданный бренд
       setNewItemData((prev) => ({
@@ -984,7 +1067,7 @@ const AddProductPage = ({
       const category = await dispatch(
         createCategoryAsync({ name: newCategory.name.trim() }),
       ).unwrap();
-      dispatch(fetchCategoriesAsync());
+      dispatch(fetchCategoriesAsync({ page: 1, page_size: DICT_PAGE_LIMIT }));
       setShowCategoryInputs(false);
       // Автоматически выбираем созданную категорию
       setNewItemData((prev) => ({
@@ -1198,6 +1281,14 @@ const AddProductPage = ({
               handleChange={handleChange}
               brands={brands || []}
               categories={categories || []}
+              onBrandQueryChange={setBrandQuery}
+              brandsLoading={brandsLoading}
+              hasMoreBrands={hasMoreBrands}
+              onLoadMoreBrands={handleLoadMoreBrands}
+              onCategoryQueryChange={setCategoryQuery}
+              categoriesLoading={categoriesLoading}
+              hasMoreCategories={hasMoreCategories}
+              onLoadMoreCategories={handleLoadMoreCategories}
               products={products || []}
               filterClient={list.filter((item) => item.type === "suppliers")}
               handleSubmit={handleSubmit}
@@ -1369,20 +1460,23 @@ const AddProductPage = ({
                           Бренд *
                         </label>
                         <div className="add-product-page__supplier-row">
-                          <select
-                            name="brand_name"
-                            className="add-product-page__input"
+                          <SearchSelect
                             value={newItemData.brand_name}
-                            onChange={handleChange}
-                            required
-                          >
-                            <option value="">Выберите бренд</option>
-                            {brands.map((brand, idx) => (
-                              <option key={brand.id ?? idx} value={brand.name}>
-                                {brand.name}
-                              </option>
-                            ))}
-                          </select>
+                            valueLabel={newItemData.brand_name}
+                            onChange={(v) =>
+                              handleChange({
+                                target: { name: "brand_name", value: v },
+                              })
+                            }
+                            options={brandOptions}
+                            placeholder="Выберите бренд"
+                            emptyText="Бренды не найдены"
+                            maxVisible={500}
+                            onQueryChange={setBrandQuery}
+                            loading={brandsLoading}
+                            hasMore={hasMoreBrands}
+                            onLoadMore={handleLoadMoreBrands}
+                          />
                           <button
                             className="add-product-page__create-supplier"
                             onClick={() => setShowBrandInputs(!showBrandInputs)}
@@ -1443,23 +1537,23 @@ const AddProductPage = ({
                           Категория *
                         </label>
                         <div className="add-product-page__supplier-row">
-                          <select
-                            name="category_name"
-                            className="add-product-page__input"
+                          <SearchSelect
                             value={newItemData.category_name}
-                            onChange={handleChange}
-                            required
-                          >
-                            <option value="">Выберите категорию</option>
-                            {categories.map((category, idx) => (
-                              <option
-                                key={category.id ?? idx}
-                                value={category.name}
-                              >
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
+                            valueLabel={newItemData.category_name}
+                            onChange={(v) =>
+                              handleChange({
+                                target: { name: "category_name", value: v },
+                              })
+                            }
+                            options={categoryOptions}
+                            placeholder="Выберите категорию"
+                            emptyText="Категории не найдены"
+                            maxVisible={500}
+                            onQueryChange={setCategoryQuery}
+                            loading={categoriesLoading}
+                            hasMore={hasMoreCategories}
+                            onLoadMore={handleLoadMoreCategories}
+                          />
                           <button
                             className="add-product-page__create-supplier"
                             onClick={() =>
@@ -1883,6 +1977,14 @@ const MarketProductForm = ({
   handleChange,
   brands,
   categories,
+  onBrandQueryChange = null,
+  brandsLoading = false,
+  hasMoreBrands = false,
+  onLoadMoreBrands = null,
+  onCategoryQueryChange = null,
+  categoriesLoading = false,
+  hasMoreCategories = false,
+  onLoadMoreCategories = null,
   products,
   filterClient,
   handleSubmit,
@@ -1937,6 +2039,21 @@ const MarketProductForm = ({
 }) => {
   const dispatch = useDispatch();
   const [showPluTooltip, setShowPluTooltip] = useState(false);
+  // Опции для поисковых селектов «Бренд» / «Категория»
+  const brandOptions = useMemo(
+    () =>
+      (brands || [])
+        .filter((b) => b?.name)
+        .map((b) => ({ value: b.name, label: b.name })),
+    [brands],
+  );
+  const categoryOptions = useMemo(
+    () =>
+      (categories || [])
+        .filter((c) => c?.name)
+        .map((c) => ({ value: c.name, label: c.name })),
+    [categories],
+  );
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
@@ -2244,20 +2361,23 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Категория</label>
             <div className="add-product-page__supplier-row">
-              <select
-                name="category_name"
-                className="market-product-form__input"
+              <SearchSelect
                 value={newItemData.category_name}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Выберите категорию</option>
-                {categories.map((category, idx) => (
-                  <option key={category.id ?? idx} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+                valueLabel={newItemData.category_name}
+                onChange={(v) =>
+                  handleChange({
+                    target: { name: "category_name", value: v },
+                  })
+                }
+                options={categoryOptions}
+                placeholder="Выберите категорию"
+                emptyText="Категории не найдены"
+                maxVisible={500}
+                onQueryChange={onCategoryQueryChange}
+                loading={categoriesLoading}
+                hasMore={hasMoreCategories}
+                onLoadMore={onLoadMoreCategories}
+              />
               <button
                 className="add-product-page__create-supplier"
                 onClick={() => setShowCategoryInputs(!showCategoryInputs)}
@@ -2313,20 +2433,23 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Бренд</label>
             <div className="add-product-page__supplier-row">
-              <select
-                name="brand_name"
-                className="market-product-form__input"
+              <SearchSelect
                 value={newItemData.brand_name}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Выберите бренд</option>
-                {brands.map((brand, idx) => (
-                  <option key={brand.id ?? idx} value={brand.name}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
+                valueLabel={newItemData.brand_name}
+                onChange={(v) =>
+                  handleChange({
+                    target: { name: "brand_name", value: v },
+                  })
+                }
+                options={brandOptions}
+                placeholder="Выберите бренд"
+                emptyText="Бренды не найдены"
+                maxVisible={500}
+                onQueryChange={onBrandQueryChange}
+                loading={brandsLoading}
+                hasMore={hasMoreBrands}
+                onLoadMore={onLoadMoreBrands}
+              />
               <button
                 className="add-product-page__create-supplier"
                 onClick={() => setShowBrandInputs(!showBrandInputs)}

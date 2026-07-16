@@ -1,6 +1,12 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerPdfFonts } from "@/pdf/registerFonts";
+import { InvoicePdfPage, InvoicePdfPageContent } from "../InvoicePdfDocument";
+import { invoicePdfStyles } from "../invoicePdfDocumentStyles";
+import {
+  estimateInvoiceContentHeight,
+  INVOICE_HALF_PAGE_HEIGHT,
+} from "../invoicePdfDocumentUtils";
 import { normalizeSummary, toNum } from "./summaryAggregation";
 
 registerPdfFonts();
@@ -94,6 +100,14 @@ const s = StyleSheet.create({
     textAlign: "right",
     fontSize: 7.5,
     color: "#555",
+  },
+
+  // Линия отреза между двумя экземплярами накладной на одной странице
+  cutLine: {
+    marginVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    borderStyle: "dashed",
   },
 });
 
@@ -226,11 +240,19 @@ const TableHead = ({ cols, heads }) => (
   </View>
 );
 
-export default function SummaryPdfDocument({ summary }) {
+/**
+ * @param {Object} summary — сводка (normalizeSummary-совместимая)
+ * @param {Array} invoices — данные накладных в формате InvoicePdfDocument
+ *   (transformWarehouseDocumentToInvoiceData). Если переданы, после сводных
+ *   таблиц каждая накладная печатается в формате продажи «точь-в-точь»,
+ *   в двух экземплярах; табличная детализация №3 при этом не рендерится.
+ */
+export default function SummaryPdfDocument({ summary, invoices = [] }) {
   const data = normalizeSummary(summary || {});
   const products = data.products || [];
   const documents = data.documents || [];
   const totals = data.totals || {};
+  const hasInvoicePages = Array.isArray(invoices) && invoices.length > 0;
 
   const created = fmtDateTime(data.created_at);
   const typeLabel = TYPE_LABEL[data.type] || data.type || "—";
@@ -387,8 +409,9 @@ export default function SummaryPdfDocument({ summary }) {
         </View>
 
         {/* Таблица №3 — Детализация по накладным (позиции внутри каждой накладной).
-            Рендерится только если бэкенд прислал documents[].items. */}
-        {hasDocItems && (
+            Fallback: рендерится, только если не переданы полноформатные накладные
+            (invoices) и бэкенд прислал documents[].items. */}
+        {!hasInvoicePages && hasDocItems && (
           <>
             <Text style={s.sectionTitle} break>
               Таблица №3. Детализация по накладным
@@ -497,6 +520,30 @@ export default function SummaryPdfDocument({ summary }) {
           fixed
         />
       </Page>
+
+      {/* Накладные в формате продажи «точь-в-точь», каждая в двух экземплярах
+          (для клиента и для склада). Короткая накладная (меньше половины
+          страницы) печатается обоими экземплярами на одном листе с линией
+          отреза, длинная — на двух отдельных листах. */}
+      {hasInvoicePages &&
+        invoices.map((inv, i) => {
+          const key = inv?.document?.id || i;
+          if (estimateInvoiceContentHeight(inv) <= INVOICE_HALF_PAGE_HEIGHT) {
+            return (
+              <Page key={key} size="A4" style={invoicePdfStyles.page}>
+                <InvoicePdfPageContent data={inv} />
+                <View style={s.cutLine} />
+                <InvoicePdfPageContent data={inv} />
+              </Page>
+            );
+          }
+          return (
+            <React.Fragment key={key}>
+              <InvoicePdfPage data={inv} />
+              <InvoicePdfPage data={inv} />
+            </React.Fragment>
+          );
+        })}
     </Document>
   );
 }

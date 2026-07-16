@@ -68,6 +68,7 @@ const Pending = () => {
       setCashFlowsLoading(true);
       try {
         const params = {
+          status: "pending", // заявки, ждущие подтверждения — фильтрует сервер
           page: pageNum,
           page_size: CASHFLOWS_PAGE_SIZE,
         };
@@ -116,7 +117,8 @@ const Pending = () => {
     return () => clearTimeout(timer);
   }, [cashboxId, debouncedSearchTerm, page, loadCashFlows]);
 
-  // Фильтрация по статусу на фронте (страница содержит операции всех статусов)
+  // Сервер уже отдаёт только pending (?status=pending); фильтр оставлен
+  // как страховка от старого формата status: "false"
   const basePending = useMemo(
     () =>
       (cashFlows || []).filter(
@@ -411,7 +413,8 @@ const Pending = () => {
 
         <div className="pending-search__info flex flex-wrap items-center gap-2">
           <span>
-            На странице: {pending.length} • Найдено: {filteredPending.length}
+            Всего: {totalCount ?? pending.length} • На странице:{" "}
+            {filteredPending.length}
             {selected.size > 0 && ` • Выбрано: ${selected.size}`}
           </span>
 
@@ -801,7 +804,7 @@ const Pending = () => {
           </button>
           <span className="text-sm text-slate-600">
             Страница {page}
-            {totalCount != null ? ` · ${totalCount} операций` : ""}
+            {totalCount != null ? ` · ${totalCount} запросов` : ""}
           </span>
           <button
             type="button"

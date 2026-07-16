@@ -17,7 +17,12 @@ import InvoicePdfTotalsSection from "./InvoicePdfTotalsSection";
 
 registerPdfFonts();
 
-export default function InvoicePdfDocument({ data }) {
+/**
+ * Содержимое накладной без обёртки Page. Вынесено отдельно, чтобы короткие
+ * накладные можно было печатать в два экземпляра на одной странице
+ * (см. SummaryPdfDocument).
+ */
+export function InvoicePdfPageContent({ data }) {
   const doc = data?.document || {};
   const seller = data?.seller || {};
   const buyer = data?.buyer || null;
@@ -44,8 +49,7 @@ export default function InvoicePdfDocument({ data }) {
   const titleLine = `${documentTitle} № ${invoiceNumber || "—"} от ${fmtTitleDateTime(invoiceDate)}`;
 
   return (
-    <Document>
-      <Page size="A4" style={s.page}>
+      <>
         <Text style={s.title}>{titleLine}</Text>
 
         <InvoicePdfParties
@@ -114,7 +118,27 @@ export default function InvoicePdfDocument({ data }) {
         )}
 
         {!isInventory && <InvoicePdfSignatures />}
-      </Page>
+      </>
+  );
+}
+
+/**
+ * Одна страница накладной. Вынесена из InvoicePdfDocument, чтобы тот же
+ * формат «точь-в-точь» можно было вкладывать в другие Document
+ * (например, накладные внутри PDF сводки).
+ */
+export function InvoicePdfPage({ data }) {
+  return (
+    <Page size="A4" style={s.page}>
+      <InvoicePdfPageContent data={data} />
+    </Page>
+  );
+}
+
+export default function InvoicePdfDocument({ data }) {
+  return (
+    <Document>
+      <InvoicePdfPage data={data} />
     </Document>
   );
 }
