@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./SearchSelect.scss";
 
 /**
@@ -9,9 +9,18 @@ import "./SearchSelect.scss";
  * поэтому открытие не подвисает даже на сотнях позиций. Адаптивен —
  * растягивается на ширину контейнера, меню скроллится.
  *
+ * Поддерживает серверный поиск/пагинацию: передайте `onQueryChange`, чтобы
+ * получать введённый текст (для запроса с params), и `onLoadMore` + `hasMore`,
+ * чтобы внизу меню появилась кнопка догрузки следующей страницы.
+ *
  * @param {string|number} value — значение выбранной опции
  * @param {(value) => void} onChange
  * @param {Array<{value, label, searchText?}>} options
+ * @param {(query: string) => void} [onQueryChange] — серверный поиск: текст из инпута (пустая строка при закрытии)
+ * @param {boolean} [loading] — идёт загрузка опций с сервера
+ * @param {boolean} [hasMore] — на сервере есть ещё страницы
+ * @param {() => void} [onLoadMore] — догрузить следующую страницу
+ * @param {string} [valueLabel] — подпись выбранного значения, если его нет среди загруженных options
  */
 const SearchSelect = ({
   value,
@@ -22,6 +31,12 @@ const SearchSelect = ({
   emptyText = "Ничего не найдено",
   maxVisible = 150,
   className = "",
+  onQueryChange = null,
+  loading = false,
+  hasMore = false,
+  onLoadMore = null,
+  loadMoreText = "Смотреть ещё",
+  valueLabel = "",
 }) => {
   const containerRef = useRef(null);
   const inputRef = useRef(null);
@@ -31,10 +46,13 @@ const SearchSelect = ({
   const selected = useMemo(() => {
     const v = value == null ? "" : String(value);
     if (!v) return null;
-    return (Array.isArray(options) ? options : []).find(
+    const found = (Array.isArray(options) ? options : []).find(
       (o) => String(o.value) === v,
     );
-  }, [options, value]);
+    if (found) return found;
+    // Значение выбрано, но не попало в загруженную страницу options
+    return valueLabel ? { value: v, label: valueLabel } : null;
+  }, [options, value, valueLabel]);
 
   const filtered = useMemo(() => {
     const list = Array.isArray(options) ? options : [];
@@ -53,10 +71,12 @@ const SearchSelect = ({
   );
   const hiddenCount = filtered.length - visible.length;
 
-  const close = () => {
+  const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-  };
+    // Сбрасываем серверный поиск, чтобы при следующем открытии был полный список
+    onQueryChange?.("");
+  }, [onQueryChange]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -78,7 +98,7 @@ const SearchSelect = ({
       document.removeEventListener("touchstart", onDocDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, close]);
 
   return (
     <div
@@ -96,6 +116,7 @@ const SearchSelect = ({
         onChange={(e) => {
           if (!open) setOpen(true);
           setQuery(e.target.value);
+          onQueryChange?.(e.target.value);
         }}
       />
       <span className="cmn-searchselect__arrow" aria-hidden>
@@ -105,7 +126,9 @@ const SearchSelect = ({
       {open && !disabled && (
         <div className="cmn-searchselect__menu">
           {visible.length === 0 ? (
-            <div className="cmn-searchselect__empty">{emptyText}</div>
+            <div className="cmn-searchselect__empty">
+              {loading ? "Загрузка..." : emptyText}
+            </div>
           ) : (
             <>
               {visible.map((o) => (
@@ -132,6 +155,16 @@ const SearchSelect = ({
                 </div>
               )}
             </>
+          )}
+          {hasMore && typeof onLoadMore === "function" && (
+            <button
+              type="button"
+              className="cmn-searchselect__loadmore"
+              disabled={loading}
+              onClick={() => onLoadMore()}
+            >
+              {loading ? "Загрузка..." : loadMoreText}
+            </button>
           )}
         </div>
       )}

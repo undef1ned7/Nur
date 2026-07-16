@@ -100,7 +100,10 @@ export const fetchBrandsAsync = createAsyncThunk(
   "brand/fetchAll",
   async (params = {}, { rejectWithValue }) => {
     try {
-      return await fetchBrands(params);
+      // append — служебный флаг для slice (догрузка страницы), в API не уходит
+      const query = { ...params };
+      delete query.append;
+      return await fetchBrands(query);
     } catch (error) {
       return handleThunkError(error, rejectWithValue);
     }
@@ -149,7 +152,10 @@ export const fetchCategoriesAsync = createAsyncThunk(
   "category/fetchAll",
   async (params = {}, { rejectWithValue }) => {
     try {
-      return await fetchCategories(params);
+      // append — служебный флаг для slice (догрузка страницы), в API не уходит
+      const query = { ...params };
+      delete query.append;
+      return await fetchCategories(query);
     } catch (error) {
       return handleThunkError(error, rejectWithValue);
     }

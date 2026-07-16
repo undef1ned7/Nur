@@ -65,6 +65,9 @@ const normalizeName = (value) =>
     .trim()
     .toLowerCase();
 
+// Размер страницы для брендов/категорий (пагинация на бэкенде)
+const DICT_PAGE_LIMIT = 100;
+
 const AddProductPage = ({
   embedded = false,
   embeddedPrefillSupplierId = "",
@@ -83,7 +86,13 @@ const AddProductPage = ({
     updating,
     createError,
     brands,
+    brandsNext,
+    brandsCount,
+    brandsLoading,
     categories,
+    categoriesNext,
+    categoriesCount,
+    categoriesLoading,
     scannedProduct,
     list: products,
     count,
@@ -279,6 +288,64 @@ const AddProductPage = ({
     name: "",
   });
 
+  // Серверный поиск по брендам/категориям (params: search, limit, offset)
+  const [brandQuery, setBrandQuery] = useState("");
+  const [categoryQuery, setCategoryQuery] = useState("");
+  const debouncedBrandQuery = useDebouncedValue(brandQuery, 350);
+  const debouncedCategoryQuery = useDebouncedValue(categoryQuery, 350);
+
+  useEffect(() => {
+    dispatch(
+      fetchBrandsAsync({
+        search: debouncedBrandQuery.trim() || undefined,
+        page: 1,
+        page_size: DICT_PAGE_LIMIT,
+      }),
+    );
+  }, [dispatch, debouncedBrandQuery]);
+
+  useEffect(() => {
+    dispatch(
+      fetchCategoriesAsync({
+        search: debouncedCategoryQuery.trim() || undefined,
+        page: 1,
+        page_size: DICT_PAGE_LIMIT,
+      }),
+    );
+  }, [dispatch, debouncedCategoryQuery]);
+
+  // Догрузка следующей страницы («Смотреть ещё»): номер следующей страницы
+  // считаем от уже загруженного количества
+  const handleLoadMoreBrands = useCallback(() => {
+    dispatch(
+      fetchBrandsAsync({
+        search: debouncedBrandQuery.trim() || undefined,
+        page: Math.floor((brands || []).length / DICT_PAGE_LIMIT) + 1,
+        page_size: DICT_PAGE_LIMIT,
+        append: true,
+      }),
+    );
+  }, [dispatch, debouncedBrandQuery, brands]);
+
+  const handleLoadMoreCategories = useCallback(() => {
+    dispatch(
+      fetchCategoriesAsync({
+        search: debouncedCategoryQuery.trim() || undefined,
+        page: Math.floor((categories || []).length / DICT_PAGE_LIMIT) + 1,
+        page_size: DICT_PAGE_LIMIT,
+        append: true,
+      }),
+    );
+  }, [dispatch, debouncedCategoryQuery, categories]);
+
+  // Есть ли ещё страницы на сервере (next из ответа или по общему count)
+  const hasMoreBrands =
+    Boolean(brandsNext) ||
+    (Number(brandsCount) || 0) > (brands || []).length;
+  const hasMoreCategories =
+    Boolean(categoriesNext) ||
+    (Number(categoriesCount) || 0) > (categories || []).length;
+
   // Проверка уникальности названий бренда/категории с задержкой при вводе
   const debouncedBrandName = useDebouncedValue(newBrand.name, 400);
   const debouncedCategoryName = useDebouncedValue(newCategory.name, 400);
@@ -334,8 +401,7 @@ const AddProductPage = ({
   useEffect(() => {
     dispatch(fetchClientsAsync());
     dispatch(getCashBoxes());
-    dispatch(fetchBrandsAsync());
-    dispatch(fetchCategoriesAsync());
+    // Бренды/категории грузятся эффектами серверного поиска выше
     // Загружаем все товары для точного подсчета весовых товаров
     // Оптимизация: загружаем только необходимое количество товаров
     dispatch(fetchProductsAsync({ page_size: 100 }));
@@ -959,7 +1025,7 @@ const AddProductPage = ({
       const brand = await dispatch(
         createBrandAsync({ name: newBrand.name.trim() }),
       ).unwrap();
-      dispatch(fetchBrandsAsync());
+      dispatch(fetchBrandsAsync({ page: 1, page_size: DICT_PAGE_LIMIT }));
       setShowBrandInputs(false);
       // Автоматически выбираем созданный бренд
       setNewItemData((prev) => ({
@@ -1001,7 +1067,7 @@ const AddProductPage = ({
       const category = await dispatch(
         createCategoryAsync({ name: newCategory.name.trim() }),
       ).unwrap();
-      dispatch(fetchCategoriesAsync());
+      dispatch(fetchCategoriesAsync({ page: 1, page_size: DICT_PAGE_LIMIT }));
       setShowCategoryInputs(false);
       // Автоматически выбираем созданную категорию
       setNewItemData((prev) => ({
@@ -1215,6 +1281,14 @@ const AddProductPage = ({
               handleChange={handleChange}
               brands={brands || []}
               categories={categories || []}
+              onBrandQueryChange={setBrandQuery}
+              brandsLoading={brandsLoading}
+              hasMoreBrands={hasMoreBrands}
+              onLoadMoreBrands={handleLoadMoreBrands}
+              onCategoryQueryChange={setCategoryQuery}
+              categoriesLoading={categoriesLoading}
+              hasMoreCategories={hasMoreCategories}
+              onLoadMoreCategories={handleLoadMoreCategories}
               products={products || []}
               filterClient={list.filter((item) => item.type === "suppliers")}
               handleSubmit={handleSubmit}
@@ -1388,6 +1462,7 @@ const AddProductPage = ({
                         <div className="add-product-page__supplier-row">
                           <SearchSelect
                             value={newItemData.brand_name}
+                            valueLabel={newItemData.brand_name}
                             onChange={(v) =>
                               handleChange({
                                 target: { name: "brand_name", value: v },
@@ -1396,6 +1471,11 @@ const AddProductPage = ({
                             options={brandOptions}
                             placeholder="Выберите бренд"
                             emptyText="Бренды не найдены"
+                            maxVisible={500}
+                            onQueryChange={setBrandQuery}
+                            loading={brandsLoading}
+                            hasMore={hasMoreBrands}
+                            onLoadMore={handleLoadMoreBrands}
                           />
                           <button
                             className="add-product-page__create-supplier"
@@ -1459,6 +1539,7 @@ const AddProductPage = ({
                         <div className="add-product-page__supplier-row">
                           <SearchSelect
                             value={newItemData.category_name}
+                            valueLabel={newItemData.category_name}
                             onChange={(v) =>
                               handleChange({
                                 target: { name: "category_name", value: v },
@@ -1467,6 +1548,11 @@ const AddProductPage = ({
                             options={categoryOptions}
                             placeholder="Выберите категорию"
                             emptyText="Категории не найдены"
+                            maxVisible={500}
+                            onQueryChange={setCategoryQuery}
+                            loading={categoriesLoading}
+                            hasMore={hasMoreCategories}
+                            onLoadMore={handleLoadMoreCategories}
                           />
                           <button
                             className="add-product-page__create-supplier"
@@ -1891,6 +1977,14 @@ const MarketProductForm = ({
   handleChange,
   brands,
   categories,
+  onBrandQueryChange = null,
+  brandsLoading = false,
+  hasMoreBrands = false,
+  onLoadMoreBrands = null,
+  onCategoryQueryChange = null,
+  categoriesLoading = false,
+  hasMoreCategories = false,
+  onLoadMoreCategories = null,
   products,
   filterClient,
   handleSubmit,
@@ -2269,6 +2363,7 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.category_name}
+                valueLabel={newItemData.category_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "category_name", value: v },
@@ -2277,6 +2372,11 @@ const MarketProductForm = ({
                 options={categoryOptions}
                 placeholder="Выберите категорию"
                 emptyText="Категории не найдены"
+                maxVisible={500}
+                onQueryChange={onCategoryQueryChange}
+                loading={categoriesLoading}
+                hasMore={hasMoreCategories}
+                onLoadMore={onLoadMoreCategories}
               />
               <button
                 className="add-product-page__create-supplier"
@@ -2335,6 +2435,7 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.brand_name}
+                valueLabel={newItemData.brand_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "brand_name", value: v },
@@ -2343,6 +2444,11 @@ const MarketProductForm = ({
                 options={brandOptions}
                 placeholder="Выберите бренд"
                 emptyText="Бренды не найдены"
+                maxVisible={500}
+                onQueryChange={onBrandQueryChange}
+                loading={brandsLoading}
+                hasMore={hasMoreBrands}
+                onLoadMore={onLoadMoreBrands}
               />
               <button
                 className="add-product-page__create-supplier"

@@ -86,6 +86,31 @@
     text-align: center;
   }
 
+  &__loadmore {
+    display: block;
+    width: 100%;
+    margin-top: 2px;
+    padding: 9px 10px;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    border-radius: 0 0 8px 8px;
+    background: #f8fafc;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    text-align: center;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #fef9e7;
+    }
+
+    &:disabled {
+      color: #94a3b8;
+      cursor: default;
+    }
+  }
+
   @media (max-width: 640px) {
     &__menu {
       max-height: 45vh;

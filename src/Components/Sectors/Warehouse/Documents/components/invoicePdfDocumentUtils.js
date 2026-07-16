@@ -183,6 +183,88 @@ export function goodsRowKey(it, idx, invoiceNumber) {
   return `row-${invoiceNumber || "n"}-${idx}-${name}-${art}`;
 }
 
+// Высота A4 в pt минус вертикальные отступы страницы накладной (14 + 14)
+// и линия отреза между экземплярами (~24). Половина — бюджет одного экземпляра,
+// когда два печатаются на одной странице.
+export const INVOICE_HALF_PAGE_HEIGHT = Math.floor((841.89 - 28 - 24) / 2);
+
+/**
+ * Грубая оценка высоты содержимого накладной (в pt) по структуре
+ * InvoicePdfPageContent. Используется, чтобы решить, помещаются ли два
+ * экземпляра на одну страницу A4. Оценка намеренно консервативная:
+ * при сомнении лучше напечатать два отдельных листа, чем получить разрыв
+ * экземпляра между страницами.
+ */
+export function estimateInvoiceContentHeight(data) {
+  const doc = data?.document || {};
+  const docType = data?.doc_type || doc.doc_type || doc.type || "SALE";
+  const isInventory = docType === "INVENTORY";
+  const isTransfer = docType === "TRANSFER";
+  const showPriceColumns = needsPriceColumns(docType);
+  const items = buildInvoiceItemsFromData(data);
+
+  const LINE = 13; // строка текста 8–9pt с межстрочным интервалом
+
+  let h = 25; // заголовок 12pt + marginBottom 10
+
+  // Блоки сторон (поставщик/покупатель или организация)
+  if (isTransfer || isInventory) {
+    h += 8 + LINE * (1 + (data?.seller?.address ? 1 : 0));
+  } else if (usesPartyBlocks(docType)) {
+    const { supplier, buyer } = resolvePartiesForDocType(
+      docType,
+      data?.seller || {},
+      data?.buyer,
+    );
+    const blocks = ["RECEIPT", "WRITE_OFF"].includes(docType)
+      ? [supplier]
+      : [supplier, buyer];
+    for (const p of blocks) {
+      if (!p?.name || p.name === "—") continue;
+      h += 8 + LINE * (1 + (p.addressLine ? 1 : 0) + (p.phoneLine ? 1 : 0));
+    }
+  }
+
+  // Мета-строки: склады и комментарий
+  if (isTransfer) {
+    h += 6 + LINE * ((data?.warehouse ? 1 : 0) + (data?.warehouse_to ? 1 : 0));
+  } else if (!isInventory && data?.warehouse) {
+    h += LINE + 6;
+  }
+  const comment = String(doc.comment ?? data?.comment ?? "").trim();
+  if (comment) h += LINE + 6;
+
+  // Таблица товаров: шапка + строки (название может переноситься) + «Итого»
+  const nameCharsPerLine = showPriceColumns ? 26 : 60;
+  h += 6 + 14;
+  for (const it of items) {
+    const lines = Math.max(
+      1,
+      Math.ceil(String(it.name || "").length / nameCharsPerLine),
+    );
+    h += Math.max(14, 6 + lines * 10);
+  }
+  if (showPriceColumns) h += 14;
+
+  // Итоги: «ИТОГО» (+скидка документа) и сумма прописью (до двух строк)
+  if (showPriceColumns) {
+    const subtotal = items.reduce((sum, it) => sum + Number(it.total || 0), 0);
+    const { showDocumentDiscountLine } = resolveDocumentDiscount(
+      doc,
+      data,
+      subtotal,
+      data?.items,
+    );
+    h += 6 + 14 + (showDocumentDiscountLine ? LINE : 0);
+    h += 8 + LINE + 2 * LINE;
+  }
+
+  // Подписи / примечание инвентаризации
+  h += isInventory ? 8 + 2 * LINE : 16 + 10 + 4 + 14;
+
+  return h;
+}
+
 /** Строки товаров для PDF/Excel — единая логика с InvoicePdfDocument. */
 export function buildInvoiceItemsFromData(data) {
   const doc = data?.document || {};

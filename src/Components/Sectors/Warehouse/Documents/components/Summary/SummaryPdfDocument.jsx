@@ -1,7 +1,12 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { registerPdfFonts } from "@/pdf/registerFonts";
-import { InvoicePdfPage } from "../InvoicePdfDocument";
+import { InvoicePdfPage, InvoicePdfPageContent } from "../InvoicePdfDocument";
+import { invoicePdfStyles } from "../invoicePdfDocumentStyles";
+import {
+  estimateInvoiceContentHeight,
+  INVOICE_HALF_PAGE_HEIGHT,
+} from "../invoicePdfDocumentUtils";
 import { normalizeSummary, toNum } from "./summaryAggregation";
 
 registerPdfFonts();
@@ -95,6 +100,14 @@ const s = StyleSheet.create({
     textAlign: "right",
     fontSize: 7.5,
     color: "#555",
+  },
+
+  // Линия отреза между двумя экземплярами накладной на одной странице
+  cutLine: {
+    marginVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    borderStyle: "dashed",
   },
 });
 
@@ -509,14 +522,28 @@ export default function SummaryPdfDocument({ summary, invoices = [] }) {
       </Page>
 
       {/* Накладные в формате продажи «точь-в-точь», каждая в двух экземплярах
-          (для клиента и для склада). */}
+          (для клиента и для склада). Короткая накладная (меньше половины
+          страницы) печатается обоими экземплярами на одном листе с линией
+          отреза, длинная — на двух отдельных листах. */}
       {hasInvoicePages &&
-        invoices.map((inv, i) => (
-          <React.Fragment key={inv?.document?.id || i}>
-            <InvoicePdfPage data={inv} />
-            <InvoicePdfPage data={inv} />
-          </React.Fragment>
-        ))}
+        invoices.map((inv, i) => {
+          const key = inv?.document?.id || i;
+          if (estimateInvoiceContentHeight(inv) <= INVOICE_HALF_PAGE_HEIGHT) {
+            return (
+              <Page key={key} size="A4" style={invoicePdfStyles.page}>
+                <InvoicePdfPageContent data={inv} />
+                <View style={s.cutLine} />
+                <InvoicePdfPageContent data={inv} />
+              </Page>
+            );
+          }
+          return (
+            <React.Fragment key={key}>
+              <InvoicePdfPage data={inv} />
+              <InvoicePdfPage data={inv} />
+            </React.Fragment>
+          );
+        })}
     </Document>
   );
 }
