@@ -1,12 +1,17 @@
 // src/components/Education/Login.jsx
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {  loginUserAsync, getCompany } from "../../../store/creators/userCreators";
-import {  logoutUser } from "../../../store/slices/userSlice";
+import {
+  loginUserAsync,
+  getCompany,
+} from "../../../store/creators/userCreators";
+import { logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
-import { isBuildingSector } from "../../../utils/sectorMapping";
-import { redirectToBuildingApp } from "../../../utils/crossAppAuth";
+import { tryRedirectToBuildingApp } from "../../../utils/crossAppAuth";
+import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
+import { clearTokens } from "../../../utils/authUtils";
+import { useAlert } from "../../../hooks/useDialog";
 import "./Login.scss";
 
 // Блокировка входа после подряд неудачных попыток
@@ -54,14 +59,16 @@ const formatLockTime = (ms) => {
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const alert = useAlert();
   const { loading, error, currentUser, isAuthenticated } = useSelector(
-    (state) => state.user
+    (state) => state.user,
   );
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [lockState, setLockState] = useState(readLockState);
   const [now, setNow] = useState(() => Date.now());
+  const [localError, setLocalError] = useState("");
 
   const lockRemainingMs = Math.max(0, (lockState.lockUntil || 0) - now);
   const isLocked = lockRemainingMs > 0;
@@ -80,7 +87,7 @@ const Login = () => {
       if (attempts >= MAX_LOGIN_ATTEMPTS) {
         const level = Math.min(
           prev.lockLevel || 0,
-          LOCK_DURATIONS_MIN.length - 1
+          LOCK_DURATIONS_MIN.length - 1,
         );
         next = {
           attempts: 0,
@@ -102,8 +109,24 @@ const Login = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("logout") === "1") {
+      dispatch(logoutUser());
+      clearTokens();
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userData");
+      params.delete("logout");
+      const search = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname +
+          (search ? `?${search}` : "") +
+          window.location.hash,
+      );
+    }
     captureBuildingAppUrlFromSearch();
-  }, []);
+  }, [dispatch]);
 
   // Нормализация сообщений об ошибке
   const getErrorMessage = (err) => {
@@ -145,37 +168,47 @@ const Login = () => {
     }
   };
 
-  const errText = getErrorMessage(error);
+  const errText = localError || getErrorMessage(error);
 
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
+    if (localError) setLocalError("");
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // ← НЕ ДАДИМ БРАУЗЕРУ ПЕРЕЗАГРУЗИТЬ СТРАНИЦУ
+    e.preventDefault();
     if (isLocked) return;
+    setLocalError("");
+
     try {
       await dispatch(loginUserAsync(formData)).unwrap();
-    } catch (e) {
-      // Ошибка уже попадёт в Redux -> error, и покажется в errText
+    } catch {
       registerFailedAttempt();
       return;
     }
 
-    // Логин успешен — сбрасываем счётчик неудачных попыток
     resetLockState();
 
     try {
       const company = await dispatch(getCompany()).unwrap();
-      if (isBuildingSector(company?.sector?.name)) {
-        redirectToBuildingApp();
+      const subscription = getCompanySubscriptionStatus(company);
+
+      if (!subscription.ok && subscription.message) {
+        setLocalError(subscription.message);
+        alert(subscription.message, true);
+        navigate("/", { replace: true });
         return;
       }
 
-      navigate("/crm/"); // навигация SPA, без reload
-    } catch (e) {
-      // Не считаем неудачной попыткой входа: авторизация уже прошла
+      if (tryRedirectToBuildingApp(company) === "redirected") {
+        return;
+      }
+
+      navigate("/crm/");
+    } catch {
+      // Авторизация уже прошла; компанию подтянет AuthGuard
+      navigate("/crm/");
     }
   };
 
@@ -227,12 +260,18 @@ const Login = () => {
                 className="login__message login__message--error"
                 role="alert"
               >
-                Неправильный логин или пароль
-                {lockState.attempts > 0 && (
+                {localError ? (
+                  localError
+                ) : (
                   <>
-                    {" "}
-                    (осталось попыток:{" "}
-                    {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
+                    Неправильный логин или пароль
+                    {lockState.attempts > 0 && (
+                      <>
+                        {" "}
+                        (осталось попыток:{" "}
+                        {Math.max(0, MAX_LOGIN_ATTEMPTS - lockState.attempts)})
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -246,7 +285,7 @@ const Login = () => {
                 Email
               </label>
               <input
-                className="login__input"
+                className="login__input text-black"
                 type="email"
                 id="email"
                 name="email"
@@ -266,7 +305,7 @@ const Login = () => {
               </label>
               <div className="login__password">
                 <input
-                  className="login__input login__input--password"
+                  className="login__input login__input--password text-black"
                   type={showPass ? "text" : "password"}
                   id="password"
                   name="password"
@@ -280,7 +319,7 @@ const Login = () => {
                 />
                 <button
                   type="button" // ← ВАЖНО: не submit
-                  className="login__toggle"
+                  className="login__toggle text-black"
                   onClick={() => setShowPass((s) => !s)}
                   aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
                 >

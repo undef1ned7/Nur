@@ -78,6 +78,13 @@ const Pending = () => {
         const { data } = await api.get("/construction/cashflows/", { params });
         const flows = Array.isArray(data) ? data : data?.results || [];
         const count = typeof data?.count === "number" ? data.count : null;
+        const visibleFlows = flows.filter(
+          (p) => p.status === "pending" || p.status === "false",
+        );
+        if (visibleFlows.length === 0 && pageNum > 1) {
+          setPage(pageNum - 1);
+          return;
+        }
         setCashFlows(flows);
         setTotalCount(count);
         setHasNext(
@@ -119,35 +126,19 @@ const Pending = () => {
 
   // Сервер уже отдаёт только pending (?status=pending); фильтр оставлен
   // как страховка от старого формата status: "false"
-  const basePending = useMemo(
+  const filteredPending = useMemo(
     () =>
       (cashFlows || []).filter(
-        (p) => p.status === "pending" || p.status === "false"
+        (p) => p.status === "pending" || p.status === "false",
       ),
-    [cashFlows]
+    [cashFlows],
   );
-
-  // pending - финальный список (уже отфильтрован по статусу на фронте)
-  const pending = useMemo(() => {
-    return basePending;
-  }, [basePending]);
 
   // Вспомогательная функция для маппинга типа
   const mapType = (t) =>
     t === "income" ? "Приход" : t === "expense" ? "Расход" : "—";
 
-  // Фильтрация по поисковому запросу
-  const filteredPending = useMemo(() => {
-    if (!debouncedSearchTerm.trim()) return pending;
-    const searchLower = debouncedSearchTerm.toLowerCase();
-    return pending.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(searchLower) ||
-        item.cashbox_name?.toLowerCase().includes(searchLower) ||
-        item.amount?.toString().includes(searchLower) ||
-        mapType(item.type)?.toLowerCase().includes(searchLower)
-    );
-  }, [pending, debouncedSearchTerm]);
+  const rowNumber = (idx) => (page - 1) * CASHFLOWS_PAGE_SIZE + idx + 1;
 
   // чистим выбранные, если список изменился
   useEffect(() => {
@@ -291,7 +282,7 @@ const Pending = () => {
     setProcessing(true);
     try {
       const selectedIds = Array.from(selected);
-      const selectedItems = pending.filter((item) =>
+      const selectedItems = filteredPending.filter((item) =>
         selectedIds.includes(item.id),
       );
 
@@ -333,7 +324,7 @@ const Pending = () => {
   // --- чекбоксы ---
   const allIds = useMemo(
     () => filteredPending.map((p) => p.id),
-    [filteredPending]
+    [filteredPending],
   );
   const allSelected =
     allIds.length > 0 && allIds.every((id) => selected.has(id));
@@ -384,7 +375,7 @@ const Pending = () => {
       {location.pathname === "/crm/hostel/kassa/requests" && <HeaderTabs />}
 
       {/* Header */}
-      <div className="pending-header">
+      {/* <div className="pending-header">
         <div className="pending-header__left">
           <div className="pending-header__icon">
             <div className="pending-header__icon-box">⏳</div>
@@ -396,7 +387,7 @@ const Pending = () => {
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Search Section */}
       <div className="pending-search-section">
@@ -413,7 +404,7 @@ const Pending = () => {
 
         <div className="pending-search__info flex flex-wrap items-center gap-2">
           <span>
-            Всего: {totalCount ?? pending.length} • На странице:{" "}
+            Всего: {totalCount ?? filteredPending.length} • На странице:{" "}
             {filteredPending.length}
             {selected.size > 0 && ` • Выбрано: ${selected.size}`}
           </span>
@@ -464,8 +455,8 @@ const Pending = () => {
                   {selected.size === 1
                     ? "запрос выбран"
                     : selected.size < 5
-                    ? "запроса выбрано"
-                    : "запросов выбрано"}
+                      ? "запроса выбрано"
+                      : "запросов выбрано"}
                 </span>
               </div>
             </div>
@@ -569,8 +560,7 @@ const Pending = () => {
                 ) : (
                   filteredPending.map((item, idx) => {
                     const rowBusy = actingId === item.id;
-                    const rowDisabled =
-                      isActionLocked && actingId !== item.id;
+                    const rowDisabled = isActionLocked && actingId !== item.id;
                     return (
                       <tr
                         key={item.id}
@@ -584,12 +574,14 @@ const Pending = () => {
                             disabled={isActionLocked}
                           />
                         </td>
-                        <td>{idx + 1}</td>
+                        <td>{rowNumber(idx)}</td>
                         <td className="pending-table__name">{item.name}</td>
                         <td>{mapType(item.type)}</td>
                         <td>{item.cashbox_name || "—"}</td>
                         <td>
-                          {new Date(item.created_at).toLocaleDateString("ru-RU")}
+                          {new Date(item.created_at).toLocaleDateString(
+                            "ru-RU",
+                          )}
                         </td>
                         <td>{item.amount ? `${item.amount} сом` : "—"}</td>
                         <td onClick={(e) => e.stopPropagation()}>
@@ -654,7 +646,7 @@ const Pending = () => {
                   onChange={toggleAll}
                   className="h-4 w-4 rounded border-slate-300"
                 />
-                Выбрать все
+                Выбрать все на странице
               </label>
 
               <div className="text-sm text-slate-600">
@@ -674,111 +666,112 @@ const Pending = () => {
               <div className="pending-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {filteredPending.map((item, idx) => {
                   const rowBusy = actingId === item.id;
-                  const rowDisabled =
-                    isActionLocked && actingId !== item.id;
+                  const rowDisabled = isActionLocked && actingId !== item.id;
                   return (
-                  <div
-                    key={item.id}
-                    className={`pending-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md${rowBusy ? " pending-card--busy" : ""}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="pt-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleRow(item.id);
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected.has(item.id)}
-                          onChange={() => toggleRow(item.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-4 w-4 rounded border-slate-300"
-                          disabled={isActionLocked}
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs text-slate-500">#{idx + 1}</div>
-                        <div className="pending-card__name mt-0.5 truncate text-sm font-semibold text-slate-900">
-                          {item.name}
+                    <div
+                      key={item.id}
+                      className={`pending-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md${rowBusy ? " pending-card--busy" : ""}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="pt-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRow(item.id);
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggleRow(item.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4 rounded border-slate-300"
+                            disabled={isActionLocked}
+                          />
                         </div>
 
-                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                          <span className="whitespace-nowrap">
-                            Тип:{" "}
-                            <span className="font-medium">
-                              {mapType(item.type)}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-slate-500">
+                            #{rowNumber(idx)}
+                          </div>
+                          <div className="pending-card__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                            {item.name}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="whitespace-nowrap">
+                              Тип:{" "}
+                              <span className="font-medium">
+                                {mapType(item.type)}
+                              </span>
                             </span>
-                          </span>
-                          <span className="whitespace-nowrap">
-                            Касса:{" "}
-                            <span className="font-medium">
-                              {item.cashbox_name || "—"}
+                            <span className="whitespace-nowrap">
+                              Касса:{" "}
+                              <span className="font-medium">
+                                {item.cashbox_name || "—"}
+                              </span>
                             </span>
-                          </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-slate-50 p-2">
-                        <div className="text-slate-500">Дата</div>
-                        <div className="mt-0.5 font-semibold text-slate-900">
-                          {new Date(item.created_at).toLocaleDateString(
-                            "ru-RU"
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Дата</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {new Date(item.created_at).toLocaleDateString(
+                              "ru-RU",
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Сумма</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {item.amount ? `${item.amount} сом` : "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          className="pending-card__action-btn pending-card__action-btn--accept flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAccept(item);
+                          }}
+                          disabled={rowDisabled || rowBusy}
+                        >
+                          {rowBusy ? (
+                            <Loader2
+                              size={14}
+                              className="pending-action-spinner"
+                            />
+                          ) : (
+                            <CheckCircle2 size={14} />
                           )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-2">
-                        <div className="text-slate-500">Сумма</div>
-                        <div className="mt-0.5 font-semibold text-slate-900">
-                          {item.amount ? `${item.amount} сом` : "—"}
-                        </div>
+                          {rowBusy ? "Обработка..." : "Одобрить"}
+                        </button>
+                        <button
+                          className="pending-card__action-btn pending-card__action-btn--reject flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReject(item);
+                          }}
+                          disabled={rowDisabled || rowBusy}
+                        >
+                          {rowBusy ? (
+                            <Loader2
+                              size={14}
+                              className="pending-action-spinner"
+                            />
+                          ) : (
+                            <XCircle size={14} />
+                          )}
+                          {rowBusy ? "Обработка..." : "Отказать"}
+                        </button>
                       </div>
                     </div>
-
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        className="pending-card__action-btn pending-card__action-btn--accept flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAccept(item);
-                        }}
-                        disabled={rowDisabled || rowBusy}
-                      >
-                        {rowBusy ? (
-                          <Loader2
-                            size={14}
-                            className="pending-action-spinner"
-                          />
-                        ) : (
-                          <CheckCircle2 size={14} />
-                        )}
-                        {rowBusy ? "Обработка..." : "Одобрить"}
-                      </button>
-                      <button
-                        className="pending-card__action-btn pending-card__action-btn--reject flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReject(item);
-                        }}
-                        disabled={rowDisabled || rowBusy}
-                      >
-                        {rowBusy ? (
-                          <Loader2
-                            size={14}
-                            className="pending-action-spinner"
-                          />
-                        ) : (
-                          <XCircle size={14} />
-                        )}
-                        {rowBusy ? "Обработка..." : "Отказать"}
-                      </button>
-                    </div>
-                  </div>
                   );
                 })}
               </div>
@@ -788,7 +781,7 @@ const Pending = () => {
       </div>
 
       {/* Пагинация: /construction/cashflows/?page=&page_size= */}
-      {!cashFlowsLoading && (page > 1 || hasNext) && (
+      {(page > 1 || hasNext) && (
         <div
           className="pending-pagination mt-4 flex items-center justify-center gap-3"
           role="navigation"

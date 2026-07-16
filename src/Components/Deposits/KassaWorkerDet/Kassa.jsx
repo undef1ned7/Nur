@@ -27,6 +27,13 @@ import Loading from "../../common/Loading/Loading";
 import DataContainer from "../../common/DataContainer/DataContainer";
 
 const CASHFLOWS_PAGE_SIZE = 100;
+const REPORT_PAGE_SIZE = 200;
+const REPORT_MAX_PAGES = 100;
+
+const isApprovedFlow = (flow) =>
+  flow.status === "true" ||
+  flow.status === "approved" ||
+  flow.status === true;
 
 // Ключ дня (YYYY-MM-DD) для группировки операций по дате
 const dayKeyOf = (v) => {
@@ -137,24 +144,11 @@ const KassaDet = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
+      const endpoint =
         company?.subscription_plan?.name === "Старт"
-          ? `https://app.nurcrm.kg/api/construction/cashboxes/${idToFetch}/`
-          : `https://app.nurcrm.kg/api/construction/cashboxes/${idToFetch}/detail/owner/`,
-        {
-          headers: {
-            Authorization: "Bearer " + localStorage.getItem("accessToken"),
-          },
-        }
-      );
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Касса с указанным ID не найдена.");
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      // console.log("Fetched cashbox details:", data);
+          ? `/construction/cashboxes/${idToFetch}/`
+          : `/construction/cashboxes/${idToFetch}/detail/owner/`;
+      const { data } = await api.get(endpoint);
       setCashboxDetails(data);
       setSelectedCashbox(data);
     } catch (err) {
@@ -181,25 +175,26 @@ const KassaDet = () => {
       setFlowsLoading(true);
       try {
         const search = (debouncedFilterSearch || "").trim();
-        const params = new URLSearchParams();
-        params.set("cashbox", cashboxId);
-        params.set("status", "approved"); // заявки (pending) — на отдельной вкладке
-        params.set("page_size", String(CASHFLOWS_PAGE_SIZE));
-        params.set("page", String(Math.max(1, page)));
-        if (search) params.set("search", search);
-        if (activeFlowType && activeFlowType !== "all") params.set("type", activeFlowType);
-        const url = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
-        const response = await fetch(url, {
-          headers: {
-            Authorization: "Bearer " + localStorage.getItem("accessToken"),
-          },
-        });
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
+        const params = {
+          cashbox: cashboxId,
+          status: "approved",
+          page_size: CASHFLOWS_PAGE_SIZE,
+          page: Math.max(1, page),
+        };
+        if (search) params.search = search;
+        if (activeFlowType && activeFlowType !== "all") params.type = activeFlowType;
+
+        const { data } = await api.get("/construction/cashflows/", { params });
         const flows = Array.isArray(data) ? data : data.results || [];
         const pageNum = Math.max(1, page);
         const count = typeof data.count === "number" ? data.count : null;
+        const visibleFlows = flows.filter(isApprovedFlow);
+
+        if (visibleFlows.length === 0 && pageNum > 1) {
+          setFlowsPage(pageNum - 1);
+          return;
+        }
+
         setFlowsList(flows);
         setFlowsTotalCount(count);
         setFlowsHasNext(
@@ -320,17 +315,8 @@ const KassaDet = () => {
     }
   };
 
-  // --- ЛОГИКА ФИЛЬТРАЦИИ ---
-  // Статус и тип фильтрует сервер (?status=approved&type=…);
-  // клиентский фильтр оставлен как страховка от старого формата status: "true"
-  const rawFlows = flowsList;
-  const filteredCashflows = rawFlows.filter(
-    (flow) =>
-      (activeFlowType === "all" || flow.type === activeFlowType) &&
-      (flow.status === "true" ||
-        flow.status === "approved" ||
-        flow.status === true)
-  );
+  // Статус фильтрует сервер (?status=approved); клиентский фильтр — страховка от "true"
+  const filteredCashflows = flowsList.filter(isApprovedFlow);
 
   const handleResetFilters = () => {
     setFilterSearch("");
@@ -340,35 +326,33 @@ const KassaDet = () => {
     setShowFilter(false);
   };
 
-  // --- ФУНКЦИИ ДЛЯ ЗАГРУЗКИ ОТЧЕТОВ ---
-  // Вспомогательная функция для загрузки всех страниц с пагинацией
-  const fetchAllPages = async (url) => {
+  // Загрузка всех страниц для отчётов (с защитой от бесконечного цикла)
+  const fetchAllCashflows = async (baseParams) => {
     const allFlows = [];
-    let currentUrl = url;
-    let guard = 0; // Защита от бесконечного цикла
-    const maxPages = 100;
+    let page = 1;
+    let guard = 0;
+    let truncated = false;
 
-    while (currentUrl && guard < maxPages) {
-      const response = await fetch(currentUrl, {
-        headers: {
-          Authorization: "Bearer " + localStorage.getItem("accessToken"),
-        },
+    while (guard < REPORT_MAX_PAGES) {
+      const { data } = await api.get("/construction/cashflows/", {
+        params: { ...baseParams, page, page_size: REPORT_PAGE_SIZE },
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const flows = Array.isArray(data) ? data : data.results || [];
+      const flows = Array.isArray(data) ? data : data?.results || [];
       allFlows.push(...flows);
-
-      // Переходим на следующую страницу, если она есть
-      currentUrl = data.next || null;
       guard += 1;
+
+      const hasNext =
+        Boolean(data?.next) ||
+        (typeof data?.count === "number" &&
+          page * REPORT_PAGE_SIZE < data.count) ||
+        (typeof data?.count !== "number" && flows.length === REPORT_PAGE_SIZE);
+
+      if (!hasNext) break;
+      page += 1;
+      if (guard >= REPORT_MAX_PAGES) truncated = true;
     }
 
-    return allFlows;
+    return { flows: allFlows, truncated };
   };
 
   const fetchMonthlyReport = async () => {
@@ -378,15 +362,19 @@ const KassaDet = () => {
       const [year, month] = selectedMonth.split("-");
       // Период и статус фильтрует сервер (date_from/date_to включительно)
       const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const params = new URLSearchParams({
+      const params = {
         cashbox: cashboxId,
         status: "approved",
         date_from: `${selectedMonth}-01`,
         date_to: `${selectedMonth}-${String(lastDay).padStart(2, "0")}`,
-        page_size: "200",
-      });
-      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
-      const flows = await fetchAllPages(initialUrl);
+      };
+      const { flows, truncated } = await fetchAllCashflows(params);
+      if (truncated) {
+        alert(
+          "Загружены не все операции за период (лимит отчёта). Уточните период или обратитесь к администратору.",
+          true,
+        );
+      }
 
       // Группировка по дням
       const dailyGroups = {};
@@ -432,15 +420,19 @@ const KassaDet = () => {
     setReportLoading(true);
     try {
       // Период и статус фильтрует сервер (date_from/date_to включительно)
-      const params = new URLSearchParams({
+      const params = {
         cashbox: cashboxId,
         status: "approved",
         date_from: selectedDate,
         date_to: selectedDate,
-        page_size: "200",
-      });
-      const initialUrl = `https://app.nurcrm.kg/api/construction/cashflows/?${params.toString()}`;
-      const flows = await fetchAllPages(initialUrl);
+      };
+      const { flows, truncated } = await fetchAllCashflows(params);
+      if (truncated) {
+        alert(
+          "Загружены не все операции за период (лимит отчёта). Уточните период или обратитесь к администратору.",
+          true,
+        );
+      }
 
       const totalIncome = flows
         .filter((f) => f.type === "income")
@@ -866,7 +858,8 @@ const KassaDet = () => {
                         idx > 0
                           ? dayKeyOf(filteredCashflows[idx - 1].created_at)
                           : null;
-                      const showDaySep = curDay && curDay !== prevDay;
+                      const showDaySep =
+                        idx === 0 || (curDay && curDay !== prevDay);
                       return (
                         <React.Fragment key={flow.id}>
                           {showDaySep && (
@@ -898,7 +891,8 @@ const KassaDet = () => {
                         idx > 0
                           ? dayKeyOf(filteredCashflows[idx - 1].created_at)
                           : null;
-                      const showDaySep = curDay && curDay !== prevDay;
+                      const showDaySep =
+                        idx === 0 || (curDay && curDay !== prevDay);
                       return (
                       <React.Fragment key={flow.id}>
                       {showDaySep && (

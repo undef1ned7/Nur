@@ -7,9 +7,9 @@ import {
   shouldRedirectToCrm,
   clearTokens,
 } from "../../../utils/authUtils";
-import { redirectToBuildingApp, shouldSkipBuildingRedirect, clearSkipBuildingRedirectParam } from "../../../utils/crossAppAuth";
+import { tryRedirectToBuildingApp, shouldSkipBuildingRedirect, clearSkipBuildingRedirectParam } from "../../../utils/crossAppAuth";
 import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
-import { isBuildingSector } from "../../../utils/sectorMapping";
+import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import {
   DEFAULT_AUTHENTICATED_PATH,
   DEFAULT_UNAUTHENTICATED_PATH,
@@ -40,19 +40,39 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
   useEffect(() => {
     const checkTokenValidity = async () => {
-      captureBuildingAppUrlFromSearch();
       const currentPath = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
 
-      if (currentPath === "/crm/logout") {
+      // Logout из building (stroy): токены на stage живут в другом origin —
+      // без очистки AuthGuard сразу вернёт в stroy.
+      const logoutFromBuilding = searchParams.get("logout") === "1";
+      if (logoutFromBuilding || currentPath === "/crm/logout") {
         clearTokens();
         localStorage.removeItem("userId");
+        localStorage.removeItem("userData");
+
+        if (logoutFromBuilding) {
+          searchParams.delete("logout");
+          const search = searchParams.toString();
+          const cleanUrl =
+            window.location.pathname +
+            (search ? `?${search}` : "") +
+            window.location.hash;
+          window.history.replaceState({}, "", cleanUrl);
+        }
+
+        if (currentPath === "/crm/logout") {
+          window.location.replace("/login");
+          return;
+        }
+
         setIsCheckingToken(false);
         return;
       }
 
-      const token = localStorage.getItem("accessToken");
+      captureBuildingAppUrlFromSearch();
 
-      // Если токена нет и мы не на публичной странице
+      const token = localStorage.getItem("accessToken");
       if (!token) {
         if (!isAllowedPathWithoutToken(currentPath)) {
           window.location.href = DEFAULT_UNAUTHENTICATED_PATH;
@@ -62,14 +82,12 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
         return;
       }
 
-      // Если нет сети — доверяем токену, не делаем API-запрос
       if (!navigator.onLine) {
         console.warn("AuthGuard: нет сети, токен принят без проверки");
         setIsCheckingToken(false);
         return;
       }
 
-      // Проверяем валидность токена через API
       try {
         await getProfileFunc();
 
@@ -77,19 +95,33 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
           clearSkipBuildingRedirectParam();
         } else {
           const company = await dispatch(getCompany()).unwrap();
-          if (isBuildingSector(company?.sector?.name)) {
-            const shouldSendToBuildingApp =
-              shouldRedirectToCrm(currentPath) ||
-              currentPath.startsWith("/crm/building");
+          const subscription = getCompanySubscriptionStatus(company);
+          const wantsAppEntry =
+            shouldRedirectToCrm(currentPath) ||
+            currentPath.startsWith("/crm/building");
 
-            if (shouldSendToBuildingApp) {
-              redirectToBuildingApp(currentPath);
+          // Истёкшая подписка: не пускаем в CRM/building, оставляем на лендинге
+          if (
+            wantsAppEntry &&
+            !subscription.ok &&
+            subscription.reason !== "unknown"
+          ) {
+            if (currentPath !== "/") {
+              window.location.replace("/");
+              return;
+            }
+            setIsCheckingToken(false);
+            return;
+          }
+
+          if (wantsAppEntry) {
+            const handoff = tryRedirectToBuildingApp(company, currentPath);
+            if (handoff === "redirected") {
               return;
             }
           }
         }
 
-        // Если токен валиден и мы на публичной странице - редирект на /crm
         if (shouldRedirectToCrm(currentPath)) {
           window.location.href = DEFAULT_AUTHENTICATED_PATH;
           return;
@@ -120,7 +152,7 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
     checkTokenValidity();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Запускаем только один раз при монтировании
+  }, []);
 
   useEffect(() => {
     if (accessToken) {

@@ -547,7 +547,9 @@
 
   .building-sell-plan__cell {
     border: 1px solid rgba(11, 35, 68, 0.1);
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
   }
 
   .building-sell-plan__cell--available {
@@ -656,7 +658,8 @@
 }
 
 .building-treaty-clientSelectValue:empty::before,
-.building-treaty-clientSelectTrigger:not([data-value]) .building-treaty-clientSelectValue {
+.building-treaty-clientSelectTrigger:not([data-value])
+  .building-treaty-clientSelectValue {
   color: rgba(11, 35, 68, 0.5);
 }
 
@@ -821,7 +824,11 @@
   gap: 16px;
   padding: 20px 22px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #fff 0%, rgba($building-primary, 0.06) 100%);
+  background: linear-gradient(
+    135deg,
+    #fff 0%,
+    rgba($building-primary, 0.06) 100%
+  );
   border: 1px solid rgba($building-primary, 0.2);
   box-shadow: 0 2px 12px rgba(11, 35, 68, 0.04);
 }
@@ -862,7 +869,10 @@
   font-weight: 600;
   color: #0b2344;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .sell-header__btn:hover:not(:disabled) {
@@ -953,7 +963,9 @@
   background: #fff;
   font-size: 14px;
   color: #0b2344;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .sell-toolbar__select:focus {
@@ -1097,7 +1109,10 @@
   font-size: 14px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .sell-choice__btn:hover {
@@ -1311,7 +1326,9 @@
   background: #fff;
   font-size: 14px;
   color: #0b2344;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .clients-toolbar__search::placeholder {
@@ -1354,7 +1371,9 @@
   font-weight: 500;
   color: rgba(11, 35, 68, 0.85);
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .clients-toolbar__viewBtn:hover {
@@ -1461,7 +1480,9 @@
   border: 1px solid #e2e8f0;
   background: #fff;
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   overflow: hidden;
 }
 
@@ -1548,7 +1569,9 @@
   font-weight: 500;
   color: #334155;
   cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .clients-grid__cardBtn:hover:not(:disabled) {
@@ -1635,7 +1658,10 @@
   font-weight: 500;
   color: rgba(11, 35, 68, 0.8);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .client-detail__tab--active {
