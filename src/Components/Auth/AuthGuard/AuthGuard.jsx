@@ -40,18 +40,39 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
   useEffect(() => {
     const checkTokenValidity = async () => {
-      captureBuildingAppUrlFromSearch();
       const currentPath = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
 
-      if (currentPath === "/crm/logout") {
+      // Logout из building (stroy): токены на stage живут в другом origin —
+      // без очистки AuthGuard сразу вернёт в stroy.
+      const logoutFromBuilding = searchParams.get("logout") === "1";
+      if (logoutFromBuilding || currentPath === "/crm/logout") {
         clearTokens();
         localStorage.removeItem("userId");
+        localStorage.removeItem("userData");
+
+        if (logoutFromBuilding) {
+          searchParams.delete("logout");
+          const search = searchParams.toString();
+          const cleanUrl =
+            window.location.pathname +
+            (search ? `?${search}` : "") +
+            window.location.hash;
+          window.history.replaceState({}, "", cleanUrl);
+        }
+
+        if (currentPath === "/crm/logout") {
+          window.location.replace("/login");
+          return;
+        }
+
         setIsCheckingToken(false);
         return;
       }
 
-      const token = localStorage.getItem("accessToken");
+      captureBuildingAppUrlFromSearch();
 
+      const token = localStorage.getItem("accessToken");
       if (!token) {
         if (!isAllowedPathWithoutToken(currentPath)) {
           window.location.href = DEFAULT_UNAUTHENTICATED_PATH;

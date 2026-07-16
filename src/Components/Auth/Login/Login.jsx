@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { tryRedirectToBuildingApp } from "../../../utils/crossAppAuth";
 import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
+import { clearTokens } from "../../../utils/authUtils";
 import { useAlert } from "../../../hooks/useDialog";
 import "./Login.scss";
 
@@ -105,8 +106,22 @@ const Login = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("logout") === "1") {
+      dispatch(logoutUser());
+      clearTokens();
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userData");
+      params.delete("logout");
+      const search = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (search ? `?${search}` : "") + window.location.hash,
+      );
+    }
     captureBuildingAppUrlFromSearch();
-  }, []);
+  }, [dispatch]);
 
   // Нормализация сообщений об ошибке
   const getErrorMessage = (err) => {
