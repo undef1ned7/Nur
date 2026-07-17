@@ -60,6 +60,8 @@ export default function PosPrintSettings() {
     () => [
       { id: "80", label: "80 мм (обычно 576 точек)", dpl: 576 },
       { id: "58", label: "58 мм (обычно 384 точки)", dpl: 384 },
+      { id: "44", label: "44 мм (обычно 320 точек)", dpl: 320 },
+      { id: "38", label: "38 мм (обычно 288 точек)", dpl: 288 },
       { id: "custom", label: "Вручную", dpl: null },
     ],
     []
@@ -67,6 +69,8 @@ export default function PosPrintSettings() {
   const selectedPreset = useMemo(() => {
     if (dotsPerLine === 576) return "80";
     if (dotsPerLine === 384) return "58";
+    if (dotsPerLine === 320) return "44";
+    if (dotsPerLine === 288) return "38";
     return "custom";
   }, [dotsPerLine]);
 
