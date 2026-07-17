@@ -163,6 +163,32 @@
     color: #6b7280;
   }
 
+  &__field {
+    margin-bottom: 14px;
+  }
+
+  &__field-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  &__select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    font-size: 0.95rem;
+    color: #111827;
+    cursor: pointer;
+
+    &:focus {
+      outline: none;
+      border-color: #f7d74f;
+    }
+  }
+
   &__checkbox {
     display: flex;
     align-items: flex-start;

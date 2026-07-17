@@ -153,12 +153,28 @@ const ShtrihMTab = ({
 };
 
 /**
- * Таб «Rongta»: экспорт весовых товаров в .xls под PLU-менеджер
- * весов Rongta RLS1100 (см. docs — GET /main/products/scale-export/).
+ * Таб «Rongta»: экспорт весовых товаров под PLU-менеджер весов
+ * Rongta RLS1100 (см. docs — GET /main/products/scale-export/).
+ * Формат по умолчанию — .TXP (рабочий формат импорта Rongta RLS),
+ * .xls — запасной.
  */
+const EXPORT_FORMATS = [
+  {
+    id: "txp",
+    label: ".TXP — формат импорта Rongta RLS (рекомендуется)",
+    filename: "scale_weight_products.TXP",
+  },
+  {
+    id: "xls",
+    label: ".xls — Excel-таблица (запасной)",
+    filename: "scale_weight_products.xls",
+  },
+];
+
 const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [translit, setTranslit] = useState(true);
+  const [format, setFormat] = useState("txp");
 
   const count = weightProducts.length;
 
@@ -167,14 +183,16 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
       setIsExporting(true);
 
       const res = await api.get("main/products/scale-export/", {
-        params: { translit: translit ? 1 : 0 },
+        params: { format, translit: translit ? 1 : 0 },
         responseType: "blob",
       });
 
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "scale_weight_products.xls";
+      a.download =
+        EXPORT_FORMATS.find((f) => f.id === format)?.filename ||
+        EXPORT_FORMATS[0].filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -201,9 +219,9 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
       <div className="scales-page__card">
         <h2 className="scales-page__card-title">Экспорт для весов Rongta</h2>
         <p className="scales-page__card-text">
-          Скачайте файл .xls с весовыми товарами и импортируйте его в весы
-          Rongta RLS1100 через PLU-менеджер (ПО весов). Товарам без PLU номер
-          будет присвоен автоматически при экспорте.
+          Скачайте файл с весовыми товарами и импортируйте его в весы Rongta
+          RLS1100 через PLU-менеджер (ПО весов). Товарам без PLU номер будет
+          присвоен автоматически при экспорте.
         </p>
 
         <div className="scales-page__stats">
@@ -215,14 +233,29 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
           </div>
         </div>
 
+        <div className="scales-page__field">
+          <div className="scales-page__field-label">Формат файла</div>
+          <select
+            className="scales-page__select"
+            value={format}
+            onChange={(e) => setFormat(e.target.value)}
+          >
+            {EXPORT_FORMATS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <label className="scales-page__checkbox">
           <input
             type="checkbox"
             checked={translit}
             onChange={(e) => setTranslit(e.target.checked)}
           />
-          Транслитерировать названия в латиницу (весы часто печатают только
-          ASCII)
+          Транслитерировать названия в латиницу (весы Rongta не печатают
+          кириллицу — вместо неё выходит «?????»)
         </label>
 
         <button
@@ -231,7 +264,9 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
           onClick={handleExport}
           disabled={loading || isExporting || count === 0}
         >
-          {isExporting ? "Выгрузка..." : "Экспорт для весов (.xls)"}
+          {isExporting
+            ? "Выгрузка..."
+            : `Экспорт для весов (.${format === "xls" ? "xls" : "TXP"})`}
         </button>
 
         {loading && (
@@ -255,7 +290,7 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
       <div className="scales-page__info-card">
         <h3 className="scales-page__info-title">Как это работает</h3>
         <ul className="scales-page__info-list">
-          <li>1. Нажмите «Экспорт для весов» — скачается файл .xls.</li>
+          <li>1. Нажмите «Экспорт для весов» — скачается файл (.TXP).</li>
           <li>
             2. Откройте ПО весов (PLU-менеджер) и импортируйте этот файл.
           </li>
