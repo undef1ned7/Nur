@@ -2111,10 +2111,11 @@ export const removeCompanyAgent = async (id) => {
 };
 
 /**
- * Включить/изменить/выключить общий доступ к складу для агента
+ * Включить/изменить/выключить общий доступ к складам для агента
  * PATCH /api/warehouse/agents/company-requests/{id}/common-access/
  * @param {string} id - UUID записи CompanyWarehouseAgent
- * @param {Object} payload - { common_access_enabled?: bool, common_warehouse?: uuid|null,
+ * @param {Object} payload - { common_access_enabled?: bool, common_warehouses?: uuid[],
+ *   common_warehouse?: uuid|null (legacy, один склад),
  *   can_sell_wholesale?: bool, can_sell_without_approval?: bool }
  */
 export const patchCompanyAgentCommonAccess = async (id, payload) => {
@@ -2139,7 +2140,8 @@ export const patchCompanyAgentCommonAccess = async (id, payload) => {
 /**
  * Владелец/админ напрямую назначает агента склада без заявки.
  * POST /api/warehouse/agents/company-memberships/
- * body: { user, common_access_enabled?, common_warehouse?,
+ * body: { user, common_access_enabled?, common_warehouses? (uuid[]),
+ *   common_warehouse? (legacy, один склад),
  *   can_sell_wholesale?, can_sell_without_approval? }
  */
 export const createCompanyMembership = async (payload) => {

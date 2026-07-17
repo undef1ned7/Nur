@@ -307,8 +307,8 @@ const Masters = () => {
     useState(false);
   const [warehouseAgentAssignedWarehouse, setWarehouseAgentAssignedWarehouse] =
     useState("");
-  const [warehouseAgentCommonWarehouse, setWarehouseAgentCommonWarehouse] =
-    useState("");
+  const [warehouseAgentCommonWarehouses, setWarehouseAgentCommonWarehouses] =
+    useState([]);
   const [warehouseAgentCanSellWholesale, setWarehouseAgentCanSellWholesale] =
     useState(false);
   const [warehouseAgentSaving, setWarehouseAgentSaving] = useState(false);
@@ -951,6 +951,19 @@ const Masters = () => {
     [isWarehouseSector],
   );
 
+  /** Набор складов общего доступа с fallback на legacy common_warehouse. */
+  const getMembershipCommonWarehouseIds = (membership) => {
+    if (
+      Array.isArray(membership?.common_warehouses) &&
+      membership.common_warehouses.length
+    ) {
+      return membership.common_warehouses.map(String);
+    }
+    return membership?.common_warehouse
+      ? [String(membership.common_warehouse)]
+      : [];
+  };
+
   const getWarehouseAgentLabel = useCallback(
     (warehouseId) => {
       if (!warehouseId) return "Все склады компании";
@@ -967,7 +980,7 @@ const Masters = () => {
     setWarehouseAgentEmployee(employee);
     setWarehouseAgentCommonEnabled(false);
     setWarehouseAgentAssignedWarehouse("");
-    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentCommonWarehouses([]);
     setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
     setWarehouseAgentExistingMembership(null);
@@ -985,8 +998,8 @@ const Masters = () => {
           : "",
       );
       setWarehouseAgentCommonEnabled(Boolean(membership.common_access_enabled));
-      setWarehouseAgentCommonWarehouse(
-        membership.common_warehouse ? String(membership.common_warehouse) : "",
+      setWarehouseAgentCommonWarehouses(
+        getMembershipCommonWarehouseIds(membership),
       );
       setWarehouseAgentCanSellWholesale(Boolean(membership.can_sell_wholesale));
     }
@@ -998,7 +1011,7 @@ const Masters = () => {
     setWarehouseAgentEmployee(null);
     setWarehouseAgentCommonEnabled(false);
     setWarehouseAgentAssignedWarehouse("");
-    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentCommonWarehouses([]);
     setWarehouseAgentCanSellWholesale(false);
     setWarehouseAgentError("");
     setWarehouseAgentExistingMembership(null);
@@ -1008,10 +1021,13 @@ const Masters = () => {
     e?.preventDefault?.();
     if (!warehouseAgentEmployee?.id || warehouseAgentSaving) return;
     const assignedWarehouse = warehouseAgentAssignedWarehouse.trim();
-    const commonWarehouse =
-      assignedWarehouse || warehouseAgentCommonWarehouse.trim();
-    if (warehouseAgentCommonEnabled && !commonWarehouse) {
-      setWarehouseAgentError("Укажите UUID склада для общего прайса.");
+    const commonWarehouses = Array.from(
+      new Set(warehouseAgentCommonWarehouses.filter(Boolean).map(String)),
+    );
+    if (warehouseAgentCommonEnabled && commonWarehouses.length === 0) {
+      setWarehouseAgentError(
+        "Выберите хотя бы один склад для общего доступа.",
+      );
       return;
     }
     setWarehouseAgentSaving(true);
@@ -1025,7 +1041,7 @@ const Masters = () => {
           can_sell_wholesale: Boolean(warehouseAgentCanSellWholesale),
         };
         if (warehouseAgentCommonEnabled) {
-          patchPayload.common_warehouse = commonWarehouse;
+          patchPayload.common_warehouses = commonWarehouses;
         }
         await patchCompanyAgentCommonAccess(
           warehouseAgentExistingMembership.id,
@@ -1039,7 +1055,7 @@ const Masters = () => {
         };
         if (warehouseAgentCommonEnabled) {
           payload.common_access_enabled = true;
-          payload.common_warehouse = commonWarehouse;
+          payload.common_warehouses = commonWarehouses;
         }
         if (warehouseAgentCanSellWholesale) {
           payload.can_sell_wholesale = true;
@@ -1057,11 +1073,12 @@ const Masters = () => {
     }
   };
 
-  useEffect(() => {
-    if (warehouseAgentAssignedWarehouse && warehouseAgentCommonEnabled) {
-      setWarehouseAgentCommonWarehouse(warehouseAgentAssignedWarehouse);
-    }
-  }, [warehouseAgentAssignedWarehouse, warehouseAgentCommonEnabled]);
+  const toggleWarehouseAgentCommonWarehouse = (warehouseId) => {
+    const id = String(warehouseId);
+    setWarehouseAgentCommonWarehouses((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
 
   /* ========= Small pager ========= */
   const Pager = ({ page, total, onChange }) => {
@@ -1586,11 +1603,13 @@ const Masters = () => {
                       {warehouseAgentExistingMembership.common_access_enabled && (
                         <>
                           {" "}
-                          · общий прайс:{" "}
+                          · общий доступ:{" "}
                           <strong>
-                            {getWarehouseAgentLabel(
-                              warehouseAgentExistingMembership.common_warehouse,
-                            )}
+                            {getMembershipCommonWarehouseIds(
+                              warehouseAgentExistingMembership,
+                            )
+                              .map((id) => getWarehouseAgentLabel(id))
+                              .join(", ") || "—"}
                           </strong>
                         </>
                       )}
@@ -1659,40 +1678,48 @@ const Masters = () => {
                 {warehouseAgentCommonEnabled && (
                   <div className="barbermasters__field barbermasters__field--full">
                     <label className="barbermasters__label">
-                      Склад общего прайса{" "}
+                      Склады общего доступа{" "}
                       <span className="barbermasters__req">*</span>
                     </label>
-                    <select
-                      className="barbermasters__input"
-                      value={
-                        warehouseAgentAssignedWarehouse ||
-                        warehouseAgentCommonWarehouse
-                      }
-                      onChange={(e) =>
-                        setWarehouseAgentCommonWarehouse(e.target.value)
-                      }
-                      disabled={
-                        warehouseAgentSaving ||
-                        warehouseAgentWarehousesLoading ||
-                        warehouseAgentMembershipLoading ||
-                        Boolean(warehouseAgentAssignedWarehouse)
-                      }
-                    >
-                      <option value="">
-                        {warehouseAgentWarehousesLoading ||
-                        warehouseAgentMembershipLoading
-                          ? "Загрузка…"
-                          : "Выберите склад"}
-                      </option>
-                      {warehouseAgentWarehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name || w.title || w.id}
-                        </option>
-                      ))}
-                    </select>
+                    {warehouseAgentWarehousesLoading ||
+                    warehouseAgentMembershipLoading ? (
+                      <div className="barbermasters__help">Загрузка…</div>
+                    ) : warehouseAgentWarehouses.length === 0 ? (
+                      <div className="barbermasters__help">
+                        У компании нет складов
+                      </div>
+                    ) : (
+                      <div
+                        className="flex flex-col gap-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-3"
+                        role="group"
+                        aria-label="Склады общего доступа"
+                      >
+                        {warehouseAgentWarehouses.map((w) => {
+                          const id = String(w.id);
+                          return (
+                            <label
+                              key={id}
+                              className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={warehouseAgentCommonWarehouses.includes(
+                                  id,
+                                )}
+                                onChange={() =>
+                                  toggleWarehouseAgentCommonWarehouse(id)
+                                }
+                                disabled={warehouseAgentSaving}
+                              />
+                              {w.name || w.title || id}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="barbermasters__help">
-                      Выберите склад, из которого агент будет видеть общий
-                      прайс‑лист.
+                      Отметьте склады, остатки которых агент будет видеть в
+                      общем прайс‑листе. Можно выбрать несколько.
                     </div>
                   </div>
                 )}
