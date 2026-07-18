@@ -936,7 +936,7 @@ const TransferProductModal = ({
 
         {createError && (
           <p className="finished-goods-modal__error-message">
-            Ошибка создания передачи: {createError?.message || "ошибка"}
+            {validateResErrors(createError, "Ошибка при создании передачи")}
           </p>
         )}
         {validationError && (

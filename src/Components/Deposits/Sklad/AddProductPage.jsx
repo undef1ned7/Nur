@@ -1281,14 +1281,6 @@ const AddProductPage = ({
               handleChange={handleChange}
               brands={brands || []}
               categories={categories || []}
-              onBrandQueryChange={setBrandQuery}
-              brandsLoading={brandsLoading}
-              hasMoreBrands={hasMoreBrands}
-              onLoadMoreBrands={handleLoadMoreBrands}
-              onCategoryQueryChange={setCategoryQuery}
-              categoriesLoading={categoriesLoading}
-              hasMoreCategories={hasMoreCategories}
-              onLoadMoreCategories={handleLoadMoreCategories}
               products={products || []}
               filterClient={list.filter((item) => item.type === "suppliers")}
               handleSubmit={handleSubmit}
@@ -1977,14 +1969,6 @@ const MarketProductForm = ({
   handleChange,
   brands,
   categories,
-  onBrandQueryChange = null,
-  brandsLoading = false,
-  hasMoreBrands = false,
-  onLoadMoreBrands = null,
-  onCategoryQueryChange = null,
-  categoriesLoading = false,
-  hasMoreCategories = false,
-  onLoadMoreCategories = null,
   products,
   filterClient,
   handleSubmit,
@@ -2363,7 +2347,6 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.category_name}
-                valueLabel={newItemData.category_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "category_name", value: v },
@@ -2372,11 +2355,6 @@ const MarketProductForm = ({
                 options={categoryOptions}
                 placeholder="Выберите категорию"
                 emptyText="Категории не найдены"
-                maxVisible={500}
-                onQueryChange={onCategoryQueryChange}
-                loading={categoriesLoading}
-                hasMore={hasMoreCategories}
-                onLoadMore={onLoadMoreCategories}
               />
               <button
                 className="add-product-page__create-supplier"
@@ -2435,7 +2413,6 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.brand_name}
-                valueLabel={newItemData.brand_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "brand_name", value: v },
@@ -2444,11 +2421,6 @@ const MarketProductForm = ({
                 options={brandOptions}
                 placeholder="Выберите бренд"
                 emptyText="Бренды не найдены"
-                maxVisible={500}
-                onQueryChange={onBrandQueryChange}
-                loading={brandsLoading}
-                hasMore={hasMoreBrands}
-                onLoadMore={onLoadMoreBrands}
               />
               <button
                 className="add-product-page__create-supplier"
