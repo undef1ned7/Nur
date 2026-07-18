@@ -62,6 +62,7 @@ import CashierCartsBar from "../../../Market/CashierPage/components/CashierCarts
 import axios from "axios";
 import api from "../../../../../api";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import { normalizePosStartResponse } from "../../../../../../tools/posSaleCarts";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import "../../../Market/CashierPage/CashierPage.scss";
 import "./SellStartCashier.scss";
@@ -101,6 +102,15 @@ const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 const getMarketCartLineId = (item) => {
   const id = item?.id ?? item?.itemId;
   return id != null && String(id).trim() ? id : null;
+};
+
+/** Корзина уже не существует на бэке (оплачена/удалена, sale_id устарел) */
+const isStaleCartError = (error) => {
+  const text =
+    typeof error === "string"
+      ? error
+      : String(error?.data?.detail ?? error?.detail ?? error?.message ?? "");
+  return /no (cart|sale) matches/i.test(text);
 };
 
 const paymentBanks = [
@@ -739,6 +749,31 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     return id ? String(id) : null;
   }, [marketMultiCart.getActiveSaleId, marketStart?.id, urlSaleId]);
 
+  const syncUrlSaleId = useCallback(
+    (saleId) => {
+      if (!saleId) return;
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set(MARKET_CASHIER_SALE_ID_PARAM, String(saleId));
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Текущий sale_id не существует на бэке (корзина оплачена/удалена) —
+  // запрашиваем /start/ без sale_id: бэк вернёт (или создаст) актуальную корзину
+  const recoverMarketSale = useCallback(async () => {
+    const data = await marketMultiCart.refreshCartsFromStart({});
+    const { activeSaleId } = normalizePosStartResponse(data);
+    const nextId = activeSaleId ? String(activeSaleId) : null;
+    if (nextId) syncUrlSaleId(nextId);
+    return nextId;
+  }, [marketMultiCart.refreshCartsFromStart, syncUrlSaleId]);
+
   const [selectedId, setSelectedId] = useState(null);
   const selectedItem = useMemo(() => {
     if (isPilorama) {
@@ -831,12 +866,17 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   useEffect(() => {
     if (!isMarketPosMode || !urlSaleId || !marketShiftId) return;
     if (String(marketStart?.id) === String(urlSaleId)) return;
-    marketMultiCart.switchToCart(urlSaleId).catch(() => {});
+    marketMultiCart.switchToCart(urlSaleId).catch(() => {
+      // sale_id из URL не найден на бэке (корзина оплачена/удалена) —
+      // подтягиваем актуальную корзину и обновляем URL
+      recoverMarketSale().catch(() => {});
+    });
   }, [
     isMarketPosMode,
     marketShiftId,
     marketMultiCart.switchToCart,
     marketStart?.id,
+    recoverMarketSale,
     urlSaleId,
   ]);
 
@@ -1167,6 +1207,32 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
           message: "Кастомная позиция добавлена в корзину",
         });
       } catch (error) {
+        // Корзина устарела — восстанавливаем актуальную и повторяем добавление
+        if (isStaleCartError(error)) {
+          try {
+            const freshSaleId = await recoverMarketSale();
+            if (freshSaleId) {
+              await dispatch(
+                addCustomItem({
+                  id: freshSaleId,
+                  name: customItem.name.trim(),
+                  price: customItem.price.trim(),
+                  quantity: Number(customItem.quantity) || 1,
+                }),
+              ).unwrap();
+              setCustomItem({ name: "", price: "", quantity: "1" });
+              setShowCustomItemModal(false);
+              setAlert({
+                open: true,
+                type: "success",
+                message: "Кастомная позиция добавлена в корзину",
+              });
+              return;
+            }
+          } catch {
+            // не восстановилось — покажем исходную ошибку ниже
+          }
+        }
         const errorMessage = validateResErrors(
           error,
           "Ошибка при добавлении кастомной позиции",
@@ -2575,33 +2641,63 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       const saleId = getMarketSaleId();
       if (!saleId) return;
       const productId = product.product ?? product.id;
-      const existingItem = currentItems.find(
-        (item) =>
-          String(item.product ?? item.product_id) === String(productId),
-      );
+      try {
+        const existingItem = currentItems.find(
+          (item) =>
+            String(item.product ?? item.product_id) === String(productId),
+        );
 
-      if (existingItem) {
-        const cartLineId = getMarketCartLineId(existingItem);
-        const nextQty = (Number(existingItem.quantity) || 0) + 1;
-        await dispatch(
-          updateManualFilling({
-            id: saleId,
-            productId: cartLineId,
-            quantity: nextQty,
-          }),
-        ).unwrap();
-        setItemQuantities((prev) => ({
-          ...prev,
-          [existingItem.id]: String(nextQty),
-        }));
-      } else {
-        await dispatch(
-          manualFilling({
-            id: saleId,
-            productId,
-            quantity: 1,
-          }),
-        ).unwrap();
+        if (existingItem) {
+          const cartLineId = getMarketCartLineId(existingItem);
+          const nextQty = (Number(existingItem.quantity) || 0) + 1;
+          await dispatch(
+            updateManualFilling({
+              id: saleId,
+              productId: cartLineId,
+              quantity: nextQty,
+            }),
+          ).unwrap();
+          setItemQuantities((prev) => ({
+            ...prev,
+            [existingItem.id]: String(nextQty),
+          }));
+        } else {
+          await dispatch(
+            manualFilling({
+              id: saleId,
+              productId,
+              quantity: 1,
+            }),
+          ).unwrap();
+        }
+      } catch (error) {
+        // Корзина устарела (оплачена/удалена, напр. по sale_id из URL) —
+        // подтягиваем актуальную и добавляем товар уже в неё
+        if (isStaleCartError(error)) {
+          try {
+            const freshSaleId = await recoverMarketSale();
+            if (freshSaleId) {
+              await dispatch(
+                manualFilling({
+                  id: freshSaleId,
+                  productId,
+                  quantity: 1,
+                }),
+              ).unwrap();
+              return;
+            }
+          } catch {
+            // не восстановилось — покажем исходную ошибку ниже
+          }
+        }
+        setAlert({
+          open: true,
+          type: "error",
+          message: validateResErrors(
+            error,
+            "Не удалось добавить товар в корзину",
+          ),
+        });
       }
       return;
     }
