@@ -663,3 +663,85 @@
     background: var(--ca-primary-dark);
   }
 }
+
+/* Детализация по услугам (таблица) */
+.consulting-analytics__card--full {
+  grid-column: 1 / -1;
+}
+
+.consulting-analytics__detailTableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.consulting-analytics__detailTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  thead th {
+    color: var(--ca-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--ca-border);
+  }
+  tbody td {
+    border-bottom: 1px solid var(--ca-border);
+  }
+  th:not(:first-child),
+  td:not(:first-child) {
+    text-align: right;
+  }
+  tfoot td {
+    padding: 10px 12px;
+    font-weight: 700;
+    border-top: 2px solid var(--ca-border);
+    text-align: right;
+  }
+  tfoot td:first-child {
+    text-align: left;
+  }
+}
+
+.consulting-analytics__detailRow.is-clickable {
+  cursor: pointer;
+}
+.consulting-analytics__detailRow.is-clickable:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.consulting-analytics__detailCaret {
+  display: inline-block;
+  width: 14px;
+  color: var(--ca-muted);
+}
+
+.consulting-analytics__detailSubRow td {
+  color: var(--ca-muted);
+  background: rgba(148, 163, 184, 0.05);
+}
+.consulting-analytics__detailSubName {
+  padding-left: 24px !important;
+}
+
+.consulting-analytics__shareCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 88px;
+}
+.consulting-analytics__shareBar {
+  height: 8px;
+  min-width: 2px;
+  background: linear-gradient(90deg, var(--ca-primary), #fde047);
+  border-radius: 999px;
+}
+.consulting-analytics__shareVal {
+  font-variant-numeric: tabular-nums;
+}

@@ -9,7 +9,10 @@ import {
   getConsultingServices,
 } from "../../../../store/creators/consultingThunk";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
-import { normalizeTariffsForApi } from "../../../../utils/consultingSalePricing";
+import {
+  normalizeRolePricesForApi,
+  normalizeTariffsForApi,
+} from "../../../../utils/consultingSalePricing";
 import {
   usePersistedViewMode,
   VIEW_MODES,
@@ -25,27 +28,129 @@ const ROLES_LIST_URL = "/users/roles/"; // кастомные роли [{id, nam
 const emptyServiceForm = () => ({
   name: "",
   price: "0",
-  installation_price: "",
   description: "",
   tariffs: [],
+  role_prices: [], // [{ custom_role, price }] — цена услуги для конкретных ролей
   custom_role: "", // роль, к которой относится услуга ("" = общая, видна везде)
 });
 
-function TariffEditor({ tariffs, onChange, disabled }) {
+/* Редактор цен по ролям — переиспользуется для услуги и для каждого тарифа.
+   Пустая строка (без роли) при сохранении отбрасывается. */
+function RolePricesEditor({
+  rolePrices = [],
+  roles = [],
+  onChange,
+  disabled,
+  compact = false,
+}) {
+  const rows = rolePrices;
+
+  const usedRoleIds = new Set(
+    rows.map((r) => String(r.custom_role || "")).filter(Boolean)
+  );
+
+  const setRow = (idx, patch) =>
+    onChange(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const addRow = () => onChange([...rows, { custom_role: "", price: "" }]);
+  const removeRow = (idx) => onChange(rows.filter((_, i) => i !== idx));
+
+  return (
+    <div
+      className={`services__rolePrices${
+        compact ? " services__rolePrices--compact" : ""
+      }`}
+    >
+      <div className="services__rolePricesHead">
+        <span className="services__label services__label--sub">
+          Цены по ролям
+        </span>
+        <button
+          type="button"
+          className="services__btn services__btn--secondary services__btn--sm"
+          onClick={addRow}
+          disabled={disabled}
+        >
+          <FaPlus /> Роль
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="services__hint services__hint--muted">
+          Нет переопределений — для всех ролей действует базовая цена.
+        </p>
+      ) : (
+        rows.map((row, idx) => (
+          <div key={idx} className="services__rolePriceRow">
+            <select
+              className="services__input"
+              value={row.custom_role || ""}
+              onChange={(e) => setRow(idx, { custom_role: e.target.value })}
+              disabled={disabled}
+            >
+              <option value="">Выберите роль</option>
+              {roles.map((r) => (
+                <option
+                  key={r.id}
+                  value={r.id}
+                  disabled={
+                    usedRoleIds.has(String(r.id)) &&
+                    String(row.custom_role) !== String(r.id)
+                  }
+                >
+                  {r.name || "—"}
+                </option>
+              ))}
+            </select>
+            <input
+              className="services__input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Цена для роли"
+              value={row.price ?? ""}
+              onChange={(e) => setRow(idx, { price: e.target.value })}
+              disabled={disabled}
+            />
+            <button
+              type="button"
+              className="services__iconBtn"
+              onClick={() => removeRow(idx)}
+              disabled={disabled}
+              aria-label="Удалить цену роли"
+            >
+              <FaTrash />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function TariffEditor({ tariffs, roles, onChange, disabled }) {
   const rows = tariffs?.length
     ? tariffs
-    : [{ name: "", price: "", subscription_amount: "", subscription_period: "month" }];
+    : [
+        {
+          name: "",
+          price: "",
+          subscription_amount: "",
+          subscription_period: "month",
+          role_prices: [],
+        },
+      ];
 
   const setRow = (idx, patch) => {
     const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
     onChange(next);
   };
 
-  const addRow = () => onChange([...rows, { name: "", price: "" }]);
+  const addRow = () =>
+    onChange([...rows, { name: "", price: "", role_prices: [] }]);
 
   const removeRow = (idx) => {
     const next = rows.filter((_, i) => i !== idx);
-    onChange(next.length ? next : [{ name: "", price: "" }]);
+    onChange(next.length ? next : [{ name: "", price: "", role_prices: [] }]);
   };
 
   return (
@@ -62,58 +167,67 @@ function TariffEditor({ tariffs, onChange, disabled }) {
         </button>
       </div>
       {rows.map((row, idx) => (
-        <div key={idx} className="services__tariffRow">
-          <input
-            className="services__input"
-            placeholder="Название тарифа"
-            value={row.name}
-            onChange={(e) => setRow(idx, { name: e.target.value })}
+        <div key={idx} className="services__tariffBlock">
+          <div className="services__tariffRow">
+            <input
+              className="services__input"
+              placeholder="Название тарифа"
+              value={row.name}
+              onChange={(e) => setRow(idx, { name: e.target.value })}
+              disabled={disabled}
+            />
+            <input
+              className="services__input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Цена"
+              value={row.price}
+              onChange={(e) => setRow(idx, { price: e.target.value })}
+              disabled={disabled}
+            />
+            <input
+              className="services__input services__input--sub"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Абон. плата"
+              title="Абонентская плата (опционально)"
+              value={row.subscription_amount ?? ""}
+              onChange={(e) =>
+                setRow(idx, { subscription_amount: e.target.value })
+              }
+              disabled={disabled}
+            />
+            <select
+              className="services__input services__input--subPeriod"
+              value={row.subscription_period || "month"}
+              onChange={(e) =>
+                setRow(idx, { subscription_period: e.target.value })
+              }
+              disabled={disabled || !row.subscription_amount}
+              title="Период абонентской платы"
+            >
+              <option value="month">/ мес.</option>
+              <option value="year">/ год</option>
+            </select>
+            <button
+              type="button"
+              className="services__iconBtn"
+              onClick={() => removeRow(idx)}
+              disabled={disabled || rows.length <= 1}
+              aria-label="Удалить тариф"
+            >
+              <FaTrash />
+            </button>
+          </div>
+          <RolePricesEditor
+            rolePrices={row.role_prices || []}
+            roles={roles}
+            onChange={(role_prices) => setRow(idx, { role_prices })}
             disabled={disabled}
+            compact
           />
-          <input
-            className="services__input"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Цена"
-            value={row.price}
-            onChange={(e) => setRow(idx, { price: e.target.value })}
-            disabled={disabled}
-          />
-          <input
-            className="services__input services__input--sub"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Абон. плата"
-            title="Абонентская плата (опционально)"
-            value={row.subscription_amount ?? ""}
-            onChange={(e) =>
-              setRow(idx, { subscription_amount: e.target.value })
-            }
-            disabled={disabled}
-          />
-          <select
-            className="services__input services__input--subPeriod"
-            value={row.subscription_period || "month"}
-            onChange={(e) =>
-              setRow(idx, { subscription_period: e.target.value })
-            }
-            disabled={disabled || !row.subscription_amount}
-            title="Период абонентской платы"
-          >
-            <option value="month">/ мес.</option>
-            <option value="year">/ год</option>
-          </select>
-          <button
-            type="button"
-            className="services__iconBtn"
-            onClick={() => removeRow(idx)}
-            disabled={disabled || rows.length <= 1}
-            aria-label="Удалить тариф"
-          >
-            <FaTrash />
-          </button>
         </div>
       ))}
       <p className="services__hint">
@@ -159,7 +273,7 @@ export default function ConsultingServices({
   /* удаление */
   const [deletingIds, setDeletingIds] = useState(new Set());
 
-  /* кастомные роли — для привязки услуги к роли */
+  /* кастомные роли — для привязки услуги к роли и для цен по ролям */
   const [roles, setRoles] = useState([]);
   const roleNameById = useMemo(() => {
     const m = new Map();
@@ -251,18 +365,27 @@ export default function ConsultingServices({
   const validate = (f, setErrState) => {
     const title = clean(f.name);
     const price = num(f.price);
-    const installation = num(f.installation_price);
     const tariffs = normalizeTariffsForApi(f.tariffs);
+    const rolePrices = normalizeRolePricesForApi(f.role_prices);
 
     if (!title) return setErrState("Укажите название услуги."), false;
     if (title.length < 2 || title.length > 120)
       return setErrState("Название: 2–120 символов."), false;
-    if (installation < 0)
-      return setErrState("Стоимость установки не может быть отрицательной."), false;
     if (!tariffs.length && !(price > 0))
       return setErrState("Укажите цену или добавьте хотя бы один тариф."), false;
     if (tariffs.some((t) => !t.name || t.price < 0))
       return setErrState("У каждого тарифа должны быть название и цена ≥ 0."), false;
+    // Пустая (без роли) строка цены по роли — подсказка вместо молчаливого игнора
+    if (
+      (f.role_prices || []).some(
+        (r) => !r.custom_role && String(r.price || "").trim() !== ""
+      )
+    )
+      return (
+        setErrState("Выберите роль для указанной цены по роли."), false
+      );
+    if (rolePrices.some((r) => r.price < 0))
+      return setErrState("Цена по роли не может быть отрицательной."), false;
     if (String(f.description || "").length > 800)
       return setErrState("Описание: максимум 800 символов."), false;
     setErrState("");
@@ -272,9 +395,9 @@ export default function ConsultingServices({
   const buildServiceDto = (f) => ({
     name: clean(f.name),
     price: num(f.price),
-    installation_price: num(f.installation_price),
     description: f.description || "",
     tariffs: normalizeTariffsForApi(f.tariffs),
+    role_prices: normalizeRolePricesForApi(f.role_prices),
     // "" → null: услуга без роли считается общей (видна во всех воронках)
     custom_role: f.custom_role || null,
   });
@@ -284,8 +407,8 @@ export default function ConsultingServices({
     e.preventDefault();
     if (createSaving) return;
 
+    if (!validate(createForm, setCreateErr)) return;
     const dto = buildServiceDto(createForm);
-    if (!validate(dto, setCreateErr)) return;
 
     setCreateSaving(true);
     try {
@@ -293,8 +416,6 @@ export default function ConsultingServices({
       setCreateOpen(false);
       setCreateForm(emptyServiceForm());
       dispatch(getConsultingServices());
-      // либо доверяем редьюсеру, либо рефетчим:
-      // dispatch(getConsultingServices());
     } catch (err) {
       setCreateErr(
         (typeof err === "string" ? err : err?.detail) ||
@@ -311,16 +432,22 @@ export default function ConsultingServices({
       id: s.id,
       name: s.title ?? s.name ?? "",
       price: String(s.price ?? "0"),
-      installation_price:
-        s.installation_price != null ? String(s.installation_price) : "",
       description: s.description ?? "",
       custom_role: s.custom_role ? String(s.custom_role) : "",
+      role_prices: (s.role_prices || []).map((r) => ({
+        custom_role: r.custom_role ? String(r.custom_role) : "",
+        price: r.price != null ? String(r.price) : "",
+      })),
       tariffs: (s.tariffs || []).map((t) => ({
         name: t.name || "",
         price: String(t.price ?? ""),
         subscription_amount:
           t.subscription_amount != null ? String(t.subscription_amount) : "",
         subscription_period: t.subscription_period || "month",
+        role_prices: (t.role_prices || []).map((r) => ({
+          custom_role: r.custom_role ? String(r.custom_role) : "",
+          price: r.price != null ? String(r.price) : "",
+        })),
       })),
     });
     setEditErr("");
@@ -332,8 +459,8 @@ export default function ConsultingServices({
     e.preventDefault();
     if (!editForm.id || editSaving) return;
 
+    if (!validate(editForm, setEditErr)) return;
     const dto = buildServiceDto(editForm);
-    if (!validate(dto, setEditErr)) return;
 
     setEditSaving(true);
     try {
@@ -412,8 +539,24 @@ export default function ConsultingServices({
                     t.subscription_period === "year" ? "год" : "мес"
                   }`
                 : "";
-            return `${t.name}: ${money(t.price)}${sub}`;
+            const roles =
+              (t.role_prices || []).length
+                ? `; роли: ${(t.role_prices || []).length}`
+                : "";
+            return `${t.name}: ${money(t.price)}${sub}${roles}`;
           })
+          .join("; ")
+      : "—";
+
+  const formatRolePrices = (entity) =>
+    (entity.role_prices || []).length
+      ? (entity.role_prices || [])
+          .map(
+            (r) =>
+              `${roleNameById.get(String(r.custom_role)) || "роль"}: ${money(
+                r.price
+              )}`
+          )
           .join("; ")
       : "—";
 
@@ -477,7 +620,7 @@ export default function ConsultingServices({
                     <tr>
                       <th>Название</th>
                       <th>Базовая цена</th>
-                      <th>Установка</th>
+                      <th>Цены по ролям</th>
                       <th>Тарифы</th>
                       <th>Описание</th>
                       <th />
@@ -493,7 +636,12 @@ export default function ConsultingServices({
                           {s.title ?? s.name ?? "—"}
                         </td>
                         <td>{money(s.price)}</td>
-                        <td>{money(s.installation_price)}</td>
+                        <td
+                          className="services__ellipsis"
+                          title={formatRolePrices(s)}
+                        >
+                          {formatRolePrices(s)}
+                        </td>
                         <td
                           className="services__ellipsis"
                           title={formatTariffs(s)}
@@ -537,10 +685,22 @@ export default function ConsultingServices({
                         <dt>Базовая цена</dt>
                         <dd>{money(s.price)}</dd>
                       </div>
-                      <div>
-                        <dt>Установка</dt>
-                        <dd>{money(s.installation_price)}</dd>
-                      </div>
+                      {(s.role_prices || []).length ? (
+                        <div className="services__cardMetaRow--full">
+                          <dt>Цены по ролям</dt>
+                          <dd>
+                            <ul className="services__tariffList">
+                              {(s.role_prices || []).map((r, i) => (
+                                <li key={r.custom_role || i}>
+                                  {roleNameById.get(String(r.custom_role)) ||
+                                    "роль"}{" "}
+                                  — {money(r.price)}
+                                </li>
+                              ))}
+                            </ul>
+                          </dd>
+                        </div>
+                      ) : null}
                       <div className="services__cardMetaRow--full">
                         <dt>Тарифы</dt>
                         <dd>
@@ -549,6 +709,9 @@ export default function ConsultingServices({
                               {(s.tariffs || []).map((t) => (
                                 <li key={t.id || t.name}>
                                   {t.name} — {money(t.price)}
+                                  {(t.role_prices || []).length
+                                    ? ` (роли: ${(t.role_prices || []).length})`
+                                    : ""}
                                 </li>
                               ))}
                             </ul>
@@ -629,24 +792,6 @@ export default function ConsultingServices({
                 </div>
 
                 <div className="services__field">
-                  <label className="services__label">Стоимость установки, с</label>
-                  <input
-                    className="services__input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={createForm.installation_price}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({
-                        ...p,
-                        installation_price: e.target.value,
-                      }))
-                    }
-                    disabled={createSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field">
                   <label className="services__label">Роль</label>
                   <select
                     className="services__input"
@@ -669,8 +814,20 @@ export default function ConsultingServices({
                 </div>
 
                 <div className="services__field services__field--full">
+                  <RolePricesEditor
+                    rolePrices={createForm.role_prices}
+                    roles={roles}
+                    onChange={(role_prices) =>
+                      setCreateForm((p) => ({ ...p, role_prices }))
+                    }
+                    disabled={createSaving || disabled}
+                  />
+                </div>
+
+                <div className="services__field services__field--full">
                   <TariffEditor
                     tariffs={createForm.tariffs}
+                    roles={roles}
                     onChange={(tariffs) =>
                       setCreateForm((p) => ({ ...p, tariffs }))
                     }
@@ -773,24 +930,6 @@ export default function ConsultingServices({
                 </div>
 
                 <div className="services__field">
-                  <label className="services__label">Стоимость установки, с</label>
-                  <input
-                    className="services__input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editForm.installation_price}
-                    onChange={(e) =>
-                      setEditForm((p) => ({
-                        ...p,
-                        installation_price: e.target.value,
-                      }))
-                    }
-                    disabled={editSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field">
                   <label className="services__label">Роль</label>
                   <select
                     className="services__input"
@@ -813,8 +952,20 @@ export default function ConsultingServices({
                 </div>
 
                 <div className="services__field services__field--full">
+                  <RolePricesEditor
+                    rolePrices={editForm.role_prices}
+                    roles={roles}
+                    onChange={(role_prices) =>
+                      setEditForm((p) => ({ ...p, role_prices }))
+                    }
+                    disabled={editSaving || disabled}
+                  />
+                </div>
+
+                <div className="services__field services__field--full">
                   <TariffEditor
                     tariffs={editForm.tariffs}
+                    roles={roles}
                     onChange={(tariffs) =>
                       setEditForm((p) => ({ ...p, tariffs }))
                     }

@@ -60,7 +60,14 @@ import {
   isLeadLockedForEmployee,
   isLeadOnCompletedStage,
 } from "../../../../utils/consultingFunnelLeadUtils";
-import { calcConsultingSaleTotal, formatTariffSubscription } from "../../../../utils/consultingSalePricing";
+import { calcConsultingSaleTotal, formatTariffSubscription, resolveTariffPrice } from "../../../../utils/consultingSalePricing";
+import { ensurePushPermission, useConsultingRealtime } from "../common/useConsultingRealtime";
+
+// Персональное событие воронки для текущего пользователя (назначение лида/работы).
+const isFunnelLeadEvent = (n) => {
+  const t = String(n?.type || n?.category || n?.event || "").toLowerCase();
+  return t.includes("lead") || t.includes("лид") || t.includes("funnel") || t.includes("assign");
+};
 import LeadCreateClientModal from "./LeadCreateClientModal";
 import LeadPaymentModal from "./LeadPaymentModal";
 import { Link } from "react-router-dom";
@@ -378,6 +385,16 @@ export default function ConsultingFunnel() {
     return () => clearTimeout(timer);
   }, [notice]);
 
+  // Десктоп-пуш о персональных событиях (лид назначен именно мне). Соединение
+  // per-user, поэтому приходит только «моё». См. useConsultingRealtime.
+  useEffect(() => {
+    ensurePushPermission();
+  }, []);
+  const onFunnelSignal = useCallback(() => {
+    refreshAllBoards();
+  }, [refreshAllBoards]);
+  useConsultingRealtime({ match: isFunnelLeadEvent, onSignal: onFunnelSignal });
+
   useEffect(() => {
     dispatch(getFunnels());
     if (FUNNEL_V2) dispatch(getLossReasons());
@@ -540,15 +557,10 @@ export default function ConsultingFunnel() {
       return;
     }
 
+    // Перенос на завершающую стадию разрешён и сотруднику (не только менеджеру):
+    // завершение лида сотрудником — штатный сценарий. Ограничение на повторное
+    // перемещение уже завершённого лида проверено выше через canDragLead().
     const targetStage = findStageInBoard(board, stageId);
-    if (
-      isCompletedStage(targetStage) &&
-      !isConsultingFunnelManager(profile) &&
-      lead &&
-      !isLeadOnCompletedStage(lead, board)
-    ) {
-      /* сотрудник может завершить лид — перенос на «Завершено» разрешён */
-    }
 
     setDragState(null);
     setBoardsMap((prev) => ({
@@ -1491,6 +1503,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
     const total = calcConsultingSaleTotal({
       service: selectedService,
       tariffId: form.tariff || null,
+      roleId: funnelRoleId,
       items: [],
       discount: 0,
       markup: 0,
@@ -1498,7 +1511,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
     if (total > 0) {
       setForm((f) => ({ ...f, estimated_value: String(total) }));
     }
-  }, [form.service, form.tariff, selectedService]);
+  }, [form.service, form.tariff, selectedService, funnelRoleId]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1603,7 +1616,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
                 const sub = formatTariffSubscription(t);
                 return (
                   <option key={t.id || t.name} value={t.id || t.name}>
-                    {t.name} — {Number(t.price || 0).toLocaleString()} с
+                    {t.name} — {resolveTariffPrice(t, funnelRoleId).toLocaleString()} с
                     {sub ? ` (+ абон. ${sub})` : ""}
                   </option>
                 );
@@ -1856,6 +1869,9 @@ function LeadDetail({
     setBusy(true);
     try {
       await dispatch(claimLead(leadId)).unwrap();
+      // Обновляем доску сразу: WebSocket может быть недоступен, иначе карточка
+      // останется в общем пуле до ручного обновления страницы.
+      onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось взять лид."));
     } finally {
@@ -1868,6 +1884,7 @@ function LeadDetail({
     setBusy(true);
     try {
       await dispatch(releaseLead(leadId)).unwrap();
+      onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось вернуть лид в пул."));
     } finally {
@@ -1883,6 +1900,7 @@ function LeadDetail({
       await dispatch(assignLead({ id: leadId, owner: assignTo })).unwrap();
       onNotice?.("Лид назначен сотруднику.");
       setAssignTo("");
+      onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось назначить лид."));
     } finally {
@@ -1895,6 +1913,7 @@ function LeadDetail({
     setBusy(true);
     try {
       await dispatch(winLead({ id: leadId })).unwrap();
+      onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось закрыть как успех."));
     } finally {

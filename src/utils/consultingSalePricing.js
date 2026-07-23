@@ -3,10 +3,34 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Итог продажи по формуле из docs/messageSELL.txt (превью до ответа сервера). */
+/**
+ * Цены по ролям (role_prices) — переопределения базовой цены услуги/тарифа для
+ * конкретных кастомных ролей. Формат элемента: { custom_role: <id>, price: <num> }.
+ * Если для роли переопределения нет — берётся базовая цена. См. docs/consulting/services-role-pricing.md.
+ */
+export function resolveRolePrice(entity, roleId) {
+  const base = num(entity?.price);
+  if (!roleId) return base;
+  const list = Array.isArray(entity?.role_prices) ? entity.role_prices : [];
+  const hit = list.find((r) => String(r.custom_role) === String(roleId));
+  return hit ? num(hit.price) : base;
+}
+
+/** Базовая цена услуги с учётом роли (без тарифа). */
+export function resolveServicePrice(service, roleId) {
+  return resolveRolePrice(service, roleId);
+}
+
+/** Цена тарифа с учётом роли. */
+export function resolveTariffPrice(tariff, roleId) {
+  return resolveRolePrice(tariff, roleId);
+}
+
+/** Итог продажи (превью до ответа сервера) с учётом роли продавца. */
 export function calcConsultingSaleTotal({
   service,
   tariffId,
+  roleId = null,
   items = [],
   discount = 0,
   markup = 0,
@@ -18,11 +42,22 @@ export function calcConsultingSaleTotal({
     ? tariffs.find((t) => String(t.id) === String(tariffId))
     : null;
 
-  const base = tariff ? num(tariff.price) : num(service.price);
-  const installation = num(service.installation_price);
+  const base = tariff
+    ? resolveTariffPrice(tariff, roleId)
+    : resolveServicePrice(service, roleId);
   const itemsSum = items.reduce((s, it) => s + num(it.price), 0);
 
-  return Math.max(0, base + installation + itemsSum - num(discount) + num(markup));
+  return Math.max(0, base + itemsSum - num(discount) + num(markup));
+}
+
+/** Нормализация цен по ролям для API: только валидные записи с ролью и ценой ≥ 0. */
+export function normalizeRolePricesForApi(rolePrices = []) {
+  return (Array.isArray(rolePrices) ? rolePrices : [])
+    .map((r) => ({
+      custom_role: r.custom_role || r.role || null,
+      price: num(r.price),
+    }))
+    .filter((r) => r.custom_role && r.price >= 0);
 }
 
 export function normalizeTariffsForApi(tariffs = []) {
@@ -38,6 +73,8 @@ export function normalizeTariffsForApi(tariffs = []) {
         row.subscription_period =
           t.subscription_period === "year" ? "year" : "month";
       }
+      const rolePrices = normalizeRolePricesForApi(t.role_prices);
+      if (rolePrices.length) row.role_prices = rolePrices;
       return row;
     })
     .filter((t) => t.name);
@@ -53,6 +90,7 @@ export function formatTariffSubscription(tariff) {
 export function calcLeadServiceTotal({
   service,
   tariffId,
+  roleId = null,
   includeSubscription = false,
 }) {
   if (!service) return 0;
@@ -60,9 +98,10 @@ export function calcLeadServiceTotal({
   const tariff = tariffId
     ? tariffs.find((t) => String(t.id) === String(tariffId))
     : null;
-  const base = tariff ? num(tariff.price) : num(service.price);
-  const installation = num(service.installation_price);
-  let total = base + installation;
+  const base = tariff
+    ? resolveTariffPrice(tariff, roleId)
+    : resolveServicePrice(service, roleId);
+  let total = base;
   if (includeSubscription) {
     const sub = tariff ? num(tariff.subscription_amount) : 0;
     total += sub;

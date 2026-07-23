@@ -25,6 +25,8 @@ import { useUser } from "../../../../store/slices/userSlice";
 import {
   calcConsultingSaleTotal,
   normalizeSaleItemsForApi,
+  resolveServicePrice,
+  resolveTariffPrice,
 } from "../../../../utils/consultingSalePricing";
 import {
   usePersistedViewMode,
@@ -119,7 +121,9 @@ export default function ConsultingSale({
   const alert = useAlert();
   const { services = [], rows = [] } = useConsulting();
   const { list: clients = [] } = useClient();
-  const { company } = useUser();
+  const { company, profile } = useUser();
+  // Роль продавца определяет цену услуги/тарифа (цены по ролям).
+  const sellerRoleId = profile?.custom_role ? String(profile.custom_role) : null;
   /* модалка создания продажи */
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = usePersistedViewMode(SALES_VIEW_STORAGE_KEY);
@@ -195,11 +199,12 @@ export default function ConsultingSale({
       calcConsultingSaleTotal({
         service: selectedService,
         tariffId: tariffId || null,
+        roleId: sellerRoleId,
         items: normalizeSaleItemsForApi(extraItems),
         discount,
         markup,
       }),
-    [selectedService, tariffId, extraItems, discount, markup]
+    [selectedService, tariffId, sellerRoleId, extraItems, discount, markup]
   );
 
   const needsTariff = serviceTariffs.length > 0;
@@ -730,7 +735,7 @@ export default function ConsultingSale({
                         {s.name ?? s.title}
                         {(s.tariffs || []).length
                           ? ` (${(s.tariffs || []).length} тариф.)`
-                          : ` — ${money(s.price)}`}
+                          : ` — ${money(resolveServicePrice(s, sellerRoleId))}`}
                       </option>
                     ))}
                   </select>
@@ -749,7 +754,7 @@ export default function ConsultingSale({
                       <option value="">Выберите тариф</option>
                       {serviceTariffs.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.name} — {money(t.price)}
+                          {t.name} — {money(resolveTariffPrice(t, sellerRoleId))}
                         </option>
                       ))}
                     </select>
@@ -796,11 +801,16 @@ export default function ConsultingSale({
                       <span>Итого (превью):</span>
                       <strong>{money(previewTotal)}</strong>
                     </div>
-                    {Number(selectedService.installation_price) > 0 && (
-                      <p className="sale__hint">
-                        Включая установку: {money(selectedService.installation_price)}
-                      </p>
-                    )}
+                    {sellerRoleId &&
+                      ((tariffId
+                        ? (serviceTariffs.find(
+                            (t) => String(t.id) === String(tariffId)
+                          )?.role_prices || []).length
+                        : (selectedService.role_prices || []).length) > 0) && (
+                        <p className="sale__hint">
+                          Цена рассчитана по вашей роли ({profile?.role_display || "роль"}).
+                        </p>
+                      )}
                   </div>
                 )}
 

@@ -11,6 +11,7 @@ const ConsultingSalary = lazy(() => import("../../Components/Sectors/Consulting/
 const ConsultingSale = lazy(() => import("../../Components/Sectors/Consulting/sale/sale"));
 const ConsultingServices = lazy(() => import("../../Components/Sectors/Consulting/services/services"));
 const ConsultingFunnel = lazy(() => import("../../Components/Sectors/Consulting/Funnel/Funnel"));
+const ConsultingLeads = lazy(() => import("../../Components/Sectors/Consulting/leads/Leads"));
 
 export const consultingRoutes = () => [
   createProtectedRoute("consulting/client", ConsultingClients),
@@ -24,4 +25,5 @@ export const consultingRoutes = () => [
   createProtectedRoute("consulting/sale", ConsultingSale),
   createProtectedRoute("consulting/services", ConsultingServices),
   createProtectedRoute("consulting/funnel", ConsultingFunnel),
+  createProtectedRoute("consulting/leads", ConsultingLeads),
 ];

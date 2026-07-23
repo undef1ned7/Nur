@@ -153,6 +153,54 @@
     color: var(--muted);
     line-height: 1.4;
   }
+  &__hint--muted { opacity: 0.85; }
+  &__label--sub { font-size: 12px; font-weight: 600; color: #475569; }
+
+  &__tariffBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  &__btn--sm {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  &__rolePrices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+  }
+  &__rolePrices--compact {
+    padding: 8px;
+    background: #f6f7f9;
+  }
+  &__rolePricesHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  &__rolePriceRow {
+    display: grid;
+    grid-template-columns: 1fr 120px 36px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    &__tariffRow { grid-template-columns: 1fr 1fr; }
+    &__rolePriceRow { grid-template-columns: 1fr 100px 36px; }
+  }
 
   &__cards {
     display: grid;
