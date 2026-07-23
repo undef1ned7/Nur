@@ -10,6 +10,7 @@ const BarberClients = lazy(() => import("../../Components/Sectors/Barber/Clients
 const BarberAnalitika = lazy(() => import("../../Components/Sectors/Barber/BarberAnalitika/BarberAnalitika"));
 const MastersTabs = lazy(() => import("../../Components/Sectors/Barber/Masters/MastersTabs/MastersTabs"));
 const BarberRequests = lazy(() => import("../../Components/Sectors/Barber/Requests/Requests"));
+const BarberSalary = lazy(() => import("../../Components/Sectors/Barber/Salary/Salary"));
 
 const barberPrefixRoutes = (prefix) => [
   createProtectedRoute(`${prefix}/services`, BarberServices),
@@ -22,6 +23,7 @@ const barberPrefixRoutes = (prefix) => [
   createProtectedRoute(`${prefix}/client-documents`, BarberClientDocuments),
   createProtectedRoute(`${prefix}/cash-reports`, BarberAnalitika),
   createProtectedRoute(`${prefix}/requests`, BarberRequests),
+  createProtectedRoute(`${prefix}/salary`, BarberSalary),
 ];
 
 export const barberRoutes = () => [

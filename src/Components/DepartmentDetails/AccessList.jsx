@@ -114,6 +114,7 @@ const SECTOR_ACCESS_TYPES = {
       label: "Документы клиентов",
       backendKey: "can_view_document",
     },
+    { value: "Зарплата", label: "Зарплата", backendKey: "can_view_salary" },
   ],
   Гостиница: [
     { value: "Комнаты", label: "Комнаты", backendKey: "can_view_hostel_rooms" },

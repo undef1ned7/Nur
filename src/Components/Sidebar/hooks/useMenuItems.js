@@ -160,6 +160,16 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       ) {
         return true;
       }
+      // Владельцу показываем «Зарплату» в Услугах/Барбершопе/Стоматологии даже
+      // без права от бэка (can_view_salary может отсутствовать в профиле,
+      // пока бэк не выдаёт его владельцу явно — см. docs/services/salary.md)
+      if (
+        ["services", "barber", "dentistry"].includes(configKey) &&
+        item.permission === "can_view_salary" &&
+        profile?.role === "owner"
+      ) {
+        return true;
+      }
       return hasPermission(item.permission);
     });
 

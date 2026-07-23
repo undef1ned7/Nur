@@ -815,6 +815,11 @@ const Masters = () => {
             label: "Документы клиентов",
             backendKey: "can_view_document",
           },
+          {
+            value: "Зарплата",
+            label: "Зарплата",
+            backendKey: "can_view_salary",
+          },
         ],
         Гостиница: [
           {

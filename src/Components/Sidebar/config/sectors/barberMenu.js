@@ -58,6 +58,13 @@ export const barberSectorMenus = {
         permission: "can_view_employees",
         implemented: true,
       },
+      {
+        label: "Зарплата",
+        to: "/crm/barber/salary",
+        icon: menuIcons.wallet,
+        permission: "can_view_salary",
+        implemented: true,
+      },
       //       {
       //   label: "Склад",
       //   to: "/crm/barber/warehouse",
@@ -123,6 +130,13 @@ export const barberSectorMenus = {
         permission: "can_view_employees",
         implemented: true,
       },
+      {
+        label: "Зарплата",
+        to: "/crm/services/salary",
+        icon: menuIcons.wallet,
+        permission: "can_view_salary",
+        implemented: true,
+      },
     ],
     dentistry: [
       {
@@ -179,6 +193,13 @@ export const barberSectorMenus = {
         to: "/crm/dentistry/masters",
         icon: menuIcons.user,
         permission: "can_view_employees",
+        implemented: true,
+      },
+      {
+        label: "Зарплата",
+        to: "/crm/dentistry/salary",
+        icon: menuIcons.wallet,
+        permission: "can_view_salary",
         implemented: true,
       },
     ],
