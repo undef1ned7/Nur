@@ -456,3 +456,13 @@ body.modal-open {
     opacity: 1;
   }
 }
+
+/* Вкладки: список / абонентская матрица */
+.clients__tabs{
+  display:inline-flex; background:#f1f5f9; border-radius:12px; padding:4px; gap:4px; margin:4px 0 14px;
+}
+.clients__tab{
+  border:0; background:transparent; padding:8px 16px; border-radius:9px;
+  font-weight:600; cursor:pointer; color:var(--muted);
+}
+.clients__tab.is-active{ background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(15,23,42,.12); }

@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
 import { getConsultingServices } from "../../../../store/creators/consultingThunk";
 import { getProfile, useUser } from "../../../../store/slices/userSlice";
+import SubscriptionMatrix from "./SubscriptionMatrix";
 
 const fmtMoney = (v) => (Number(v) || 0).toLocaleString() + " с";
 
@@ -21,6 +22,7 @@ export default function ConsultingClients() {
   // ожидаем, что слайс уже кладёт results в list
   const { list: rows = [], loading = false, error: err = "" } = useClient();
 
+  const [tab, setTab] = useState("list"); // list | matrix
   const [q, setQ] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -86,32 +88,59 @@ export default function ConsultingClients() {
           <p className="clients__subtitle">Справочник (сервер)</p>
         </div>
 
-        <div className="clients__actions">
-          <div className="clients__search">
-            <span className="clients__searchIcon" aria-hidden>
-              🔎
-            </span>
-            <input
-              className="clients__searchInput"
-              placeholder="Поиск по имени, телефону, продавцу, услуге…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              aria-label="Поиск клиентов"
-            />
-          </div>
+        {tab === "list" && (
+          <div className="clients__actions">
+            <div className="clients__search">
+              <span className="clients__searchIcon" aria-hidden>
+                🔎
+              </span>
+              <input
+                className="clients__searchInput"
+                placeholder="Поиск по имени, телефону, продавцу, услуге…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label="Поиск клиентов"
+              />
+            </div>
 
-          <button
-            className="clients__btn clients__btn--primary"
-            onClick={onCreate}
-          >
-            + Клиент
-          </button>
-        </div>
+            <button
+              className="clients__btn clients__btn--primary"
+              onClick={onCreate}
+            >
+              + Клиент
+            </button>
+          </div>
+        )}
       </header>
 
-      {!!err && <div className="clients__error">{String(err)}</div>}
+      <div className="clients__tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "list"}
+          className={`clients__tab ${tab === "list" ? "is-active" : ""}`}
+          onClick={() => setTab("list")}
+        >
+          Список
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "matrix"}
+          className={`clients__tab ${tab === "matrix" ? "is-active" : ""}`}
+          onClick={() => setTab("matrix")}
+        >
+          Абонентская матрица
+        </button>
+      </div>
 
-      <div className="clients__tableWrap">
+      {tab === "matrix" && <SubscriptionMatrix />}
+
+      {tab === "list" && (
+        <>
+          {!!err && <div className="clients__error">{String(err)}</div>}
+
+          <div className="clients__tableWrap">
         <table className="clients__table">
           <thead>
             <tr>
@@ -206,9 +235,11 @@ export default function ConsultingClients() {
                 </td>
               </tr>
             )}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {isFormOpen && (
         <ClientForm id={editId} onClose={() => setIsFormOpen(false)} />

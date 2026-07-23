@@ -354,6 +354,14 @@ const ConsultingAnalytics = () => {
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const [draftErr, setDraftErr] = useState("");
+  const [expandedSvc, setExpandedSvc] = useState(() => new Set());
+
+  const toggleSvc = (name) =>
+    setExpandedSvc((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
 
   const applyPreset = (p) => {
     setShowPeriodModal(false);
@@ -479,6 +487,88 @@ const ConsultingAnalytics = () => {
     return Array.from(m, ([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.sum - a.sum)
       .slice(0, 8);
+  }, [sales]);
+
+  // Услуга по названию — для сопоставления абонентки/тарифов с продажами.
+  const serviceByName = useMemo(() => {
+    const m = new Map();
+    (services || []).forEach((s) =>
+      m.set(String(s.name ?? s.title ?? "").trim(), s),
+    );
+    return m;
+  }, [services]);
+
+  // Детализация по каждой услуге отдельно: продажи, выручка, средний чек,
+  // уникальные клиенты, доля выручки и разбивка по тарифам.
+  const byServiceDetailed = useMemo(() => {
+    const m = new Map();
+    sales.forEach((r) => {
+      const name = String(r.service_display || "—");
+      const amount = Number(r.total ?? r.service_price) || 0;
+      if (!m.has(name)) {
+        m.set(name, {
+          name,
+          count: 0,
+          sum: 0,
+          clients: new Set(),
+          tariffs: new Map(),
+        });
+      }
+      const g = m.get(name);
+      g.count += 1;
+      g.sum += amount;
+      const clientKey = String(r.client || r.client_display || "");
+      if (clientKey) g.clients.add(clientKey);
+      const tName = String(r.tariff_display || "Без тарифа");
+      const t = g.tariffs.get(tName) || { name: tName, count: 0, sum: 0 };
+      t.count += 1;
+      t.sum += amount;
+      g.tariffs.set(tName, t);
+    });
+    const total = revenue || 1;
+    return Array.from(m.values())
+      .map((g) => ({
+        name: g.name,
+        count: g.count,
+        sum: g.sum,
+        avg: g.count ? g.sum / g.count : 0,
+        clients: g.clients.size,
+        share: Math.round((g.sum * 100) / total),
+        tariffs: Array.from(g.tariffs.values()).sort((a, b) => b.sum - a.sum),
+      }))
+      .sort((a, b) => b.sum - a.sum);
+  }, [sales, revenue]);
+
+  // Оценка абонентской выручки в месяц (MRR): сопоставляем проданный тариф с
+  // его абонплатой из справочника услуг; годовые приводим к месяцу.
+  const subscriptionMrr = useMemo(() => {
+    let mrr = 0;
+    sales.forEach((r) => {
+      const s = serviceByName.get(String(r.service_display || "").trim());
+      if (!s) return;
+      const t = (s.tariffs || []).find((x) => x.name === r.tariff_display);
+      const amt = Number(t?.subscription_amount) || 0;
+      if (!amt) return;
+      mrr += t.subscription_period === "year" ? amt / 12 : amt;
+    });
+    return mrr;
+  }, [sales, serviceByName]);
+
+  // Клиентская аналитика: уникальные и повторные клиенты за период.
+  const clientStats = useMemo(() => {
+    const counts = new Map();
+    sales.forEach((r) => {
+      const key = String(r.client || r.client_display || "");
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const unique = counts.size;
+    const repeat = [...counts.values()].filter((c) => c > 1).length;
+    return {
+      unique,
+      repeat,
+      repeatPct: unique ? Math.round((repeat * 100) / unique) : 0,
+    };
   }, [sales]);
 
   const statusCounts = useMemo(() => {
@@ -682,6 +772,34 @@ const ConsultingAnalytics = () => {
         />
       </div>
 
+      {/* CRM-детализация: клиентская база и абонентская выручка */}
+      <div className={`${BEM}__kpis`}>
+        <KpiCard
+          label="Уникальных клиентов"
+          value={clientStats.unique}
+          description={`Повторных: ${clientStats.repeat} (${clientStats.repeatPct}%)`}
+          icon={FileText}
+        />
+        <KpiCard
+          label="Абонентка (MRR)"
+          value={money(subscriptionMrr)}
+          description="Оценка регулярной выручки в месяц"
+          icon={Banknote}
+        />
+        <KpiCard
+          label="Конверсия заявок"
+          value={pct(salesCount, reqCount)}
+          description={`${salesCount} продаж из ${reqCount} заявок`}
+          icon={TrendingUp}
+        />
+        <KpiCard
+          label="Услуг продано"
+          value={byServiceDetailed.length}
+          description="Разных услуг за период"
+          icon={ShoppingBag}
+        />
+      </div>
+
       <div className={`${BEM}__chartsRow`}>
         <div className={`${BEM}__card`}>
           <div className={`${BEM}__cardTitle`}>Динамика выручки</div>
@@ -828,6 +946,97 @@ const ConsultingAnalytics = () => {
           <div className={`${BEM}__cardTitle`}>ТОП услуг (список)</div>
           <RankList items={byService} />
         </div>
+      </div>
+
+      {/* Детализация по каждой услуге отдельно (с разбивкой по тарифам) */}
+      <div className={`${BEM}__card ${BEM}__card--full`}>
+        <div className={`${BEM}__cardTitle`}>Детализация по услугам</div>
+        {byServiceDetailed.length ? (
+          <div className={`${BEM}__detailTableWrap`}>
+            <table className={`${BEM}__detailTable`}>
+              <thead>
+                <tr>
+                  <th>Услуга</th>
+                  <th>Продаж</th>
+                  <th>Клиентов</th>
+                  <th>Выручка</th>
+                  <th>Ср. чек</th>
+                  <th>Доля</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byServiceDetailed.map((s) => {
+                  const open = expandedSvc.has(s.name);
+                  const hasTariffs =
+                    s.tariffs.length > 1 ||
+                    (s.tariffs[0] && s.tariffs[0].name !== "Без тарифа");
+                  return (
+                    <React.Fragment key={s.name}>
+                      <tr
+                        className={`${BEM}__detailRow${
+                          hasTariffs ? " is-clickable" : ""
+                        }`}
+                        onClick={() => hasTariffs && toggleSvc(s.name)}
+                      >
+                        <td>
+                          {hasTariffs && (
+                            <span className={`${BEM}__detailCaret`}>
+                              {open ? "▾" : "▸"}
+                            </span>
+                          )}
+                          {s.name}
+                        </td>
+                        <td>{s.count}</td>
+                        <td>{s.clients}</td>
+                        <td>
+                          <b>{money(s.sum)}</b>
+                        </td>
+                        <td>{money(s.avg)}</td>
+                        <td>
+                          <div className={`${BEM}__shareCell`}>
+                            <span
+                              className={`${BEM}__shareBar`}
+                              style={{ width: `${Math.min(100, s.share)}%` }}
+                            />
+                            <span className={`${BEM}__shareVal`}>{s.share}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                      {open &&
+                        s.tariffs.map((t) => (
+                          <tr
+                            key={`${s.name}-${t.name}`}
+                            className={`${BEM}__detailSubRow`}
+                          >
+                            <td className={`${BEM}__detailSubName`}>↳ {t.name}</td>
+                            <td>{t.count}</td>
+                            <td>—</td>
+                            <td>{money(t.sum)}</td>
+                            <td>{money(t.count ? t.sum / t.count : 0)}</td>
+                            <td>—</td>
+                          </tr>
+                        ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Итого</td>
+                  <td>{salesCount}</td>
+                  <td>{clientStats.unique}</td>
+                  <td>
+                    <b>{money(revenue)}</b>
+                  </td>
+                  <td>{money(avgCheck)}</td>
+                  <td>100%</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <div className={`${BEM}__empty`}>Нет продаж за период</div>
+        )}
       </div>
 
       <Modal

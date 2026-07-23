@@ -1,0 +1,206 @@
+.subMatrix {
+  --sm-border: var(--border, #e5e7eb);
+  --sm-muted: var(--muted, #64748b);
+  --sm-sticky-bg: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  &__toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  &__field {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--sm-muted);
+    span {
+      font-weight: 600;
+    }
+  }
+  &__field--grow {
+    flex: 1 1 220px;
+    min-width: 180px;
+  }
+  &__input {
+    border: 1px solid var(--sm-border);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 14px;
+    background: #fff;
+    width: 100%;
+  }
+
+  &__legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--sm-muted);
+  }
+  &__legendItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  &__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    display: inline-block;
+    &--paid {
+      background: #dcfce7;
+      border: 1px solid #86efac;
+    }
+    &--planned {
+      background: #dbeafe;
+      border: 1px solid #93c5fd;
+    }
+    &--overdue {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+    }
+  }
+
+  &__notice {
+    border: 1px dashed var(--sm-border);
+    border-radius: 12px;
+    padding: 18px;
+    background: #fffbeb;
+    p {
+      margin: 6px 0 0;
+      color: var(--sm-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    code {
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+  }
+  &__alert {
+    padding: 12px 14px;
+    border: 1px solid var(--sm-border);
+    border-radius: 10px;
+    background: #fff7ed;
+    color: #9a3412;
+  }
+
+  &__tableWrap {
+    overflow-x: auto;
+    border: 1px solid var(--sm-border);
+    border-radius: 12px;
+  }
+  &__table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 13px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--sm-border);
+      white-space: nowrap;
+      text-align: center;
+    }
+    thead th {
+      background: #f8fafc;
+      color: var(--sm-muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+  }
+
+  &__monthCol {
+    min-width: 84px;
+  }
+
+  /* Липкие левые колонки: ФИО, услуга, абонплата */
+  &__stickyCol {
+    position: sticky;
+    background: var(--sm-sticky-bg);
+    text-align: left !important;
+    z-index: 1;
+  }
+  thead &__stickyCol {
+    z-index: 3;
+  }
+  &__stickyCol--1 {
+    left: 0;
+    min-width: 160px;
+    font-weight: 600;
+  }
+  &__stickyCol--2 {
+    left: 160px;
+    min-width: 150px;
+  }
+  &__stickyCol--3 {
+    left: 310px;
+    min-width: 110px;
+    border-right: 2px solid var(--sm-border);
+    small {
+      color: var(--sm-muted);
+    }
+  }
+
+  &__cell {
+    font-variant-numeric: tabular-nums;
+    &--paid {
+      background: #dcfce7;
+      color: #15803d;
+      font-weight: 600;
+    }
+    &--planned {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    &--overdue {
+      background: #fee2e2;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    &--none {
+      color: #cbd5e1;
+    }
+  }
+
+  &__totalCell {
+    font-weight: 700;
+    background: #f8fafc;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__empty {
+    text-align: center !important;
+    color: var(--sm-muted);
+    padding: 28px 12px;
+  }
+
+  tfoot &__stickyCol {
+    background: #f8fafc;
+    font-weight: 700;
+  }
+
+  @media (max-width: 640px) {
+    &__legend {
+      margin-left: 0;
+    }
+    &__stickyCol--2,
+    &__stickyCol--3 {
+      position: static;
+    }
+    &__stickyCol--1 {
+      position: static;
+    }
+  }
+}
