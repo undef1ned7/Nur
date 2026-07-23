@@ -58,11 +58,13 @@ import { useUser } from "../../../../../store/slices/userSlice";
 import UniversalModal from "../UniversalModal/UniversalModal";
 import { DEAL_STATUS_RU } from "../../../../pages/Sell/Sell";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import BarcodeAmbiguityModal from "../../../../common/BarcodeAmbiguityModal/BarcodeAmbiguityModal";
 import CashierCartsBar from "../../../Market/CashierPage/components/CashierCartsBar";
 import axios from "axios";
 import api from "../../../../../api";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
 import { normalizePosStartResponse } from "../../../../../../tools/posSaleCarts";
+import { getBarcodeAmbiguity } from "../../../../../../tools/barcodeAmbiguity";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 import "../../../Market/CashierPage/CashierPage.scss";
 import "./SellStartCashier.scss";
@@ -704,6 +706,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const [tempSelectedAgent, setTempSelectedAgent] = useState("");
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
+  const [barcodeAmbiguityLoading, setBarcodeAmbiguityLoading] = useState(false);
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [agents, setAgents] = useState([]);
@@ -1137,6 +1141,35 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     }
   };
 
+  const handleAmbiguousAgentProductSelect = async (match) => {
+    if (!agentCart.currentCart?.id || !match?.id) return;
+    setBarcodeAmbiguityLoading(true);
+    try {
+      await dispatch(
+        addProductToAgentCart({
+          cartId: agentCart.currentCart.id,
+          product_id: match.id,
+          quantity: 1,
+          agent: selectedAgent,
+        }),
+      ).unwrap();
+      setBarcodeInput("");
+      setBarcodeAmbiguity(null);
+      onRefresh();
+    } catch (error) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: validateResErrors(
+          error,
+          "Не удалось добавить выбранный товар",
+        ),
+      });
+    } finally {
+      setBarcodeAmbiguityLoading(false);
+    }
+  };
+
   const handleBarcodeScan = async () => {
     if (!barcodeInput.trim()) {
       setAlert({
@@ -1166,6 +1199,11 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       setBarcodeInput("");
       onRefresh();
     } catch (error) {
+      const ambiguity = getBarcodeAmbiguity(error);
+      if (ambiguity) {
+        setBarcodeAmbiguity(ambiguity);
+        return;
+      }
       const errorMessage = validateResErrors(
         error,
         "Ошибка при сканировании товара",
@@ -4338,6 +4376,17 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
         message={alert.message}
         okText="Ok"
         onClose={() => setAlert((a) => ({ ...a, open: false }))}
+      />
+
+      <BarcodeAmbiguityModal
+        open={Boolean(barcodeAmbiguity)}
+        message={barcodeAmbiguity?.message}
+        matches={barcodeAmbiguity?.matches}
+        loading={barcodeAmbiguityLoading}
+        onSelect={handleAmbiguousAgentProductSelect}
+        onClose={() => {
+          if (!barcodeAmbiguityLoading) setBarcodeAmbiguity(null);
+        }}
       />
     </section>
   );

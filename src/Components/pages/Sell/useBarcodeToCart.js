@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import useScanDetection from "use-scan-detection";
-import { sendBarCode, startSale } from "../../../store/creators/saleThunk";
+import {
+  manualFilling,
+  sendBarCode,
+  startSale,
+} from "../../../store/creators/saleThunk";
+import { getBarcodeAmbiguity } from "../../../../tools/barcodeAmbiguity";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 /**
  * useBarcodeToCart
@@ -20,6 +26,8 @@ export function useBarcodeToCart(saleId, opts = {}) {
   const dispatch = useDispatch();
   const [lastBarcode, setLastBarcode] = useState("");
   const [error, setError] = useState("");
+  const [ambiguity, setAmbiguity] = useState(null);
+  const [ambiguityLoading, setAmbiguityLoading] = useState(false);
   const busyRef = useRef(false);
 
   const { onError, onScanned, onAdded, minLength = 3, discount_total = 0, shift = null } = opts;
@@ -59,7 +67,15 @@ export function useBarcodeToCart(saleId, opts = {}) {
         await dispatch(startSale({ discount_total, shift })).unwrap();
         if (typeof onAdded === "function") onAdded(res);
       } catch (e) {
-        const msg = e?.message || "Не удалось добавить товар по штрих‑коду";
+        const barcodeAmbiguity = getBarcodeAmbiguity(e);
+        if (barcodeAmbiguity) {
+          setAmbiguity(barcodeAmbiguity);
+          return;
+        }
+        const msg = validateResErrors(
+          e,
+          "Не удалось добавить товар по штрих‑коду",
+        );
         setError(msg);
         if (typeof onError === "function") onError(msg);
       } finally {
@@ -70,7 +86,39 @@ export function useBarcodeToCart(saleId, opts = {}) {
     })();
   }, [lastBarcode, saleId, dispatch, onError, onAdded, discount_total, shift]);
 
-  return { lastBarcode, error };
+  const selectAmbiguousProduct = async (match) => {
+    if (!saleId || !match?.id) return;
+    setAmbiguityLoading(true);
+    try {
+      const result = await dispatch(
+        manualFilling({
+          id: saleId,
+          productId: match.id,
+          quantity: 1,
+        }),
+      ).unwrap();
+      await dispatch(startSale({ discount_total, shift })).unwrap();
+      setAmbiguity(null);
+      if (typeof onAdded === "function") onAdded(result);
+    } catch (e) {
+      const msg = validateResErrors(e, "Не удалось добавить выбранный товар");
+      setError(msg);
+      if (typeof onError === "function") onError(msg);
+    } finally {
+      setAmbiguityLoading(false);
+    }
+  };
+
+  return {
+    lastBarcode,
+    error,
+    ambiguity,
+    ambiguityLoading,
+    selectAmbiguousProduct,
+    closeAmbiguity: () => {
+      if (!ambiguityLoading) setAmbiguity(null);
+    },
+  };
 }
 
 export default useBarcodeToCart;

@@ -83,6 +83,7 @@ const initialState = {
 
   // Кэш для товаров (ключ - сериализованные параметры запроса)
   productsCache: {},
+  latestFetchRequestId: null,
 };
 
 const productSlice = createSlice({
@@ -121,6 +122,7 @@ const productSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchProductsAsync.pending, (state, action) => {
+        state.latestFetchRequestId = action.meta.requestId;
         // Не устанавливаем loading, если есть валидный кэш (stale-while-revalidate)
         // Это позволяет показывать кэшированные данные без белого экрана при быстрой смене страниц
         const skipLoading = action.meta?.arg?._skipLoadingIfCached;
@@ -134,6 +136,7 @@ const productSlice = createSlice({
         }
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
+        if (state.latestFetchRequestId !== action.meta.requestId) return;
         state.loading = false;
         state.error = null;
         applyPagination(state, action.payload, "list");
@@ -167,8 +170,10 @@ const productSlice = createSlice({
         }
       })
       .addCase(fetchProductsAsync.rejected, (state, action) => {
+        if (state.latestFetchRequestId !== action.meta.requestId) return;
         state.loading = false;
-        state.error = action.payload;
+        state.error =
+          action.meta.aborted ? null : action.payload;
       })
 
       // 🆕 FETCH BRANDS
@@ -383,6 +388,7 @@ const productSlice = createSlice({
         state.creating = false;
         state.list.unshift(action.payload);
         state.count += 1;
+        state.productsCache = {};
       })
       .addCase(createProductAsync.rejected, (state, action) => {
         state.creating = false;
@@ -396,6 +402,7 @@ const productSlice = createSlice({
       })
       .addCase(updateProductAsync.fulfilled, (state, action) => {
         state.updating = false;
+        state.productsCache = {};
         const index = state.list.findIndex(
           (product) => product.id === action.payload.id
         );
@@ -415,6 +422,7 @@ const productSlice = createSlice({
       })
       .addCase(deleteProductAsync.fulfilled, (state, action) => {
         state.deleting = false;
+        state.productsCache = {};
         state.list = state.list.filter(
           (product) => product.id !== action.payload
         );
@@ -430,6 +438,7 @@ const productSlice = createSlice({
       })
       .addCase(bulkDeleteProductsAsync.fulfilled, (state, action) => {
         state.deleting = false;
+        state.productsCache = {};
         // Удаляем удаленные товары из списка
         const deletedIds = action.meta.arg.ids;
         state.list = state.list.filter(
