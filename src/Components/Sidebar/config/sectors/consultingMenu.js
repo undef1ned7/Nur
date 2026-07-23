@@ -51,6 +51,15 @@ export const consultingMenu = [
         implemented: true,
       },
       {
+        label: "Лиды",
+        to: "/crm/consulting/leads",
+        icon: menuIcons.comments,
+        // Отдельного права can_view_leads ещё нет на бэке — гейтим вместе с
+        // воронкой (лиды питают воронку). См. docs/consulting/leads-whatsapp.md.
+        permission: "can_view_funnel",
+        implemented: true,
+      },
+      {
         label: "Продажи",
         to: "/crm/consulting/sale",
         icon: menuIcons.shoppingCart,
