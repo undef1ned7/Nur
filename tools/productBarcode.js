@@ -10,9 +10,6 @@ const getBarcodeCandidates = (product) => {
     "barcode",
     "bar_code",
     "barcode_value",
-    "article",
-    "sku",
-    "code",
   ];
 
   for (const key of directKeys) {
@@ -69,10 +66,7 @@ export const productMatchesBarcode = (product, rawQuery) => {
   if (!query) return false;
 
   const barcodeCandidates = getBarcodeCandidates(product).map(normalize);
-  if (barcodeCandidates.some((value) => value === query)) return true;
-
-  const haystack = productSearchHaystackLower(product);
-  return haystack.includes(query);
+  return barcodeCandidates.some((value) => value === query);
 };
 
 const digitsOnly = (raw) => String(raw ?? "").replace(/\D/g, "");

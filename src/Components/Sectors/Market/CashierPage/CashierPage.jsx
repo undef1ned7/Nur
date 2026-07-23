@@ -40,6 +40,7 @@ import { resetPosSale, useSale } from "../../../../store/slices/saleSlice";
 import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import BarcodeAmbiguityModal from "../../../common/BarcodeAmbiguityModal/BarcodeAmbiguityModal";
 import CustomServiceModal from "../../../pages/Sell/components/CustomServiceModal";
 import DiscountModal from "../../../pages/Sell/components/DiscountModal";
 import "./CashierPage.scss";
@@ -77,6 +78,7 @@ import {
   isOwnOpenShift,
   resolveCashierId,
 } from "../../../../tools/cashierOpenShift";
+import { getBarcodeAmbiguity } from "../../../../../tools/barcodeAmbiguity";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
@@ -1187,6 +1189,8 @@ const CashierPage = () => {
   // Отслеживаем сканирование напрямую для автоматического создания продажи
   const [scannedBarcode, setScannedBarcode] = useState("");
   const barcodeProcessingRef = React.useRef(false);
+  const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
+  const [barcodeAmbiguityLoading, setBarcodeAmbiguityLoading] = useState(false);
 
   useScanDetection({
     minLength: 3,
@@ -1209,7 +1213,8 @@ const CashierPage = () => {
         showReceiptsModal ||
         showHotkeyProductsModal ||
         showCustomServiceModal ||
-        showDiscountModal
+        showDiscountModal ||
+        barcodeAmbiguity
       ) {
         return;
       }
@@ -1263,6 +1268,11 @@ const CashierPage = () => {
         );
         return;
       }
+
+      // Сканер не должен оставлять код в текстовом поиске или позволять
+      // запоздалому search-запросу подменить сетку товаров.
+      setSearchTerm("");
+      setDebouncedSearchTerm("");
 
       // Запоминаем время сканирования и устанавливаем флаги
       const scanTime = Date.now();
@@ -1325,12 +1335,14 @@ const CashierPage = () => {
       }
 
       barcodeProcessingRef.current = true;
+      let targetSaleIdForScan = null;
 
       try {
         const productsScrollTop = productsGridRef.current?.scrollTop ?? 0;
         const scanSaleId =
           multiCartRef.current?.getActiveSaleId?.() || getSaleIdFromUrl() || null;
         const saleId = scanSaleId || (await ensureActiveSaleId(shiftId));
+        targetSaleIdForScan = saleId;
 
         if (!saleId) {
           showAlert("error", "Ошибка", "Не удалось создать продажу");
@@ -1425,6 +1437,15 @@ const CashierPage = () => {
         isScanningRef.current = true;
       } catch (error) {
         console.error("Ошибка при сканировании:", error);
+        const ambiguity = getBarcodeAmbiguity(error);
+        if (ambiguity) {
+          setBarcodeAmbiguity({
+            ...ambiguity,
+            barcode,
+            saleId: targetSaleIdForScan,
+          });
+          return;
+        }
         const message = validateResErrors(
           error,
           "Не удалось добавить товар по штрих-коду",
@@ -2299,6 +2320,35 @@ const CashierPage = () => {
 
   const addToCart = async (product) => {
     return addToCartWithPackage(product, null);
+  };
+
+  const handleAmbiguousCashierProductSelect = async (match) => {
+    const saleId =
+      barcodeAmbiguity?.saleId ||
+      multiCartRef.current?.getActiveSaleId?.() ||
+      getSaleIdFromUrl();
+    if (!saleId || !match?.id) return;
+
+    setBarcodeAmbiguityLoading(true);
+    try {
+      await dispatch(
+        manualFilling({
+          id: saleId,
+          productId: match.id,
+          quantity: 1,
+        }),
+      ).unwrap();
+      await dispatch(getSale({ id: saleId })).unwrap();
+      setBarcodeAmbiguity(null);
+    } catch (error) {
+      showAlert(
+        "error",
+        "Ошибка",
+        validateResErrors(error, "Не удалось добавить выбранный товар"),
+      );
+    } finally {
+      setBarcodeAmbiguityLoading(false);
+    }
   };
 
   const revertScanPackLine = async (cartItemId) => {
@@ -4280,6 +4330,17 @@ const CashierPage = () => {
           }}
         />
       )}
+
+      <BarcodeAmbiguityModal
+        open={Boolean(barcodeAmbiguity)}
+        message={barcodeAmbiguity?.message}
+        matches={barcodeAmbiguity?.matches}
+        loading={barcodeAmbiguityLoading}
+        onSelect={handleAmbiguousCashierProductSelect}
+        onClose={() => {
+          if (!barcodeAmbiguityLoading) setBarcodeAmbiguity(null);
+        }}
+      />
 
       <AlertModal
         open={alertModal.open}

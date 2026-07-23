@@ -32,6 +32,7 @@ import { useProducts } from "../../../store/slices/productSlice";
 import { fetchProductsAsync } from "../../../store/creators/productCreators";
 import { useSale } from "../../../store/slices/saleSlice";
 import useBarcodeToCart from "./useBarcodeToCart";
+import BarcodeAmbiguityModal from "../../common/BarcodeAmbiguityModal/BarcodeAmbiguityModal";
 import { createDebt } from "./Sell";
 import { calcDaysUntilIsoDate } from "../../../tools/deferredPaymentDates";
 // Импорт модулей
@@ -103,7 +104,13 @@ const SellMainStart = () => {
   const lastScanTimeRef = useRef(0);
 
   // Автодобавление товара по сканеру штрих-кода
-  const { error: barcodeScanError } = useBarcodeToCart(start?.id, {
+  const {
+    error: barcodeScanError,
+    ambiguity: barcodeAmbiguity,
+    ambiguityLoading: barcodeAmbiguityLoading,
+    selectAmbiguousProduct,
+    closeAmbiguity,
+  } = useBarcodeToCart(start?.id, {
     onError: (msg) =>
       setAlert({
         open: true,
@@ -1637,6 +1644,15 @@ const SellMainStart = () => {
         message={alert.message}
         okText="Ok"
         onClose={() => setAlert((a) => ({ ...a, open: false }))}
+      />
+
+      <BarcodeAmbiguityModal
+        open={Boolean(barcodeAmbiguity)}
+        message={barcodeAmbiguity?.message}
+        matches={barcodeAmbiguity?.matches}
+        loading={barcodeAmbiguityLoading}
+        onSelect={selectAmbiguousProduct}
+        onClose={closeAmbiguity}
       />
     </section>
   );

@@ -186,5 +186,48 @@ describe("saleThunk", () => {
       });
       expect(result.type).toBe("products/sendBarcode/fulfilled");
     });
+
+    it("preserves 409 ambiguity details for the UI", async () => {
+      api.post.mockRejectedValue({
+        response: {
+          status: 409,
+          data: {
+            ambiguous: true,
+            message: "Выберите товар",
+            matches: [
+              { id: "one", name: "Легенда 0.5" },
+              { id: "two", name: "Легенда 1.0" },
+            ],
+          },
+        },
+        message: "Request failed with status code 409",
+      });
+
+      const store = createTestStore({
+        sale: {
+          posCarts: [{ saleId: "10", isMain: true }],
+          activeSaleId: "10",
+          start: { id: 10 },
+        },
+      });
+
+      const result = await store.dispatch(
+        sendBarCode({ barcode: "4601234567890" }),
+      );
+
+      expect(result.type).toBe("products/sendBarcode/rejected");
+      expect(result.payload).toEqual({
+        status: 409,
+        message: "Выберите товар",
+        data: {
+          ambiguous: true,
+          message: "Выберите товар",
+          matches: [
+            { id: "one", name: "Легенда 0.5" },
+            { id: "two", name: "Легенда 1.0" },
+          ],
+        },
+      });
+    });
   });
 });

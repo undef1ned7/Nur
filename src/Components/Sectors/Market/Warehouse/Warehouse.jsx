@@ -5,6 +5,7 @@ import "./Warehouse.scss";
 import api from "../../../../api";
 import FilterModal from "./components/FilterModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import BarcodeAmbiguityModal from "../../../common/BarcodeAmbiguityModal/BarcodeAmbiguityModal";
 import WarehouseHeader from "./components/WarehouseHeader";
 import SearchSection from "./components/SearchSection";
 import BulkActionsBar from "./components/BulkActionsBar";
@@ -26,6 +27,7 @@ import {
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
 import { lookupMarketWarehouseProductByBarcode } from "../../../../../tools/marketWarehouseBarcodeScan";
+import { getBarcodeAmbiguity } from "../../../../../tools/barcodeAmbiguity";
 
 const WAREHOUSE_SELECTED_IDS_KEY = "marketWarehouseSelectedProductIds";
 const WAREHOUSE_SELECTED_SNAPSHOTS_KEY = "marketWarehouseSelectedProductSnapshots";
@@ -78,6 +80,7 @@ const Warehouse = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [scanLookupLoading, setScanLookupLoading] = useState(false);
+  const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -338,7 +341,7 @@ const Warehouse = () => {
       ) {
         return;
       }
-      if (showFilterModal || showDeleteConfirmModal) return;
+      if (showFilterModal || showDeleteConfirmModal || barcodeAmbiguity) return;
 
       const now = Date.now();
       const isDuplicateScan =
@@ -362,6 +365,11 @@ const Warehouse = () => {
 
         alert("Товар с таким штрихкодом не найден.", true);
       } catch (error) {
+        const ambiguity = getBarcodeAmbiguity(error);
+        if (ambiguity) {
+          setBarcodeAmbiguity(ambiguity);
+          return;
+        }
         const errorMessage = validateResErrors(
           error,
           "Ошибка поиска товара по штрихкоду",
@@ -469,6 +477,17 @@ const Warehouse = () => {
         okText="Удалить"
         onClose={() => setShowDeleteConfirmModal(false)}
         onConfirm={confirmBulkDelete}
+      />
+
+      <BarcodeAmbiguityModal
+        open={Boolean(barcodeAmbiguity)}
+        message={barcodeAmbiguity?.message}
+        matches={barcodeAmbiguity?.matches}
+        onSelect={(match) => {
+          setBarcodeAmbiguity(null);
+          navigate(`/crm/sklad/${match.id}`);
+        }}
+        onClose={() => setBarcodeAmbiguity(null)}
       />
     </div>
   );
