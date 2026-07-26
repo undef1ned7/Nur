@@ -190,6 +190,115 @@
     align-items: center;
     gap: 5px;
     color: #0f172a;
+    font-weight: 600;
+    &--whatsapp {
+      color: #25d366;
+    }
+    &--instagram {
+      color: #e1306c;
+    }
+    &--telegram {
+      color: #2aabee;
+    }
+    &--manual {
+      color: #64748b;
+    }
+  }
+
+  &__msgPreview {
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--leads-muted);
+    font-size: 13px;
+  }
+
+  &__codeBlock {
+    display: block;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid var(--leads-border);
+    border-radius: 8px;
+    font-size: 12px;
+    word-break: break-all;
+  }
+
+  &__steps {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.55;
+    li + li {
+      margin-top: 6px;
+    }
+    code {
+      font-size: 12px;
+    }
+  }
+
+  &__fieldHint {
+    display: block;
+    margin-top: 4px;
+    color: var(--leads-muted);
+    font-size: 12px;
+    line-height: 1.4;
+    &--warn {
+      color: #9a3412;
+    }
+  }
+
+  &__channelList {
+    display: grid;
+    gap: 8px;
+  }
+  &__channelCard {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid var(--leads-border);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font: inherit;
+    &.is-active {
+      border-color: var(--leads-primary);
+      background: #fffbeb;
+    }
+    b {
+      font-size: 13px;
+    }
+    span {
+      font-size: 14px;
+      color: #0f172a;
+    }
+    code {
+      font-size: 11px;
+      color: #475569;
+      word-break: break-all;
+    }
+    small {
+      color: var(--leads-muted);
+      font-size: 12px;
+    }
+  }
+
+  &__apiCell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 220px;
+    code {
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    small {
+      font-size: 11px;
+    }
   }
 
   &__status {
@@ -367,6 +476,9 @@
     border-radius: 14px;
     padding: 18px;
     box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  }
+  &__modal--wide {
+    width: min(520px, 100%);
   }
   &__modalHead {
     display: flex;

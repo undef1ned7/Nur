@@ -13,7 +13,9 @@ fallback: пока эндпоинт не реализован (ответ `404/5
 |---|---|---|
 | 2 | [services-role-pricing.md](./services-role-pricing.md) | Убрали «Стоимость установки». Цены услуги и тарифов — **по ролям** (`role_prices`). |
 | 1 | [analytics.md](./analytics.md) | Детализация аналитики **по каждой услуге** и дополнительные CRM-метрики. |
-| 3 | [leads-whatsapp.md](./leads-whatsapp.md) | Страница «Лиды»: приём из WhatsApp по webhook + авто-распределение по ролям. |
+| 3 | [leads-whatsapp.md](./leads-whatsapp.md) | Страница «Лиды»: входящие + распределение. |
+| 3b | [wazzup-integration.md](./wazzup-integration.md) | Wazzup API v3: аккаунты, webhook, send-message. |
+| 3c | [wazzup-frontend.md](./wazzup-frontend.md) | Чат 100% WS: `send_message` / `new_message` / `message_status`; история REST. |
 | 4 | [funnel-crm-logic.md](./funnel-crm-logic.md) | Аудит бизнес-логики воронки продаж; что бэкенд обязан гарантировать. |
 | 5 | [salary-auto-accrual.md](./salary-auto-accrual.md) | Зарплата: авто-начисление % с закрытых продаж/выигранных лидов. |
 | 6 | [subscription-matrix.md](./subscription-matrix.md) | Абонентская матрица «ФИО × услуга × месяцы» на странице «Клиенты». |
