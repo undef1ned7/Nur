@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { usePointerReorder } from "../../../../hooks/usePointerReorder";
 import {
@@ -21,10 +21,12 @@ import {
   canDragLead,
   filterActiveBoardLeads,
   isLeadOnCompletedStage,
+  resolveCurrentUserId,
 } from "../../../../utils/consultingFunnelLeadUtils";
 
 const COLLAPSED_KEY = "consulting_funnel_collapsed_v1";
 const FUNNEL_V2 = import.meta.env.VITE_FUNNEL_V2 === "true";
+const COLUMN_PAGE_SIZE = 25;
 
 function readCollapsedMap() {
   try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "{}"); }
@@ -120,12 +122,18 @@ function Column({
   onAddLead, onCardClick, onClaimLead, onTransferLead,
   onEditStage, onDeleteStage,
   claimBusyId, canManageLeads, canManageStages,
-  board, profile,
+  board, profile, currentUserId,
   // stage reorder (pointer-based)
   isStageDragging, isStageDragOver, canDragStage,
   onStageHandlePointerDown,    // (e, stageId) => void
+  visibleLimit,
+  onShowMore,
 }) {
   const stageColor = stage?.color || "#cbd5e1";
+  const totalFiltered = leads.length;
+  const limit = Math.max(COLUMN_PAGE_SIZE, visibleLimit || COLUMN_PAGE_SIZE);
+  const visibleLeads = leads.slice(0, limit);
+  const hiddenCount = Math.max(0, totalFiltered - visibleLeads.length);
   const sum = leads.reduce((acc, l) => acc + (Number(l.estimated_value) || 0), 0);
   const systemStage = !unassigned && isSystemStage(stage);
 
@@ -177,7 +185,9 @@ function Column({
           <span className="funnel__colDot" style={{ background: stageColor }} />
           <span className="funnel__colName">{stage?.name || "—"}</span>
           {systemStage && <span className="funnel__colLock">🔒</span>}
-          <span className="funnel__colCount">{leads.length}</span>
+          <span className="funnel__colCount" title="По фильтру">
+            {totalFiltered}
+          </span>
           {canManageStages && !unassigned && !systemStage && stage?.id && (
             <span className="funnel__colStageActions">
               <button type="button" className="funnel__colStageBtn"
@@ -190,7 +200,7 @@ function Column({
         {sum > 0 && <span className="funnel__colSum">{fmtMoneyShort(sum)} с</span>}
       </div>
       <div className="funnel__colBody">
-        {leads.map((lead) => (
+        {visibleLeads.map((lead) => (
           <LeadCard
             key={lead.id}
             lead={lead}
@@ -202,14 +212,29 @@ function Column({
             onTransfer={onTransferLead}
             claimBusy={claimBusyId === lead.id}
             canManageLeads={canManageLeads}
-            canDrag={canDragLead(lead, board, profile, canManageLeads)}
+            canDrag={canDragLead(
+              lead,
+              board,
+              profile,
+              canManageLeads,
+              currentUserId,
+            )}
             completed={isLeadOnCompletedStage(lead, board)}
           />
         ))}
-        {!leads.length && (
+        {!totalFiltered && (
           <div className="funnel__colEmpty">
             {canManageLeads ? "Перетащите карточку" : "Нет лидов"}
           </div>
+        )}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            className="funnel__colMore"
+            onClick={onShowMore}
+          >
+            Показать ещё ({hiddenCount})
+          </button>
         )}
       </div>
       {!unassigned && canManageLeads && (
@@ -224,7 +249,8 @@ function Column({
 /* ─── FunnelBoardRow ────────────────────────────────────────────── */
 export default function FunnelBoardRow({
   funnel, board, profile, isManager,
-  matchLead, hasFilters,
+  matchLead, hasFilters, filterRevision,
+  currentUserId: currentUserIdProp,
   dragState, onDragStart, onDragEnd, onDropStage,
   boardRef, claimBusyId, onClaimLead,
   onOpenLead, onCreateLead, onTransferLead,
@@ -236,6 +262,25 @@ export default function FunnelBoardRow({
   const dispatch = useDispatch();
   const [dragOverStage, setDragOverStage] = useState(null);
   const [collapsed, setCollapsed] = useState(() => isFunnelCollapsed(funnel.id));
+  const [visibleByCol, setVisibleByCol] = useState({});
+  const [prevFilterRevision, setPrevFilterRevision] = useState(filterRevision);
+
+  if (filterRevision !== prevFilterRevision) {
+    setPrevFilterRevision(filterRevision);
+    setVisibleByCol({});
+  }
+
+  const colLimit = useCallback(
+    (key) => visibleByCol[key] || COLUMN_PAGE_SIZE,
+    [visibleByCol],
+  );
+
+  const showMoreCol = useCallback((key) => {
+    setVisibleByCol((prev) => ({
+      ...prev,
+      [key]: (prev[key] || COLUMN_PAGE_SIZE) + COLUMN_PAGE_SIZE,
+    }));
+  }, []);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
@@ -249,19 +294,34 @@ export default function FunnelBoardRow({
   const canManageStages = canManageStagesInFunnel(profile, funnel);
   const canEditMeta     = canEditFunnelMeta(profile, funnel);
   const tag             = funnelProtectionLabel(funnel);
+  const currentUserId   = currentUserIdProp || resolveCurrentUserId(profile);
 
-  const rawColumns    = board?.columns   || [];
-  const rawUnassigned = board?.unassigned || [];
-  const totalLeads    = board?.funnel?.leads_count ?? 0;
+  const rawColumns = useMemo(() => board?.columns || [], [board?.columns]);
+  const rawUnassigned = useMemo(
+    () => board?.unassigned || [],
+    [board?.unassigned],
+  );
+  const totalLeads = board?.funnel?.leads_count ?? 0;
 
-  const mapLeads = (leads) => {
-    const active = filterActiveBoardLeads(leads);
-    return hasFilters ? active.filter(matchLead) : active;
-  };
+  const mapLeads = useCallback(
+    (leads) => {
+      const active = filterActiveBoardLeads(leads);
+      if (typeof matchLead !== "function") return active;
+      return active.filter(matchLead);
+    },
+    [matchLead],
+  );
 
-  const columns    = rawColumns.map((c) => ({ ...c, leads: mapLeads(c.leads) }));
-  const unassigned = mapLeads(rawUnassigned);
-  const shownLeads = columns.reduce((n, c) => n + (c.leads?.length || 0), 0) + unassigned.length;
+  const columns = useMemo(
+    () => rawColumns.map((c) => ({ ...c, leads: mapLeads(c.leads) })),
+    [rawColumns, mapLeads],
+  );
+  const unassigned = useMemo(
+    () => mapLeads(rawUnassigned),
+    [rawUnassigned, mapLeads],
+  );
+  const shownLeads =
+    columns.reduce((n, c) => n + (c.leads?.length || 0), 0) + unassigned.length;
 
   const dragLeadId     = dragState?.funnelId === funnel.id ? dragState.leadId : null;
   const allowedStageIds = dragLeadId && allowedTransitions
@@ -276,7 +336,11 @@ export default function FunnelBoardRow({
 
   const handleClaim = async (leadId) => {
     if (!canManageLeads) return;
-    try { await dispatch(claimLead(leadId)).unwrap(); } catch {}
+    try {
+      await dispatch(claimLead(leadId)).unwrap();
+    } catch {
+      /* claim error handled by board refresh / notice elsewhere */
+    }
     onClaimLead?.(leadId);
   };
 
@@ -409,7 +473,10 @@ export default function FunnelBoardRow({
 
         {!collapsed && (
           <p className="funnel__rowMeta">
-            {hasFilters ? `Показано ${shownLeads} из ${totalLeads}` : `${totalLeads} лид(ов)`}
+            {shownLeads !== totalLeads
+              ? `Показано ${shownLeads} из ${totalLeads}`
+              : `${totalLeads} лид(ов)`}
+            {hasFilters ? " · фильтр" : ""}
           </p>
         )}
 
@@ -435,7 +502,9 @@ export default function FunnelBoardRow({
 
       {!collapsed && (
         <div className="funnel__board funnel__board--row" ref={boardRef}>
-          {columns.map((col) => (
+          {columns.map((col) => {
+            const colKey = String(col.stage?.id || "stage");
+            return (
             <Column
               key={col.stage?.id}
               stage={col.stage}
@@ -465,13 +534,17 @@ export default function FunnelBoardRow({
               canManageStages={canManageStages}
               board={board}
               profile={profile}
+              currentUserId={currentUserId}
               // stage reorder (pointer-based)
               isStageDragging={String(stageDragId) === String(col.stage?.id)}
               isStageDragOver={String(stageDragOverId) === String(col.stage?.id)}
               canDragStage={canManageStages && !isSystemStage(col.stage)}
               onStageHandlePointerDown={onStageHandlePointerDown}
+              visibleLimit={colLimit(colKey)}
+              onShowMore={() => showMoreCol(colKey)}
             />
-          ))}
+            );
+          })}
 
           {!!unassigned.length && (
             <Column
@@ -493,9 +566,12 @@ export default function FunnelBoardRow({
               canManageStages={false}
               board={board}
               profile={profile}
+              currentUserId={currentUserId}
               isStageDragging={false}
               isStageDragOver={false}
               canDragStage={false}
+              visibleLimit={colLimit("unassigned")}
+              onShowMore={() => showMoreCol("unassigned")}
             />
           )}
         </div>

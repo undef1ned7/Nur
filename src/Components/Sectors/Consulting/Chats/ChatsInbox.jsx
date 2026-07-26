@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, startTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -10,7 +17,11 @@ import {
 import {
   getConsultingLead,
   listWazzupChats,
+  messageBelongsToLead,
+  normalizeChatMessage,
+  normalizePhone,
 } from "../../../../api/consultingWazzup";
+import { useWazzupChatSocket } from "../../../../hooks/useWazzupChatSocket";
 import {
   isConsultingChatRealtimeEvent,
   leadSourceLabel,
@@ -24,9 +35,19 @@ import "../Funnel/Funnel.scss";
 import "./chats.scss";
 
 const CHANNEL_META = {
-  whatsapp: { title: "WhatsApp", Icon: FaWhatsapp, tone: "wa" },
-  telegram: { title: "Telegram", Icon: FaTelegram, tone: "tg" },
-  instagram: { title: "Instagram", Icon: FaInstagram, tone: "ig" },
+  whatsapp: { title: "WhatsApp", Icon: FaWhatsapp, tone: "wa", available: true },
+  telegram: {
+    title: "Telegram",
+    Icon: FaTelegram,
+    tone: "tg",
+    available: false,
+  },
+  instagram: {
+    title: "Instagram",
+    Icon: FaInstagram,
+    tone: "ig",
+    available: false,
+  },
 };
 
 const fmtTime = (iso) => {
@@ -43,6 +64,44 @@ const fmtTime = (iso) => {
     : d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
 };
 
+/** Не затирать локальный unread/preview устаревшим ответом API. */
+function mergeChatThreads(prev, next, openLeadId) {
+  const prevById = new Map(
+    (prev || []).map((t) => [String(t.lead_id || t.id), t]),
+  );
+  return (next || []).map((row) => {
+    const id = String(row.lead_id || row.id);
+    const old = prevById.get(id);
+    if (openLeadId && id === String(openLeadId)) {
+      return { ...row, unread_count: 0, has_unread: false };
+    }
+    if (!old) return row;
+
+    const oldT = new Date(old.last_message_at || 0).getTime();
+    const newT = new Date(row.last_message_at || 0).getTime();
+    const oldUnread = Number(old.unread_count) || 0;
+    const newUnread = Number(row.unread_count) || 0;
+
+    if (oldT > newT) {
+      return {
+        ...row,
+        last_message: old.last_message || row.last_message,
+        last_message_at: old.last_message_at,
+        unread_count: Math.max(oldUnread, newUnread),
+        has_unread: Math.max(oldUnread, newUnread) > 0,
+      };
+    }
+    if (oldT === newT && oldUnread > newUnread) {
+      return {
+        ...row,
+        unread_count: oldUnread,
+        has_unread: oldUnread > 0,
+      };
+    }
+    return row;
+  });
+}
+
 /**
  * Inbox канала: список чатов слева, диалог справа.
  * /crm/consulting/chats/:channel[/:leadId]
@@ -53,6 +112,7 @@ export default function ChatsInbox() {
   const channel = String(channelParam || "whatsapp").toLowerCase();
   const meta = CHANNEL_META[channel] || CHANNEL_META.whatsapp;
   const Icon = meta.Icon;
+  const channelAvailable = meta.available !== false;
 
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +122,8 @@ export default function ChatsInbox() {
   const [notice, setNotice] = useState("");
   const [apiLead, setApiLead] = useState(null);
   const [leadLoading, setLeadLoading] = useState(false);
+  const leadIdRef = useRef(leadId);
+  leadIdRef.current = leadId;
 
   const threadLead = useMemo(() => {
     if (!leadId) return null;
@@ -79,23 +141,37 @@ export default function ChatsInbox() {
     };
   }, [leadId, threads, channel]);
 
-  const loadThreads = useCallback(async () => {
-    setLoading(true);
-    setErr("");
-    setNotReady(false);
+  const loadThreads = useCallback(async ({ silent = false } = {}) => {
+    if (CHANNEL_META[channel]?.available === false) {
+      setThreads([]);
+      setLoading(false);
+      setNotReady(false);
+      return;
+    }
+    if (!silent) {
+      setLoading(true);
+      setErr("");
+      setNotReady(false);
+    }
     try {
       const { threads: rows, notReady: nr } = await listWazzupChats(channel);
-      setThreads(rows);
+      setThreads((prev) =>
+        silent
+          ? mergeChatThreads(prev, rows, leadIdRef.current)
+          : rows,
+      );
       setNotReady(!!nr && !rows.length);
     } catch (e) {
-      setErr(
-        typeof e?.detail === "string"
-          ? e.detail
-          : "Не удалось загрузить список чатов.",
-      );
-      setThreads([]);
+      if (!silent) {
+        setErr(
+          typeof e?.detail === "string"
+            ? e.detail
+            : "Не удалось загрузить список чатов.",
+        );
+        setThreads([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [channel]);
 
@@ -109,16 +185,116 @@ export default function ChatsInbox() {
     ensurePushPermission();
   }, []);
 
-  const onChatSignal = useCallback(() => {
-    startTransition(() => {
-      loadThreads();
-    });
-  }, [loadThreads]);
+  /**
+   * Уведомления больше НЕ дергают полный reload списка:
+   * new_message уже обрабатывает /ws/wazzup/, а refetch мигал UI
+   * и затирал бейдж непрочитанных.
+   * Тихий refetch только для назначения/нового лида (новый поток в списке).
+   */
+  const onChatSignal = useCallback(
+    (n) => {
+      const t = String(n?.type || n?.event || n?.notification_type || "").toLowerCase();
+      const isMessage =
+        t.includes("message") ||
+        t.includes("lead_message") ||
+        t.includes("new_message");
+      if (isMessage) return;
+      startTransition(() => {
+        loadThreads({ silent: true });
+      });
+    },
+    [loadThreads],
+  );
 
   useConsultingRealtime({
     match: isConsultingChatRealtimeEvent,
     onSignal: onChatSignal,
+    desktopPush: false,
   });
+
+  /** Подъём чата наверх + preview/unread по WS new_message */
+  const onInboxNewMessage = useCallback(
+    (data) => {
+      const msg = normalizeChatMessage(data);
+      const openId = leadIdRef.current ? String(leadIdRef.current) : "";
+
+      setThreads((prev) => {
+        const findIdx = (rows) => {
+          let i = rows.findIndex((t) =>
+            messageBelongsToLead(msg, {
+              id: t.lead_id || t.id,
+              phone: t.phone || t.chat_id,
+            }),
+          );
+          if (i < 0 && msg.lead_id) {
+            i = rows.findIndex(
+              (t) => String(t.lead_id || t.id) === String(msg.lead_id),
+            );
+          }
+          if (i < 0 && msg.chat_id) {
+            const phone = normalizePhone(msg.chat_id);
+            i = rows.findIndex((t) => {
+              const tp = normalizePhone(t.phone || t.chat_id);
+              return (
+                tp &&
+                phone &&
+                (tp === phone || tp.endsWith(phone) || phone.endsWith(tp))
+              );
+            });
+          }
+          return i;
+        };
+
+        const rows = [...prev];
+        const i = findIdx(rows);
+        if (i < 0) {
+          startTransition(() => loadThreads({ silent: true }));
+          return prev;
+        }
+
+        const cur = rows[i];
+        const threadId = String(cur.lead_id || cur.id);
+        const isOpen =
+          !!openId &&
+          (threadId === openId ||
+            (msg.lead_id && String(msg.lead_id) === openId));
+        const bumpUnread = msg.direction === "in" && !isOpen;
+        const nextUnread = bumpUnread
+          ? (Number(cur.unread_count) || 0) + 1
+          : isOpen
+            ? 0
+            : Number(cur.unread_count) || 0;
+
+        const updated = {
+          ...cur,
+          last_message: msg.text || cur.last_message,
+          last_message_at: msg.created_at || cur.last_message_at,
+          unread_count: nextUnread,
+          has_unread: nextUnread > 0,
+        };
+        rows.splice(i, 1);
+        return [updated, ...rows];
+      });
+    },
+    [loadThreads],
+  );
+
+  useWazzupChatSocket({
+    enabled: true,
+    onNewMessage: onInboxNewMessage,
+  });
+
+  /** Локальный сброс бейджа; mark-read → Wazzup unread:0 делает LeadMessengerPanel */
+  useEffect(() => {
+    if (!leadId) return;
+    setThreads((prev) =>
+      prev.map((t) =>
+        String(t.lead_id || t.id) === String(leadId)
+          ? { ...t, unread_count: 0, has_unread: false }
+          : t,
+      ),
+    );
+  }, [leadId]);
 
   useEffect(() => {
     if (!leadId) return undefined;
@@ -153,16 +329,36 @@ export default function ChatsInbox() {
     };
   }, [leadId, channel]);
 
-  // Пока API грузится — показываем данные из списка чатов
+  // Стабильный lead для панели: preview из списка не должен менять identity
+  // и провоцировать перезагрузку истории.
   const lead = useMemo(() => {
     if (!leadId) return null;
-    if (apiLead && String(apiLead.id) === String(leadId)) {
-      // если это только stub "Чат" и есть thread — предпочитаем thread
-      if (apiLead.full_name === "Чат" && threadLead) return threadLead;
-      return apiLead;
-    }
-    return threadLead;
-  }, [leadId, apiLead, threadLead]);
+    const fromApi =
+      apiLead && String(apiLead.id) === String(leadId) ? apiLead : null;
+    const base =
+      fromApi && fromApi.full_name !== "Чат"
+        ? fromApi
+        : threadLead || fromApi;
+    if (!base) return null;
+    return {
+      id: base.id || base.lead_id || leadId,
+      full_name: base.full_name || "Чат",
+      phone: base.phone || "",
+      source: base.source || channel,
+      title: base.title || base.full_name,
+      message: base.message || base.first_message || "",
+      first_message: base.first_message || "",
+      created_at: base.created_at,
+    };
+  }, [
+    leadId,
+    channel,
+    apiLead,
+    threadLead?.id,
+    threadLead?.full_name,
+    threadLead?.phone,
+    threadLead?.source,
+  ]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -177,6 +373,39 @@ export default function ChatsInbox() {
     const id = thread.lead_id || thread.id;
     navigate(`/crm/consulting/chats/${channel}/${id}`);
   };
+
+  const handleNotice = useCallback((m) => setNotice(m || ""), []);
+  const handleError = useCallback((m) => setErr(m || ""), []);
+
+  if (!channelAvailable) {
+    return (
+      <section className={`crmInbox crmInbox--${meta.tone}`}>
+        <header className="crmInbox__top">
+          <Link to="/crm/consulting/chats" className="crmInbox__back">
+            <FaArrowLeft /> CRM
+          </Link>
+          <div className="crmInbox__brand">
+            <Icon className="crmInbox__brandIcon" />
+            <div>
+              <h1 className="crmInbox__title">{meta.title}</h1>
+              <p className="crmInbox__sub">Пока не доступно</p>
+            </div>
+          </div>
+        </header>
+        <div className="crmInbox__unavailable">
+          <Icon />
+          <h2>{meta.title} пока не доступен</h2>
+          <p>
+            Сейчас в CRM работают только чаты WhatsApp. Telegram и Instagram
+            появятся позже.
+          </p>
+          <Link to="/crm/consulting/chats/whatsapp" className="crmInbox__goWa">
+            Открыть WhatsApp
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={`crmInbox crmInbox--${meta.tone}`}>
@@ -196,6 +425,23 @@ export default function ChatsInbox() {
         <nav className="crmInbox__channels" aria-label="Мессенджеры">
           {Object.entries(CHANNEL_META).map(([id, m]) => {
             const I = m.Icon;
+            if (m.available === false) {
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="crmInbox__chPill is-disabled"
+                  title={`${m.title} пока не доступен`}
+                  onClick={() =>
+                    setNotice(
+                      `${m.title} пока не доступен. Сейчас работают только чаты WhatsApp.`,
+                    )
+                  }
+                >
+                  <I />
+                </button>
+              );
+            }
             return (
               <Link
                 key={id}
@@ -297,8 +543,8 @@ export default function ChatsInbox() {
             <div className="crmInbox__chatWrap">
               <LeadMessengerPanel
                 lead={lead}
-                onNotice={(m) => setNotice(m || "")}
-                onError={(m) => setErr(m || "")}
+                onNotice={handleNotice}
+                onError={handleError}
               />
             </div>
           ) : (

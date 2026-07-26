@@ -29,6 +29,7 @@ import {
   claimLead,
   releaseLead,
   assignLead,
+  transferLeadOwner,
   archiveLead,
   setLeadParticipants,
   getFunnelOrder,
@@ -56,9 +57,12 @@ import {
 } from "../../../../utils/consultingFunnelDefaults";
 import {
   canDragLead,
+  canEditLead,
   findStageInBoard,
   isLeadLockedForEmployee,
   isLeadOnCompletedStage,
+  isLeadOwner,
+  resolveCurrentUserId,
 } from "../../../../utils/consultingFunnelLeadUtils";
 import { calcConsultingSaleTotal, formatTariffSubscription, resolveTariffPrice } from "../../../../utils/consultingSalePricing";
 import { ensurePushPermission, useConsultingRealtime } from "../common/useConsultingRealtime";
@@ -236,6 +240,31 @@ export default function ConsultingFunnel() {
   const [ownerFilter, setOwnerFilter] = useState("");
   const [riskOnly, setRiskOnly] = useState(false);
   const [gradeFilter, setGradeFilter] = useState("");
+  const [ownerScope, setOwnerScope] = useState(() => {
+    try {
+      const saved = localStorage.getItem("consulting_funnel_scope_v1");
+      if (saved === "mine" || saved === "all" || saved === "pool") return saved;
+    } catch {
+      /* ignore */
+    }
+    return "mine";
+  });
+
+  // Сотрудник не видит чужие лиды — только «Мои» (+ «Пул» для claim).
+  const effectiveOwnerScope = isManager
+    ? ownerScope
+    : ownerScope === "pool"
+      ? "pool"
+      : "mine";
+
+  if (!isManager && ownerScope === "all") {
+    setOwnerScope("mine");
+    try {
+      localStorage.setItem("consulting_funnel_scope_v1", "mine");
+    } catch {
+      /* ignore */
+    }
+  }
 
   const [funnelFormOpen, setFunnelFormOpen] = useState(false);
   const [funnelEditTarget, setFunnelEditTarget] = useState(null);
@@ -514,12 +543,36 @@ export default function ConsultingFunnel() {
     return [...map.entries()].map(([id, name]) => ({ id, name }));
   }, [boardsMap]);
 
+  const myUserId =
+    wsUserId || profile?.id || profile?.user_id || localStorage.getItem("userId") || "";
+
+  const persistOwnerScope = useCallback(
+    (next) => {
+      // Сотруднику нельзя включать «Все»
+      const scoped = !isManager && next === "all" ? "mine" : next;
+      setOwnerScope(scoped);
+      try {
+        localStorage.setItem("consulting_funnel_scope_v1", scoped);
+      } catch {
+        /* ignore */
+      }
+    },
+    [isManager],
+  );
+
   // предикат фильтрации одной карточки
   const matchLead = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (lead) => {
+      if (effectiveOwnerScope === "mine") {
+        // Пока нет user id (WS/профиль) — не прячем всю доску
+        if (myUserId && String(lead.owner) !== String(myUserId)) return false;
+      } else if (effectiveOwnerScope === "pool") {
+        if (lead.owner) return false;
+      }
+      // effectiveOwnerScope === "all" — без ограничения по владельцу (только менеджер)
       if (riskOnly && !lead.is_at_risk) return false;
-      if (ownerFilter && lead.owner !== ownerFilter) return false;
+      if (isManager && ownerFilter && lead.owner !== ownerFilter) return false;
       if (gradeFilter && lead.score_grade !== gradeFilter) return false;
       if (q) {
         const hay = [lead.title, lead.full_name, lead.phone, lead.email]
@@ -530,15 +583,32 @@ export default function ConsultingFunnel() {
       }
       return true;
     };
-  }, [query, riskOnly, ownerFilter, gradeFilter]);
+  }, [
+    query,
+    riskOnly,
+    ownerFilter,
+    gradeFilter,
+    effectiveOwnerScope,
+    myUserId,
+    isManager,
+  ]);
 
-  const hasFilters = !!(query.trim() || ownerFilter || riskOnly || gradeFilter);
+  const hasFilters = !!(
+    query.trim() ||
+    (isManager && ownerFilter) ||
+    riskOnly ||
+    gradeFilter ||
+    effectiveOwnerScope !== "mine"
+  );
+
+  const filterRevision = `${effectiveOwnerScope}|${query}|${ownerFilter}|${riskOnly}|${gradeFilter}|${myUserId}|${isManager}`;
 
   const resetFilters = () => {
     setQuery("");
     setOwnerFilter("");
     setRiskOnly(false);
     setGradeFilter("");
+    persistOwnerScope("mine");
   };
 
   const onDropToStage = async (funnelId, leadId, stageId) => {
@@ -550,8 +620,12 @@ export default function ConsultingFunnel() {
       [...(board.columns || []).flatMap((c) => c.leads || []), ...(board.unassigned || [])].find(
         (l) => l.id === leadId,
       );
-    if (lead && !canDragLead(lead, board, profile, true)) {
-      setNotice("Завершённые лиды может перемещать только администратор.");
+    if (lead && !canDragLead(lead, board, profile, true, myUserId)) {
+      setNotice(
+        lead.owner && !isLeadOwner(lead, myUserId) && !isManager
+          ? "С этим лидом может взаимодействовать только назначенный сотрудник."
+          : "Завершённые лиды может перемещать только администратор.",
+      );
       setDragState(null);
       return;
     }
@@ -660,6 +734,31 @@ export default function ConsultingFunnel() {
 
       {visibleFunnels.length > 0 && (
         <div className="funnel__toolbar">
+          <div className="funnel__scope" role="group" aria-label="Чьи лиды">
+            {(isManager
+              ? [
+                  { id: "mine", label: "Мои" },
+                  { id: "all", label: "Все" },
+                  { id: "pool", label: "Пул" },
+                ]
+              : [
+                  { id: "mine", label: "Мои" },
+                  { id: "pool", label: "Пул" },
+                ]
+            ).map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`funnel__scopeBtn${
+                  effectiveOwnerScope === s.id ? " funnel__scopeBtn--active" : ""
+                }`}
+                onClick={() => persistOwnerScope(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
           <div className="funnel__searchWrap">
             <span className="funnel__searchIcon" aria-hidden>
               🔍
@@ -681,7 +780,7 @@ export default function ConsultingFunnel() {
             )}
           </div>
 
-          {owners.length > 1 && (
+          {isManager && owners.length > 1 && (
             <select
               className="funnel__select funnel__select--sm"
               value={ownerFilter}
@@ -749,6 +848,8 @@ export default function ConsultingFunnel() {
               isManager={isManager}
               matchLead={matchLead}
               hasFilters={hasFilters}
+              filterRevision={filterRevision}
+              currentUserId={myUserId}
               dragState={dragState}
               onDragStart={(funnelId, leadId) =>
                 setDragState({ funnelId, leadId })
@@ -1790,6 +1891,9 @@ function LeadDetail({
   const [busy, setBusy] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [assignTo, setAssignTo] = useState("");
+  const [transferTo, setTransferTo] = useState("");
+
+  const detailUserId = resolveCurrentUserId(profile, wsUserId);
 
   // WhatsApp/IG/TG лиды сразу открываем на вкладке «Чат».
   useEffect(() => {
@@ -1810,7 +1914,6 @@ function LeadDetail({
   }, [dispatch, leadId]);
 
   useEffect(() => {
-    if (!wsIsManager) return undefined;
     let cancelled = false;
     api
       .get("/users/employees/")
@@ -1825,14 +1928,14 @@ function LeadDetail({
               [e.first_name, e.last_name].filter(Boolean).join(" ") ||
               e.email ||
               "Сотрудник",
-          }))
+          })),
         );
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [wsIsManager]);
+  }, []);
 
   if (!lead) {
     return (
@@ -1845,8 +1948,15 @@ function LeadDetail({
   const closed = lead.status === "won" || lead.status === "lost";
   const onCompleted = isLeadOnCompletedStage(lead, board);
   const completedLocked = isLeadLockedForEmployee(lead, board, profile);
-  const isMine = wsUserId && lead.owner === wsUserId;
+  const isMine = isLeadOwner(lead, detailUserId);
   const inPool = !lead.owner;
+  const canTouch = canEditLead(lead, board, profile, detailUserId);
+  const canTransferOwner =
+    canManageLeads &&
+    !closed &&
+    !inPool &&
+    (isMine || wsIsManager) &&
+    employees.length > 0;
   const clientId = lead.client || lead.client_id;
   const clientName = lead.client_display || lead.client_full_name;
 
@@ -1910,6 +2020,27 @@ function LeadDetail({
       onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось назначить лид."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onTransferOwner = async () => {
+    if (!transferTo) return setErr("Выберите сотрудника для передачи.");
+    if (detailUserId && String(transferTo) === String(detailUserId)) {
+      return setErr("Нельзя передать лид самому себе.");
+    }
+    setErr("");
+    setBusy(true);
+    try {
+      await dispatch(
+        transferLeadOwner({ id: leadId, new_owner_id: transferTo }),
+      ).unwrap();
+      onNotice?.("Лид передан сотруднику.");
+      setTransferTo("");
+      onBoardRefresh?.();
+    } catch (e) {
+      setErr(errToText(e, "Не удалось передать лид."));
     } finally {
       setBusy(false);
     }
@@ -2013,7 +2144,33 @@ function LeadDetail({
               </button>
             </>
           )}
-          {onCompleted && !lead.is_archived && canManageLeads && (
+          {canTransferOwner && (
+            <>
+              <select
+                className="funnel__select funnel__select--inline"
+                value={transferTo}
+                onChange={(e) => setTransferTo(e.target.value)}
+                aria-label="Передать другому сотруднику"
+              >
+                <option value="">Передать…</option>
+                {employees
+                  .filter((e) => String(e.id) !== String(detailUserId))
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+              </select>
+              <button
+                className="funnel__btn"
+                onClick={onTransferOwner}
+                disabled={busy || !transferTo}
+              >
+                Передать
+              </button>
+            </>
+          )}
+          {onCompleted && !lead.is_archived && canTouch && (
             <button
               className="funnel__btn funnel__btn--secondary"
               onClick={onArchive}
@@ -2022,7 +2179,7 @@ function LeadDetail({
               В архив
             </button>
           )}
-          {canManageLeads && !closed && !completedLocked && onTransfer && (
+          {canTouch && !closed && !completedLocked && onTransfer && (
             <button
               className="funnel__btn"
               onClick={() => onTransfer(lead)}
@@ -2031,7 +2188,7 @@ function LeadDetail({
               ⇄ В другую воронку
             </button>
           )}
-          {canManageLeads && !clientId && (
+          {canTouch && !clientId && (
             <button
               className="funnel__btn funnel__btn--secondary"
               onClick={() => setCreateClientOpen(true)}
@@ -2040,7 +2197,7 @@ function LeadDetail({
               + Клиент
             </button>
           )}
-          {canManageLeads && clientId && !lead.payment_registered && (
+          {canTouch && clientId && !lead.payment_registered && (
             <button
               className="funnel__btn funnel__btn--primary"
               onClick={() => setPaymentOpen(true)}
@@ -2049,7 +2206,7 @@ function LeadDetail({
               Оформить оплату
             </button>
           )}
-          {FUNNEL_V2 && (
+          {FUNNEL_V2 && canTouch && (
             <>
               <button className="funnel__btn" onClick={onRecalc} disabled={busy}>
                 ↻ Скоринг
@@ -2078,6 +2235,12 @@ function LeadDetail({
       </div>
 
       {!!err && <div className="funnel__error">{err}</div>}
+      {!canTouch && !inPool && (
+        <p className="funnel__hint funnel__hint--lock">
+          С этим лидом может взаимодействовать только назначенный сотрудник
+          {lead.owner_display ? ` (${lead.owner_display})` : ""} или руководитель.
+        </p>
+      )}
 
       {FUNNEL_V2 && loseOpen && !closed && (
         <LoseForm
@@ -2119,7 +2282,7 @@ function LeadDetail({
           funnelId={funnelId}
           stages={stages}
           onClose={onClose}
-          readOnly={!canManageLeads || completedLocked}
+          readOnly={!canTouch || completedLocked}
         />
       )}
       {completedLocked && (
@@ -2135,11 +2298,17 @@ function LeadDetail({
         <TasksTab leadId={leadId} tasks={tasks} />
       )}
       {tab === "messenger" && (
-        <LeadMessengerPanel
-          lead={lead}
-          onNotice={onNotice}
-          onError={setErr}
-        />
+        canTouch ? (
+          <LeadMessengerPanel
+            lead={lead}
+            onNotice={onNotice}
+            onError={setErr}
+          />
+        ) : (
+          <p className="funnel__hint funnel__hint--lock">
+            Чат доступен только назначенному сотруднику или руководителю.
+          </p>
+        )
       )}
       {createClientOpen && (
         <LeadCreateClientModal

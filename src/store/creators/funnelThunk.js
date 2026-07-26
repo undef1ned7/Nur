@@ -379,6 +379,24 @@ export const assignLead = createAsyncThunk(
   }
 );
 
+/**
+ * Передать лид другому сотруднику (owner или руководитель).
+ * POST /consalting/leads/{id}/transfer-owner/  { new_owner_id }
+ */
+export const transferLeadOwner = createAsyncThunk(
+  "funnel/transferLeadOwner",
+  async ({ id, new_owner_id }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(`${BASE}/leads/${id}/transfer-owner/`, {
+        new_owner_id,
+      });
+      return data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
 /* Перемещение лида между стадиями (drag & drop) */
 export const moveLeadStage = createAsyncThunk(
   "funnel/moveStage",

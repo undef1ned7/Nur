@@ -24,6 +24,8 @@ import {
 import { playNotificationSound } from "../config/notificationSound";
 import {
   consultingNotificationLeadId,
+  extractLeadIdFromConsaltingUrl,
+  isConsultingLeadNoReplyEvent,
   resolveConsultingNotificationUrl,
 } from "../utils/consultingLeadSources";
 import { isConsultingActiveChatLead } from "../utils/consultingActiveChat";
@@ -47,6 +49,18 @@ const CONSULTING_EVENT_META = {
   },
   "consulting.lead.task.assigned": {
     title: "Вам поручена задача по лиду",
+    level: "info",
+  },
+  lead_transferred: {
+    title: "Вам передан лид",
+    level: "info",
+  },
+  "lead.transferred": {
+    title: "Вам передан лид",
+    level: "info",
+  },
+  "consulting.lead.transferred": {
+    title: "Вам передан лид",
     level: "info",
   },
   "lead.message": {
@@ -137,6 +151,9 @@ function resolveConsultingMeta(type) {
   if (type.includes("message") || type.includes("wazzup")) {
     return CONSULTING_EVENT_META["lead.message"];
   }
+  if (type.includes("transfer")) {
+    return CONSULTING_EVENT_META.lead_transferred;
+  }
   if (type.includes("task") && type.includes("assign")) {
     return CONSULTING_EVENT_META["consulting.lead.task.assigned"];
   }
@@ -189,6 +206,7 @@ function normalizeConsultingNotification(type, payload, raw) {
         data.meta?.lead_id ??
         data.lead_id ??
         data.lead ??
+        extractLeadIdFromConsaltingUrl(data.url || data.link || raw?.url) ??
         null,
       source:
         data.meta?.source ??
@@ -307,15 +325,20 @@ export function useNotificationsSocket({ enabled = true } = {}) {
           msg,
         );
         const leadId = consultingNotificationLeadId(normalized);
+        // SLA/warning всегда со звуком — даже если чат открыт.
+        const isSla =
+          consultingType.includes("no_reply") ||
+          consultingType.includes("sla") ||
+          consultingType.includes("no_activity") ||
+          consultingType.includes("task_overdue") ||
+          consultingType.includes("unanswered") ||
+          consultingType.includes("reply_overdue");
         const skipSound =
+          !isSla &&
           leadId &&
           isConsultingActiveChatLead(leadId) &&
           document.visibilityState === "visible" &&
-          (consultingType.includes("message") ||
-            consultingType.includes("no_reply") ||
-            consultingType.includes("sla") ||
-            consultingType.includes("no_activity") ||
-            consultingType.includes("task_overdue"));
+          consultingType.includes("message");
         dispatch(notificationReceived(normalized));
         if (!(normalized.is_read ?? false) && !skipSound) {
           playNotificationSound();
@@ -323,18 +346,54 @@ export function useNotificationsSocket({ enabled = true } = {}) {
         return;
       }
 
-      const id = payload?.id ?? payload?.uuid ?? payload?.pk;
-      const looksLikeNotification =
-        id != null && (payload.title || payload.message || payload.type);
-      if (!looksLikeNotification) return;
+      // Generic path: create_and_publish часто шлёт без id
+      // { type:"notification", data:{ type:"lead_message", title, message, url } }
+      const hasContent = !!(
+        payload?.title ||
+        payload?.message ||
+        payload?.body ||
+        payload?.url ||
+        payload?.type
+      );
+      if (!hasContent) return;
 
-      // Обычное уведомление из create_and_publish_notification — deep-link на SPA
-      const enriched = { ...payload };
+      const enriched = {
+        ...payload,
+        id:
+          payload?.id ??
+          payload?.uuid ??
+          payload?.pk ??
+          payload?.notification_id ??
+          `ws-${innerType || type || "notif"}-${Date.now()}`,
+      };
+
+      // SLA-текст без спец. type → level warning
+      if (
+        !enriched.level &&
+        isConsultingLeadNoReplyEvent(enriched)
+      ) {
+        enriched.level = "warning";
+        if (!enriched.type || enriched.type === "notification") {
+          enriched.type = "sla_breach";
+        }
+      }
+
       const resolved = resolveConsultingNotificationUrl(enriched);
       if (resolved) enriched.url = resolved;
 
       const leadId = consultingNotificationLeadId(enriched);
+      if (leadId) {
+        enriched.meta = {
+          ...(typeof enriched.meta === "object" && enriched.meta
+            ? enriched.meta
+            : {}),
+          lead_id: enriched.meta?.lead_id ?? leadId,
+        };
+      }
+
+      const isSla = isConsultingLeadNoReplyEvent(enriched);
       const skipSound =
+        !isSla &&
         leadId &&
         isConsultingActiveChatLead(leadId) &&
         document.visibilityState === "visible";
