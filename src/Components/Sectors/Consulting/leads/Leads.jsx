@@ -1,7 +1,9 @@
 // src/Components/Sectors/Consulting/leads/Leads.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  FaInstagram,
   FaPlus,
+  FaTelegram,
   FaTimes,
   FaWhatsapp,
   FaSyncAlt,
@@ -18,15 +20,23 @@ import {
 } from "../../../../api/consultingLeads";
 import { useAlert } from "../../../../hooks/useDialog";
 import {
+  LEAD_SOURCES,
+  isConsultingChatRealtimeEvent,
+  leadSourceMeta,
+} from "../../../../utils/consultingLeadSources";
+import {
   ensurePushPermission,
   useConsultingRealtime,
 } from "../common/useConsultingRealtime";
+import WazzupAccountsTab from "./WazzupAccountsTab";
 import "./leads.scss";
 
-// Персональные события лидов текущего пользователя (назначение/новый лид).
-const isLeadEvent = (n) => {
-  const t = String(n?.type || n?.category || n?.event || "").toLowerCase();
-  return t.includes("lead") || t.includes("лид");
+const SourceIcon = ({ source }) => {
+  const s = String(source || "").toLowerCase();
+  if (s === "instagram") return <FaInstagram aria-hidden />;
+  if (s === "telegram") return <FaTelegram aria-hidden />;
+  if (s === "whatsapp") return <FaWhatsapp aria-hidden />;
+  return null;
 };
 
 const ROLES_URL = "/users/roles/";
@@ -75,7 +85,7 @@ const fmtDateTime = (iso) => {
 
 export default function ConsultingLeads() {
   const alert = useAlert();
-  const [tab, setTab] = useState("inbox"); // inbox | settings
+  const [tab, setTab] = useState("inbox"); // inbox | settings | integration
 
   /* справочники */
   const [roles, setRoles] = useState([]);
@@ -117,7 +127,8 @@ export default function ConsultingLeads() {
             <FaWhatsapp className="leads__titleIcon" /> Лиды
           </h2>
           <p className="leads__subtitle">
-            Входящие обращения из WhatsApp и правила их распределения
+            Входящие из WhatsApp / Instagram / Telegram (Wazzup), распределение и
+            подключение каналов
           </p>
         </div>
         <div className="leads__tabs" role="tablist">
@@ -139,14 +150,25 @@ export default function ConsultingLeads() {
           >
             Распределение
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "integration"}
+            className={`leads__tab ${tab === "integration" ? "is-active" : ""}`}
+            onClick={() => setTab("integration")}
+          >
+            Интеграция
+          </button>
         </div>
       </header>
 
-      {tab === "inbox" ? (
+      {tab === "inbox" && (
         <InboxTab empById={empById} employees={employees} alert={alert} />
-      ) : (
+      )}
+      {tab === "settings" && (
         <SettingsTab roles={roles} employees={employees} alert={alert} />
       )}
+      {tab === "integration" && <WazzupAccountsTab alert={alert} />}
     </section>
   );
 }
@@ -157,6 +179,7 @@ function InboxTab({ empById, employees, alert }) {
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
+  const [source, setSource] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [notReady, setNotReady] = useState(false);
@@ -174,6 +197,7 @@ function InboxTab({ empById, employees, alert }) {
           page: pageNum,
           page_size: PER_PAGE,
           status: status || undefined,
+          source: source || undefined,
           search: q.trim() || undefined,
         });
         const rows = asArray(data);
@@ -193,7 +217,7 @@ function InboxTab({ empById, employees, alert }) {
         setLoading(false);
       }
     },
-    [status, q],
+    [status, source, q],
   );
 
   useEffect(() => {
@@ -205,9 +229,12 @@ function InboxTab({ empById, employees, alert }) {
     ensurePushPermission();
   }, []);
 
-  // Реалтайм: когда ЛИЧНО мне назначили/пришёл лид — обновляем список.
+  // Реалтайм: назначение / сообщение / «долго не отвечали» — только «мои» события.
   const onLeadSignal = useCallback(() => fetchLeads(1), [fetchLeads]);
-  useConsultingRealtime({ match: isLeadEvent, onSignal: onLeadSignal });
+  useConsultingRealtime({
+    match: isConsultingChatRealtimeEvent,
+    onSignal: onLeadSignal,
+  });
 
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
 
@@ -230,6 +257,18 @@ function InboxTab({ empById, employees, alert }) {
             {Object.entries(STATUS_RU).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
+              </option>
+            ))}
+          </select>
+          <select
+            className="leads__input"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          >
+            <option value="">Все источники</option>
+            {LEAD_SOURCES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
@@ -259,12 +298,13 @@ function InboxTab({ empById, employees, alert }) {
         <div className="leads__notice">
           <FaWhatsapp className="leads__noticeIcon" />
           <div>
-            <b>Интеграция с WhatsApp ещё не подключена.</b>
+            <b>Список входящих лидов пока недоступен на бэкенде.</b>
             <p>
-              Как только бэкенд подключит webhook, входящие сообщения из WhatsApp
-              будут автоматически появляться здесь и распределяться между
-              сотрудниками по правилам из вкладки «Распределение». Пока можно
-              добавлять лиды вручную.
+              После появления <code>/consalting/inbound-leads/</code> сообщения из
+              WhatsApp / Instagram / Telegram (Wazzup webhook) будут появляться
+              здесь и распределяться по правилам вкладки «Распределение». Каналы
+              подключаются во вкладке «Интеграция». Пока можно добавлять лиды
+              вручную (если POST уже доступен) или через Admin.
             </p>
           </div>
         </div>
@@ -279,6 +319,7 @@ function InboxTab({ empById, employees, alert }) {
                 <th>Имя</th>
                 <th>Телефон</th>
                 <th>Источник</th>
+                <th>Сообщение</th>
                 <th>Назначен</th>
                 <th>Статус</th>
                 <th />
@@ -287,26 +328,34 @@ function InboxTab({ empById, employees, alert }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="leads__empty" colSpan={7}>
+                  <td className="leads__empty" colSpan={8}>
                     Загрузка…
                   </td>
                 </tr>
               ) : items.length ? (
-                items.map((l) => (
+                items.map((l) => {
+                  const src = leadSourceMeta(l.source || "manual");
+                  return (
                   <tr key={l.id}>
                     <td>{fmtDateTime(l.created_at || l.received_at)}</td>
                     <td>{l.full_name || l.name || "—"}</td>
                     <td>{l.phone || "—"}</td>
                     <td>
-                      <span className="leads__sourceTag">
-                        {l.source === "whatsapp" ? (
-                          <>
-                            <FaWhatsapp /> WhatsApp
-                          </>
-                        ) : (
-                          l.source || "Вручную"
-                        )}
+                      <span
+                        className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
+                        style={{ color: src.color }}
+                      >
+                        <SourceIcon source={src.value} /> {src.label}
                       </span>
+                    </td>
+                    <td
+                      className="leads__msgPreview"
+                      title={l.message || ""}
+                    >
+                      {l.message
+                        ? String(l.message).slice(0, 80) +
+                          (String(l.message).length > 80 ? "…" : "")
+                        : "—"}
                     </td>
                     <td>
                       {l.owner
@@ -334,10 +383,11 @@ function InboxTab({ empById, employees, alert }) {
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
-                  <td className="leads__empty" colSpan={7}>
+                  <td className="leads__empty" colSpan={8}>
                     Пока нет входящих лидов
                   </td>
                 </tr>
@@ -455,6 +505,20 @@ function CreateLeadModal({ onClose, onCreated, onError }) {
               onChange={set("phone")}
               placeholder="+996700000000"
             />
+          </div>
+          <div className="leads__field">
+            <label className="leads__label">Источник</label>
+            <select
+              className="leads__input"
+              value={form.source}
+              onChange={set("source")}
+            >
+              {LEAD_SOURCES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="leads__field">
             <label className="leads__label">Сообщение / комментарий</label>
@@ -663,8 +727,9 @@ function SettingsTab({ roles, employees, alert }) {
           <span>
             <b>Авто-распределение входящих лидов</b>
             <small>
-              Когда включено, каждый новый лид из WhatsApp сразу назначается
-              сотруднику по выбранной стратегии.
+              Когда включено, каждый новый лид из WhatsApp / Instagram / Telegram
+              сразу назначается сотруднику по выбранной стратегии (round-robin,
+              least-loaded или вручную).
             </small>
           </span>
         </label>

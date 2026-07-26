@@ -2,6 +2,13 @@ import { menuIcons } from "../menuIcons";
 
 export const consultingMenu = [
       {
+        label: "CRM",
+        to: "/crm/consulting/chats",
+        icon: menuIcons.comments,
+        permission: "can_view_funnel",
+        implemented: true,
+      },
+      {
         label: "Аналитика",
         to: "/crm/consulting/analytics",
         icon: menuIcons.chartBar,

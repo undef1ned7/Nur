@@ -8,6 +8,7 @@ import {
   markAllNotificationsReadAsync,
   markNotificationReadAsync,
 } from "../../store/creators/notificationCreators";
+import { resolveConsultingNotificationUrl } from "../../utils/consultingLeadSources";
 
 const PAGE_SIZE = 20;
 
@@ -78,7 +79,7 @@ const NotificationModal = ({ onClose }) => {
   const handleClick = useCallback(
     (n) => {
       if (isUnread(n)) dispatch(markNotificationReadAsync(idOf(n)));
-      const url = n?.url ?? n?.link ?? n?.data?.url;
+      const url = resolveConsultingNotificationUrl(n);
       if (url) {
         onClose?.();
         if (/^https?:\/\//i.test(url)) window.location.assign(url);

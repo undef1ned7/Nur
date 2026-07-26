@@ -62,14 +62,10 @@ import {
 } from "../../../../utils/consultingFunnelLeadUtils";
 import { calcConsultingSaleTotal, formatTariffSubscription, resolveTariffPrice } from "../../../../utils/consultingSalePricing";
 import { ensurePushPermission, useConsultingRealtime } from "../common/useConsultingRealtime";
-
-// Персональное событие воронки для текущего пользователя (назначение лида/работы).
-const isFunnelLeadEvent = (n) => {
-  const t = String(n?.type || n?.category || n?.event || "").toLowerCase();
-  return t.includes("lead") || t.includes("лид") || t.includes("funnel") || t.includes("assign");
-};
+import { isConsultingFunnelRealtimeEvent } from "../../../../utils/consultingLeadSources";
 import LeadCreateClientModal from "./LeadCreateClientModal";
 import LeadPaymentModal from "./LeadPaymentModal";
+import LeadMessengerPanel from "./LeadMessengerPanel";
 import { Link } from "react-router-dom";
 import FunnelBoardRow from "./FunnelBoardRow";
 import LeadTransferModal from "./LeadTransferModal";
@@ -86,6 +82,9 @@ import {
 } from "../../../../utils/funnelBoardFetch";
 import { useConfirm } from "../../../../hooks/useDialog";
 import { usePointerReorder } from "../../../../hooks/usePointerReorder";
+
+// Персональное событие воронки: lead.assigned (Wazzup) и consulting.lead.*.
+const isFunnelLeadEvent = isConsultingFunnelRealtimeEvent;
 
 /**
  * Расширенные возможности «Воронка 2.0» (скоринг, лента, задачи, win/lose,
@@ -1792,6 +1791,14 @@ function LeadDetail({
   const [employees, setEmployees] = useState([]);
   const [assignTo, setAssignTo] = useState("");
 
+  // WhatsApp/IG/TG лиды сразу открываем на вкладке «Чат».
+  useEffect(() => {
+    const src = String(lead?.source || "").toLowerCase();
+    if (["whatsapp", "instagram", "telegram"].includes(src)) {
+      setTab("messenger");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при открытии карточки
+  }, [leadId]);
   useEffect(() => {
     if (FUNNEL_V2) {
       dispatch(getLeadTimeline(leadId));
@@ -2081,26 +2088,30 @@ function LeadDetail({
         />
       )}
 
-      {FUNNEL_V2 && (
-        <div className="funnel__tabs">
-          {[
-            ["info", "Информация"],
-            ["timeline", "Лента"],
-            ["tasks", "Задачи"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              className={`funnel__tab${
-                tab === key ? " funnel__tab--active" : ""
-              }`}
-              onClick={() => setTab(key)}
-            >
-              {label}
-              {key === "tasks" && tasks?.length ? ` (${tasks.length})` : ""}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="funnel__tabs">
+        {[
+          ["info", "Информация"],
+          ...(FUNNEL_V2
+            ? [
+                ["timeline", "Лента"],
+                ["tasks", "Задачи"],
+              ]
+            : []),
+          ["messenger", "Чат"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`funnel__tab${
+              tab === key ? " funnel__tab--active" : ""
+            }`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+            {key === "tasks" && tasks?.length ? ` (${tasks.length})` : ""}
+          </button>
+        ))}
+      </div>
 
       {tab === "info" && (
         <LeadInfoForm
@@ -2122,6 +2133,13 @@ function LeadDetail({
       )}
       {FUNNEL_V2 && tab === "tasks" && (
         <TasksTab leadId={leadId} tasks={tasks} />
+      )}
+      {tab === "messenger" && (
+        <LeadMessengerPanel
+          lead={lead}
+          onNotice={onNotice}
+          onError={setErr}
+        />
       )}
       {createClientOpen && (
         <LeadCreateClientModal
@@ -2336,11 +2354,21 @@ function LeadInfoForm({ lead, funnelId, stages, onClose, readOnly = false }) {
         </div>
         <div className="funnel__field">
           <label className="funnel__label">Источник</label>
-          <input
+          <select
             className="funnel__input"
             value={form.source}
             onChange={set("source")}
-          />
+          >
+            <option value="">—</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
+            <option value="telegram">Telegram</option>
+            <option value="manual">Вручную</option>
+            {form.source &&
+              !["whatsapp", "instagram", "telegram", "manual", ""].includes(
+                form.source,
+              ) && <option value={form.source}>{form.source}</option>}
+          </select>
         </div>
       </div>
 
