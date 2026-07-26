@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
-import { Link } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import {
   FaCheck,
   FaCheckDouble,
@@ -13,6 +13,7 @@ import {
 import {
   listLeadMessages,
   listWazzupAccounts,
+  markLeadChatRead,
   messageBelongsToLead,
   normalizeChatMessage,
 } from "../../../../api/consultingWazzup";
@@ -22,6 +23,7 @@ import {
 } from "../../../../utils/consultingLeadSources";
 import { setConsultingActiveChatLead } from "../../../../utils/consultingActiveChat";
 import { useWazzupChatSocket } from "../../../../hooks/useWazzupChatSocket";
+import { markLeadNotificationsReadAsync } from "../../../../store/creators/notificationCreators";
 
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
@@ -137,6 +139,7 @@ function byTime(a, b) {
  *  WS realtime   wss://…/ws/wazzup/?token=  → new_message | message_status
  */
 export default function LeadMessengerPanel({ lead, onNotice, onError }) {
+  const dispatch = useDispatch();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notReadyAccounts, setNotReadyAccounts] = useState(false);
@@ -150,9 +153,17 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const bottomRef = useRef(null);
   const leadRef = useRef(lead);
+  const onNoticeRef = useRef(onNotice);
+  const onErrorRef = useRef(onError);
   useEffect(() => {
     leadRef.current = lead;
   }, [lead]);
+  useEffect(() => {
+    onNoticeRef.current = onNotice;
+  }, [onNotice]);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     setConsultingActiveChatLead(lead?.id || null);
@@ -162,6 +173,29 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   const preferredType = String(lead?.source || "")
     .trim()
     .toLowerCase();
+  const leadId = lead?.id ? String(lead.id) : "";
+
+  /**
+   * Открыли чат:
+   * 1) mark-read → Wazzup unread: 0 (синие ✓✓ у клиента)
+   * 2) связанные уведомления в колокольчике → прочитаны
+   */
+  useEffect(() => {
+    if (!leadId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await markLeadChatRead(leadId);
+      } catch {
+        /* 404/501 — эндпоинт ещё не на проде; UI не блокируем */
+      }
+      if (cancelled) return;
+      dispatch(markLeadNotificationsReadAsync(leadId));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leadId, dispatch]);
 
   const scrollBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -170,34 +204,35 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   }, []);
 
   const loadMessages = useCallback(async () => {
-    if (!lead?.id) return;
+    const current = leadRef.current;
+    if (!current?.id) return;
     setLoadingMsgs(true);
     try {
-      const { messages: rows, notReady } = await listLeadMessages(lead.id);
+      const { messages: rows, notReady } = await listLeadMessages(current.id);
       setHistoryNotReady(!!notReady && !rows.length);
       const seed = [];
-      const seedText = lead.message || lead.first_message || "";
+      const seedText = current.message || current.first_message || "";
       if (!rows.length && seedText) {
         seed.push(
           normalizeChatMessage(
             {
-              id: `seed-${lead.id}`,
+              id: `seed-${current.id}`,
               text: seedText,
               direction: "inbound",
-              created_at: lead.created_at,
+              created_at: current.created_at,
             },
-            { lead_id: lead.id },
+            { lead_id: current.id },
           ),
         );
       }
       setMessages(rows.length ? rows.sort(byTime) : seed);
       scrollBottom();
     } catch (e) {
-      onError?.(errText(e, "Не удалось загрузить историю чата."));
+      onErrorRef.current?.(errText(e, "Не удалось загрузить историю чата."));
     } finally {
       setLoadingMsgs(false);
     }
-  }, [lead, onError, scrollBottom]);
+  }, [scrollBottom]);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,7 +258,9 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
         if (e?.status === 404 || e?.status === 501) {
           setNotReadyAccounts(true);
         } else {
-          onError?.(errText(e, "Не удалось загрузить каналы Wazzup."));
+          onErrorRef.current?.(
+            errText(e, "Не удалось загрузить каналы Wazzup."),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -232,14 +269,15 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
     return () => {
       cancelled = true;
     };
-  }, [preferredType, onError]);
+  }, [preferredType]);
 
+  // История только при смене лида — не при каждом ререндере родителя / preview.
   useEffect(() => {
+    if (!leadId) return;
     startTransition(() => {
       loadMessages();
     });
-  }, [loadMessages]);
-
+  }, [leadId, loadMessages]);
   const onNewMessage = useCallback(
     (data) => {
       const current = leadRef.current;
@@ -302,7 +340,7 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
             }),
           );
         }
-        onError?.(
+        onErrorRef.current?.(
           msg?.detail ||
             msg?.error ||
             data?.detail ||
@@ -326,9 +364,9 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
       pendingTempIdRef.current = null;
       setSending(false);
       scrollBottom();
-      onNotice?.("Сообщение отправлено в WhatsApp.");
+      onNoticeRef.current?.("Сообщение отправлено в WhatsApp.");
     },
-    [lead.id, onError, onNotice, scrollBottom],
+    [lead.id, scrollBottom],
   );
 
   const { isConnected: wsConnected, sendMessage: sendViaWs } =
@@ -347,11 +385,11 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!message.trim() && !mediaUrl.trim()) {
-      onError?.("Введите текст или укажите ссылку на файл.");
+      onErrorRef.current?.("Введите текст или укажите ссылку на файл.");
       return;
     }
     if (!wsConnected) {
-      onError?.(
+      onErrorRef.current?.(
         "WebSocket /ws/wazzup/ не подключён (offline). Дождитесь live и отправьте снова.",
       );
       return;
@@ -387,7 +425,7 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
         upsertMessage(prev, { ...optimistic, status: "error" }),
       );
       setSending(false);
-      onError?.("Сокет закрылся — сообщение не отправлено.");
+      onErrorRef.current?.("Сокет закрылся — сообщение не отправлено.");
       return;
     }
 
@@ -418,10 +456,10 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   if (notReadyAccounts) {
     return (
       <div className="funnel__messengerNotice">
-        <b>Wazzup API ещё не доступен на бэкенде.</b>
+        <b>Каналы мессенджеров ещё не готовы.</b>
         <p>
-          Нужны <code>/consalting/wazzup-accounts/</code> и{" "}
-          <code>send-message</code>. Подключение — «Лиды» → «Интеграция».
+          Интеграция настраивается администратором в фоне. Если чат не
+          открывается — обратитесь к администратору NurCRM.
         </p>
       </div>
     );
@@ -430,15 +468,10 @@ export default function LeadMessengerPanel({ lead, onNotice, onError }) {
   if (!accounts.length) {
     return (
       <div className="funnel__messengerNotice">
-        <b>Нет подключённых каналов Wazzup.</b>
+        <b>Нет активных каналов Wazzup.</b>
         <p>
-          1) Канал WhatsApp в{" "}
-          <a href="https://wazzup24.com" target="_blank" rel="noreferrer">
-            Wazzup24
-          </a>{" "}
-          (QR). 2) API Key + Channel ID в{" "}
-          <Link to="/crm/consulting/leads">Лиды → Интеграция</Link>. 3)
-          «Зарегистрировать Webhook».
+          Каналы подключаются автоматически. Попросите администратора проверить
+          настройки компании — вам ничего вводить не нужно.
         </p>
       </div>
     );

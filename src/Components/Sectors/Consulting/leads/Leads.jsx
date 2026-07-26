@@ -127,8 +127,8 @@ export default function ConsultingLeads() {
             <FaWhatsapp className="leads__titleIcon" /> Лиды
           </h2>
           <p className="leads__subtitle">
-            Входящие из WhatsApp / Instagram / Telegram (Wazzup), распределение и
-            подключение каналов
+            Входящие из WhatsApp / Instagram / Telegram (Wazzup) и распределение
+            по сотрудникам. Каналы подключаются автоматически.
           </p>
         </div>
         <div className="leads__tabs" role="tablist">
@@ -168,7 +168,7 @@ export default function ConsultingLeads() {
       {tab === "settings" && (
         <SettingsTab roles={roles} employees={employees} alert={alert} />
       )}
-      {tab === "integration" && <WazzupAccountsTab alert={alert} />}
+      {tab === "integration" && <WazzupAccountsTab />}
     </section>
   );
 }

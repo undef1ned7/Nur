@@ -71,11 +71,25 @@ export function isConsultingLeadMessageEvent(n) {
   );
 }
 
-/** Долго не отвечали / SLA / просрочка (бэкенд signals.py). */
+/** Лид передан другому сотруднику. */
+export function isConsultingLeadTransferEvent(n) {
+  const t = notifType(n);
+  const hay = `${t} ${n?.title || ""} ${n?.message || ""}`.toLowerCase();
+  return (
+    t === "lead_transferred" ||
+    t === "lead.transferred" ||
+    t.includes("lead_transferred") ||
+    t.includes("lead.transferred") ||
+    t.includes("transfer") ||
+    hay.includes("передан лид") ||
+    hay.includes("вам передан")
+  );
+}
+
+/** Долго не отвечали / SLA / просрочка (бэкенд tasks.py / signals.py). */
 export function isConsultingLeadNoReplyEvent(n) {
   const t = notifType(n);
-  if (!t) return false;
-  return (
+  if (
     t === "lead.no_reply" ||
     t === "lead.unanswered" ||
     t === "lead.reply_overdue" ||
@@ -91,7 +105,19 @@ export function isConsultingLeadNoReplyEvent(n) {
     t.includes("no_activity") ||
     t.includes("sla_breach") ||
     t.includes("task_overdue") ||
-    t.includes("sla")
+    (t.includes("sla") && !t.includes("message"))
+  ) {
+    return true;
+  }
+
+  // create_and_publish без спец. type: «⏰ Внимание: Лид без ответа > 15 мин!»
+  const hay = `${t} ${n?.title || ""} ${n?.message || ""}`.toLowerCase();
+  return (
+    hay.includes("без ответа") ||
+    hay.includes("ожидает вашего ответа") ||
+    hay.includes("превышено время ответа") ||
+    hay.includes("нет активности") ||
+    (hay.includes("лид") && hay.includes("более") && hay.includes("минут"))
   );
 }
 
@@ -100,7 +126,8 @@ export function isConsultingChatRealtimeEvent(n) {
   if (
     isConsultingLeadAssignEvent(n) ||
     isConsultingLeadMessageEvent(n) ||
-    isConsultingLeadNoReplyEvent(n)
+    isConsultingLeadNoReplyEvent(n) ||
+    isConsultingLeadTransferEvent(n)
   ) {
     return true;
   }

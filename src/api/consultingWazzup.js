@@ -1,17 +1,13 @@
 /**
  * Консалтинг: интеграция Wazzup API v3 (WhatsApp / Instagram / Telegram).
  *
- * Два параллельных бэкенд-модуля:
- *  - Консалтинг (эта страница): /api/consalting/wazzup-accounts/
- *  - Общий CRM:                 /api/crm/wazzup-accounts/
+ * Каналы настраивает админ в Django Admin
+ * (`/admin/consalting/wazzupaccountconsalting/`).
+ * Фронт только читает готовые аккаунты:
+ *   GET /consalting/wazzup/credentials/  (алиас wazzup-credentials/)
+ *   fallback: GET /consalting/wazzup-accounts/
  *
- * Подключение — 2 шага:
- *  1) POST …/wazzup-accounts/           { api_key, channel_id, integration_type }
- *  2) POST …/wazzup-accounts/{id}/setup-webhook/  { webhook_url? }
- *     → бэкенд регистрирует webhook в Wazzup и ставит is_connected = true
- *
- * Channel ID = поле channelId из GET https://api.wazzup24.com/v3/channels
- * (UUID, не plainId/телефон).
+ * Пользователь CRM ключи/webhook не вводит — всё фоном на бэке.
  *
  * Контракт: docs/consulting/wazzup-integration.md
  */
@@ -31,6 +27,9 @@ const reject = (label) => (error) => {
   return Promise.reject(error);
 };
 
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+
 /** Webhook URL модуля Консалтинг (не /crm/wazzup/webhook/). */
 export function getDefaultWazzupWebhookUrl() {
   const base = (
@@ -40,28 +39,76 @@ export function getDefaultWazzupWebhookUrl() {
 }
 
 /**
- * GET /consalting/wazzup-accounts/
- * Список аккаунтов Wazzup текущей компании.
- *
- * Ответ — массив (или { results }):
- * {
- *   id, company, branch,
- *   api_key,           // часто маскированный
- *   api_url,           // напр. https://api.wazzup24.com
- *   channel_id,
- *   integration_type,  // whatsapp | instagram | telegram
- *   integration_type_display,
- *   is_active, is_connected,
- *   created_at, updated_at
- * }
+ * Нормализация аккаунта для UI (без api_key в стейте).
+ */
+export function normalizeWazzupAccount(raw) {
+  const r = raw && typeof raw === "object" ? raw : {};
+  const type = String(r.integration_type || "whatsapp").toLowerCase();
+  const active = r.is_active !== false;
+  return {
+    id: r.id,
+    channel_id: r.channel_id || "",
+    integration_type: type,
+    integration_type_display: r.integration_type_display || "",
+    api_url: r.api_url || "",
+    is_active: active,
+    // credentials без is_connected → считаем connected, если active
+    is_connected:
+      r.is_connected === true ||
+      r.webhook_configured === true ||
+      r.is_webhook_set === true ||
+      (r.is_connected == null && active),
+    created_at: r.created_at || null,
+    updated_at: r.updated_at || null,
+  };
+}
+
+/**
+ * GET /consalting/wazzup/credentials/ | /wazzup-credentials/
+ * Массив каналов компании (настройка только в Django Admin).
+ */
+export const listWazzupCredentials = async () => {
+  const paths = [
+    `${BASE}/wazzup/credentials/`,
+    `${BASE}/wazzup-credentials/`,
+  ];
+  let lastErr = null;
+  for (const path of paths) {
+    try {
+      const { data } = await api.get(path);
+      return asArray(data).map(normalizeWazzupAccount);
+    } catch (error) {
+      const status = error?.response?.status;
+      lastErr = error;
+      if (status === 404 || status === 501) continue;
+      return reject("List Wazzup Credentials Error")(error);
+    }
+  }
+  if (lastErr) return reject("List Wazzup Credentials Error")(lastErr);
+  return [];
+};
+
+/**
+ * Список каналов Wazzup для отправки / статуса.
+ * Сначала credentials (фоновая админ-настройка), затем wazzup-accounts.
  *
  * @param {Object} [params]
- * @returns {Promise<Array|Object>}
+ * @returns {Promise<Array>}
  */
 export const listWazzupAccounts = async (params = {}) => {
   try {
+    const rows = await listWazzupCredentials();
+    if (rows.length) return rows;
+  } catch (error) {
+    const status = error?.status || error?.response?.status;
+    if (status && status !== 404 && status !== 501) {
+      return reject("List Wazzup Accounts Error")(error);
+    }
+  }
+
+  try {
     const { data } = await api.get(`${BASE}/wazzup-accounts/`, { params });
-    return data;
+    return asArray(data).map(normalizeWazzupAccount);
   } catch (error) {
     return reject("List Wazzup Accounts Error")(error);
   }
@@ -75,26 +122,27 @@ export const listWazzupAccounts = async (params = {}) => {
 export const getWazzupAccount = async (id) => {
   try {
     const { data } = await api.get(`${BASE}/wazzup-accounts/${id}/`);
-    return data;
+    return normalizeWazzupAccount(data);
   } catch (error) {
     return reject("Get Wazzup Account Error")(error);
   }
 };
 
 /**
+ * @deprecated Каналы создаёт админ в Django Admin, не пользователь CRM.
  * POST /consalting/wazzup-accounts/
- * @param {{ api_key: string, channel_id: string, integration_type: "whatsapp"|"instagram"|"telegram" }} payload
  */
 export const createWazzupAccount = async (payload) => {
   try {
     const { data } = await api.post(`${BASE}/wazzup-accounts/`, payload);
-    return data;
+    return normalizeWazzupAccount(data);
   } catch (error) {
     return reject("Create Wazzup Account Error")(error);
   }
 };
 
 /**
+ * @deprecated Отключение — через админку.
  * DELETE /consalting/wazzup-accounts/{id}/
  */
 export const deleteWazzupAccount = async (id) => {
@@ -107,19 +155,8 @@ export const deleteWazzupAccount = async (id) => {
 };
 
 /**
+ * @deprecated Webhook настраивается на бэке / в админке.
  * POST /consalting/wazzup-accounts/{id}/setup-webhook/
- * NurCRM регистрирует URL в Wazzup API v3 через PATCH /v3/webhooks
- * (не POST — у Wazzup на /v3/webhooks POST нет → 404).
- *
- * Body (наш API): { webhook_url?: string }
- * Бэкенд → Wazzup:
- *   PATCH https://api.wazzup24.com/v3/webhooks
- *   { webhooksUri, subscriptions: { messagesAndStatuses: true } }
- *
- * Успех → is_connected = true.
- *
- * @param {string} id
- * @param {{ webhook_url?: string }} [payload]
  */
 export const setupWazzupWebhook = async (id, payload = {}) => {
   try {
@@ -325,54 +362,108 @@ export function messageBelongsToLead(msg, lead) {
 const asList = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
+/** Собрать все страницы paginated DRF-ответа (до maxPages). */
+async function fetchAllPages(path, params, { maxPages = 20 } = {}) {
+  const pageSize = params?.page_size || 100;
+  let page = 1;
+  let rows = [];
+  let guard = 0;
+
+  while (guard < maxPages) {
+    guard += 1;
+    const { data } = await api.get(path, {
+      params: { ...params, page, page_size: pageSize },
+    });
+    const chunk = asList(data);
+    rows = rows.concat(chunk);
+
+    const count = typeof data?.count === "number" ? data.count : null;
+    const hasNext = Boolean(data?.next);
+    if (!chunk.length) break;
+    if (count != null && rows.length >= count) break;
+    if (!hasNext && count == null) break;
+    if (!hasNext) break;
+    page += 1;
+  }
+
+  return rows;
+}
+
 /**
- * Нормализация элемента списка чатов (лид / inbound / wazzup-chat).
+ * Нормализация элемента списка чатов.
+ * Контракт GET /consalting/chats/ | /wazzup-chats/:
+ * { id, lead_id, chat_id, name, phone, owner, last_message,
+ *   last_message_text, last_message_time, unread_count, has_unread }
  */
 export function normalizeChatThread(raw, channel) {
   const r = raw && typeof raw === "object" ? raw : {};
-  const leadId = r.lead_id || r.lead || (r.id && !r.inbound ? r.id : null);
+  const leadId = r.lead_id || r.lead || r.id || null;
   const id = String(leadId || r.id || "");
+
+  const lastObj =
+    r.last_message && typeof r.last_message === "object" ? r.last_message : null;
+  const lastText = String(
+    r.last_message_text ||
+      (typeof r.last_message === "string" ? r.last_message : "") ||
+      lastObj?.text ||
+      lastObj?.message ||
+      r.message ||
+      r.text ||
+      "",
+  );
+  const lastAt =
+    r.last_message_time ||
+    r.last_message_at ||
+    lastObj?.created_at ||
+    r.updated_at ||
+    r.created_at ||
+    null;
+
+  const unread = Number(r.unread_count ?? r.unread ?? (r.has_unread ? 1 : 0));
+
   return {
     id,
     lead_id: leadId ? String(leadId) : id,
+    chat_id: r.chat_id || r.phone || "",
     full_name:
-      r.full_name ||
       r.name ||
+      r.full_name ||
       r.title ||
       r.contact_name ||
       r.client_display ||
       "Без имени",
     phone: r.phone || r.chat_id || r.plain_id || "",
-    source: String(r.source || r.integration_type || channel || "whatsapp").toLowerCase(),
-    last_message:
-      r.last_message ||
-      r.last_message_text ||
-      r.message ||
-      r.text ||
-      "",
-    last_message_at:
-      r.last_message_at ||
-      r.updated_at ||
-      r.created_at ||
-      null,
-    unread_count: Number(r.unread_count || r.unread || 0) || 0,
-    status: r.status || "",
+    source: String(
+      r.source || r.integration_type || channel || "whatsapp",
+    ).toLowerCase(),
+    owner: r.owner || null,
+    last_message: lastText,
+    last_message_at: lastAt,
+    unread_count: Number.isFinite(unread) ? unread : 0,
+    has_unread: r.has_unread === true || unread > 0,
     raw: r,
   };
 }
 
 /**
  * Список диалогов по каналу (whatsapp | telegram | instagram).
- * Пробует dedicated chats API, затем leads/?source=, затем inbound-leads.
+ * Основной путь: GET /consalting/chats/ и /wazzup-chats/
+ * Тянем все страницы — иначе DRF отдаёт только первую (часто 4–10 шт.).
  *
  * @param {"whatsapp"|"telegram"|"instagram"} channel
- * @returns {Promise<{ threads: Array, notReady: boolean }>}
+ * @returns {Promise<{ threads: Array, notReady: boolean, path?: string }>}
  */
 export const listWazzupChats = async (channel) => {
   const ch = String(channel || "whatsapp").toLowerCase();
   const attempts = [
-    { path: `${BASE}/wazzup-chats/`, params: { integration_type: ch, source: ch } },
-    { path: `${BASE}/chats/`, params: { integration_type: ch, source: ch } },
+    {
+      path: `${BASE}/chats/`,
+      params: { integration_type: ch, source: ch, page_size: 100 },
+    },
+    {
+      path: `${BASE}/wazzup-chats/`,
+      params: { integration_type: ch, source: ch, page_size: 100 },
+    },
     { path: `${BASE}/leads/`, params: { source: ch, page_size: 100 } },
     { path: `${BASE}/inbound-leads/`, params: { source: ch, page_size: 100 } },
   ];
@@ -382,9 +473,7 @@ export const listWazzupChats = async (channel) => {
 
   for (const { path, params } of attempts) {
     try {
-      const { data } = await api.get(path, { params });
-      const rows = asList(data);
-      // Фильтр по каналу на случай, если бэк не отфильтровал
+      const rows = await fetchAllPages(path, params);
       const filtered = rows.filter((r) => {
         const src = String(r.source || r.integration_type || ch).toLowerCase();
         return !r.source && !r.integration_type
@@ -427,5 +516,19 @@ export const getConsultingLead = async (id) => {
     return data;
   } catch (error) {
     return reject("Get Consulting Lead Error")(error);
+  }
+};
+
+/**
+ * POST /consalting/leads/{id}/mark-read/ — сброс непрочитанных в inbox.
+ */
+export const markLeadChatRead = async (id) => {
+  try {
+    const { data } = await api.post(`${BASE}/leads/${id}/mark-read/`);
+    return data;
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status === 404 || status === 501) return { notReady: true };
+    return reject("Mark Lead Chat Read Error")(error);
   }
 };

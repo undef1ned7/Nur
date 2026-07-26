@@ -19,6 +19,44 @@ export function isLeadArchived(lead) {
   return lead?.is_archived === true || !!lead?.archived_at;
 }
 
+export function resolveCurrentUserId(profile, wsUserId) {
+  return (
+    wsUserId ||
+    profile?.id ||
+    profile?.user_id ||
+    localStorage.getItem("userId") ||
+    ""
+  );
+}
+
+export function isLeadOwner(lead, userId) {
+  if (!lead?.owner || !userId) return false;
+  return String(lead.owner) === String(userId);
+}
+
+/**
+ * С лидом можно взаимодействовать (edit / move / chat / notes / delete):
+ * — руководитель компании (owner/admin);
+ * — назначенный сотрудник (lead.owner);
+ * — лид без владельца (пул) — только claim/просмотр; редактирование — нет
+ *   (canEditLead ниже).
+ */
+export function canInteractWithLead(lead, profile, userId) {
+  if (!lead || isLeadArchived(lead)) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  if (!lead.owner) return false; // пул: сначала claim
+  return isLeadOwner(lead, userId);
+}
+
+/** Редактирование / перемещение / чат / удаление. */
+export function canEditLead(lead, board, profile, userId) {
+  if (!canInteractWithLead(lead, profile, userId)) return false;
+  if (isLeadOnCompletedStage(lead, board) && !isConsultingFunnelManager(profile)) {
+    return false;
+  }
+  return true;
+}
+
 /** Лид на «Завершено» — редактирование/перемещение только owner/admin. */
 export function isLeadLockedForEmployee(lead, board, profile) {
   if (!lead || isLeadArchived(lead)) return true;
@@ -26,11 +64,9 @@ export function isLeadLockedForEmployee(lead, board, profile) {
   return !isConsultingFunnelManager(profile);
 }
 
-export function canDragLead(lead, board, profile, canManageLeads) {
+export function canDragLead(lead, board, profile, canManageLeads, userId) {
   if (!canManageLeads || !lead || isLeadArchived(lead)) return false;
-  if (isLeadOnCompletedStage(lead, board) && !isConsultingFunnelManager(profile)) {
-    return false;
-  }
+  if (!canEditLead(lead, board, profile, userId)) return false;
   return true;
 }
 
