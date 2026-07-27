@@ -262,20 +262,24 @@ wss://…/ws/wazzup/?token=<JWT_ACCESS>
 При сплошных `404/501` UI работает на realtime + локальных исходящих
 (`notReady`).
 
-Список чатов: `listWazzupChats` сначала бьёт в `/wazzup-chats/` (оптимизированный
-эндпоинт ~20–50 мс), иначе `/chats/`, `/leads/`, `/inbound-leads/`.
+Список чатов: `listWazzupChats` мержит `/chats/`, `/wazzup-chats/`, `/leads/`,
+`/inbound-leads/` по `lead_id` (бэкенд `/chats/` часто отдаёт голый массив без
+пагинации и может быть неполным).
 
 ### 7.3. Как UI отправляет сообщение
 
 `LeadMessengerPanel` (контракт: [wazzup-chat-async.md](./wazzup-chat-async.md)):
 
-1. Optimistic-пузырь `local-*` со статусом `pending`.
-2. **WS** `send_message` (`content_uri`, опционально `account_id`).
-3. Свой пузырь **подтверждается из `send_message_ack`** (серверный `id`, обычно
-   ещё `pending`). **Своё исходящее по `new_message` отправителю не приходит.**
-4. Медиа: `upload` → `content_uri` → WS; fallback — multipart `send-message`.
-5. `message_status` по тому же `id`: `pending → sent|delivered|read|failed`.
-6. Все события — **upsert по `id`**, не append. После реконнекта — догрузка REST.
+1. **Optimistic-пузырь** `local-*` сразу в UI (как WhatsApp), композер
+   очищается мгновенно.
+2. **WS** `send_message` (`content_uri`, опционально `account_id`) — основной путь.
+3. Ack/REST **заменяет** temp на серверный `id` (`confirmOptimisticMessage`).
+   **Своё исходящее по `new_message` отправителю не приходит.**
+4. Если WS offline — fallback `POST …/send-message/` (нужен выбранный аккаунт).
+5. Медиа: preview blob → `upload` → `content_uri` → WS/REST; fallback — multipart.
+6. `message_status` по тому же серверному `id`: `pending → sent|delivered|read|failed`.
+7. Все события — **upsert по `id`**, не append. После реконнекта — догрузка REST.
+8. Через ~25 с без финального статуса — REST + «Доставка не подтверждена».
 
 Привязка WS-сообщения к открытому лиду: `messageBelongsToLead` —
 по `lead_id` или по совпадению последних 10 цифр телефона (`chat_id` ↔

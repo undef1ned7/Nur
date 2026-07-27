@@ -77,4 +77,61 @@ describe("wazzupSocketManager", () => {
 
     release();
   });
+
+  it("dispatches ack, new_message and message_status to every subscriber", async () => {
+    const {
+      acquireWazzupSocket,
+      subscribeWazzupSocket,
+    } = await import("./wazzupSocketManager");
+    const first = {
+      onSendAck: vi.fn(),
+      onNewMessage: vi.fn(),
+      onStatus: vi.fn(),
+    };
+    const second = {
+      onSendAck: vi.fn(),
+      onNewMessage: vi.fn(),
+      onStatus: vi.fn(),
+    };
+    const unsubscribeFirst = subscribeWazzupSocket(first);
+    const unsubscribeSecond = subscribeWazzupSocket(second);
+    const release = acquireWazzupSocket();
+    vi.runOnlyPendingTimers();
+    const socket = MockWebSocket.instances[0];
+
+    const frames = [
+      {
+        action: "send_message_ack",
+        status: "success",
+        data: { id: "message-1", status: "pending" },
+      },
+      {
+        type: "new_message",
+        data: { id: "message-2", text: "Входящее" },
+      },
+      {
+        type: "message_status",
+        data: { id: "message-1", status: "sent" },
+      },
+    ];
+    frames.forEach((frame) => {
+      socket.onmessage({ data: JSON.stringify(frame) });
+    });
+
+    for (const subscriber of [first, second]) {
+      expect(subscriber.onSendAck).toHaveBeenCalledWith(frames[0]);
+      expect(subscriber.onNewMessage).toHaveBeenCalledWith(
+        frames[1].data,
+        frames[1],
+      );
+      expect(subscriber.onStatus).toHaveBeenCalledWith(
+        frames[2].data,
+        frames[2],
+      );
+    }
+
+    unsubscribeFirst();
+    unsubscribeSecond();
+    release();
+  });
 });

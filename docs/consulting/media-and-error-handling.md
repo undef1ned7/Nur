@@ -41,7 +41,8 @@
 Статусы UI: `pending → sent → delivered → read`, либо `error`.
 
 - Бэкенд `FAILED` / WS `status: "failed"` → UI `error` (красный `!`).
-- Ошибка `send_message_ack` → optimistic-бабл в `error`.
+- Ошибка `send_message_ack` → toast (пузыря ещё нет: он появляется только из
+  успешного ack/REST).
 
 ## 3. Авто-статус «В работу»
 
@@ -63,7 +64,7 @@
 | `POST …/send-message/` | — | ~0.4–1.2 с |
 
 **Фронт:**
-1. `listWazzupChats` сначала бьёт в `/wazzup-chats/` (быстрый путь).
+1. `listWazzupChats` сначала `/chats/` (контракт), затем алиас `/wazzup-chats/`.
 2. `markLeadChatRead` — fire-and-forget: не блокирует открытие чата и загрузку истории.
 3. Inbox: live через `/ws/wazzup/`; полный refetch списка — только silent и не на каждое сообщение.
 4. Плейсхолдеры медиа в preview списка — без лишних запросов за телом сообщения.

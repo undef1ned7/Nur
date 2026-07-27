@@ -1,5 +1,5 @@
 // src/Components/Sectors/Consulting/Funnel/Funnel.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import "./Funnel.scss";
 import { useDispatch } from "react-redux";
 import {
@@ -71,6 +71,7 @@ import { ensurePushPermission, useConsultingRealtime } from "../common/useConsul
 import {
   consultingChatPath,
   CRM_CHAT_CHANNELS,
+  isConsultingChatRealtimeEvent,
   isConsultingFunnelRealtimeEvent,
 } from "../../../../utils/consultingLeadSources";
 import LeadCreateClientModal from "./LeadCreateClientModal";
@@ -2184,8 +2185,29 @@ function LeadDetail({
   const [employees, setEmployees] = useState([]);
   const [assignTo, setAssignTo] = useState("");
   const [transferTo, setTransferTo] = useState("");
+  const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
 
   const detailUserId = resolveCurrentUserId(profile, wsUserId);
+
+  // Уведомление — резервный сигнал тихой REST-сверки открытого чата (§ гайда / Map upsert).
+  const onMessengerChatSignal = useCallback((n) => {
+    const t = String(
+      n?.type || n?.event || n?.notification_type || "",
+    ).toLowerCase();
+    const isMessage =
+      t.includes("message") ||
+      t.includes("lead_message") ||
+      t.includes("new_message");
+    if (!isMessage) return;
+    startTransition(() => {
+      setHistoryRefreshSignal((value) => value + 1);
+    });
+  }, []);
+  useConsultingRealtime({
+    match: isConsultingChatRealtimeEvent,
+    onSignal: onMessengerChatSignal,
+    desktopPush: false,
+  });
 
   // WhatsApp/IG/TG лиды сразу открываем на вкладке «Чат» (если tab не задан в URL).
   useEffect(() => {
@@ -2614,6 +2636,7 @@ function LeadDetail({
             lead={lead}
             onNotice={onNotice}
             onError={setErr}
+            refreshSignal={historyRefreshSignal}
           />
         ) : (
           <p className="funnel__hint funnel__hint--lock">

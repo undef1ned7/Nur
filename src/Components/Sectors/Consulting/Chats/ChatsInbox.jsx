@@ -137,6 +137,7 @@ export default function ChatsInbox() {
   const [apiLead, setApiLead] = useState(null);
   const [leadLoading, setLeadLoading] = useState(false);
   const [claimBusy, setClaimBusy] = useState(false);
+  const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0);
   const leadIdRef = useRef(leadId);
   useEffect(() => {
     leadIdRef.current = leadId;
@@ -203,10 +204,9 @@ export default function ChatsInbox() {
   }, []);
 
   /**
-   * Уведомления больше НЕ дергают полный reload списка:
-   * new_message уже обрабатывает /ws/wazzup/, а refetch мигал UI
-   * и затирал бейдж непрочитанных.
-   * Тихий refetch только для назначения/нового лида (новый поток в списке).
+   * Уведомление — резервный сигнал синхронизации на случай, если чатовый WS
+   * потерял событие. Сверка тихая: существующий UI не очищается, сообщения
+   * в открытом диалоге сливаются по id.
    */
   const onChatSignal = useCallback(
     (n) => {
@@ -215,9 +215,11 @@ export default function ChatsInbox() {
         t.includes("message") ||
         t.includes("lead_message") ||
         t.includes("new_message");
-      if (isMessage) return;
       startTransition(() => {
         loadThreads({ silent: true });
+        if (isMessage) {
+          setHistoryRefreshSignal((value) => value + 1);
+        }
       });
     },
     [loadThreads],
@@ -414,6 +416,10 @@ export default function ChatsInbox() {
 
   const handleNotice = useCallback((m) => setNotice(m || ""), []);
   const handleError = useCallback((m) => setErr(m || ""), []);
+  const handlePanelMessage = useCallback(
+    (message) => onInboxNewMessage(message),
+    [onInboxNewMessage],
+  );
 
   if (!channelAvailable) {
     return (
@@ -446,7 +452,9 @@ export default function ChatsInbox() {
   }
 
   return (
-    <section className={`crmInbox crmInbox--${meta.tone}`}>
+    <section
+      className={`crmInbox crmInbox--${meta.tone}${leadId ? " crmInbox--chatOpen" : ""}`}
+    >
       <header className="crmInbox__top">
         <Link to="/crm/consulting/chats" className="crmInbox__back">
           <FaArrowLeft /> Чаты
@@ -515,21 +523,19 @@ export default function ChatsInbox() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск по имени или телефону…"
+              placeholder="Поиск"
             />
           </div>
 
           {notReady && (
             <div className="crmInbox__emptyHint">
-              Список чатов с бэка пока пуст или эндпоинт не готов. Диалоги
-              появятся из лидов с источником «{leadSourceLabel(channel)}» после
-              входящих сообщений Wazzup.
+              Диалоги появятся после входящих сообщений.
             </div>
           )}
 
           <div className="crmInbox__list">
             {loading ? (
-              <div className="crmInbox__emptyHint">Загрузка чатов…</div>
+              <div className="crmInbox__emptyHint">Загрузка…</div>
             ) : filtered.length ? (
               filtered.map((t) => {
                 const active =
@@ -567,8 +573,7 @@ export default function ChatsInbox() {
               })
             ) : (
               <div className="crmInbox__emptyHint">
-                Чатов пока нет. Когда клиент напишет в {meta.title}, диалог
-                появится здесь.
+                Пока нет чатов в {meta.title}
               </div>
             )}
           </div>
@@ -578,18 +583,25 @@ export default function ChatsInbox() {
           {!leadId ? (
             <div className="crmInbox__placeholder">
               <Icon />
-              <p>Выберите чат слева, чтобы открыть переписку</p>
+              <p>Выберите чат</p>
             </div>
           ) : leadLoading && !lead ? (
             <div className="crmInbox__placeholder">
-              <p>Открываем чат…</p>
+              <p>Открываем…</p>
             </div>
           ) : lead ? (
             <div className="crmInbox__chatWrap">
               <div className="crmInbox__chatBar">
+                <button
+                  type="button"
+                  className="crmInbox__chatBack"
+                  onClick={() => navigate(`/crm/consulting/chats/${channel}`)}
+                >
+                  <FaArrowLeft /> Назад
+                </button>
                 {funnelPath && (
                   <Link to={funnelPath} className="crmInbox__funnelLink">
-                    <FaExternalLinkAlt /> Карточка на воронке
+                    <FaExternalLinkAlt /> Воронка
                   </Link>
                 )}
                 {inPool && (
@@ -609,6 +621,8 @@ export default function ChatsInbox() {
                   lead={lead}
                   onNotice={handleNotice}
                   onError={handleError}
+                  onMessageUpsert={handlePanelMessage}
+                  refreshSignal={historyRefreshSignal}
                 />
               ) : (
                 <>
@@ -617,6 +631,8 @@ export default function ChatsInbox() {
                     lead={lead}
                     onNotice={handleNotice}
                     onError={handleError}
+                    onMessageUpsert={handlePanelMessage}
+                    refreshSignal={historyRefreshSignal}
                     readOnly
                   />
                   <p className="crmInbox__lockHint">

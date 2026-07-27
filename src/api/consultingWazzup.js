@@ -630,31 +630,123 @@ export function messageBelongsToLead(msg, lead) {
 const asList = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
-/** Собрать все страницы paginated DRF-ответа (до maxPages). */
-async function fetchAllPages(path, params, { maxPages = 20 } = {}) {
-  const pageSize = params?.page_size || 100;
+/** next от DRF часто абсолютный URL — приводим к path относительно api baseURL. */
+function toRelativeApiUrl(next) {
+  if (!next || typeof next !== "string") return null;
+  if (next.startsWith("/")) return next.replace(/^\/api(?=\/)/, "");
+  try {
+    const u = new URL(next);
+    return `${u.pathname.replace(/^\/api(?=\/)/, "")}${u.search}`;
+  } catch {
+    return next;
+  }
+}
+
+/**
+ * Собрать все страницы paginated DRF-ответа.
+ * Следуем `next` (PageNumber / LimitOffset / Cursor), иначе page++ пока
+ * страница полная или count ещё не выбран.
+ */
+async function fetchAllPages(path, params, { maxPages = 100 } = {}) {
+  const pageSize = Number(params?.page_size || params?.limit || 200) || 200;
+  const baseParams = {
+    ...params,
+    page_size: pageSize,
+    limit: pageSize,
+  };
+
   let page = 1;
+  let offset = 0;
   let rows = [];
+  let nextUrl = null;
   let guard = 0;
 
   while (guard < maxPages) {
     guard += 1;
-    const { data } = await api.get(path, {
-      params: { ...params, page, page_size: pageSize },
-    });
+    const { data } = nextUrl
+      ? await api.get(nextUrl)
+      : await api.get(path, {
+          params: { ...baseParams, page, offset },
+        });
+
     const chunk = asList(data);
-    rows = rows.concat(chunk);
+    if (chunk.length) rows = rows.concat(chunk);
 
     const count = typeof data?.count === "number" ? data.count : null;
-    const hasNext = Boolean(data?.next);
-    if (!chunk.length) break;
+    const relativeNext = toRelativeApiUrl(data?.next);
+
+    if (relativeNext) {
+      nextUrl = relativeNext;
+      page += 1;
+      offset = rows.length;
+      continue;
+    }
+
+    nextUrl = null;
     if (count != null && rows.length >= count) break;
-    if (!hasNext && count == null) break;
-    if (!hasNext) break;
-    page += 1;
+    if (!chunk.length) break;
+
+    // next нет, но count говорит, что есть ещё — или страница «полная».
+    const pageLooksFull = chunk.length >= pageSize;
+    const countSaysMore = count != null && rows.length < count;
+    if (pageLooksFull || countSaysMore) {
+      // Защита: бэк игнорирует page → одни и те же rows по кругу.
+      const prior = rows.slice(0, -chunk.length);
+      if (prior.length) {
+        const priorIds = new Set(
+          prior.map((r) => String(r?.id ?? r?.lead_id ?? r?.lead ?? "")),
+        );
+        const allDup = chunk.every((r) =>
+          priorIds.has(String(r?.id ?? r?.lead_id ?? r?.lead ?? "")),
+        );
+        if (allDup) break;
+      }
+      page += 1;
+      offset = rows.length;
+      continue;
+    }
+    break;
   }
 
   return rows;
+}
+
+function threadMatchesChannel(raw, channel) {
+  const ch = String(channel || "").toLowerCase();
+  if (!ch) return true;
+  const hay = [
+    raw?.source,
+    raw?.integration_type,
+    raw?.transport,
+    raw?.channel,
+    raw?.channel_type,
+    raw?.type,
+  ]
+    .filter((v) => v != null && String(v).trim() !== "")
+    .map((v) => String(v).toLowerCase());
+  if (!hay.length) return null; // неизвестно — решает вызывающий
+  return hay.some((v) => v === ch || v.includes(ch));
+}
+
+/**
+ * /chats/ — доверяем ответу.
+ * /leads/?source=whatsapp — на бэке source часто пустой, и в выборку попадают
+ * обычные CRM-лиды. Берём только явный канал / «Заявка из WhatsApp» / есть last_message.
+ */
+function shouldIncludeThread(raw, channel, { fromLeadsFallback = false } = {}) {
+  const ch = String(channel || "").toLowerCase();
+  const matched = threadMatchesChannel(raw, ch);
+  if (matched === true) return true;
+  if (matched === false && !fromLeadsFallback) return false;
+
+  const blob = `${raw?.title || ""} ${raw?.full_name || ""} ${raw?.description || ""}`.toLowerCase();
+  if (ch && blob.includes(ch)) return true;
+
+  if (!fromLeadsFallback) return true; // /chats/, /wazzup-chats/
+
+  // fallback leads/inbound: без маркера канала — только если уже есть переписка
+  if (matched === false) return false;
+  return Boolean(raw?.last_message || raw?.last_message_text || raw?.last_message_at);
 }
 
 /**
@@ -728,8 +820,10 @@ export function normalizeChatThread(raw, channel) {
 
 /**
  * Список диалогов по каналу (whatsapp | telegram | instagram).
- * Приоритет по контракту: GET /chats/, затем /wazzup-chats/ и legacy-алиасы.
- * Тянем все страницы — иначе DRF отдаёт только первую.
+ *
+ * Бэкенд `/chats/` часто отдаёт **голый массив** без пагинации (`count`/`next`)
+ * и может быть неполным. Поэтому мержим ответы нескольких эндпоинтов по
+ * `lead_id`, предпочитая более свежий `last_message_at`.
  *
  * @param {"whatsapp"|"telegram"|"instagram"} channel
  * @returns {Promise<{ threads: Array, notReady: boolean, path?: string }>}
@@ -737,50 +831,109 @@ export function normalizeChatThread(raw, channel) {
 export const listWazzupChats = async (channel) => {
   const ch = String(channel || "whatsapp").toLowerCase();
   const attempts = [
-    // Основной маршрут контракта, затем его оптимизированный алиас.
     {
       path: `${BASE}/chats/`,
-      params: { integration_type: ch, source: ch, page_size: 100 },
+      params: { integration_type: ch, source: ch, page_size: 200 },
     },
     {
       path: `${BASE}/wazzup-chats/`,
-      params: { integration_type: ch, source: ch, page_size: 100 },
+      params: { integration_type: ch, source: ch, page_size: 200 },
     },
-    { path: `${BASE}/leads/`, params: { source: ch, page_size: 100 } },
-    { path: `${BASE}/inbound-leads/`, params: { source: ch, page_size: 100 } },
+    { path: `${BASE}/leads/`, params: { source: ch, page_size: 200 } },
+    { path: `${BASE}/inbound-leads/`, params: { source: ch, page_size: 200 } },
   ];
 
+  const byId = new Map();
+  const usedPaths = [];
   let sawNotReady = false;
+  let sawSuccess = false;
 
   for (const { path, params } of attempts) {
+    const fromLeadsFallback =
+      path.includes("/leads/") || path.includes("/inbound-leads/");
     try {
       const rows = await fetchAllPages(path, params);
-      const filtered = rows.filter((r) => {
-        const src = String(r.source || r.integration_type || ch).toLowerCase();
-        return !r.source && !r.integration_type
-          ? true
-          : src === ch || src.includes(ch);
-      });
-      const threads = filtered
-        .map((r) => normalizeChatThread(r, ch))
-        .filter((t) => t.id)
-        .sort((a, b) => {
-          const ta = new Date(a.last_message_at || 0).getTime();
-          const tb = new Date(b.last_message_at || 0).getTime();
-          return tb - ta;
-        });
-      return { threads, notReady: false, path };
+      sawSuccess = true;
+      usedPaths.push(path);
+      for (const raw of rows) {
+        if (!shouldIncludeThread(raw, ch, { fromLeadsFallback })) continue;
+        const thread = normalizeChatThread(
+          {
+            ...raw,
+            // Бэк часто отдаёт source: "" у WhatsApp-лидов — чиним для UI.
+            source: raw?.source || raw?.integration_type || ch,
+          },
+          ch,
+        );
+        if (!thread.id) continue;
+        const prev = byId.get(thread.id);
+        if (!prev) {
+          byId.set(thread.id, thread);
+          continue;
+        }
+        // Более свежий preview / больший unread побеждает.
+        const prevT = new Date(prev.last_message_at || 0).getTime();
+        const nextT = new Date(thread.last_message_at || 0).getTime();
+        const preferNext =
+          nextT > prevT ||
+          (!prev.last_message && !!thread.last_message) ||
+          (Number(thread.unread_count) || 0) > (Number(prev.unread_count) || 0);
+        byId.set(
+          thread.id,
+          preferNext
+            ? {
+                ...prev,
+                ...thread,
+                unread_count: Math.max(
+                  Number(prev.unread_count) || 0,
+                  Number(thread.unread_count) || 0,
+                ),
+                has_unread:
+                  prev.has_unread ||
+                  thread.has_unread ||
+                  (Number(thread.unread_count) || 0) > 0,
+              }
+            : {
+                ...thread,
+                ...prev,
+                unread_count: Math.max(
+                  Number(prev.unread_count) || 0,
+                  Number(thread.unread_count) || 0,
+                ),
+                has_unread:
+                  prev.has_unread ||
+                  thread.has_unread ||
+                  (Number(prev.unread_count) || 0) > 0,
+              },
+        );
+      }
     } catch (error) {
       const status = error?.response?.status;
       if (status === 404 || status === 501) {
         sawNotReady = true;
         continue;
       }
+      // Если уже есть данные с другого эндпоинта — не валим весь список.
+      if (byId.size) continue;
       return reject("List Wazzup Chats Error")(error);
     }
   }
 
-  return { threads: [], notReady: sawNotReady, path: null };
+  if (!sawSuccess && sawNotReady) {
+    return { threads: [], notReady: true, path: null };
+  }
+
+  const threads = Array.from(byId.values()).sort((a, b) => {
+    const ta = new Date(a.last_message_at || 0).getTime();
+    const tb = new Date(b.last_message_at || 0).getTime();
+    return tb - ta;
+  });
+
+  return {
+    threads,
+    notReady: !threads.length && sawNotReady,
+    path: usedPaths[0] || null,
+  };
 };
 
 /**

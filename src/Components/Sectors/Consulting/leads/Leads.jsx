@@ -5,6 +5,7 @@ import {
   FaInstagram,
   FaLayerGroup,
   FaPlus,
+  FaSearch,
   FaTelegram,
   FaTimes,
   FaWhatsapp,
@@ -84,7 +85,26 @@ const STRATEGIES = [
 const fmtDateTime = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("ru-RU");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const initials = (name) => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
 };
 
 export default function ConsultingLeads() {
@@ -143,16 +163,16 @@ export default function ConsultingLeads() {
   return (
     <section className="leads">
       <header className="leads__header">
-        <div>
-          <h2 className="leads__title">
-            <FaWhatsapp className="leads__titleIcon" /> Лиды
-          </h2>
+        <div className="leads__heading">
+          <h2 className="leads__title">Лиды</h2>
           <p className="leads__subtitle">
-            Входящие из WhatsApp / Instagram / Telegram (Wazzup) и распределение
-            по сотрудникам. Каналы подключаются автоматически.
+            Входящие из WhatsApp, Instagram и Telegram
           </p>
         </div>
-        <div className="leads__tabs" role="tablist">
+      </header>
+
+      <div className="leads__tabsRow">
+        <div className="leads__tabs" role="tablist" aria-label="Разделы лидов">
           <button
             type="button"
             role="tab"
@@ -181,7 +201,7 @@ export default function ConsultingLeads() {
             Интеграция
           </button>
         </div>
-      </header>
+      </div>
 
       {tab === "inbox" && (
         <InboxTab empById={empById} employees={employees} alert={alert} />
@@ -263,16 +283,31 @@ function InboxTab({ empById, employees, alert }) {
     <>
       <div className="leads__toolbar">
         <div className="leads__filters">
-          <input
-            className="leads__input"
-            placeholder="Поиск по имени / телефону…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <label className="leads__search">
+            <FaSearch className="leads__searchIcon" aria-hidden />
+            <input
+              className="leads__searchInput"
+              placeholder="Имя или телефон…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Поиск лидов"
+            />
+            {!!q && (
+              <button
+                type="button"
+                className="leads__searchClear"
+                onClick={() => setQ("")}
+                aria-label="Очистить поиск"
+              >
+                <FaTimes />
+              </button>
+            )}
+          </label>
           <select
             className="leads__input"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
+            aria-label="Статус"
           >
             <option value="">Все статусы</option>
             {Object.entries(STATUS_RU).map(([v, l]) => (
@@ -285,6 +320,7 @@ function InboxTab({ empById, employees, alert }) {
             className="leads__input"
             value={source}
             onChange={(e) => setSource(e.target.value)}
+            aria-label="Источник"
           >
             <option value="">Все источники</option>
             {LEAD_SOURCES.map((s) => (
@@ -295,20 +331,26 @@ function InboxTab({ empById, employees, alert }) {
           </select>
         </div>
         <div className="leads__toolbarActions">
+          {!loading && !notReady && (
+            <span className="leads__count">
+              {count} {pluralLeads(count)}
+            </span>
+          )}
           <button
             type="button"
             className="leads__btn"
             onClick={() => fetchLeads(page)}
             title="Обновить"
+            disabled={loading}
           >
-            <FaSyncAlt /> Обновить
+            <FaSyncAlt aria-hidden />
           </button>
           <button
             type="button"
             className="leads__btn leads__btn--primary"
             onClick={() => setCreateOpen(true)}
           >
-            <FaPlus /> Лид вручную
+            <FaPlus aria-hidden /> Лид
           </button>
         </div>
       </div>
@@ -319,13 +361,11 @@ function InboxTab({ empById, employees, alert }) {
         <div className="leads__notice">
           <FaWhatsapp className="leads__noticeIcon" />
           <div>
-            <b>Список входящих лидов пока недоступен на бэкенде.</b>
+            <b>Входящие лиды пока недоступны</b>
             <p>
-              После появления <code>/consalting/inbound-leads/</code> сообщения из
-              WhatsApp / Instagram / Telegram (Wazzup webhook) будут появляться
-              здесь и распределяться по правилам вкладки «Распределение». Каналы
-              подключаются во вкладке «Интеграция». Пока можно добавлять лиды
-              вручную (если POST уже доступен) или через Admin.
+              Сообщения из WhatsApp, Instagram и Telegram появятся здесь после
+              подключения на сервере. Каналы — во вкладке «Интеграция», правила
+              раздачи — в «Распределение». Пока можно добавить лид вручную.
             </p>
           </div>
         </div>
@@ -336,103 +376,148 @@ function InboxTab({ empById, employees, alert }) {
           <table className="leads__table">
             <thead>
               <tr>
-                <th>Получен</th>
-                <th>Имя</th>
-                <th>Телефон</th>
-                <th>Источник</th>
-                <th>Сообщение</th>
-                <th>Назначен</th>
-                <th>Статус</th>
-                <th />
+                <th className="leads__colLead">Лид</th>
+                <th className="leads__colDate">Получен</th>
+                <th className="leads__colSource">Источник</th>
+                <th className="leads__colMsg">Сообщение</th>
+                <th className="leads__colOwner">Назначен</th>
+                <th className="leads__colStatus">Статус</th>
+                <th className="leads__colActions" aria-label="Действия" />
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="leads__empty" colSpan={8}>
-                    Загрузка…
+                  <td className="leads__empty" colSpan={7}>
+                    Загрузка списка лидов…
                   </td>
                 </tr>
               ) : items.length ? (
                 items.map((l) => {
                   const src = leadSourceMeta(l.source || "manual");
+                  const name = l.full_name || l.name || "";
+                  const ownerName = l.owner
+                    ? empById.get(String(l.owner)) ||
+                      l.owner_display ||
+                      "—"
+                    : null;
                   return (
-                  <tr key={l.id}>
-                    <td>{fmtDateTime(l.created_at || l.received_at)}</td>
-                    <td>{l.full_name || l.name || "—"}</td>
-                    <td>{l.phone || "—"}</td>
-                    <td>
-                      <span
-                        className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
-                        style={{ color: src.color }}
+                    <tr key={l.id} className="leads__row">
+                      <td className="leads__colLead">
+                        <div className="leads__person">
+                          <span className="leads__avatar" aria-hidden>
+                            {initials(name)}
+                          </span>
+                          <div className="leads__personText">
+                            <div className="leads__name" title={name || undefined}>
+                              {name || "Без имени"}
+                            </div>
+                            <div
+                              className="leads__phone"
+                              title={l.phone || undefined}
+                            >
+                              {l.phone || "Телефон не указан"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="leads__colDate leads__date">
+                        {fmtDateTime(l.created_at || l.received_at)}
+                      </td>
+                      <td className="leads__colSource">
+                        <span
+                          className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
+                          style={{ color: src.color }}
+                        >
+                          <SourceIcon source={src.value} /> {src.label}
+                        </span>
+                      </td>
+                      <td
+                        className="leads__colMsg leads__msgPreview"
+                        title={l.message || ""}
                       >
-                        <SourceIcon source={src.value} /> {src.label}
-                      </span>
-                    </td>
-                    <td
-                      className="leads__msgPreview"
-                      title={l.message || ""}
-                    >
-                      {l.message
-                        ? String(l.message).slice(0, 80) +
-                          (String(l.message).length > 80 ? "…" : "")
-                        : "—"}
-                    </td>
-                    <td>
-                      {l.owner
-                        ? empById.get(String(l.owner)) ||
-                          l.owner_display ||
-                          "—"
-                        : "— не распределён —"}
-                    </td>
-                    <td>
-                      <span
-                        className={`leads__status leads__status--${
-                          l.status || "new"
-                        }`}
+                        {l.message
+                          ? String(l.message).slice(0, 80) +
+                            (String(l.message).length > 80 ? "…" : "")
+                          : "—"}
+                      </td>
+                      <td
+                        className="leads__colOwner"
+                        title={ownerName || undefined}
                       >
-                        {STATUS_RU[l.status] || l.status || "Новый"}
-                      </span>
-                    </td>
-                    <td className="leads__rowActions">
-                      {l.lead && (
-                        <>
-                          <Link
-                            to={
-                              consultingChatPath(
-                                l.lead,
-                                l.source || "whatsapp",
-                              ) || "#"
-                            }
-                            className="leads__btn leads__btn--sm leads__btn--ghost"
-                            title="Открыть чат"
+                        {ownerName ? (
+                          <span className="leads__cellText">{ownerName}</span>
+                        ) : (
+                          <span className="leads__unassigned">Не назначен</span>
+                        )}
+                      </td>
+                      <td className="leads__colStatus">
+                        <span
+                          className={`leads__status leads__status--${
+                            l.status || "new"
+                          }`}
+                        >
+                          {STATUS_RU[l.status] || l.status || "Новый"}
+                        </span>
+                      </td>
+                      <td className="leads__colActions">
+                        <div className="leads__rowActions">
+                          {l.lead && (
+                            <>
+                              <Link
+                                to={
+                                  consultingChatPath(
+                                    l.lead,
+                                    l.source || "whatsapp",
+                                  ) || "#"
+                                }
+                                className="leads__btn leads__btn--sm"
+                                title="Открыть чат"
+                              >
+                                <FaComments aria-hidden />
+                                <span>Чат</span>
+                              </Link>
+                              <Link
+                                to={consultingFunnelLeadPath(l.lead) || "#"}
+                                className="leads__btn leads__btn--sm"
+                                title="Открыть на воронке"
+                              >
+                                <FaLayerGroup aria-hidden />
+                                <span>Воронка</span>
+                              </Link>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            className="leads__btn leads__btn--sm"
+                            onClick={() => setAssignFor(l)}
+                            title="Назначить"
                           >
-                            <FaComments /> Чат
-                          </Link>
-                          <Link
-                            to={consultingFunnelLeadPath(l.lead) || "#"}
-                            className="leads__btn leads__btn--sm leads__btn--ghost"
-                            title="Открыть на воронке"
-                          >
-                            <FaLayerGroup /> Воронка
-                          </Link>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        className="leads__btn leads__btn--sm"
-                        onClick={() => setAssignFor(l)}
-                      >
-                        <FaUserCheck /> Назначить
-                      </button>
-                    </td>
-                  </tr>
+                            <FaUserCheck aria-hidden />
+                            <span>Назначить</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td className="leads__empty" colSpan={8}>
-                    Пока нет входящих лидов
+                  <td className="leads__empty" colSpan={7}>
+                    <div className="leads__emptyState">
+                      <strong>Пока нет входящих лидов</strong>
+                      <p>
+                        Новые обращения из мессенджеров появятся здесь. Можно
+                        добавить лид вручную.
+                      </p>
+                      <button
+                        type="button"
+                        className="leads__btn leads__btn--primary"
+                        onClick={() => setCreateOpen(true)}
+                      >
+                        <FaPlus aria-hidden /> Добавить лид
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -444,6 +529,7 @@ function InboxTab({ empById, employees, alert }) {
       {count > PER_PAGE && (
         <div className="leads__pager">
           <button
+            type="button"
             className="leads__btn"
             disabled={page <= 1}
             onClick={() => fetchLeads(page - 1)}
@@ -454,6 +540,7 @@ function InboxTab({ empById, employees, alert }) {
             Стр. {page} из {totalPages}
           </span>
           <button
+            type="button"
             className="leads__btn"
             disabled={page >= totalPages}
             onClick={() => fetchLeads(page + 1)}
@@ -488,6 +575,15 @@ function InboxTab({ empById, employees, alert }) {
       )}
     </>
   );
+}
+
+function pluralLeads(n) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return "лидов";
+  if (last === 1) return "лид";
+  if (last >= 2 && last <= 4) return "лида";
+  return "лидов";
 }
 
 function CreateLeadModal({ onClose, onCreated, onError }) {
@@ -752,10 +848,10 @@ function SettingsTab({ roles, employees, alert }) {
         <div className="leads__notice">
           <FaWhatsapp className="leads__noticeIcon" />
           <div>
-            <b>Хранение настроек на бэкенде ещё не реализовано.</b>
+            <b>Сохранение настроек пока недоступно</b>
             <p>
-              Можно задать желаемые правила заранее — они вступят в силу после
-              подключения. Контракт для бэка: docs/consulting/leads-whatsapp.md.
+              Можно задать правила заранее — они заработают после подключения на
+              сервере.
             </p>
           </div>
         </div>
@@ -771,9 +867,8 @@ function SettingsTab({ roles, employees, alert }) {
           <span>
             <b>Авто-распределение входящих лидов</b>
             <small>
-              Когда включено, каждый новый лид из WhatsApp / Instagram / Telegram
-              сразу назначается сотруднику по выбранной стратегии (round-robin,
-              least-loaded или вручную).
+              Новый лид из мессенджера сразу назначается сотруднику по выбранной
+              стратегии.
             </small>
           </span>
         </label>
