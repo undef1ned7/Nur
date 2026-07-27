@@ -5,6 +5,7 @@ import {
   fetchNotificationDetailAsync,
   markNotificationReadAsync,
 } from '../creators/notificationCreators';
+import { consultingNotificationLeadId } from '../../utils/consultingLeadSources';
 
 const initialState = {
   list: [],
@@ -20,6 +21,20 @@ const initialState = {
 
 const isUnread = (n) => !(n?.is_read ?? n?.read ?? false);
 const idOf = (n) => n?.id ?? n?.uuid ?? n?.pk;
+
+function markListForLead(state, leadId) {
+  const id = String(leadId || '');
+  if (!id) return;
+  let dec = 0;
+  state.list.forEach((n) => {
+    if (!isUnread(n)) return;
+    if (String(consultingNotificationLeadId(n) || '') !== id) return;
+    n.is_read = true;
+    n.read = true;
+    dec += 1;
+  });
+  if (dec) state.unreadCount = Math.max(0, state.unreadCount - dec);
+}
 
 const notificationSlice = createSlice({
   name: 'notification',
@@ -55,6 +70,10 @@ const notificationSlice = createSlice({
     /** Явная установка счётчика непрочитанных (из WS-события счётчика). */
     unreadCountSet: (state, action) => {
       state.unreadCount = Math.max(0, Number(action.payload) || 0);
+    },
+    /** Открыли чат лида — все связанные уведомления прочитаны. */
+    markLeadNotificationsReadLocal: (state, action) => {
+      markListForLead(state, action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -137,6 +156,7 @@ export const {
   notificationMarkedReadLocal,
   allMarkedReadLocal,
   unreadCountSet,
+  markLeadNotificationsReadLocal,
 } = notificationSlice.actions;
 
 export default notificationSlice.reducer;

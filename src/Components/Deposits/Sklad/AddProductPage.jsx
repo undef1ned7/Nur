@@ -404,7 +404,10 @@ const AddProductPage = ({
     // Бренды/категории грузятся эффектами серверного поиска выше
     // Загружаем все товары для точного подсчета весовых товаров
     // Оптимизация: загружаем только необходимое количество товаров
-    dispatch(fetchProductsAsync({ page_size: 100 }));
+    const productsRequest = dispatch(fetchProductsAsync({ page_size: 100 }));
+    return () => {
+      productsRequest.abort();
+    };
   }, [dispatch]);
   // console.log(cashData);
 

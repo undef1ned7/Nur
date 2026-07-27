@@ -11,6 +11,7 @@ import {
 import NotificationModal from "../NotificationModal/NotificationModal";
 import { fetchNotificationsAsync } from "../../store/creators/notificationCreators";
 import { useNotificationsSocket } from "../../hooks/useNotificationsSocket";
+import ConsultingWazzupNotifyBridge from "../Sectors/Consulting/common/ConsultingWazzupNotifyBridge";
 import "./Header.scss";
 
 const pageTitles = {
@@ -163,6 +164,12 @@ const pageTitles = {
   "/crm/consulting/salary": "Зарплата",
   "/crm/consulting/sale": "Продажа",
   "/crm/consulting/services": "Услуги",
+  "/crm/consulting/funnel": "Воронка продаж",
+  "/crm/consulting/leads": "Лиды",
+  "/crm/consulting/chats": "Чаты",
+  "/crm/consulting/chats/whatsapp": "WhatsApp",
+  "/crm/consulting/chats/telegram": "Telegram",
+  "/crm/consulting/chats/instagram": "Instagram",
 
   "/crm/warehouse/warehouses": "Склады",
   "/crm/warehouse/analytics": "Аналитика",
@@ -240,6 +247,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
   // Real-time уведомления через WebSocket (интеграция с колокольчиком).
   useNotificationsSocket({ enabled: !!userProfile });
+
+  // Консалтинг: входящие Wazzup → колокольчик (если не в этом чате).
+  // «Долго не отвечали» приходит только с бэка через /ws/notifications/.
 
   // Первичная загрузка списка/счётчика (один раз при появлении пользователя).
   useEffect(() => {
@@ -384,6 +394,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
   return (
     <div className="header">
+      <ConsultingWazzupNotifyBridge />
       <div className="header__left">
         <div className="header__burger" onClick={toggleSidebar}>
           <Menu size={24} />

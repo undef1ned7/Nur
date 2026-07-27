@@ -10,6 +10,7 @@ import {
   toDecimalString,
 } from "../../tools/clientDeals";
 import { handleThunkError } from "./utils/handleThunkError";
+import { serializeApiError } from "../../../tools/barcodeAmbiguity";
 
 // ===== Helpers для сделок =====
 
@@ -173,7 +174,7 @@ export const sendBarCode = createAsyncThunk(
       );
       return data;
     } catch (error) {
-      return handleThunkError(error, rejectWithValue);
+      return rejectWithValue(serializeApiError(error));
     }
   },
 );
