@@ -24,12 +24,12 @@ import {
   normalizeMessageStatus,
   resolveMediaType,
   resolveMediaTypeFromFile,
+  sendWazzupMessage,
   sendWazzupMessageWithFile,
   uploadConsultingChatMedia,
 } from "../../../../api/consultingWazzup";
 import {
   leadSourceLabel,
-  WAZZUP_INTEGRATION_TYPES,
 } from "../../../../utils/consultingLeadSources";
 import { setConsultingActiveChatLead } from "../../../../utils/consultingActiveChat";
 import { useWazzupChatSocket } from "../../../../hooks/useWazzupChatSocket";
@@ -37,11 +37,16 @@ import { markLeadNotificationsReadAsync } from "../../../../store/creators/notif
 import ChatMessageMedia from "./ChatMessageMedia";
 import {
   applyChatMessageStatus,
+  confirmOptimisticMessage,
+  markMessageError,
+  mergeChatMessages,
   reconcilePendingMessage,
+  sortChatMessages,
   takePendingForAck,
   upsertChatMessage,
 } from "./chatMessageState";
 
+/** §6 гайда: если за 20–30 с после ack нет message_status — REST + «не подтверждено». */
 const DELIVERY_STATUS_TIMEOUT_MS = 25000;
 
 const asArray = (d) =>
@@ -146,13 +151,20 @@ function formatFileSize(bytes) {
 }
 
 /**
- * WhatsApp-чат лида (контракт async Wazzup):
- *  — своё исходящее рисуем из send_message_ack (по сокету себе не приходит)
- *  — upsert строго по data.id
+ * WhatsApp-чат лида (контракт async Wazzup — docs/consulting/wazzup-chat-async.md):
+ *  — своё исходящее рисуем из send_message_ack / REST (по сокету себе не приходит)
+ *  — Map upsert строго по data.id
  *  — финальный статус: message_status (pending → sent|failed|delivered|read)
- *  REST история GET /wazzup-messages/?lead=
+ *  — история GET /wazzup-messages/?lead= при открытии и после реконнекта
  */
-export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly = false }) {
+export default function LeadMessengerPanel({
+  lead,
+  onNotice,
+  onError,
+  onMessageUpsert,
+  refreshSignal = 0,
+  readOnly = false,
+}) {
   const dispatch = useDispatch();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,16 +176,26 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
   const [showMediaLink, setShowMediaLink] = useState(false);
   const [mediaFile, setMediaFile] = useState(null);
   const [sending, setSending] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [messagesById, setMessagesById] = useState(() => new Map());
+  const messages = useMemo(
+    () => sortChatMessages(messagesById),
+    [messagesById],
+  );
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const bottomRef = useRef(null);
+  const bodyRef = useRef(null);
+  const stickToBottomRef = useRef(true);
+  const seqRef = useRef(0);
   const fileInputRef = useRef(null);
   const markReadTimerRef = useRef(null);
   const deliveryWatchdogsRef = useRef(new Map());
+  const historySyncInFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const leadRef = useRef(lead);
   const onNoticeRef = useRef(onNotice);
   const onErrorRef = useRef(onError);
+  const onMessageUpsertRef = useRef(onMessageUpsert);
+  const refreshSignalRef = useRef(refreshSignal);
   useEffect(() => {
     leadRef.current = lead;
   }, [lead]);
@@ -183,6 +205,9 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  useEffect(() => {
+    onMessageUpsertRef.current = onMessageUpsert;
+  }, [onMessageUpsert]);
 
   useEffect(() => {
     setConsultingActiveChatLead(lead?.id || null);
@@ -267,18 +292,60 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
     [dispatch],
   );
 
-  const scrollBottom = useCallback(() => {
+  const scrollBottom = useCallback((instant = false) => {
+    const run = () => {
+      const el = bodyRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+      bottomRef.current?.scrollIntoView({
+        behavior: instant ? "auto" : "smooth",
+        block: "end",
+      });
+    };
+    // Два кадра: после commit DOM и после layout пузыря/медиа.
     requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      run();
+      requestAnimationFrame(run);
     });
   }, []);
 
-  const loadMessages = useCallback(async ({ merge = false } = {}) => {
+  const onBodyScroll = useCallback(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }, []);
+
+  const maybeScrollForMessage = useCallback(
+    (message, { force = false } = {}) => {
+      if (force || message?.direction === "out" || stickToBottomRef.current) {
+        stickToBottomRef.current = true;
+        scrollBottom(true);
+      }
+    },
+    [scrollBottom],
+  );
+
+  const loadMessages = useCallback(async ({
+    merge = false,
+    silent = false,
+  } = {}) => {
     const current = leadRef.current;
     if (!current?.id) return;
-    if (!merge) setLoadingMsgs(true);
+    const requestLeadId = String(current.id);
+    if (merge && historySyncInFlightRef.current) return;
+    if (merge) historySyncInFlightRef.current = true;
+    if (!merge && !silent) setLoadingMsgs(true);
     try {
       const { messages: rows, notReady } = await listLeadMessages(current.id);
+      if (
+        !mountedRef.current ||
+        String(leadRef.current?.id || "") !== requestLeadId
+      ) {
+        return;
+      }
       setHistoryNotReady(!!notReady && !rows.length);
       const seed = [];
       const seedText = current.message || current.first_message || "";
@@ -297,17 +364,17 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       }
       const incoming = rows.length ? rows : seed;
       // Дедуп по id (в т.ч. после реконнекта — пересечение с сокетом)
-      setMessages((prev) => {
-        if (!merge || !prev.length) {
-          return incoming.reduce((acc, m) => upsertChatMessage(acc, m), []);
-        }
-        return incoming.reduce((acc, m) => upsertChatMessage(acc, m), prev);
-      });
-      scrollBottom();
+      setMessagesById((prev) =>
+        mergeChatMessages(merge ? prev : new Map(), incoming),
+      );
+      if (!silent) scrollBottom();
     } catch (e) {
-      onErrorRef.current?.(errText(e, "Не удалось загрузить историю чата."));
+      if (!silent) {
+        onErrorRef.current?.(errText(e, "Не удалось загрузить историю чата."));
+      }
     } finally {
-      if (!merge) setLoadingMsgs(false);
+      if (merge) historySyncInFlightRef.current = false;
+      if (!merge && !silent && mountedRef.current) setLoadingMsgs(false);
     }
   }, [scrollBottom]);
 
@@ -348,10 +415,12 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
     };
   }, [preferredType]);
 
-  /** Pending WS-отправки: ack сопоставляется внутри активного leadId. */
-  const pendingQueueRef = useRef([]);
+  /** WS-запросы до ack: ответ сопоставляется внутри активного leadId. */
+  // Только корреляция запроса с ack. После ack ожидание доставки живёт отдельно
+  // в deliveryWatchdogsRef и завершается лишь по message_status/REST-сверке.
+  const sendRequestsRef = useRef([]);
 
-  // История только при смене лида — не при каждом ререндере родителя / preview.
+  // История при открытии диалога (§5.2), дальше — сокет + реконнект/watchdog.
   useEffect(() => {
     if (!leadId) return;
     startTransition(() => {
@@ -359,10 +428,20 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
     });
   }, [leadId, loadMessages]);
 
-  const enqueuePending = useCallback((tempId, text, meta = {}) => {
+  // Резервная тихая REST-сверка по сигналу уведомлений (Map не очищаем).
+  useEffect(() => {
+    if (refreshSignalRef.current === refreshSignal) return;
+    refreshSignalRef.current = refreshSignal;
+    if (!leadId) return;
+    startTransition(() => {
+      loadMessages({ merge: true, silent: true });
+    });
+  }, [refreshSignal, leadId, loadMessages]);
+
+  const enqueueSendRequest = useCallback((tempId, text, meta = {}) => {
     const currentLeadId = leadRef.current?.id;
-    pendingQueueRef.current = [
-      ...pendingQueueRef.current,
+    sendRequestsRef.current = [
+      ...sendRequestsRef.current,
       {
         tempId,
         leadId: currentLeadId ? String(currentLeadId) : "",
@@ -370,21 +449,22 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
         mediaUrl: meta.mediaUrl || "",
         mediaType: meta.mediaType || "",
         createdAt: meta.createdAt || new Date().toISOString(),
+        blobUrl: meta.blobUrl || "",
         at: Date.now(),
       },
     ];
   }, []);
 
-  const takePending = useCallback((ackData = {}) => {
+  const takeSendRequest = useCallback((ackData = {}) => {
     const activeLeadId = leadRef.current?.id
       ? String(leadRef.current.id)
       : "";
     const result = takePendingForAck(
-      pendingQueueRef.current,
+      sendRequestsRef.current,
       ackData,
       activeLeadId,
     );
-    pendingQueueRef.current = result.queue;
+    sendRequestsRef.current = result.queue;
     return result.pending;
   }, []);
 
@@ -422,7 +502,7 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
           /* Даже при ошибке REST показываем, что доставка не подтверждена. */
         }
         if (!mountedRef.current) return;
-        setMessages((prev) =>
+        setMessagesById((prev) =>
           reconcilePendingMessage(prev, history, messageId),
         );
       }, DELIVERY_STATUS_TIMEOUT_MS);
@@ -439,13 +519,15 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       // Здесь — входящие и чужие исходящие; upsert строго по data.id.
       const normalized = normalizeChatMessage(data);
       if (!messageBelongsToLead(normalized, current)) return;
-      setMessages((prev) => upsertChatMessage(prev, normalized));
+      seqRef.current += 1;
+      normalized._seq = seqRef.current;
+      setMessagesById((prev) => upsertChatMessage(prev, normalized));
       if (normalized.direction === "in") {
         scheduleMarkRead(current.id);
       }
-      scrollBottom();
+      maybeScrollForMessage(normalized);
     },
-    [scheduleMarkRead, scrollBottom],
+    [scheduleMarkRead, maybeScrollForMessage],
   );
 
   const onStatus = useCallback((data) => {
@@ -465,12 +547,9 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       clearDeliveryWatchdog(data?.id);
     }
     // Без lead_id — обновляем только если id уже есть в треде
-    setMessages((prev) => {
+    setMessagesById((prev) => {
       const id = data?.id != null ? String(data.id) : "";
-      if (
-        leadIdFromEvent ||
-        prev.some((m) => id && String(m.id) === id)
-      ) {
+      if (leadIdFromEvent || (id && prev.has(id))) {
         return applyChatMessageStatus(prev, data);
       }
       return prev;
@@ -492,39 +571,44 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       ) {
         return;
       }
-      const taken = takePending(data);
+      const taken = takeSendRequest(data);
 
       if (!ok) {
-        // Ошибка без нашей pending-записи относится к другому/уже закрытому чату.
         if (!taken) return;
+        if (taken.tempId) {
+          setMessagesById((prev) => markMessageError(prev, taken.tempId));
+        }
+        if (taken.blobUrl) URL.revokeObjectURL(taken.blobUrl);
         onErrorRef.current?.(
           msg?.detail ||
             msg?.error ||
             data?.detail ||
-            "Не удалось отправить сообщение через WebSocket.",
+            "Не удалось отправить сообщение.",
         );
-        if (!pendingQueueRef.current.length) setSending(false);
+        if (!sendRequestsRef.current.length) setSending(false);
         return;
       }
 
       // Успешный ack без lead_id принимаем только при наличии локальной отправки.
       if (!ackLeadId && !taken) return;
 
-      // Пузырь исходящего — из ack: id сервера, status обычно "pending",
-      // дальше message_status догоняет sent/delivered/read/failed.
+      // Optimistic local-* → серверный id (контракт: пузырь из ack).
       const confirmed = normalizeChatMessage(data, {
         lead_id: currentLeadId,
         direction: "out",
         status: data.status || "pending",
-        text: taken?.text || "",
-        media_url: taken?.mediaUrl || "",
+        text: taken?.text || data.text || "",
+        media_url: data.media_url || data.content_uri || taken?.mediaUrl || "",
         created_at: taken?.createdAt,
       });
       if (!confirmed.id) {
+        if (taken?.tempId) {
+          setMessagesById((prev) => markMessageError(prev, taken.tempId));
+        }
         onErrorRef.current?.(
-          "Сервер вернул ack без id сообщения. Пузырь не добавлен, чтобы избежать дублей.",
+          "Сервер вернул ack без id сообщения. Обновите историю чата.",
         );
-        if (!pendingQueueRef.current.length) setSending(false);
+        if (!sendRequestsRef.current.length) setSending(false);
         return;
       }
       if (!confirmed.media_type && taken?.mediaType) {
@@ -532,12 +616,16 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       }
       if (data.message_id) confirmed.message_id = String(data.message_id);
 
-      setMessages((prev) => upsertChatMessage(prev, confirmed));
+      setMessagesById((prev) =>
+        confirmOptimisticMessage(prev, taken?.tempId, confirmed),
+      );
+      if (taken?.blobUrl) URL.revokeObjectURL(taken.blobUrl);
+      onMessageUpsertRef.current?.(confirmed);
       scheduleDeliveryWatchdog(confirmed);
-      if (!pendingQueueRef.current.length) setSending(false);
-      scrollBottom();
+      if (!sendRequestsRef.current.length) setSending(false);
+      maybeScrollForMessage(confirmed, { force: true });
     },
-    [scheduleDeliveryWatchdog, scrollBottom, takePending],
+    [scheduleDeliveryWatchdog, maybeScrollForMessage, takeSendRequest],
   );
 
   const { isConnected: wsConnected, sendMessage: sendViaWs } =
@@ -564,7 +652,7 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
     wsEverConnectedRef.current = true;
     if (!hadWsDisconnectRef.current) return;
     hadWsDisconnectRef.current = false;
-    loadMessages({ merge: true });
+    loadMessages({ merge: true, silent: true });
   }, [wsConnected, leadId, loadMessages]);
 
   const selected = useMemo(
@@ -578,29 +666,39 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
       ? resolveMediaType({}, mediaUrl.trim())
       : "";
 
-  /** Нет ack за 15с — error (не «sent»: иначе статус врёт до message_status). */
-  const finishPendingTimeout = (tempId) => {
+  /** Нет ack за 15с — помечаем optimistic-пузырь error. */
+  const finishPendingTimeout = (tempId, blobUrl) => {
     window.setTimeout(() => {
-      const still = pendingQueueRef.current.some((p) => p.tempId === tempId);
+      const still = sendRequestsRef.current.some((p) => p.tempId === tempId);
       if (!still) return;
-      pendingQueueRef.current = pendingQueueRef.current.filter(
+      const row = sendRequestsRef.current.find((p) => p.tempId === tempId);
+      sendRequestsRef.current = sendRequestsRef.current.filter(
         (p) => p.tempId !== tempId,
       );
-      if (!pendingQueueRef.current.length) setSending(false);
+      setMessagesById((prev) => markMessageError(prev, tempId));
+      if (blobUrl || row?.blobUrl) {
+        URL.revokeObjectURL(blobUrl || row.blobUrl);
+      }
+      if (!sendRequestsRef.current.length) setSending(false);
       onErrorRef.current?.(
-        "Нет подтверждения отправки (ack). Проверьте соединение и попробуйте снова.",
+        "Нет подтверждения отправки. Проверьте соединение и попробуйте снова.",
       );
     }, 15000);
   };
 
   const submit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     const text = message.trim();
     const link = mediaUrl.trim();
     const file = mediaFile;
 
-    if (!text && !link && !file) {
-      onErrorRef.current?.("Введите текст, выберите файл или укажите ссылку.");
+    if (!text && !link && !file) return;
+
+    const canSendOffline = !!accountId;
+    if (!wsConnected && !canSendOffline && !file) {
+      onErrorRef.current?.(
+        "Нет соединения. Выберите канал Wazzup или дождитесь live.",
+      );
       return;
     }
 
@@ -612,27 +710,89 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
         ? resolveMediaTypeFromFile(file)
         : "";
     const createdAt = new Date().toISOString();
+    const blobUrl = file ? URL.createObjectURL(file) : "";
 
-    setSending(true);
+    // Мгновенный пузырь (как WhatsApp) — потом confirmOptimistic по ack/REST.
+    seqRef.current += 1;
+    const optimistic = {
+      id: tempId,
+      text,
+      media_url: blobUrl || media,
+      media_type: mediaType,
+      direction: "out",
+      status: "pending",
+      created_at: createdAt,
+      lead_id: lead.id,
+      optimistic: true,
+      _seq: seqRef.current,
+    };
+    setMessagesById((prev) => upsertChatMessage(prev, optimistic));
+    onMessageUpsertRef.current?.(optimistic);
+    setMessage("");
+    setMediaUrl("");
+    setShowMediaLink(false);
+    clearMediaFile();
+    maybeScrollForMessage(optimistic, { force: true });
 
-    // 1) Файл с устройства → upload → публичный URL → WS
+    const failOptimistic = (errMsg) => {
+      setMessagesById((prev) => markMessageError(prev, tempId));
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      onErrorRef.current?.(errMsg);
+      setSending(false);
+    };
+
+    const confirmFromServer = (raw, extras = {}) => {
+      const confirmed = normalizeChatMessage(raw, {
+        lead_id: lead.id,
+        direction: "out",
+        status: raw?.status || "pending",
+        text: extras.text ?? text,
+        media_url: extras.mediaUrl ?? media,
+        created_at: extras.createdAt ?? createdAt,
+      });
+      if (!confirmed.id) {
+        throw {
+          detail:
+            "Сервер не вернул id сообщения. Обновите историю чата.",
+        };
+      }
+      if (!confirmed.media_type && (extras.mediaType || mediaType)) {
+        confirmed.media_type = extras.mediaType || mediaType;
+      }
+      if (raw?.message_id) confirmed.message_id = String(raw.message_id);
+      setMessagesById((prev) =>
+        confirmOptimisticMessage(prev, tempId, confirmed),
+      );
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      onMessageUpsertRef.current?.(confirmed);
+      scheduleDeliveryWatchdog(confirmed);
+      maybeScrollForMessage(confirmed, { force: true });
+      return confirmed;
+    };
+
     if (file) {
+      setSending(true);
       try {
         const uploaded = await uploadConsultingChatMedia(file, {
           accountId: accountId || undefined,
         });
         media = uploaded.url;
         mediaType = uploaded.media_type || mediaType;
+        setMessagesById((prev) =>
+          upsertChatMessage(prev, {
+            ...optimistic,
+            media_url: media,
+            media_type: mediaType,
+          }),
+        );
       } catch (uploadErr) {
-        // 2) Запасной путь: multipart send-message (если бэк умеет file)
         if (
           uploadErr?.notReady ||
           uploadErr?.status === 404 ||
           uploadErr?.status === 501
         ) {
           if (!accountId) {
-            setSending(false);
-            onErrorRef.current?.(
+            failOptimistic(
               "Загрузка файлов ещё не подключена. Выберите канал или отправьте по ссылке.",
             );
             return;
@@ -643,90 +803,83 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
               message: text,
               file,
             });
-            const raw = data?.data || data;
-            const confirmed = normalizeChatMessage(raw, {
-              lead_id: lead.id,
-              direction: "out",
-              status: raw?.status || "pending",
-            });
-            if (!confirmed.id) {
-              throw {
-                detail:
-                  "Сервер отправил файл, но не вернул id сообщения. Обновите историю чата.",
-              };
-            }
-            // Не сохраняем blob:-preview: clearMediaFile отзывает этот URL.
-            // Серверный content_uri появится в REST-ответе или при refetch истории.
-            if (!confirmed.media_type) confirmed.media_type = mediaType;
-            setMessages((prev) => upsertChatMessage(prev, confirmed));
-            scheduleDeliveryWatchdog(confirmed);
+            confirmFromServer(data?.data || data, { mediaType });
             setSending(false);
-            setMessage("");
-            clearMediaFile();
-            setMediaUrl("");
-            setShowMediaLink(false);
-            onNoticeRef.current?.("Файл отправлен.");
-            scrollBottom();
             return;
           } catch (multipartErr) {
-            setSending(false);
-            onErrorRef.current?.(
+            failOptimistic(
               errText(
                 multipartErr,
                 errText(
                   uploadErr,
-                  "Загрузка файлов ещё не подключена на сервере. Можно отправить по публичной ссылке (🔗).",
+                  "Не удалось отправить файл. Попробуйте ссылку.",
                 ),
               ),
             );
             return;
           }
         }
-        setSending(false);
-        onErrorRef.current?.(
-          errText(uploadErr, "Не удалось загрузить файл."),
-        );
+        failOptimistic(errText(uploadErr, "Не удалось загрузить файл."));
         return;
       }
     }
 
-    // URL / уже загруженный файл — через WebSocket
     if (!wsConnected) {
-      setSending(false);
-      onErrorRef.current?.(
-        "WebSocket /ws/wazzup/ не подключён (offline). Дождитесь live и отправьте снова.",
-      );
+      if (!accountId) {
+        failOptimistic(
+          "WebSocket offline и не выбран канал Wazzup.",
+        );
+        return;
+      }
+      setSending(true);
+      try {
+        const data = await sendWazzupMessage(accountId, {
+          lead_id: lead.id,
+          message: text,
+          content_uri: media || undefined,
+          media_url: media || undefined,
+        });
+        confirmFromServer(data?.data || data, {
+          mediaUrl: media,
+          mediaType,
+        });
+        setSending(false);
+      } catch (restErr) {
+        failOptimistic(errText(restErr, "Не удалось отправить сообщение."));
+      }
       return;
     }
 
-    enqueuePending(tempId, text, {
-      mediaUrl: media,
+    enqueueSendRequest(tempId, text, {
+      mediaUrl: media || blobUrl,
       mediaType,
       createdAt,
+      blobUrl,
     });
     const ok = sendViaWs({
       lead_id: lead.id,
-      text: text || (media ? " " : ""),
+      text: text || (media || blobUrl ? " " : ""),
       media_url: media || undefined,
       content_uri: media || undefined,
       account_id: accountId || undefined,
     });
     if (!ok) {
-      pendingQueueRef.current = pendingQueueRef.current.filter(
+      sendRequestsRef.current = sendRequestsRef.current.filter(
         (p) => p.tempId !== tempId,
       );
-      if (!pendingQueueRef.current.length) setSending(false);
-      onErrorRef.current?.("Сокет закрылся — сообщение не отправлено.");
+      failOptimistic("Сокет закрылся — сообщение не отправлено.");
       return;
     }
 
-    setMessage("");
-    setMediaUrl("");
-    setShowMediaLink(false);
-    clearMediaFile();
-    // Текст можно слать дальше, не дожидаясь ack — очередь pending разрулит галочки
     setSending(false);
-    finishPendingTimeout(tempId);
+    finishPendingTimeout(tempId, blobUrl);
+  };
+
+  const onComposerKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!sending) submit(e);
+    }
   };
 
   if (loading) {
@@ -761,75 +914,69 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
     <div className="funnel__chat">
       <header className="funnel__chatHead">
         <div className="funnel__chatPeer">
-          <span className="funnel__chatAvatar">
-            <SourceIcon type={lead.source || selected?.integration_type} />
+          <span className="funnel__chatAvatar" aria-hidden>
+            {(lead.full_name || lead.title || "?").trim().charAt(0).toUpperCase()}
           </span>
-          <div>
+          <div className="funnel__chatPeerText">
             <div className="funnel__chatPeerName">
               {lead.full_name || lead.title || "Клиент"}
             </div>
             <div className="funnel__chatPeerMeta">
-              {leadSourceLabel(lead.source || selected?.integration_type)}
-              {lead.phone ? ` · ${lead.phone}` : ""}
-              {" · "}
+              <SourceIcon type={lead.source || selected?.integration_type} />
+              <span>
+                {leadSourceLabel(lead.source || selected?.integration_type)}
+                {lead.phone ? ` · ${lead.phone}` : ""}
+              </span>
               <span
                 className={
                   wsConnected
                     ? "funnel__chatWs funnel__chatWs--on"
                     : "funnel__chatWs"
                 }
-                title={
-                  wsConnected
-                    ? "WebSocket /ws/wazzup/ подключён"
-                    : "WebSocket отключён — входящие могут не приходить live"
-                }
+                title={wsConnected ? "В сети" : "Офлайн — REST-отправка"}
               >
-                {wsConnected ? "live" : "offline"}
+                {wsConnected ? "online" : "offline"}
               </span>
             </div>
           </div>
         </div>
-        <select
-          className="funnel__select funnel__select--inline"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          aria-label="Канал Wazzup"
-          title="Канал отправки"
-        >
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.integration_type_display ||
-                leadSourceLabel(a.integration_type)}{" "}
-              · {a.channel_id || a.id}
-              {a.is_connected ? " ✓" : ""}
-            </option>
-          ))}
-        </select>
+        {accounts.length > 1 && (
+          <select
+            className="funnel__select funnel__select--inline"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            aria-label="Канал отправки"
+            title="Канал отправки"
+          >
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.integration_type_display ||
+                  leadSourceLabel(a.integration_type)}
+                {a.is_connected ? " ✓" : ""}
+              </option>
+            ))}
+          </select>
+        )}
       </header>
 
-      {!WAZZUP_INTEGRATION_TYPES.some((t) => t.value === preferredType) &&
-        preferredType && (
-          <p className="funnel__hint" style={{ margin: "0 0 8px" }}>
-            Источник лида «{preferredType}» — проверьте выбранный канал.
-          </p>
-        )}
-
       {historyNotReady && (
-        <p className="funnel__hint" style={{ margin: "0 0 8px" }}>
-          История пока недоступна — нужен{" "}
-          <code>GET /consalting/wazzup-messages/?lead=…</code>. Отправка и live
-          через <code>/ws/wazzup/</code> работают отдельно.
+        <p className="funnel__chatBanner">
+          История подгрузится позже — live-сообщения уже работают.
         </p>
       )}
 
-      <div className="funnel__chatBody" role="log" aria-live="polite">
+      <div
+        className="funnel__chatBody"
+        role="log"
+        aria-live="polite"
+        ref={bodyRef}
+        onScroll={onBodyScroll}
+      >
         {loadingMsgs && !messages.length ? (
-          <div className="funnel__chatEmpty">Загрузка сообщений…</div>
+          <div className="funnel__chatEmpty">Загрузка…</div>
         ) : !messages.length ? (
           <div className="funnel__chatEmpty">
-            Напишите сообщение — оно уйдёт через WebSocket (
-            <code>action: send_message</code>). Входящие —{" "}
-            <code>new_message</code>.
+            Начните диалог — сообщение появится сразу.
           </div>
         ) : (
           messages.map((m) => {
@@ -837,7 +984,9 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
             return (
               <div
                 key={m.id}
-                className={`funnel__chatBubble funnel__chatBubble--${m.direction}`}
+                className={`funnel__chatBubble funnel__chatBubble--${m.direction}${
+                  m.optimistic ? " funnel__chatBubble--optimistic" : ""
+                }`}
               >
                 {!!text && <div className="funnel__chatText">{text}</div>}
                 {!!m.media_url && (
@@ -862,93 +1011,87 @@ export default function LeadMessengerPanel({ lead, onNotice, onError, readOnly =
           Отправка недоступна.
         </p>
       ) : (
-      <form className="funnel__chatComposer" onSubmit={submit}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="funnel__chatFileInput"
-          accept={CHAT_MEDIA_ACCEPT}
-          onChange={onPickFile}
-          tabIndex={-1}
-          aria-hidden
-        />
-        {mediaFile && (
-          <div className="funnel__chatAttach">
-            <span className="funnel__chatAttachName" title={mediaFile.name}>
-              {mediaTypeLabel(selectedMediaType) || "📎"} {mediaFile.name}
-              <span className="funnel__chatAttachSize">
-                {" "}
-                · {formatFileSize(mediaFile.size)}
+        <form className="funnel__chatComposer" onSubmit={submit}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="funnel__chatFileInput"
+            accept={CHAT_MEDIA_ACCEPT}
+            onChange={onPickFile}
+            tabIndex={-1}
+            aria-hidden
+          />
+          {mediaFile && (
+            <div className="funnel__chatAttach">
+              <span className="funnel__chatAttachName" title={mediaFile.name}>
+                {mediaTypeLabel(selectedMediaType) || "Файл"} {mediaFile.name}
+                <span className="funnel__chatAttachSize">
+                  {" "}
+                  · {formatFileSize(mediaFile.size)}
+                </span>
               </span>
-            </span>
+              <button
+                type="button"
+                className="funnel__btn funnel__btn--icon"
+                onClick={clearMediaFile}
+                title="Убрать файл"
+                aria-label="Убрать файл"
+              >
+                <FaTimes />
+              </button>
+            </div>
+          )}
+          {showMediaLink && !mediaFile && (
+            <input
+              className="funnel__input"
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+              placeholder="Публичная ссылка на файл"
+            />
+          )}
+          <div className="funnel__chatComposerRow">
             <button
               type="button"
               className="funnel__btn funnel__btn--icon"
-              onClick={clearMediaFile}
-              title="Убрать файл"
-              aria-label="Убрать файл"
+              onClick={() => fileInputRef.current?.click()}
+              title="Прикрепить файл"
+              disabled={sending}
             >
-              <FaTimes />
+              <FaPaperclip />
+            </button>
+            <button
+              type="button"
+              className={`funnel__btn funnel__btn--icon${showMediaLink ? " is-active" : ""}`}
+              onClick={() => {
+                setShowMediaLink((v) => !v);
+                if (!showMediaLink) clearMediaFile();
+              }}
+              title="Ссылка на файл"
+              disabled={sending}
+            >
+              <FaLink />
+            </button>
+            <textarea
+              className="funnel__input funnel__chatInput"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={onComposerKeyDown}
+              placeholder="Сообщение"
+              autoComplete="off"
+              rows={1}
+            />
+            <button
+              type="submit"
+              className="funnel__btn funnel__btn--primary funnel__btn--icon"
+              disabled={
+                sending || (!message.trim() && !mediaUrl.trim() && !mediaFile)
+              }
+              title="Отправить"
+            >
+              <FaPaperPlane />
             </button>
           </div>
-        )}
-        {showMediaLink && !mediaFile && (
-          <input
-            className="funnel__input"
-            value={mediaUrl}
-            onChange={(e) => setMediaUrl(e.target.value)}
-            placeholder="https://… публичная ссылка на файл"
-          />
-        )}
-        <div className="funnel__chatComposerRow">
-          <button
-            type="button"
-            className="funnel__btn funnel__btn--icon"
-            onClick={() => fileInputRef.current?.click()}
-            title="Прикрепить фото, видео, аудио или документ"
-            disabled={sending}
-          >
-            <FaPaperclip />
-          </button>
-          <button
-            type="button"
-            className={`funnel__btn funnel__btn--icon${showMediaLink ? " is-active" : ""}`}
-            onClick={() => {
-              setShowMediaLink((v) => !v);
-              if (!showMediaLink) clearMediaFile();
-            }}
-            title="Отправить по ссылке"
-            disabled={sending}
-          >
-            <FaLink />
-          </button>
-          <input
-            className="funnel__input funnel__chatInput"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Сообщение в WhatsApp…"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            className="funnel__btn funnel__btn--primary funnel__btn--icon"
-            disabled={
-              sending ||
-              (!message.trim() && !mediaUrl.trim() && !mediaFile) ||
-              (!mediaFile && !wsConnected)
-            }
-            title={
-              mediaFile
-                ? "Загрузить и отправить файл"
-                : wsConnected
-                  ? "Отправить через WebSocket"
-                  : "Нужен live WebSocket"
-            }
-          >
-            <FaPaperPlane />
-          </button>
-        </div>
-      </form>
+        </form>
       )}
     </div>
   );

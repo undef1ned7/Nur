@@ -1,9 +1,5 @@
 import { normalizeMessageStatus } from "../../../../api/consultingWazzup";
 
-function byTime(a, b) {
-  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-}
-
 export function sameChatMessage(a, b) {
   return !!(a?.id && b?.id && String(a.id) === String(b.id));
 }
@@ -28,66 +24,168 @@ export function pickNewerMessageStatus(prev, next) {
   return nextRank >= previousRank ? next : prev;
 }
 
-/** Серверные сообщения с неизвестным id намеренно не добавляются. */
-export function upsertChatMessage(list, message) {
-  if (!message?.id) return list;
-  const index = list.findIndex((item) => sameChatMessage(item, message));
-  if (index === -1) return [...list, message].sort(byTime);
-
-  const next = list.slice();
-  const previous = next[index];
-  next[index] = {
+function mergeMessage(previous, message) {
+  if (!previous) return { ...message, id: String(message.id) };
+  const nextCreated =
+    message.created_at ||
+    message.timestamp ||
+    previous.created_at ||
+    previous.timestamp ||
+    "";
+  return {
     ...previous,
     ...message,
-    id: message.id ? String(message.id) : previous.id,
+    id: String(message.id),
     message_id: message.message_id || previous.message_id,
+    created_at: nextCreated,
+    timestamp: message.timestamp || previous.timestamp || nextCreated,
     direction:
       previous.direction === "out" || message.direction === "out"
         ? "out"
         : message.direction,
     status: pickNewerMessageStatus(previous.status, message.status),
   };
-  return next.sort(byTime);
 }
 
-/** message_status обновляет существующий пузырь и не создаёт новый. */
-export function applyChatMessageStatus(list, data) {
+/** Единственный путь записи одного сообщения: Map upsert строго по data.id. */
+export function upsertChatMessage(byId, message) {
+  if (!message?.id) return byId;
+  const key = String(message.id);
+  const next = new Map(byId);
+  next.set(key, mergeMessage(next.get(key), message));
+  return next;
+}
+
+/** Массовый upsert истории: одна копия Map, без сортировки после каждой записи. */
+export function mergeChatMessages(byId, messages) {
+  const next = new Map(byId);
+  for (const message of messages || []) {
+    if (!message?.id) continue;
+    const key = String(message.id);
+    next.set(key, mergeMessage(next.get(key), message));
+  }
+  return next;
+}
+
+/** Числовое время для сортировки (не localeCompare — ломается на +00:00 vs +06:00). */
+export function messageSortTime(message) {
+  const raw =
+    message?.timestamp ||
+    message?.created_at ||
+    message?.createdAt ||
+    message?.dateTime ||
+    "";
+  if (!raw) {
+    // Без времени — в конец ленты (новые optimistic / status-stub).
+    return Number.POSITIVE_INFINITY;
+  }
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+}
+
+/** Сортировка выполняется только для render-представления, state остаётся Map. */
+export function sortChatMessages(byId) {
+  return Array.from(byId.values()).sort((a, b) => {
+    const byTime = messageSortTime(a) - messageSortTime(b);
+    if (byTime) return byTime;
+    const bySeq = (Number(a._seq) || 0) - (Number(b._seq) || 0);
+    if (bySeq) return bySeq;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+/**
+ * Optimistic local-* → серверный id: удаляем temp, upsert по data.id.
+ * Сохраняем локальный текст/медиа, если ack пришёл урезанным.
+ */
+export function confirmOptimisticMessage(byId, tempId, serverMessage) {
+  if (!serverMessage?.id) return byId;
+  const serverKey = String(serverMessage.id);
+  const tempKey = tempId ? String(tempId) : "";
+  const next = new Map(byId);
+  const optimistic = tempKey ? next.get(tempKey) : null;
+  if (tempKey) next.delete(tempKey);
+
+  const existing = next.get(serverKey);
+  const fromOptimistic = optimistic
+    ? { ...optimistic, id: serverKey, optimistic: false }
+    : null;
+  const base = fromOptimistic
+    ? mergeMessage(existing, fromOptimistic)
+    : existing;
+
+  const serverMedia =
+    serverMessage.media_url || serverMessage.content_uri || "";
+  const baseMedia = base?.media_url || "";
+  const mediaUrl =
+    serverMedia ||
+    (baseMedia && !String(baseMedia).startsWith("blob:") ? baseMedia : "") ||
+    baseMedia;
+
+  next.set(
+    serverKey,
+    mergeMessage(base, {
+      ...serverMessage,
+      id: serverKey,
+      text: serverMessage.text || base?.text || "",
+      media_url: mediaUrl,
+      media_type: serverMessage.media_type || base?.media_type || "",
+      created_at:
+        serverMessage.created_at ||
+        serverMessage.timestamp ||
+        base?.created_at ||
+        "",
+      direction: "out",
+      optimistic: false,
+    }),
+  );
+  return next;
+}
+
+export function markMessageError(byId, messageId) {
+  const key = messageId ? String(messageId) : "";
+  if (!key || !byId.has(key)) return byId;
+  const next = new Map(byId);
+  const prev = next.get(key);
+  next.set(key, { ...prev, status: "error" });
+  return next;
+}
+
+/**
+ * message_status тоже идёт через Map upsert. Запись создаётся даже если статус
+ * обогнал ack: последующий ack дополнит её текстом, не откатив статус в pending.
+ */
+export function applyChatMessageStatus(byId, data) {
   const id = data?.id != null ? String(data.id) : "";
   const messageId = data?.message_id || data?.messageId;
-  if (!id || data?.status == null || data.status === "") return list;
+  if (!id || data?.status == null || data.status === "") return byId;
   const status = normalizeMessageStatus(data.status, { isOut: true });
-  if (!status) return list;
+  const previous = byId.get(id);
+  if (!status) return byId;
 
-  let matched = false;
-  const next = list.map((message) => {
-    const isMatch = String(message.id) === id;
-    if (!isMatch) return message;
-    matched = true;
-    return {
-      ...message,
-      status: pickNewerMessageStatus(message.status, status),
-      message_id: messageId ? String(messageId) : message.message_id,
-    };
+  return upsertChatMessage(byId, {
+    ...data,
+    id,
+    direction: previous?.direction || "out",
+    created_at:
+      previous?.created_at || data.timestamp || data.created_at || "",
+    status,
+    message_id: messageId ? String(messageId) : previous?.message_id,
   });
-  return matched ? next : list;
 }
 
 /**
  * Сливает свежую REST-историю и помечает конкретный pending, если сервер
  * по-прежнему не дал финального статуса.
  */
-export function reconcilePendingMessage(list, history, messageId) {
+export function reconcilePendingMessage(byId, history, messageId) {
   const key = messageId ? String(messageId) : "";
-  const merged = (history || []).reduce(
-    (messages, message) => upsertChatMessage(messages, message),
-    list,
-  );
+  const merged = mergeChatMessages(byId, history);
   if (!key) return merged;
-  return merged.map((message) =>
-    String(message.id) === key && message.status === "pending"
-      ? { ...message, status: "unconfirmed" }
-      : message,
-  );
+  const message = merged.get(key);
+  if (!message || message.status !== "pending") return merged;
+  merged.set(key, { ...message, status: "unconfirmed" });
+  return merged;
 }
 
 /**
