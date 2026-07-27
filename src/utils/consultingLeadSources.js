@@ -121,13 +121,76 @@ export function isConsultingLeadNoReplyEvent(n) {
   );
 }
 
+/** Лид обновлён (в т.ч. статус → in_work после ответа менеджера). */
+export function isConsultingLeadUpdatedEvent(n) {
+  const t = notifType(n);
+  if (!t) return false;
+  return (
+    t === "lead.updated" ||
+    t === "lead_updated" ||
+    t.includes("lead.updated") ||
+    t.includes("lead_updated") ||
+    (t.includes("inbound") && t.includes("status")) ||
+    (t.includes("lead") && t.includes("in_work"))
+  );
+}
+
+/** Смена стадии / перемещение на воронке. */
+export function isConsultingLeadStageEvent(n) {
+  const t = notifType(n);
+  if (!t) return false;
+  return (
+    t === "lead.stage_changed" ||
+    t === "lead.moved" ||
+    t === "lead_moved" ||
+    t.includes("lead.stage") ||
+    t.includes("stage_changed") ||
+    t.includes("move_stage") ||
+    t.includes("moved_stage") ||
+    (t.includes("lead") && t.includes("stage") && !t.includes("message"))
+  );
+}
+
+/**
+ * Deep-link в CRM-чат по lead id и источнику.
+ * @param {string|number} leadId
+ * @param {string} [source]
+ */
+export function consultingChatPath(leadId, source = "whatsapp") {
+  if (!leadId) return null;
+  const raw = String(source || "whatsapp")
+    .trim()
+    .toLowerCase();
+  const channel = CRM_CHAT_CHANNELS.includes(raw) ? raw : "whatsapp";
+  return `/crm/consulting/chats/${channel}/${leadId}`;
+}
+
+/**
+ * Deep-link на карточку лида на воронке.
+ * @param {string|number} leadId
+ * @param {{ tab?: string }} [opts]
+ */
+export function consultingFunnelLeadPath(leadId, opts = {}) {
+  if (!leadId) return null;
+  const params = new URLSearchParams();
+  params.set("lead", String(leadId));
+  if (opts.tab) params.set("tab", String(opts.tab));
+  return `/crm/consulting/funnel?${params.toString()}`;
+}
+
+/** Вкладка «Интеграция» на странице Лиды. */
+export function consultingLeadsIntegrationPath() {
+  return "/crm/consulting/leads?tab=integration";
+}
+
 /** Любое событие чата/лида для CRM inbox. */
 export function isConsultingChatRealtimeEvent(n) {
   if (
     isConsultingLeadAssignEvent(n) ||
     isConsultingLeadMessageEvent(n) ||
     isConsultingLeadNoReplyEvent(n) ||
-    isConsultingLeadTransferEvent(n)
+    isConsultingLeadTransferEvent(n) ||
+    isConsultingLeadUpdatedEvent(n)
   ) {
     return true;
   }
@@ -151,6 +214,7 @@ export function isConsultingFunnelRealtimeEvent(n) {
   if (!t) return false;
   return (
     isConsultingChatRealtimeEvent(n) ||
+    isConsultingLeadUpdatedEvent(n) ||
     t.includes("lead") ||
     t.includes("лид") ||
     t.includes("funnel") ||
@@ -178,8 +242,7 @@ export function consultingNotificationChatPath(n) {
       n?.source ||
       "whatsapp",
   ).toLowerCase();
-  const channel = CRM_CHAT_CHANNELS.includes(raw) ? raw : "whatsapp";
-  return `/crm/consulting/chats/${channel}/${leadId}`;
+  return consultingChatPath(leadId, raw);
 }
 
 /** Id лида из API-пути бэка: /consalting/leads/{uuid} */
@@ -195,6 +258,8 @@ export function extractLeadIdFromConsaltingUrl(url) {
 /**
  * URL клика по уведомлению → рабочий фронтовый маршрут.
  * Бэк шлёт `/consalting/leads/{id}` — на SPA это не маршрут.
+ *
+ * Сообщение / SLA → чаты; назначение / передача / стадия → карточка на воронке.
  */
 export function resolveConsultingNotificationUrl(n) {
   const rawUrl = n?.url ?? n?.link ?? n?.data?.url ?? "";
@@ -202,14 +267,18 @@ export function resolveConsultingNotificationUrl(n) {
 
   if (
     leadId &&
-    (isConsultingLeadMessageEvent(n) ||
-      isConsultingLeadNoReplyEvent(n) ||
-      /\/consalting\/leads\//i.test(String(rawUrl)))
+    (isConsultingLeadAssignEvent(n) ||
+      isConsultingLeadTransferEvent(n) ||
+      isConsultingLeadStageEvent(n))
   ) {
-    return (
-      consultingNotificationChatPath(n) ||
-      `/crm/consulting/chats/whatsapp/${leadId}`
-    );
+    return consultingFunnelLeadPath(leadId);
+  }
+
+  if (
+    leadId &&
+    (isConsultingLeadMessageEvent(n) || isConsultingLeadNoReplyEvent(n))
+  ) {
+    return consultingNotificationChatPath(n) || consultingChatPath(leadId);
   }
 
   if (rawUrl) {
@@ -219,10 +288,13 @@ export function resolveConsultingNotificationUrl(n) {
 
     const fromPath = extractLeadIdFromConsaltingUrl(path);
     if (fromPath) {
-      return `/crm/consulting/chats/whatsapp/${fromPath}`;
+      // Без спец. type — по умолчанию чат (ответ клиенту).
+      return consultingChatPath(fromPath);
     }
     if (/\/consalting\/leads\/?$/i.test(path)) return "/crm/consulting/leads";
-    if (/\/consalting\/funnel/i.test(path)) return "/crm/consulting/funnel";
+    if (/\/consalting\/funnel/i.test(path)) {
+      return leadId ? consultingFunnelLeadPath(leadId) : "/crm/consulting/funnel";
+    }
     if (path.startsWith("/crm/")) return path;
     if (path.startsWith("/consalting/")) {
       return path.replace(/^\/consalting\//, "/crm/consulting/");

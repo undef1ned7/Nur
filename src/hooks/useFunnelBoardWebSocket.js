@@ -9,6 +9,7 @@ const UPSERT_EVENTS = new Set([
   "lead.claimed",
   "lead.released",
   "lead.updated",
+  "lead_updated",
   "lead.stage_changed",
   "lead.won",
   "lead.lost",
@@ -185,15 +186,22 @@ export function useFunnelBoardWebSocket({
       case "lead.assigned":
         assigned?.(data);
         break;
-      default:
-        if (isChatMessageEvent(msg.type)) {
+      default: {
+        const typeKey = String(msg.type || "")
+          .toLowerCase()
+          .replace(/_/g, ".");
+        if (isChatMessageEvent(msg.type) || isChatMessageEvent(typeKey)) {
           chatMessage?.(msg);
           break;
         }
-        if (UPSERT_EVENTS.has(msg.type) && data.id) {
+        if (
+          (UPSERT_EVENTS.has(msg.type) || UPSERT_EVENTS.has(typeKey)) &&
+          data.id
+        ) {
           upsert?.(data);
         }
         break;
+      }
     }
   }, []);
 

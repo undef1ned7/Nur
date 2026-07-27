@@ -46,6 +46,7 @@ async function refreshAccessToken() {
 let ws = null;
 let pingTimer = null;
 let reconnectTimer = null;
+let connectTimer = null;
 let retry = 0;
 let connectGen = 0;
 let intentionalClose = false;
@@ -64,6 +65,13 @@ function clearReconnect() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+  }
+}
+
+function clearScheduledConnect() {
+  if (connectTimer) {
+    clearTimeout(connectTimer);
+    connectTimer = null;
   }
 }
 
@@ -107,6 +115,7 @@ function dispatchFrame(msg) {
 
 function hardClose() {
   clearPing();
+  clearScheduledConnect();
   if (ws) {
     try {
       ws.onclose = null;
@@ -120,6 +129,19 @@ function hardClose() {
     ws = null;
   }
   notifyStatus(false);
+}
+
+function scheduleConnect() {
+  if (connectTimer || refCount <= 0) return;
+  connectTimer = window.setTimeout(() => {
+    connectTimer = null;
+    if (
+      refCount > 0 &&
+      (!ws || ws.readyState === WebSocket.CLOSED)
+    ) {
+      connect();
+    }
+  }, 0);
 }
 
 function connect() {
@@ -210,11 +232,9 @@ function scheduleReconnect(myGen) {
  */
 export function acquireWazzupSocket() {
   refCount += 1;
-  if (refCount === 1 || !ws || ws.readyState === WebSocket.CLOSED) {
-    // microtask — не дёргать setState синхронно из React effect
-    window.setTimeout(() => {
-      if (refCount > 0) connect();
-    }, 0);
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    // Один отложенный CONNECT даже при одновременном mount нескольких holders.
+    scheduleConnect();
   }
   return () => {
     refCount = Math.max(0, refCount - 1);
@@ -249,14 +269,25 @@ export function subscribeWazzupStatus(fn) {
 
 export function sendWazzupChatMessage(payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  const media =
+    payload.media_url || payload.content_uri || payload.contentUri || "";
   const frame = {
     action: "send_message",
     lead_id: payload.lead_id,
     text: payload.text || "",
+    content_uri: media || null,
+    account_id: payload.account_id || null,
   };
-  if (payload.media_url) frame.media_url = payload.media_url;
-  ws.send(JSON.stringify(frame));
-  return true;
+  // Дубль media_url — совместимость со старым бэком
+  if (media) {
+    frame.media_url = media;
+  }
+  try {
+    ws.send(JSON.stringify(frame));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isWazzupSocketOpen() {

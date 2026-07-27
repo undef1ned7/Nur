@@ -19,19 +19,63 @@ export function isLeadArchived(lead) {
   return lead?.is_archived === true || !!lead?.archived_at;
 }
 
-export function resolveCurrentUserId(profile, wsUserId) {
-  return (
-    wsUserId ||
-    profile?.id ||
-    profile?.user_id ||
-    localStorage.getItem("userId") ||
-    ""
-  );
+/** Id из строки / числа / вложенного `{ id }` (owner с API часто объект). */
+export function resolveEntityId(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "object") {
+    const nested =
+      value.id ??
+      value.uuid ??
+      value.pk ??
+      value.user_id ??
+      value.user ??
+      null;
+    if (nested != null && typeof nested === "object") {
+      return resolveEntityId(nested);
+    }
+    return nested != null && nested !== "" ? String(nested) : null;
+  }
+  return String(value);
 }
 
-export function isLeadOwner(lead, userId) {
-  if (!lead?.owner || !userId) return false;
-  return String(lead.owner) === String(userId);
+/**
+ * Все возможные id текущего пользователя (profile / user slice / localStorage).
+ * Нужны, потому что lead.owner и profile.id иногда расходятся по типу сущности.
+ */
+export function resolveCurrentUserIds(profile, wsUserId) {
+  const ids = [];
+  const seen = new Set();
+  const add = (raw) => {
+    const id = resolveEntityId(raw);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  add(wsUserId);
+  add(profile?.user_id);
+  add(profile?.user);
+  add(profile?.id);
+  add(profile?.employee_id);
+  add(profile?.employee?.id);
+  try {
+    add(localStorage.getItem("userId"));
+  } catch {
+    /* ignore */
+  }
+  return ids;
+}
+
+export function resolveCurrentUserId(profile, wsUserId) {
+  return resolveCurrentUserIds(profile, wsUserId)[0] || "";
+}
+
+export function isLeadOwner(lead, userIdOrIds) {
+  const ownerId = resolveEntityId(lead?.owner);
+  if (!ownerId) return false;
+  const ids = Array.isArray(userIdOrIds)
+    ? userIdOrIds
+    : resolveCurrentUserIds(null, userIdOrIds);
+  return ids.some((id) => id && String(id) === ownerId);
 }
 
 /**
@@ -44,8 +88,10 @@ export function isLeadOwner(lead, userId) {
 export function canInteractWithLead(lead, profile, userId) {
   if (!lead || isLeadArchived(lead)) return false;
   if (isConsultingFunnelManager(profile)) return true;
-  if (!lead.owner) return false; // пул: сначала claim
-  return isLeadOwner(lead, userId);
+  const ownerId = resolveEntityId(lead.owner);
+  if (!ownerId) return false; // пул: сначала claim
+  const ids = resolveCurrentUserIds(profile, userId);
+  return ids.includes(ownerId);
 }
 
 /** Редактирование / перемещение / чат / удаление. */

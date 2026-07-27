@@ -52,7 +52,7 @@ const fmtMoneyShort = (v) => {
 };
 
 /* ─── LeadCard ─────────────────────────────────────────────────── */
-function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads, onTransfer, canDrag = true, completed = false }) {
+function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads, onTransfer, canDrag = true, completed = false, unreadCount = 0 }) {
   const inPool = !lead.owner;
   return (
     <article
@@ -63,6 +63,7 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
         inPool      ? "funnel__card--pool"       : "",
         !canDrag    ? "funnel__card--readonly"   : "",
         completed   ? "funnel__card--completed"  : "",
+        unreadCount > 0 ? "funnel__card--unread" : "",
       ].filter(Boolean).join(" ")}
       draggable={canDrag}
       onDragStart={canDrag ? onDragStart : undefined}
@@ -72,6 +73,11 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
       <div className="funnel__cardTop">
         <div className="funnel__cardTitle" title={lead.title}>{lead.title || "Без названия"}</div>
         <div className="funnel__cardTopRight">
+          {unreadCount > 0 && (
+            <span className="funnel__unreadBadge" title="Нужен ответ">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
           {inPool && <span className="funnel__poolBadge">Пул</span>}
           {lead.score_grade && (
             <span className={`funnel__grade funnel__grade--${String(lead.score_grade).toLowerCase()}`}>
@@ -128,6 +134,7 @@ function Column({
   onStageHandlePointerDown,    // (e, stageId) => void
   visibleLimit,
   onShowMore,
+  unreadByLeadId,
 }) {
   const stageColor = stage?.color || "#cbd5e1";
   const totalFiltered = leads.length;
@@ -220,6 +227,11 @@ function Column({
               currentUserId,
             )}
             completed={isLeadOnCompletedStage(lead, board)}
+            unreadCount={
+              Number(unreadByLeadId?.[lead.id]) ||
+              Number(unreadByLeadId?.[String(lead.id)]) ||
+              0
+            }
           />
         ))}
         {!totalFiltered && (
@@ -258,6 +270,7 @@ export default function FunnelBoardRow({
   allowedTransitions, onRefreshBoard,
   // funnel row reorder (pointer-based, из Funnel.jsx)
   funnelDragId, isDragOver, onFunnelHandlePointerDown,
+  unreadByLeadId,
 }) {
   const dispatch = useDispatch();
   const [dragOverStage, setDragOverStage] = useState(null);
@@ -542,6 +555,7 @@ export default function FunnelBoardRow({
               onStageHandlePointerDown={onStageHandlePointerDown}
               visibleLimit={colLimit(colKey)}
               onShowMore={() => showMoreCol(colKey)}
+              unreadByLeadId={unreadByLeadId}
             />
             );
           })}
@@ -572,6 +586,7 @@ export default function FunnelBoardRow({
               canDragStage={false}
               visibleLimit={colLimit("unassigned")}
               onShowMore={() => showMoreCol("unassigned")}
+              unreadByLeadId={unreadByLeadId}
             />
           )}
         </div>

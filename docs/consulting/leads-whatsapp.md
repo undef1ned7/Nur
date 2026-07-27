@@ -4,13 +4,20 @@
 Фронт: `src/Components/Sectors/Consulting/leads/Leads.jsx`,  
 API: `src/api/consultingLeads.js`, `src/api/consultingWazzup.js`.
 
+**Роль в IA:** очередь inbound + назначение + настройки распределения /
+интеграции. Ответы клиенту — в **Чатах** или во вкладке «Чат» на **Воронке**.
+Из строки входящего (если есть `lead`): «Чат» / «Воронка».
+`?tab=integration` — прямая ссылка на статус каналов (также из Чатов).
+
 **Вкладки:**
 - **Входящие** — inbox inbound-лидов (WhatsApp / Instagram / Telegram / вручную)
 - **Распределение** — round-robin / least-loaded / manual + роли-получатели
 - **Интеграция** — аккаунты Wazzup, setup-webhook
 
 Полный контракт провайдера: [wazzup-integration.md](./wazzup-integration.md).  
-Реалтайм: [realtime-notifications.md](./realtime-notifications.md).
+Реалтайм: [realtime-notifications.md](./realtime-notifications.md).  
+**Бэкенд (углублённо, 1A/2A):** [backend-main-funnel-inbound.md](./backend-main-funnel-inbound.md) —
+webhook → только `is_main`, assign не меняет funnel.
 
 **Статус фронта:** UI готов. При `404/501` — заглушка «ещё не подключено»,
 интерфейс не падает. После деплоя бэка заглушки снимаются сами.

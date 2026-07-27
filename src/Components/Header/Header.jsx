@@ -166,7 +166,7 @@ const pageTitles = {
   "/crm/consulting/services": "Услуги",
   "/crm/consulting/funnel": "Воронка продаж",
   "/crm/consulting/leads": "Лиды",
-  "/crm/consulting/chats": "CRM",
+  "/crm/consulting/chats": "Чаты",
   "/crm/consulting/chats/whatsapp": "WhatsApp",
   "/crm/consulting/chats/telegram": "Telegram",
   "/crm/consulting/chats/instagram": "Instagram",

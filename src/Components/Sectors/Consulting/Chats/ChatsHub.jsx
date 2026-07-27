@@ -31,8 +31,8 @@ const CHANNELS = [
 ];
 
 /**
- * CRM — хаб выбора мессенджера (WA / TG / IG).
- * Дальше: /crm/consulting/chats/:channel
+ * Хаб выбора мессенджера (WA / TG / IG).
+ * Primary entry — /crm/consulting/chats/whatsapp; хаб — fallback для TG/IG.
  */
 export default function ChatsHub() {
   const [notice, setNotice] = useState("");
@@ -48,7 +48,7 @@ export default function ChatsHub() {
           <FaComments />
         </div>
         <div>
-          <h1 className="crmChats__title">CRM</h1>
+          <h1 className="crmChats__title">Чаты</h1>
           <p className="crmChats__subtitle">
             Выберите мессенджер — откроется список всех чатов. Можно зайти в
             любой диалог и ответить клиенту.
@@ -102,8 +102,11 @@ export default function ChatsHub() {
       </div>
 
       <p className="crmChats__foot">
-        Каналы WhatsApp подключаются автоматически администратором. Менеджеру
-        ничего настраивать не нужно — просто отвечайте клиентам в чатах.
+        Каналы WhatsApp подключаются администратором.{" "}
+        <Link to="/crm/consulting/leads?tab=integration">
+          Настройки каналов
+        </Link>
+        {" — "}просто отвечайте клиентам в чатах.
       </p>
     </section>
   );

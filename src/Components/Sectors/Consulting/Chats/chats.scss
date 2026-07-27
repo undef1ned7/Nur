@@ -207,6 +207,24 @@
     padding: 4px;
     border-radius: 12px;
   }
+  &__settings {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--crm-border);
+    background: #fff;
+    white-space: nowrap;
+    &:hover {
+      background: #f8fafc;
+    }
+  }
   &__chPill {
     width: 36px;
     height: 36px;
@@ -392,6 +410,51 @@
       border: 0;
       border-radius: 0;
     }
+  }
+  &__chatBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--crm-border);
+    background: #f8fafc;
+  }
+  &__funnelLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  &__claimBtn {
+    margin-left: auto;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+    background: #0f172a;
+    color: #fff;
+    &:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+  }
+  &__lockHint {
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #92400e;
+    background: #fffbeb;
+    border-top: 1px solid #fde68a;
   }
   &__placeholder {
     flex: 1;

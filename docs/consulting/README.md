@@ -13,9 +13,13 @@ fallback: пока эндпоинт не реализован (ответ `404/5
 |---|---|---|
 | 2 | [services-role-pricing.md](./services-role-pricing.md) | Убрали «Стоимость установки». Цены услуги и тарифов — **по ролям** (`role_prices`). |
 | 1 | [analytics.md](./analytics.md) | Детализация аналитики **по каждой услуге** и дополнительные CRM-метрики. |
-| 3 | [leads-whatsapp.md](./leads-whatsapp.md) | Страница «Лиды»: входящие + распределение. |
+| 3 | [whatsapp-overview.md](./whatsapp-overview.md) | **Обзор WhatsApp/Wazzup:** архитектура, экраны (Лиды / Воронка / Чаты), WS/REST, deep links, чек-лист. |
+| 3a | [leads-whatsapp.md](./leads-whatsapp.md) | Страница «Лиды»: входящие + распределение. |
 | 3b | [wazzup-integration.md](./wazzup-integration.md) | Wazzup API v3: аккаунты, webhook, send-message. |
-| 3c | [wazzup-frontend.md](./wazzup-frontend.md) | Чат 100% WS: `send_message` / `new_message` / `message_status`; история REST. |
+| 3c | [wazzup-frontend.md](./wazzup-frontend.md) | Чат: WS/REST обзор, эндпоинты. |
+| **3c′** | **[wazzup-chat-async.md](./wazzup-chat-async.md)** | **Актуальный контракт:** upsert по `id`, пузырь из ack (`pending`), `message_status`. |
+| 3d | [media-and-error-handling.md](./media-and-error-handling.md) | Медиа (фото/видео/голос), ошибки `failed`, авто `in_work`. |
+| **3e** | **[backend-main-funnel-inbound.md](./backend-main-funnel-inbound.md)** | **Бэкенд (углублённо):** главная воронка, webhook → `is_main` only (1A), assign primary (2A), demote peers, чек-лист. |
 | 4 | [funnel-crm-logic.md](./funnel-crm-logic.md) | Аудит бизнес-логики воронки продаж; что бэкенд обязан гарантировать. |
 | 5 | [salary-auto-accrual.md](./salary-auto-accrual.md) | Зарплата: авто-начисление % с закрытых продаж/выигранных лидов. |
 | 6 | [subscription-matrix.md](./subscription-matrix.md) | Абонентская матрица «ФИО × услуга × месяцы» на странице «Клиенты». |
@@ -30,3 +34,5 @@ fallback: пока эндпоинт не реализован (ответ `404/5
    (создание сделки/абонентки/начисления зарплаты).
 4. **#6 Матрица** — читает абонентские платежи, создаваемые при завершении лида.
 5. **#3 Лиды/WhatsApp** — независимый модуль, можно параллельно.
+   Критичный подпункт для бэка: **#3e** [backend-main-funnel-inbound.md](./backend-main-funnel-inbound.md)
+   (webhook → главная воронка, assign без смены funnel).

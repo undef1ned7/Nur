@@ -54,6 +54,8 @@ import {
   isProtectedFunnel,
   isSystemStage,
   isCompletedStage,
+  isMainFunnel,
+  isRoleFunnel,
 } from "../../../../utils/consultingFunnelDefaults";
 import {
   canDragLead,
@@ -66,11 +68,15 @@ import {
 } from "../../../../utils/consultingFunnelLeadUtils";
 import { calcConsultingSaleTotal, formatTariffSubscription, resolveTariffPrice } from "../../../../utils/consultingSalePricing";
 import { ensurePushPermission, useConsultingRealtime } from "../common/useConsultingRealtime";
-import { isConsultingFunnelRealtimeEvent } from "../../../../utils/consultingLeadSources";
+import {
+  consultingChatPath,
+  CRM_CHAT_CHANNELS,
+  isConsultingFunnelRealtimeEvent,
+} from "../../../../utils/consultingLeadSources";
 import LeadCreateClientModal from "./LeadCreateClientModal";
 import LeadPaymentModal from "./LeadPaymentModal";
 import LeadMessengerPanel from "./LeadMessengerPanel";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import FunnelBoardRow from "./FunnelBoardRow";
 import LeadTransferModal from "./LeadTransferModal";
 import FunnelEmployeesPicker from "./FunnelEmployeesPicker";
@@ -79,6 +85,7 @@ import {
   moveLeadOnBoard,
   removeLeadFromBoard as removeLeadFromBoardMap,
   upsertLeadOnBoard as upsertLeadOnBoardMap,
+  findLeadOnBoard,
 } from "../../../../utils/funnelBoardUtils";
 import {
   fetchAccessibleFunnelBoards,
@@ -86,6 +93,11 @@ import {
 } from "../../../../utils/funnelBoardFetch";
 import { useConfirm } from "../../../../hooks/useDialog";
 import { usePointerReorder } from "../../../../hooks/usePointerReorder";
+import {
+  getConsultingLead,
+  listWazzupChats,
+  normalizeChatMessage,
+} from "../../../../api/consultingWazzup";
 
 // Персональное событие воронки: lead.assigned (Wazzup) и consulting.lead.*.
 const isFunnelLeadEvent = isConsultingFunnelRealtimeEvent;
@@ -206,6 +218,9 @@ export default function ConsultingFunnel() {
   const confirm = useConfirm();
   const { profile } = useUser();
   const isManager = isConsultingFunnelManager(profile);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const leadFromUrl = searchParams.get("lead");
+  const tabFromUrl = searchParams.get("tab");
   const canViewFunnel = canViewConsultingFunnel(profile);
 
   const {
@@ -276,6 +291,14 @@ export default function ConsultingFunnel() {
   const [notice, setNotice] = useState(null);
   const [claimBusyId, setClaimBusyId] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
+  const [unreadByLeadId, setUnreadByLeadId] = useState({});
+  const leadModalRef = useRef(null);
+  const funnelChatMessageHandlerRef = useRef(null);
+  const deeplinkFetchRef = useRef("");
+  useEffect(() => {
+    leadModalRef.current = leadModal;
+  }, [leadModal]);
 
   // Порядок воронок per-user. Источник истины — сервер (user-preferences),
   // localStorage используется как кэш и fallback при отсутствии эндпоинта (404).
@@ -377,11 +400,26 @@ export default function ConsultingFunnel() {
       funnelIdsKey: visibleFunnelIdsKey,
       enabled: !!visibleFunnelIdsKey,
       onUpsert: (lead) => {
-        if (!lead?.funnel) return;
-        setBoardsMap((prev) => ({
-          ...prev,
-          [lead.funnel]: upsertLeadOnBoardMap(prev[lead.funnel], lead),
-        }));
+        if (!lead?.id) return;
+        if (lead.funnel) {
+          setBoardsMap((prev) => ({
+            ...prev,
+            [lead.funnel]: upsertLeadOnBoardMap(prev[lead.funnel], lead),
+          }));
+          return;
+        }
+        // lead.updated / in_work без funnel — найти доску и смержить статус
+        setBoardsMap((prev) => {
+          for (const key of Object.keys(prev)) {
+            if (findLeadOnBoard(prev[key], lead.id)) {
+              return {
+                ...prev,
+                [key]: upsertLeadOnBoardMap(prev[key], lead),
+              };
+            }
+          }
+          return prev;
+        });
       },
       onRemove: (data) => {
         const fid = data?.funnel || data?.funnel_id;
@@ -405,6 +443,12 @@ export default function ConsultingFunnel() {
       onAssigned: (lead) =>
         setNotice(`Вам назначен лид: ${lead?.title || "без названия"}`),
       onReconnect: refreshAllBoards,
+      onChatMessage: (frame) => {
+        const type = String(frame?.type || "").toLowerCase();
+        if (type !== "new_message") return;
+        const data = frame?.data || frame?.payload || frame;
+        funnelChatMessageHandlerRef.current?.(data);
+      },
     });
 
   useEffect(() => {
@@ -572,6 +616,13 @@ export default function ConsultingFunnel() {
       }
       // effectiveOwnerScope === "all" — без ограничения по владельцу (только менеджер)
       if (riskOnly && !lead.is_at_risk) return false;
+      if (needsReplyOnly) {
+        const unread =
+          Number(unreadByLeadId[lead.id]) ||
+          Number(unreadByLeadId[String(lead.id)]) ||
+          0;
+        if (unread <= 0) return false;
+      }
       if (isManager && ownerFilter && lead.owner !== ownerFilter) return false;
       if (gradeFilter && lead.score_grade !== gradeFilter) return false;
       if (q) {
@@ -586,6 +637,8 @@ export default function ConsultingFunnel() {
   }, [
     query,
     riskOnly,
+    needsReplyOnly,
+    unreadByLeadId,
     ownerFilter,
     gradeFilter,
     effectiveOwnerScope,
@@ -597,16 +650,18 @@ export default function ConsultingFunnel() {
     query.trim() ||
     (isManager && ownerFilter) ||
     riskOnly ||
+    needsReplyOnly ||
     gradeFilter ||
     effectiveOwnerScope !== "mine"
   );
 
-  const filterRevision = `${effectiveOwnerScope}|${query}|${ownerFilter}|${riskOnly}|${gradeFilter}|${myUserId}|${isManager}`;
+  const filterRevision = `${effectiveOwnerScope}|${query}|${ownerFilter}|${riskOnly}|${needsReplyOnly}|${gradeFilter}|${myUserId}|${isManager}`;
 
   const resetFilters = () => {
     setQuery("");
     setOwnerFilter("");
     setRiskOnly(false);
+    setNeedsReplyOnly(false);
     setGradeFilter("");
     persistOwnerScope("mine");
   };
@@ -664,6 +719,196 @@ export default function ConsultingFunnel() {
       );
     }
   };
+
+  const openLeadModal = useCallback(
+    (funnelId, leadId, tab) => {
+      setLeadModal({
+        funnelId,
+        leadId,
+        initialTab: tab || undefined,
+      });
+      setUnreadByLeadId((prev) => {
+        if (!prev[leadId] && !prev[String(leadId)]) return prev;
+        const next = { ...prev };
+        delete next[leadId];
+        delete next[String(leadId)];
+        return next;
+      });
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("lead", String(leadId));
+          if (tab) p.set("tab", String(tab));
+          else p.delete("tab");
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const closeLeadModal = useCallback(() => {
+    setLeadModal(null);
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete("lead");
+        p.delete("tab");
+        return p;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
+  // Deep link: ?lead=&tab= → открыть карточку после загрузки досок
+  useEffect(() => {
+    if (!leadFromUrl) {
+      deeplinkFetchRef.current = "";
+      if (leadModalRef.current?.leadId && !leadModalRef.current?.create) {
+        setLeadModal(null);
+      }
+      return;
+    }
+    if (boardsLoading) return;
+
+    const already =
+      leadModalRef.current?.leadId &&
+      String(leadModalRef.current.leadId) === String(leadFromUrl);
+    if (already) return;
+
+    let foundFunnelId = null;
+    for (const [fid, board] of Object.entries(boardsMap)) {
+      if (
+        findLeadOnBoard(board, leadFromUrl) ||
+        findLeadOnBoard(board, String(leadFromUrl))
+      ) {
+        foundFunnelId = fid;
+        break;
+      }
+    }
+    // String-id fallback across boards
+    if (!foundFunnelId) {
+      for (const [fid, board] of Object.entries(boardsMap)) {
+        const cols = board?.columns || [];
+        const hit =
+          cols.some((c) =>
+            (c.leads || []).some((l) => String(l.id) === String(leadFromUrl)),
+          ) ||
+          (board?.unassigned || []).some(
+            (l) => String(l.id) === String(leadFromUrl),
+          );
+        if (hit) {
+          foundFunnelId = fid;
+          break;
+        }
+      }
+    }
+
+    if (foundFunnelId) {
+      setLeadModal({
+        funnelId: foundFunnelId,
+        leadId: leadFromUrl,
+        initialTab: tabFromUrl || undefined,
+      });
+      setUnreadByLeadId((prev) => {
+        if (!prev[leadFromUrl] && !prev[String(leadFromUrl)]) return prev;
+        const next = { ...prev };
+        delete next[leadFromUrl];
+        delete next[String(leadFromUrl)];
+        return next;
+      });
+      return;
+    }
+
+    if (deeplinkFetchRef.current === String(leadFromUrl)) return;
+    deeplinkFetchRef.current = String(leadFromUrl);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getConsultingLead(leadFromUrl);
+        if (cancelled || !data) return;
+        const funnelId =
+          data.funnel ||
+          data.funnel_id ||
+          (visibleFunnels[0] && visibleFunnels[0].id);
+        if (!funnelId) return;
+        setLeadModal({
+          funnelId: String(funnelId),
+          leadId: leadFromUrl,
+          initialTab: tabFromUrl || undefined,
+        });
+        refreshBoard(String(funnelId));
+      } catch {
+        /* лид недоступен */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    leadFromUrl,
+    tabFromUrl,
+    boardsLoading,
+    boardsMap,
+    visibleFunnels,
+    refreshBoard,
+  ]);
+
+  // Seed unread из inbox + live WS
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await listWazzupChats("whatsapp");
+        if (cancelled) return;
+        const rows = Array.isArray(data?.threads)
+          ? data.threads
+          : Array.isArray(data)
+            ? data
+            : Array.isArray(data?.results)
+              ? data.results
+              : [];
+        const map = {};
+        for (const t of rows) {
+          const id = t.lead_id || t.id;
+          const n = Number(t.unread_count) || 0;
+          if (id && n > 0) map[String(id)] = n;
+        }
+        if (Object.keys(map).length) {
+          setUnreadByLeadId((prev) => ({ ...map, ...prev }));
+        }
+      } catch {
+        /* inbox API может быть пуст */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onFunnelWazzupMessage = useCallback((data) => {
+    const msg = normalizeChatMessage(data);
+    if (msg.direction !== "in") return;
+    const id = msg.lead_id ? String(msg.lead_id) : "";
+    if (!id) return;
+    const openId = leadModalRef.current?.leadId
+      ? String(leadModalRef.current.leadId)
+      : "";
+    if (openId && openId === id) return;
+    setUnreadByLeadId((prev) => ({
+      ...prev,
+      [id]: (Number(prev[id]) || 0) + 1,
+    }));
+  }, []);
+
+  useEffect(() => {
+    funnelChatMessageHandlerRef.current = onFunnelWazzupMessage;
+    return () => {
+      funnelChatMessageHandlerRef.current = null;
+    };
+  }, [onFunnelWazzupMessage]);
 
   const activeLeadModalFunnelId = leadModal?.funnelId;
   const activeLeadBoard = activeLeadModalFunnelId
@@ -821,6 +1066,16 @@ export default function ConsultingFunnel() {
             </button>
           )}
 
+          <button
+            type="button"
+            className={`funnel__chipBtn${
+              needsReplyOnly ? " funnel__chipBtn--active" : ""
+            }`}
+            onClick={() => setNeedsReplyOnly((v) => !v)}
+          >
+            Нужен ответ
+          </button>
+
           {hasFilters && (
             <button className="funnel__chipBtn" onClick={resetFilters}>
               Сбросить
@@ -857,13 +1112,14 @@ export default function ConsultingFunnel() {
               onDragEnd={() => setDragState(null)}
               onDropStage={onDropToStage}
               claimBusyId={claimBusyId}
-              onClaimLead={(leadId) => refreshBoard(f.id)}
+              onClaimLead={(_leadId) => refreshBoard(f.id)}
               onOpenLead={(funnelId, leadId) =>
-                setLeadModal({ funnelId, leadId })
+                openLeadModal(funnelId, leadId)
               }
               onCreateLead={(funnelId, stageId) =>
                 setLeadModal({ funnelId, create: true, stageId })
               }
+              unreadByLeadId={unreadByLeadId}
               onTransferLead={(funnelId, lead) =>
                 setTransferModal({ sourceFunnelId: funnelId, sourceLead: lead })
               }
@@ -937,6 +1193,7 @@ export default function ConsultingFunnel() {
       )}
       {leadModal?.leadId && activeLeadModalFunnelId && (
         <LeadDetail
+          key={`${leadModal.leadId}:${leadModal.initialTab || ""}`}
           leadId={leadModal.leadId}
           funnelId={activeLeadModalFunnelId}
           board={activeLeadBoard}
@@ -947,7 +1204,8 @@ export default function ConsultingFunnel() {
           visibleFunnels={visibleFunnels}
           boardsMap={boardsMap}
           profile={profile}
-          onClose={() => setLeadModal(null)}
+          initialTab={leadModal.initialTab}
+          onClose={closeLeadModal}
           onNotice={setNotice}
           onTransfer={(lead) =>
             setTransferModal({
@@ -979,7 +1237,7 @@ export default function ConsultingFunnel() {
           onClose={() => setArchiveOpen(false)}
           onOpenLead={(funnelId, leadId) => {
             setArchiveOpen(false);
-            setLeadModal({ funnelId, leadId });
+            openLeadModal(funnelId, leadId);
           }}
         />
       )}
@@ -1256,9 +1514,13 @@ function FormActions({ saving, onClose }) {
 function FunnelForm({ funnel: existing, onClose }) {
   const dispatch = useDispatch();
   const isEdit = !!existing?.id;
+  const roleFunnel = isRoleFunnel(existing);
   const [name, setName] = useState(existing?.name || "");
   const [description, setDescription] = useState(existing?.description || "");
   const [isActive, setIsActive] = useState(existing?.is_active ?? true);
+  const [isMain, setIsMain] = useState(() =>
+    existing ? isMainFunnel(existing) : false,
+  );
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1273,6 +1535,11 @@ function FunnelForm({ funnel: existing, onClose }) {
         description: description.trim(),
         is_active: isActive,
       };
+      // Ролевые воронки не становятся главными — туда идут заявки роли.
+      if (!roleFunnel) {
+        payload.is_main = !!isMain;
+        if (isMain) payload.funnel_kind = "main";
+      }
       if (isEdit) {
         await dispatch(
           updateFunnel({ id: existing.id, data: payload })
@@ -1323,6 +1590,23 @@ function FunnelForm({ funnel: existing, onClose }) {
           />
           Активна
         </label>
+        {!roleFunnel && (
+          <>
+            <label className="funnel__check">
+              <input
+                type="checkbox"
+                checked={isMain}
+                onChange={(e) => setIsMain(e.target.checked)}
+              />
+              Главная воронка
+            </label>
+            <p className="funnel__hint">
+              Входящие из WhatsApp / мессенджеров попадают на главную воронку.
+              Одновременно главной может быть только одна — бэкенд снимет флаг с
+              предыдущей.
+            </p>
+          </>
+        )}
         <FormActions saving={saving} onClose={onClose} />
       </form>
     </Modal>
@@ -1872,6 +2156,7 @@ function LeadDetail({
   wsIsManager,
   canManageLeads = true,
   profile,
+  initialTab,
   onClose,
   onNotice,
   onTransfer,
@@ -1883,7 +2168,14 @@ function LeadDetail({
   const board = boardProp || boardFromStore;
   const lead = findLead(board, leadId);
 
-  const [tab, setTab] = useState("info");
+  const [tab, setTab] = useState(() =>
+    initialTab === "messenger" ||
+    initialTab === "info" ||
+    initialTab === "timeline" ||
+    initialTab === "tasks"
+      ? initialTab
+      : "info",
+  );
   const [loseOpen, setLoseOpen] = useState(false);
   const [createClientOpen, setCreateClientOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -1895,10 +2187,18 @@ function LeadDetail({
 
   const detailUserId = resolveCurrentUserId(profile, wsUserId);
 
-  // WhatsApp/IG/TG лиды сразу открываем на вкладке «Чат».
+  // WhatsApp/IG/TG лиды сразу открываем на вкладке «Чат» (если tab не задан в URL).
   useEffect(() => {
+    if (
+      initialTab === "messenger" ||
+      initialTab === "info" ||
+      initialTab === "timeline" ||
+      initialTab === "tasks"
+    ) {
+      return;
+    }
     const src = String(lead?.source || "").toLowerCase();
-    if (["whatsapp", "instagram", "telegram"].includes(src)) {
+    if (CRM_CHAT_CHANNELS.includes(src)) {
       setTab("messenger");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- только при открытии карточки
@@ -2108,6 +2408,16 @@ function LeadDetail({
               <span className="funnel__chip">{lead.owner_display}</span>
             )
           )}
+          {CRM_CHAT_CHANNELS.includes(String(lead.source || "").toLowerCase()) &&
+            consultingChatPath(leadId, lead.source) && (
+              <Link
+                to={consultingChatPath(leadId, lead.source)}
+                className="funnel__chip funnel__chip--client"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Открыть в чатах
+              </Link>
+            )}
         </div>
         <div className="funnel__detailActions">
           {canManageLeads && inPool && (
@@ -2300,6 +2610,7 @@ function LeadDetail({
       {tab === "messenger" && (
         canTouch ? (
           <LeadMessengerPanel
+            key={lead.id}
             lead={lead}
             onNotice={onNotice}
             onError={setErr}

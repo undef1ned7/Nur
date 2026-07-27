@@ -1,7 +1,9 @@
-// src/Components/Sectors/Consulting/leads/Leads.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
+  FaComments,
   FaInstagram,
+  FaLayerGroup,
   FaPlus,
   FaTelegram,
   FaTimes,
@@ -21,6 +23,8 @@ import {
 import { useAlert } from "../../../../hooks/useDialog";
 import {
   LEAD_SOURCES,
+  consultingChatPath,
+  consultingFunnelLeadPath,
   isConsultingChatRealtimeEvent,
   leadSourceMeta,
 } from "../../../../utils/consultingLeadSources";
@@ -85,7 +89,24 @@ const fmtDateTime = (iso) => {
 
 export default function ConsultingLeads() {
   const alert = useAlert();
-  const [tab, setTab] = useState("inbox"); // inbox | settings | integration
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const tab =
+    tabFromUrl === "integration" || tabFromUrl === "settings"
+      ? tabFromUrl
+      : "inbox";
+
+  const selectTab = (next) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === "inbox") p.delete("tab");
+        else p.set("tab", next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
 
   /* справочники */
   const [roles, setRoles] = useState([]);
@@ -137,7 +158,7 @@ export default function ConsultingLeads() {
             role="tab"
             aria-selected={tab === "inbox"}
             className={`leads__tab ${tab === "inbox" ? "is-active" : ""}`}
-            onClick={() => setTab("inbox")}
+            onClick={() => selectTab("inbox")}
           >
             Входящие
           </button>
@@ -146,7 +167,7 @@ export default function ConsultingLeads() {
             role="tab"
             aria-selected={tab === "settings"}
             className={`leads__tab ${tab === "settings" ? "is-active" : ""}`}
-            onClick={() => setTab("settings")}
+            onClick={() => selectTab("settings")}
           >
             Распределение
           </button>
@@ -155,7 +176,7 @@ export default function ConsultingLeads() {
             role="tab"
             aria-selected={tab === "integration"}
             className={`leads__tab ${tab === "integration" ? "is-active" : ""}`}
-            onClick={() => setTab("integration")}
+            onClick={() => selectTab("integration")}
           >
             Интеграция
           </button>
@@ -374,6 +395,29 @@ function InboxTab({ empById, employees, alert }) {
                       </span>
                     </td>
                     <td className="leads__rowActions">
+                      {l.lead && (
+                        <>
+                          <Link
+                            to={
+                              consultingChatPath(
+                                l.lead,
+                                l.source || "whatsapp",
+                              ) || "#"
+                            }
+                            className="leads__btn leads__btn--sm leads__btn--ghost"
+                            title="Открыть чат"
+                          >
+                            <FaComments /> Чат
+                          </Link>
+                          <Link
+                            to={consultingFunnelLeadPath(l.lead) || "#"}
+                            className="leads__btn leads__btn--sm leads__btn--ghost"
+                            title="Открыть на воронке"
+                          >
+                            <FaLayerGroup /> Воронка
+                          </Link>
+                        </>
+                      )}
                       <button
                         type="button"
                         className="leads__btn leads__btn--sm"

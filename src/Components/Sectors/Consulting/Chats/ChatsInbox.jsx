@@ -7,8 +7,11 @@ import {
   startTransition,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import {
   FaArrowLeft,
+  FaCog,
+  FaExternalLinkAlt,
   FaInstagram,
   FaSearch,
   FaTelegram,
@@ -21,11 +24,20 @@ import {
   normalizeChatMessage,
   normalizePhone,
 } from "../../../../api/consultingWazzup";
+import { claimLead } from "../../../../store/creators/funnelThunk";
 import { useWazzupChatSocket } from "../../../../hooks/useWazzupChatSocket";
 import {
+  consultingFunnelLeadPath,
+  consultingLeadsIntegrationPath,
   isConsultingChatRealtimeEvent,
   leadSourceLabel,
 } from "../../../../utils/consultingLeadSources";
+import {
+  canEditLead,
+  resolveCurrentUserId,
+  resolveEntityId,
+} from "../../../../utils/consultingFunnelLeadUtils";
+import { useUser } from "../../../../store/slices/userSlice";
 import {
   ensurePushPermission,
   useConsultingRealtime,
@@ -109,6 +121,8 @@ function mergeChatThreads(prev, next, openLeadId) {
 export default function ChatsInbox() {
   const { channel: channelParam, leadId } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { profile, userId: storeUserId } = useUser();
   const channel = String(channelParam || "whatsapp").toLowerCase();
   const meta = CHANNEL_META[channel] || CHANNEL_META.whatsapp;
   const Icon = meta.Icon;
@@ -122,8 +136,11 @@ export default function ChatsInbox() {
   const [notice, setNotice] = useState("");
   const [apiLead, setApiLead] = useState(null);
   const [leadLoading, setLeadLoading] = useState(false);
+  const [claimBusy, setClaimBusy] = useState(false);
   const leadIdRef = useRef(leadId);
-  leadIdRef.current = leadId;
+  useEffect(() => {
+    leadIdRef.current = leadId;
+  }, [leadId]);
 
   const threadLead = useMemo(() => {
     if (!leadId) return null;
@@ -267,6 +284,7 @@ export default function ChatsInbox() {
 
         const updated = {
           ...cur,
+          // text уже содержит плейсхолдер медиа из normalizeChatMessage
           last_message: msg.text || cur.last_message,
           last_message_at: msg.created_at || cur.last_message_at,
           unread_count: nextUnread,
@@ -283,18 +301,6 @@ export default function ChatsInbox() {
     enabled: true,
     onNewMessage: onInboxNewMessage,
   });
-
-  /** Локальный сброс бейджа; mark-read → Wazzup unread:0 делает LeadMessengerPanel */
-  useEffect(() => {
-    if (!leadId) return;
-    setThreads((prev) =>
-      prev.map((t) =>
-        String(t.lead_id || t.id) === String(leadId)
-          ? { ...t, unread_count: 0, has_unread: false }
-          : t,
-      ),
-    );
-  }, [leadId]);
 
   useEffect(() => {
     if (!leadId) return undefined;
@@ -341,6 +347,7 @@ export default function ChatsInbox() {
         : threadLead || fromApi;
     if (!base) return null;
     return {
+      ...fromApi,
       id: base.id || base.lead_id || leadId,
       full_name: base.full_name || "Чат",
       phone: base.phone || "",
@@ -349,16 +356,47 @@ export default function ChatsInbox() {
       message: base.message || base.first_message || "",
       first_message: base.first_message || "",
       created_at: base.created_at,
+      owner: resolveEntityId(fromApi?.owner ?? base.owner) || null,
+      owner_display: fromApi?.owner_display ?? base.owner_display,
+      stage: fromApi?.stage ?? base.stage,
+      status: fromApi?.status ?? base.status,
+      is_archived: fromApi?.is_archived ?? base.is_archived,
     };
   }, [
     leadId,
     channel,
     apiLead,
-    threadLead?.id,
-    threadLead?.full_name,
-    threadLead?.phone,
-    threadLead?.source,
+    threadLead,
   ]);
+
+  const userId = resolveCurrentUserId(profile, storeUserId);
+  const canTouchChat = lead ? canEditLead(lead, null, profile, userId) : false;
+  const inPool = !!(lead && !resolveEntityId(lead.owner));
+  const funnelPath = lead?.id ? consultingFunnelLeadPath(lead.id) : null;
+
+  const onClaimChat = useCallback(async () => {
+    if (!lead?.id) return;
+    setClaimBusy(true);
+    setErr("");
+    try {
+      const data = await dispatch(claimLead(lead.id)).unwrap();
+      setApiLead((prev) => ({
+        ...(prev || {}),
+        ...data,
+        id: data?.id || lead.id,
+        source: data?.source || lead.source || channel,
+      }));
+      setNotice("Лид взят в работу.");
+    } catch (e) {
+      setErr(
+        typeof e?.detail === "string"
+          ? e.detail
+          : "Не удалось взять лид в работу.",
+      );
+    } finally {
+      setClaimBusy(false);
+    }
+  }, [dispatch, lead, channel]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -382,7 +420,7 @@ export default function ChatsInbox() {
       <section className={`crmInbox crmInbox--${meta.tone}`}>
         <header className="crmInbox__top">
           <Link to="/crm/consulting/chats" className="crmInbox__back">
-            <FaArrowLeft /> CRM
+            <FaArrowLeft /> Чаты
           </Link>
           <div className="crmInbox__brand">
             <Icon className="crmInbox__brandIcon" />
@@ -396,8 +434,8 @@ export default function ChatsInbox() {
           <Icon />
           <h2>{meta.title} пока не доступен</h2>
           <p>
-            Сейчас в CRM работают только чаты WhatsApp. Telegram и Instagram
-            появятся позже.
+            Сейчас работают только чаты WhatsApp. Telegram и Instagram появятся
+            позже.
           </p>
           <Link to="/crm/consulting/chats/whatsapp" className="crmInbox__goWa">
             Открыть WhatsApp
@@ -411,7 +449,7 @@ export default function ChatsInbox() {
     <section className={`crmInbox crmInbox--${meta.tone}`}>
       <header className="crmInbox__top">
         <Link to="/crm/consulting/chats" className="crmInbox__back">
-          <FaArrowLeft /> CRM
+          <FaArrowLeft /> Чаты
         </Link>
         <div className="crmInbox__brand">
           <Icon className="crmInbox__brandIcon" />
@@ -454,6 +492,13 @@ export default function ChatsInbox() {
             );
           })}
         </nav>
+        <Link
+          to={consultingLeadsIntegrationPath()}
+          className="crmInbox__settings"
+          title="Настройки каналов Wazzup"
+        >
+          <FaCog /> Настройки каналов
+        </Link>
       </header>
 
       {!!err && <div className="crmInbox__alert">{err}</div>}
@@ -510,7 +555,7 @@ export default function ChatsInbox() {
                         <span className="crmInbox__itemPreview">
                           {t.last_message || t.phone || "Нет сообщений"}
                         </span>
-                        {t.unread_count > 0 && (
+                        {!active && t.unread_count > 0 && (
                           <span className="crmInbox__badge">
                             {t.unread_count > 99 ? "99+" : t.unread_count}
                           </span>
@@ -541,11 +586,46 @@ export default function ChatsInbox() {
             </div>
           ) : lead ? (
             <div className="crmInbox__chatWrap">
-              <LeadMessengerPanel
-                lead={lead}
-                onNotice={handleNotice}
-                onError={handleError}
-              />
+              <div className="crmInbox__chatBar">
+                {funnelPath && (
+                  <Link to={funnelPath} className="crmInbox__funnelLink">
+                    <FaExternalLinkAlt /> Карточка на воронке
+                  </Link>
+                )}
+                {inPool && (
+                  <button
+                    type="button"
+                    className="crmInbox__claimBtn"
+                    disabled={claimBusy}
+                    onClick={onClaimChat}
+                  >
+                    {claimBusy ? "…" : "Взять в работу"}
+                  </button>
+                )}
+              </div>
+              {canTouchChat ? (
+                <LeadMessengerPanel
+                  key={lead.id}
+                  lead={lead}
+                  onNotice={handleNotice}
+                  onError={handleError}
+                />
+              ) : (
+                <>
+                  <LeadMessengerPanel
+                    key={lead.id}
+                    lead={lead}
+                    onNotice={handleNotice}
+                    onError={handleError}
+                    readOnly
+                  />
+                  <p className="crmInbox__lockHint">
+                    {inPool
+                      ? "Лид в общем пуле. Нажмите «Взять в работу», чтобы отвечать."
+                      : "Чат доступен только назначенному сотруднику или руководителю."}
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="crmInbox__placeholder">

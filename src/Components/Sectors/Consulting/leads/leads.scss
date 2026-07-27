@@ -97,6 +97,7 @@
     font-weight: 600;
     cursor: pointer;
     color: #0f172a;
+    text-decoration: none;
     &:hover {
       background: #f8fafc;
     }
@@ -187,6 +188,11 @@
   }
   &__rowActions {
     text-align: right;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    align-items: center;
   }
 
   &__sourceTag {

@@ -177,13 +177,23 @@ export const setupWazzupWebhook = async (id, payload = {}) => {
  * POST /consalting/wazzup-accounts/{id}/send-message/
  * Отправка ответа клиенту из карточки лида воронки.
  * @param {string} accountId
- * @param {{ lead_id: string, message: string, media_url?: string }} payload
+ * @param {{ lead_id: string, message?: string, media_url?: string, content_uri?: string }} payload
  */
 export const sendWazzupMessage = async (accountId, payload) => {
   try {
+    const media =
+      payload?.media_url || payload?.content_uri || payload?.contentUri || "";
+    const body = {
+      lead_id: payload.lead_id,
+      message: payload.message ?? payload.text ?? "",
+    };
+    if (media) {
+      body.media_url = media;
+      body.content_uri = media;
+    }
     const { data } = await api.post(
       `${BASE}/wazzup-accounts/${accountId}/send-message/`,
-      payload,
+      body,
     );
     return data;
   } catch (error) {
@@ -191,10 +201,259 @@ export const sendWazzupMessage = async (accountId, payload) => {
   }
 };
 
+/** Лимит вложения в чате (клиентская проверка; WhatsApp обычно ≤16–64 МБ). */
+export const CHAT_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+
+export const CHAT_MEDIA_ACCEPT =
+  "image/*,video/*,audio/*,.ogg,.opus,.oga,.mp3,.m4a,.aac,.wav,.amr,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv";
+
+/** media_type по File (MIME + имя). */
+export function resolveMediaTypeFromFile(file) {
+  if (!file) return "";
+  const mime = String(file.type || "").toLowerCase();
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "voice";
+  if (
+    mime.includes("pdf") ||
+    mime.includes("msword") ||
+    mime.includes("officedocument") ||
+    mime.includes("spreadsheet") ||
+    mime.includes("zip")
+  ) {
+    return "document";
+  }
+  return resolveMediaType({ type: "" }, file.name || "");
+}
+
+function extractUploadedMediaUrl(data) {
+  if (!data) return "";
+  if (typeof data === "string" && /^https?:\/\//i.test(data)) return data;
+  if (typeof data !== "object") return "";
+  return (
+    data.url ||
+    data.content_uri ||
+    data.contentUri ||
+    data.media_url ||
+    data.file_url ||
+    data.file ||
+    data.path ||
+    (typeof data.media === "string" ? data.media : "") ||
+    ""
+  );
+}
+
+/**
+ * Загрузка файла → публичный URL для Wazzup contentUri.
+ * Маршруты бэка (apps/consalting/urls.py):
+ *   POST /consalting/wazzup-accounts/{id}/upload/  → upload_media_detail
+ *   POST /consalting/wazzup/upload/                → upload_media_list
+ *   POST /consalting/wazzup-accounts/upload/       → upload_media_list
+ * Поле: file (+ алиас media).
+ * Ответ: { url | content_uri | media_url | file }
+ *
+ * @param {File} file
+ * @param {{ accountId?: string }} [opts]
+ * @returns {Promise<{ url: string, media_type: string, notReady?: boolean }>}
+ */
+export const uploadConsultingChatMedia = async (file, opts = {}) => {
+  if (!file) {
+    return Promise.reject({ detail: "Файл не выбран." });
+  }
+  if (file.size > CHAT_MEDIA_MAX_BYTES) {
+    return Promise.reject({
+      detail: `Файл слишком большой (макс. ${Math.round(CHAT_MEDIA_MAX_BYTES / (1024 * 1024))} МБ).`,
+    });
+  }
+
+  const accountId = opts.accountId;
+  const paths = [
+    // detail — предпочтительно (привязка к каналу)
+    accountId ? `${BASE}/wazzup-accounts/${accountId}/upload/` : null,
+    // list-алиасы из urls.py
+    `${BASE}/wazzup/upload/`,
+    `${BASE}/wazzup-accounts/upload/`,
+  ].filter(Boolean);
+
+  let sawNotReady = false;
+  let lastErr = null;
+
+  for (const path of paths) {
+    const fd = new FormData();
+    // Бэк ждёт именно поле `file` (см. upload_media_*)
+    fd.append("file", file, file.name || "upload.bin");
+    try {
+      const { data } = await api.post(path, fd, { timeout: 120000 });
+      const url = extractUploadedMediaUrl(data);
+      if (!url) {
+        lastErr = { detail: "Сервер не вернул URL файла.", data };
+        continue;
+      }
+      return {
+        url,
+        media_type: resolveMediaTypeFromFile(file) || resolveMediaType({}, url),
+        raw: data,
+        path,
+      };
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404 || status === 501) {
+        sawNotReady = true;
+        continue;
+      }
+      return reject("Upload Consulting Chat Media Error")(error);
+    }
+  }
+
+  if (sawNotReady && !lastErr) {
+    return Promise.reject({
+      notReady: true,
+      status: 404,
+      detail:
+        "Загрузка файлов ещё не подключена на сервере (нужен POST …/wazzup/upload/).",
+    });
+  }
+  return reject("Upload Consulting Chat Media Error")(
+    lastErr || { detail: "Не удалось загрузить файл." },
+  );
+};
+
+/**
+ * Запасной путь: multipart send-message (file + lead_id) без отдельного upload.
+ * @param {string} accountId
+ * @param {{ lead_id: string, message?: string, file: File }} payload
+ */
+export const sendWazzupMessageWithFile = async (accountId, payload) => {
+  if (!accountId || !payload?.lead_id || !payload?.file) {
+    return Promise.reject({ detail: "Нужны account, lead_id и file." });
+  }
+  if (payload.file.size > CHAT_MEDIA_MAX_BYTES) {
+    return Promise.reject({
+      detail: `Файл слишком большой (макс. ${Math.round(CHAT_MEDIA_MAX_BYTES / (1024 * 1024))} МБ).`,
+    });
+  }
+  const fd = new FormData();
+  fd.append("lead_id", payload.lead_id);
+  const msg = payload.message ?? payload.text ?? "";
+  if (msg) {
+    fd.append("message", msg);
+    fd.append("text", msg);
+  }
+  fd.append("file", payload.file, payload.file.name || "upload.bin");
+  try {
+    const { data } = await api.post(
+      `${BASE}/wazzup-accounts/${accountId}/send-message/`,
+      fd,
+      {
+        timeout: 120000,
+      },
+    );
+    return data;
+  } catch (error) {
+    return reject("Send Wazzup Message With File Error")(error);
+  }
+};
+
+/** Канонические media_type UI: image | video | voice | document | file */
+const MEDIA_TYPE_ALIASES = {
+  image: "image",
+  photo: "image",
+  picture: "image",
+  img: "image",
+  video: "video",
+  audio: "voice",
+  voice: "voice",
+  ptt: "voice",
+  document: "document",
+  doc: "document",
+  file: "file",
+  attachment: "file",
+};
+
+const MEDIA_LABELS = {
+  image: "📷 [Фотография]",
+  video: "🎥 [Видеозапись]",
+  voice: "🎙 [Голосовое сообщение]",
+  document: "📄 [Документ]",
+  file: "📎 [Вложение]",
+};
+
+/**
+ * Статусы доставки UI: pending | sent | delivered | read | error
+ * (бэкенд FAILED / failed → error).
+ */
+export function normalizeMessageStatus(raw, { isOut = false } = {}) {
+  const statusRaw = String(raw || "").toLowerCase().trim();
+  if (["pending", "queued", "sending"].includes(statusRaw)) return "pending";
+  if (["sent", "send"].includes(statusRaw)) return "sent";
+  if (["delivered", "delivery", "received"].includes(statusRaw))
+    return "delivered";
+  if (["read", "seen", "viewed"].includes(statusRaw)) return "read";
+  if (["error", "failed", "fail"].includes(statusRaw)) return "error";
+  if (isOut && !statusRaw) return "sent";
+  return statusRaw;
+}
+
+/** Плейсхолдер для списков / preview, если нет подписи к медиа. */
+export function mediaTypeLabel(mediaType) {
+  const key = String(mediaType || "").toLowerCase();
+  return MEDIA_LABELS[key] || (key ? MEDIA_LABELS.file : "");
+}
+
+/**
+ * Определяет media_type по полю API или расширению URL.
+ * @param {object} [raw]
+ * @param {string} [mediaUrl]
+ * @returns {string} image|video|voice|document|file|""
+ */
+export function resolveMediaType(raw = {}, mediaUrl = "") {
+  const m = raw && typeof raw === "object" ? raw : {};
+  const explicit = String(
+    m.media_type || m.mediaType || m.type || m.content_type || "",
+  )
+    .toLowerCase()
+    .trim();
+
+  if (explicit) {
+    // "image/jpeg" → image; "audio/ogg" → voice
+    const mimeMain = explicit.split("/")[0];
+    if (MEDIA_TYPE_ALIASES[explicit]) return MEDIA_TYPE_ALIASES[explicit];
+    if (MEDIA_TYPE_ALIASES[mimeMain]) return MEDIA_TYPE_ALIASES[mimeMain];
+    // type: text / chat / location — не медиа
+    if (
+      ["text", "chat", "message", "location", "contact", "sticker"].includes(
+        explicit,
+      )
+    ) {
+      /* fall through to URL */
+    }
+  }
+
+  const url = String(
+    mediaUrl ||
+      m.media_url ||
+      m.content_uri ||
+      m.contentUri ||
+      m.file_url ||
+      "",
+  ).toLowerCase();
+  if (!url) return "";
+
+  const path = url.split("?")[0].split("#")[0];
+  if (/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(path)) return "image";
+  if (/\.(mp4|mov|webm|m4v|avi|mkv)$/i.test(path)) return "video";
+  if (/\.(ogg|oga|opus|mp3|m4a|aac|wav|amr)$/i.test(path)) return "voice";
+  if (/\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|csv)$/i.test(path))
+    return "document";
+  if (/^https?:\/\//i.test(url)) return "file";
+  return "";
+}
+
 /**
  * Нормализация сообщения чата (REST / WS new_message / send-message).
- * Контракт: inbound|outbound, is_incoming, status sent|delivered|read.
+ * Контракт: inbound|outbound, is_incoming, status sent|delivered|read|failed.
  * Статусы UI: pending | sent | delivered | read | error
+ * Медиа: media_url (+ content_uri), media_type: image|video|voice|document|file
  */
 export function normalizeChatMessage(raw, fallback = {}) {
   const m = raw && typeof raw === "object" ? raw : {};
@@ -208,7 +467,12 @@ export function normalizeChatMessage(raw, fallback = {}) {
     m.is_incoming === false ||
     m.is_outgoing === true ||
     m.isEcho === true ||
-    m.is_echo === true
+    m.is_echo === true ||
+    m.from_me === true ||
+    m.fromMe === true ||
+    m.is_from_me === true ||
+    String(m.author_type || m.sender_type || "").toLowerCase() === "manager" ||
+    String(m.author_type || m.sender_type || "").toLowerCase() === "operator"
   ) {
     isOut = true;
   }
@@ -216,42 +480,52 @@ export function normalizeChatMessage(raw, fallback = {}) {
     dir === "inbound" ||
     dir === "in" ||
     dir === "incoming" ||
-    m.is_incoming === true
+    m.is_incoming === true ||
+    m.from_me === false ||
+    m.fromMe === false
   ) {
-    isOut = false;
+    // Явный inbound важнее эвристик, кроме is_echo / from_me true выше
+    if (!(m.isEcho === true || m.is_echo === true || m.from_me === true || m.fromMe === true)) {
+      isOut = false;
+    }
   }
   if (!dir && m.is_incoming == null && fallback.direction === "out") {
     isOut = true;
   }
 
-  const statusRaw = String(
-    m.status || m.delivery_status || fallback.status || (isOut ? "sent" : ""),
-  ).toLowerCase();
-
-  let status = statusRaw;
-  if (["pending", "queued", "sending"].includes(statusRaw)) status = "pending";
-  else if (["sent", "send"].includes(statusRaw)) status = "sent";
-  else if (["delivered", "delivery", "received"].includes(statusRaw))
-    status = "delivered";
-  else if (["read", "seen", "viewed"].includes(statusRaw)) status = "read";
-  else if (["error", "failed", "fail"].includes(statusRaw)) status = "error";
-  else if (isOut && !status) status = "sent";
+  const status = normalizeMessageStatus(
+    m.status || m.delivery_status || fallback.status || "",
+    { isOut },
+  );
 
   const messageId = m.message_id || m.messageId || null;
+  const media_url =
+    m.media_url ||
+    m.content_uri ||
+    m.contentUri ||
+    m.file_url ||
+    fallback.media_url ||
+    "";
+  const media_type =
+    resolveMediaType(m, media_url) ||
+    resolveMediaType(fallback, fallback.media_url || "") ||
+    "";
+
+  let text = String(m.text ?? m.message ?? m.body ?? fallback.text ?? "");
+  // Фоллбэк для списков: пустой текст + медиа → плейсхолдер
+  if (!text.trim() && media_type) {
+    text = mediaTypeLabel(media_type);
+  }
+  const stableId = m.id ?? fallback.id ?? "";
 
   return {
-    id: String(
-      m.id ?? messageId ?? m.external_id ?? m.uuid ?? fallback.id ?? `tmp-${Date.now()}`,
-    ),
+    // Серверный контракт требует стабильный data.id. Не синтезируем id здесь:
+    // иначе повтор одного события получит новый ключ и не схлопнется upsert-ом.
+    id: stableId === "" || stableId == null ? "" : String(stableId),
     message_id: messageId ? String(messageId) : null,
-    text: String(m.text ?? m.message ?? m.body ?? fallback.text ?? ""),
-    media_url:
-      m.media_url ||
-      m.content_uri ||
-      m.contentUri ||
-      m.file_url ||
-      fallback.media_url ||
-      "",
+    text,
+    media_url,
+    media_type,
     direction: isOut ? "out" : "in",
     status,
     created_at:
@@ -296,7 +570,6 @@ export const listLeadMessages = async (leadId) => {
   if (!leadId) return { messages: [], path: null, notReady: false };
 
   let sawNotReady = false;
-  let lastErr = null;
 
   for (const { path, params } of MESSAGE_LIST_PATHS(leadId)) {
     try {
@@ -319,15 +592,10 @@ export const listLeadMessages = async (leadId) => {
         sawNotReady = true;
         continue;
       }
-      lastErr = error;
-      if (status && status < 500) continue;
-      break;
+      return reject("List Lead Messages Error")(error);
     }
   }
 
-  if (lastErr && !sawNotReady) {
-    return reject("List Lead Messages Error")(lastErr);
-  }
   return { messages: [], path: null, notReady: sawNotReady };
 };
 
@@ -348,12 +616,12 @@ export function messageBelongsToLead(msg, lead) {
   const chatPhone = normalizePhone(msg?.chat_id);
   const leadPhone = normalizePhone(lead.phone);
   if (chatPhone && leadPhone) {
-    // Сравниваем хвост (с/без кода страны)
-    return (
-      chatPhone === leadPhone ||
-      chatPhone.endsWith(leadPhone) ||
-      leadPhone.endsWith(chatPhone)
-    );
+    // Строже, чем endsWith: сравниваем последние 10 цифр.
+    // Это уменьшает ложные совпадения при близких номерах/хвостах.
+    if (chatPhone.length >= 10 && leadPhone.length >= 10) {
+      return chatPhone.slice(-10) === leadPhone.slice(-10);
+    }
+    return chatPhone === leadPhone;
   }
   // Нет якоря — не подмешиваем чужие диалоги
   return false;
@@ -402,7 +670,7 @@ export function normalizeChatThread(raw, channel) {
 
   const lastObj =
     r.last_message && typeof r.last_message === "object" ? r.last_message : null;
-  const lastText = String(
+  let lastText = String(
     r.last_message_text ||
       (typeof r.last_message === "string" ? r.last_message : "") ||
       lastObj?.text ||
@@ -410,7 +678,20 @@ export function normalizeChatThread(raw, channel) {
       r.message ||
       r.text ||
       "",
-  );
+  ).trim();
+  // Пустой preview + медиа → плейсхолдер (голос/фото/…), как в нормализации сообщений
+  if (!lastText) {
+    const mediaSrc = lastObj || r;
+    const mt = resolveMediaType(
+      mediaSrc,
+      mediaSrc?.content_uri ||
+        mediaSrc?.media_url ||
+        r.last_content_uri ||
+        r.content_uri ||
+        "",
+    );
+    if (mt) lastText = mediaTypeLabel(mt);
+  }
   const lastAt =
     r.last_message_time ||
     r.last_message_at ||
@@ -447,8 +728,8 @@ export function normalizeChatThread(raw, channel) {
 
 /**
  * Список диалогов по каналу (whatsapp | telegram | instagram).
- * Основной путь: GET /consalting/chats/ и /wazzup-chats/
- * Тянем все страницы — иначе DRF отдаёт только первую (часто 4–10 шт.).
+ * Приоритет по контракту: GET /chats/, затем /wazzup-chats/ и legacy-алиасы.
+ * Тянем все страницы — иначе DRF отдаёт только первую.
  *
  * @param {"whatsapp"|"telegram"|"instagram"} channel
  * @returns {Promise<{ threads: Array, notReady: boolean, path?: string }>}
@@ -456,6 +737,7 @@ export function normalizeChatThread(raw, channel) {
 export const listWazzupChats = async (channel) => {
   const ch = String(channel || "whatsapp").toLowerCase();
   const attempts = [
+    // Основной маршрут контракта, затем его оптимизированный алиас.
     {
       path: `${BASE}/chats/`,
       params: { integration_type: ch, source: ch, page_size: 100 },
@@ -469,7 +751,6 @@ export const listWazzupChats = async (channel) => {
   ];
 
   let sawNotReady = false;
-  let lastErr = null;
 
   for (const { path, params } of attempts) {
     try {
@@ -495,15 +776,10 @@ export const listWazzupChats = async (channel) => {
         sawNotReady = true;
         continue;
       }
-      lastErr = error;
-      if (status && status < 500) continue;
-      break;
+      return reject("List Wazzup Chats Error")(error);
     }
   }
 
-  if (lastErr && !sawNotReady) {
-    return reject("List Wazzup Chats Error")(lastErr);
-  }
   return { threads: [], notReady: sawNotReady, path: null };
 };
 
@@ -521,6 +797,7 @@ export const getConsultingLead = async (id) => {
 
 /**
  * POST /consalting/leads/{id}/mark-read/ — сброс непрочитанных в inbox.
+ * На бэке Wazzup PATCH уходит в фон → ответ < 1 с; UI вызывает fire-and-forget.
  */
 export const markLeadChatRead = async (id) => {
   try {
