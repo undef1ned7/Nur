@@ -1,9 +1,5 @@
-// src/components/Analytics/Analytics.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./Analytics.scss";
-import { FaChevronLeft, FaChevronRight, FaSearch, FaTimes } from "react-icons/fa";
-import { Banknote, FileText, ShoppingBag, TrendingUp } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -20,44 +16,42 @@ import {
   YAxis,
 } from "recharts";
 import {
-  getConsultingRows,
-  getConsultingServices,
-  getConsultingRequests,
-} from "../../../../store/creators/consultingThunk";
-import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
-import { useConsulting } from "../../../../store/slices/consultingSlice";
-import api from "../../../../api";
+  Banknote,
+  Clock,
+  FileText,
+  MessageSquare,
+  ShoppingBag,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import {
+  getAnalyticsDashboard,
+  getAnalyticsManagers,
+  getAnalyticsMessenger,
+  getAnalyticsSources,
+} from "../../../../api/consultingAnalytics";
+import { consultingFunnelLeadPath } from "../../../../utils/consultingLeadSources";
 import Modal from "../../../common/Modal/Modal";
+import "./Analytics.scss";
 
-const EMPLOYEES_LIST_URL = "/users/employees/";
 const BEM = "consulting-analytics";
 
-const asArray = (d) =>
-  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+const TABS = [
+  { id: "overview", label: "Обзор", hint: "Главные показатели" },
+  { id: "messenger", label: "Мессенджер", hint: "Ответы и ожидание" },
+  { id: "sources", label: "Источники", hint: "Откуда приходят заявки" },
+  { id: "managers", label: "Менеджеры", hint: "Нагрузка команды" },
+];
 
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-const money = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n.toLocaleString("ru-RU") + " с" : "—";
-};
-
-const pct = (num, den) => {
-  const a = Number(num) || 0;
-  const b = Number(den) || 0;
-  if (!b) return "0%";
-  return `${Math.round((a * 100) / b)}%`;
-};
-
-const clean = (s) => String(s || "").trim();
-const uniq = (arr) => Array.from(new Set(arr));
-
 const formatDateRu = (iso) => {
   if (!iso) return "—";
   const [y, m, d] = String(iso).split("-");
-  if (!y || !m || !d) return iso;
+  if (!y || !m || !d) return String(iso);
   return `${d}.${m}.${y}`;
 };
 
@@ -65,198 +59,149 @@ const formatChartDate = (iso) => {
   if (!iso) return "";
   const parts = String(iso).split("-");
   if (parts.length >= 3) return `${parts[2]}.${parts[1]}`;
-  return iso;
+  return String(iso);
 };
 
-const PAGE = 8;
+const formatDateTime = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
-const Combo = ({
-  title = "Выбор",
-  items = [],
-  selected = [],
-  onPick,
-  placeholder = "Поиск…",
-  disabled = false,
-}) => {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const ref = useRef(null);
-  const inputRef = useRef(null);
+/** Деньги; null → «—». */
+const money = (v) => {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toLocaleString("ru-RU")} с` : "—";
+};
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+/** Число; null → «—». */
+const num = (v, digits = 0) => {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("ru-RU", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits > 0 ? Math.min(digits, 1) : 0,
+  });
+};
+
+/**
+ * Доля 0..1 → проценты. Уже-проценты (share/percent) передавайте через
+ * `alreadyPercent: true`.
+ */
+const pct = (v, { alreadyPercent = false, digits = 1 } = {}) => {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  const value = alreadyPercent ? n : n * 100;
+  return `${value.toLocaleString("ru-RU", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits > 0 ? 0 : 0,
+  })}%`;
+};
+
+const minutesLabel = (v) => {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  if (n < 1) return `${Math.round(n * 60)} сек`;
+  if (n < 60)
+    return `${n.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} мин`;
+  const h = Math.floor(n / 60);
+  const m = Math.round(n % 60);
+  return `${h} ч ${m} мин`;
+};
+
+/** KPI-объект {current, previous, diff, percent} или скаляр. */
+const kpiValue = (kpi) => {
+  if (kpi == null) return null;
+  if (typeof kpi === "object" && !Array.isArray(kpi)) {
+    return kpi.current ?? null;
+  }
+  return kpi;
+};
+
+const kpiMeta = (kpi) => {
+  if (kpi == null || typeof kpi !== "object" || Array.isArray(kpi)) {
+    return { percent: null, diff: null, previous: null };
+  }
+  return {
+    percent: kpi.percent ?? null,
+    diff: kpi.diff ?? null,
+    previous: kpi.previous ?? null,
+  };
+};
+
+const normalizeWaiting = (raw) => {
+  if (raw == null) return { count: 0, items: [] };
+  if (typeof raw === "number") return { count: raw, items: [] };
+  if (typeof raw === "object") {
+    return {
+      count:
+        Number(raw.count) ||
+        (Array.isArray(raw.items) ? raw.items.length : 0),
+      items: Array.isArray(raw.items) ? raw.items : [],
     };
-    const onEsc = (e) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onEsc);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onEsc);
-    };
-  }, [open]);
+  }
+  return { count: 0, items: [] };
+};
 
-  const filtered = useMemo(() => {
-    const t = clean(q).toLowerCase();
-    if (!t) return items;
-    return items.filter((it) => it.label.toLowerCase().includes(t));
-  }, [items, q]);
+const errText = (e, fallback) => {
+  if (!e) return fallback;
+  if (typeof e.detail === "string") return e.detail;
+  if (typeof e === "string") return e;
+  return fallback;
+};
 
-  const total = Math.max(1, Math.ceil(filtered.length / PAGE));
-  const safePage = Math.min(page, total);
-  const rows = filtered.slice((safePage - 1) * PAGE, safePage * PAGE);
+const isNotReady = (e) => e?.status === 404 || e?.status === 501;
 
+/* ===================== UI atoms ===================== */
+
+const Delta = ({ percent, invert = false }) => {
+  if (percent == null || percent === "") return null;
+  const n = Number(percent);
+  if (!Number.isFinite(n) || n === 0) {
+    return <span className={`${BEM}__delta is-flat`}>без изм.</span>;
+  }
+  const up = n > 0;
+  const good = invert ? !up : up;
   return (
-    <div className={`${BEM}__combo`} ref={ref}>
-      <div className={`${BEM}__comboControl${disabled ? " is-disabled" : ""}`}>
-        <FaSearch className={`${BEM}__comboIcon`} />
-        <input
-          ref={inputRef}
-          className={`${BEM}__comboInput`}
-          placeholder={placeholder}
-          value={q}
-          onFocus={() => {
-            if (disabled) return;
-            setOpen(true);
-            setTimeout(() => inputRef.current?.select(), 0);
-          }}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-          disabled={disabled}
-        />
-        <button
-          type="button"
-          className={`${BEM}__comboToggle`}
-          onClick={() => {
-            if (disabled) return;
-            setOpen((o) => !o);
-            setTimeout(() => inputRef.current?.focus(), 0);
-          }}
-          aria-label={`Открыть «${title}»`}
-          disabled={disabled}
-        >
-          ▾
-        </button>
-      </div>
-
-      {open && (
-        <div className={`${BEM}__comboDrop`} role="listbox">
-          {rows.length === 0 ? (
-            <div className={`${BEM}__comboEmpty`}>Ничего не найдено</div>
-          ) : (
-            <>
-              <ul className={`${BEM}__comboList`}>
-                {rows.map((it) => {
-                  const isPicked = selected.includes(String(it.id));
-                  return (
-                    <li key={it.id}>
-                      <button
-                        type="button"
-                        className={`${BEM}__comboItem${
-                          isPicked ? " is-active" : ""
-                        }`}
-                        onClick={() => {
-                          if (!isPicked) onPick?.(it.id);
-                        }}
-                        disabled={isPicked}
-                        title={isPicked ? "Уже выбрано" : `Добавить «${it.label}»`}
-                      >
-                        <span className={`${BEM}__comboItemLabel`}>
-                          {it.label}
-                        </span>
-                        {isPicked && (
-                          <span className={`${BEM}__tag`}>Добавлено</span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {filtered.length > PAGE && (
-                <div className={`${BEM}__comboPager`}>
-                  <button
-                    type="button"
-                    className={`${BEM}__pageBtn`}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={safePage === 1}
-                  >
-                    <FaChevronLeft /> Назад
-                  </button>
-                  <span className={`${BEM}__page`}>
-                    Стр. {safePage} из {total}
-                  </span>
-                  <button
-                    type="button"
-                    className={`${BEM}__pageBtn`}
-                    onClick={() => setPage((p) => Math.min(total, p + 1))}
-                    disabled={safePage === total}
-                  >
-                    Далее <FaChevronRight />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    <span className={`${BEM}__delta ${good ? "is-up" : "is-down"}`}>
+      {up ? <TrendingUp size={13} strokeWidth={2.4} /> : <TrendingDown size={13} strokeWidth={2.4} />}
+      {up ? "+" : ""}
+      {n.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%
+    </span>
   );
 };
 
-const FilterField = ({
+const KpiCard = ({
   label,
-  emptyHint,
-  items,
-  selectedIds,
-  onRemove,
-  comboProps,
+  value,
+  description,
+  icon: Icon,
+  percent,
+  invertDelta = false,
+  tone = "default",
 }) => (
-  <div className={`${BEM}__filterField`}>
-    <label className={`${BEM}__label`}>{label}</label>
-    <Combo {...comboProps} selected={selectedIds} />
-    <div className={`${BEM}__chipsSlot`}>
-      {selectedIds.length > 0 ? (
-        <div className={`${BEM}__chips`}>
-          {selectedIds.map((id) => {
-            const item = items.find((x) => String(x.id) === String(id));
-            return (
-              <span key={id} className={`${BEM}__chipSoft`}>
-                <span className={`${BEM}__chipText`} title={item?.label || id}>
-                  {item?.label || id}
-                </span>
-                <button
-                  type="button"
-                  className={`${BEM}__chipClose`}
-                  aria-label="Убрать"
-                  onClick={() => onRemove(id)}
-                >
-                  <FaTimes />
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      ) : (
-        <span className={`${BEM}__chipsEmpty`}>{emptyHint}</span>
-      )}
-    </div>
-  </div>
-);
-
-const KpiCard = ({ label, value, description, icon: Icon }) => (
-  <div className={`${BEM}__kpi`}>
+  <div className={`${BEM}__kpi ${BEM}__kpi--${tone}`}>
     {Icon && (
-      <div className={`${BEM}__kpiIcon`}>
-        <Icon size={20} strokeWidth={2.2} />
+      <div className={`${BEM}__kpiIcon`} aria-hidden>
+        <Icon size={18} strokeWidth={2.2} />
       </div>
     )}
     <div className={`${BEM}__kpiBody`}>
-      <div className={`${BEM}__kpiLabel`}>{label}</div>
+      <div className={`${BEM}__kpiTop`}>
+        <div className={`${BEM}__kpiLabel`}>{label}</div>
+        <Delta percent={percent} invert={invertDelta} />
+      </div>
       <div className={`${BEM}__kpiValue`}>{value}</div>
       {description ? (
         <div className={`${BEM}__kpiDesc`}>{description}</div>
@@ -265,103 +210,129 @@ const KpiCard = ({ label, value, description, icon: Icon }) => (
   </div>
 );
 
-const RankList = ({ items, emptyText = "Нет данных" }) => {
-  if (!items.length) {
-    return <div className={`${BEM}__empty`}>{emptyText}</div>;
-  }
+const Empty = ({ title = "Нет данных", children }) => (
+  <div className={`${BEM}__emptyState`}>
+    <strong>{title}</strong>
+    {children ? <p>{children}</p> : <p>За выбранный период пока ничего нет</p>}
+  </div>
+);
 
-  const maxSum = items[0]?.sum || 1;
+const SectionCard = ({ title, subtitle, action, children, full = false }) => (
+  <div className={`${BEM}__card${full ? ` ${BEM}__card--full` : ""}`}>
+    <div className={`${BEM}__cardHead`}>
+      <div className={`${BEM}__cardHeading`}>
+        <div className={`${BEM}__cardTitle`}>{title}</div>
+        {subtitle ? (
+          <div className={`${BEM}__cardSubtitle`}>{subtitle}</div>
+        ) : null}
+      </div>
+      {action}
+    </div>
+    {children}
+  </div>
+);
 
-  return (
-    <ul className={`${BEM}__rankList`}>
-      {items.map((item) => (
-        <li key={item.name} className={`${BEM}__rankRow`}>
-          <div className={`${BEM}__rankMain`}>
-            <div className={`${BEM}__rankTitle`} title={item.name}>
-              {item.name}
-            </div>
-            <div className={`${BEM}__barWrap`} aria-hidden>
-              <div
-                className={`${BEM}__bar`}
-                style={{
-                  width: `${Math.min(100, (item.sum / maxSum) * 100)}%`,
-                }}
-              />
-            </div>
-          </div>
-          <div className={`${BEM}__rankMeta`}>
-            <b>{money(item.sum)}</b>
-            <span> · {item.count} шт.</span>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-};
+const SectionLabel = ({ children }) => (
+  <div className={`${BEM}__sectionLabel`}>{children}</div>
+);
 
-const ConsultingAnalytics = () => {
-  const dispatch = useDispatch();
-  const { rows = [], services = [] } = useConsulting();
-  const requests = useSelector((s) => s.consulting?.requests || []);
-  const loadingConsulting = useSelector((s) => s.consulting?.loading) || false;
+const LoadingBlock = () => (
+  <div className={`${BEM}__loading`} aria-live="polite">
+    <span className={`${BEM}__spinner`} />
+    Загружаем данные…
+  </div>
+);
 
-  const [employees, setEmployees] = useState([]);
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const res = await api.get(EMPLOYEES_LIST_URL);
-      const list = asArray(res.data).map((e) => ({
-        id: String(e.id),
-        label:
-          [e?.last_name || "", e?.first_name || ""]
-            .filter(Boolean)
-            .join(" ")
-            .trim() || e?.email || "—",
-      }));
-      setEmployees(list);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+/* ===================== Page ===================== */
 
-  useEffect(() => {
-    dispatch(getConsultingRows());
-    dispatch(getConsultingServices());
-    dispatch(getConsultingRequests());
-    dispatch(fetchClientsAsync());
-    fetchEmployees();
-  }, [dispatch, fetchEmployees]);
-
-  const serviceOpts = useMemo(
-    () =>
-      (services || []).map((s) => ({
-        id: String(s.id),
-        label: String(s.name ?? s.title ?? "—"),
-      })),
-    [services],
-  );
-
-  const today = new Date();
+export default function ConsultingAnalytics() {
+  const today = useMemo(() => new Date(), []);
   const todayIso = ymd(today);
+
+  const [tab, setTab] = useState("overview");
   const [preset, setPreset] = useState("30");
   const [from, setFrom] = useState(
     ymd(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)),
   );
   const [to, setTo] = useState(todayIso);
-  const [empSel, setEmpSel] = useState([]);
-  const [srvSel, setSrvSel] = useState([]);
-  const [err, setErr] = useState("");
+  const [debounced, setDebounced] = useState({ from, to });
+
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
   const [draftErr, setDraftErr] = useState("");
-  const [expandedSvc, setExpandedSvc] = useState(() => new Set());
+  const [rangeErr, setRangeErr] = useState("");
 
-  const toggleSvc = (name) =>
-    setExpandedSvc((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
+  const [loading, setLoading] = useState(false);
+  const [notReady, setNotReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const [dashboard, setDashboard] = useState(null);
+  const [messenger, setMessenger] = useState(null);
+  const [sources, setSources] = useState(null);
+  const [managers, setManagers] = useState(null);
+
+  // Debounce периода — не дёргать тяжёлый dashboard на каждый ввод.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced({ from, to }), 400);
+    return () => clearTimeout(t);
+  }, [from, to]);
+
+  useEffect(() => {
+    if (new Date(from) > new Date(to)) {
+      setRangeErr("Начальная дата позже конечной.");
+    } else {
+      setRangeErr("");
+    }
+  }, [from, to]);
+
+  const periodParams = useMemo(
+    () => ({
+      date_from: debounced.from,
+      date_to: debounced.to,
+    }),
+    [debounced],
+  );
+
+  const load = useCallback(async () => {
+    if (new Date(periodParams.date_from) > new Date(periodParams.date_to)) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setNotReady(false);
+    try {
+      if (tab === "overview") {
+        const data = await getAnalyticsDashboard(periodParams);
+        setDashboard(data);
+      } else if (tab === "messenger") {
+        const data = await getAnalyticsMessenger(periodParams);
+        setMessenger(data);
+      } else if (tab === "sources") {
+        const data = await getAnalyticsSources(periodParams);
+        setSources(data);
+      } else if (tab === "managers") {
+        const data = await getAnalyticsManagers(periodParams);
+        setManagers(data);
+      }
+    } catch (e) {
+      if (isNotReady(e)) {
+        setNotReady(true);
+        if (tab === "overview") setDashboard(null);
+        if (tab === "messenger") setMessenger(null);
+        if (tab === "sources") setSources(null);
+        if (tab === "managers") setManagers(null);
+      } else {
+        setError(errText(e, "Не удалось загрузить аналитику."));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [tab, periodParams]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const applyPreset = (p) => {
     setShowPeriodModal(false);
@@ -390,288 +361,128 @@ const ConsultingAnalytics = () => {
     setFrom(draftFrom);
     setTo(draftTo);
     setPreset("custom");
-    setErr("");
     setShowPeriodModal(false);
   };
 
-  const onPickEmp = (id) =>
-    setEmpSel((prev) => uniq([...prev, String(id)]));
-  const onPickSrv = (id) =>
-    setSrvSel((prev) => uniq([...prev, String(id)]));
-  const removeEmp = (id) =>
-    setEmpSel((prev) => prev.filter((x) => x !== String(id)));
-  const removeSrv = (id) =>
-    setSrvSel((prev) => prev.filter((x) => x !== String(id)));
+  const resetFilters = () => applyPreset("30");
 
-  useEffect(() => {
-    if (new Date(from) > new Date(to)) {
-      setErr("Начальная дата позже конечной.");
-    } else {
-      setErr("");
-    }
-  }, [from, to]);
+  const kpis = dashboard?.kpis || {};
+  const leads = dashboard?.leads || {};
+  const dashMessenger = dashboard?.messenger || {};
+  const dashSources = dashboard?.sources || {};
+  const dashSales = dashboard?.sales || {};
+  const dashManagers = Array.isArray(dashboard?.managers)
+    ? dashboard.managers
+    : [];
 
-  const empNameById = useMemo(() => {
-    const m = new Map();
-    employees.forEach((e) => m.set(String(e.id), e.label));
-    return m;
-  }, [employees]);
+  const waitingOverview = normalizeWaiting(dashMessenger.waiting_now);
+  const waitingMessenger = normalizeWaiting(messenger?.waiting_now);
 
-  const srvNameById = useMemo(() => {
-    const m = new Map();
-    serviceOpts.forEach((s) => m.set(String(s.id), s.label));
-    return m;
-  }, [serviceOpts]);
+  const salesByDay = useMemo(() => {
+    const rows = Array.isArray(dashSales.by_day) ? dashSales.by_day : [];
+    return rows.map((r) => ({
+      date: r.date,
+      label: formatChartDate(r.date),
+      revenue: Number(r.revenue ?? r.sum ?? r.total) || 0,
+      sales: Number(r.sales ?? r.count) || 0,
+    }));
+  }, [dashSales]);
 
-  const inRange = (iso) => {
-    if (!iso) return false;
-    const d = new Date(iso);
-    return d >= new Date(from) && d <= new Date(to);
-  };
+  const msgByDay = useMemo(() => {
+    const rows = Array.isArray(messenger?.by_day) ? messenger.by_day : [];
+    return rows.map((r) => ({
+      date: r.date,
+      label: formatChartDate(r.date),
+      inbound: Number(r.inbound) || 0,
+      outbound: Number(r.outbound) || 0,
+      total: Number(r.total) || 0,
+    }));
+  }, [messenger]);
 
-  const sales = useMemo(() => {
-    let base = (rows || []).filter((r) => inRange(r.created_at || r.date));
-    if (empSel.length) {
-      const empNames = empSel
-        .map((id) => empNameById.get(String(id)))
-        .filter(Boolean);
-      base = base.filter((r) =>
-        r.user_display ? empNames.includes(String(r.user_display)) : true,
-      );
-    }
-    if (srvSel.length) {
-      const srvNames = srvSel
-        .map((id) => srvNameById.get(String(id)))
-        .filter(Boolean);
-      base = base.filter((r) =>
-        r.service_display ? srvNames.includes(String(r.service_display)) : true,
-      );
-    }
-    return base;
-  }, [rows, from, to, empSel, srvSel, empNameById, srvNameById]);
+  const msgByHour = useMemo(() => {
+    const rows = Array.isArray(messenger?.by_hour) ? messenger.by_hour : [];
+    return rows.map((r) => ({
+      hour: `${String(r.hour).padStart(2, "0")}:00`,
+      inbound: Number(r.inbound) || 0,
+      outbound: Number(r.outbound) || 0,
+    }));
+  }, [messenger]);
 
-  const reqs = useMemo(
-    () => (requests || []).filter((r) => inRange(r.created_at)),
-    [requests, from, to],
-  );
+  const sourceStatusPie = useMemo(() => {
+    const by = sources?.by_status || dashSources.by_status || {};
+    const map = [
+      { key: "new", name: "Новые", color: "#3b82f6" },
+      { key: "assigned", name: "Назначены", color: "#f59e0b" },
+      { key: "in_work", name: "В работе", color: "#f7d617" },
+      { key: "converted", name: "Клиенты", color: "#10b981" },
+      { key: "rejected", name: "Отклонены", color: "#ef4444" },
+    ];
+    return map
+      .map((m) => ({ ...m, value: Number(by[m.key]) || 0 }))
+      .filter((x) => x.value > 0);
+  }, [sources, dashSources]);
 
-  const revenue = useMemo(
-    () => sales.reduce((sum, r) => sum + (Number(r.service_price) || 0), 0),
-    [sales],
-  );
-  const salesCount = sales.length;
-  const reqCount = reqs.length;
-  const avgCheck = salesCount ? revenue / salesCount : 0;
+  const sourcesBySource = useMemo(() => {
+    const rows = Array.isArray(sources?.by_source)
+      ? sources.by_source
+      : Array.isArray(dashSources.by_source)
+        ? dashSources.by_source
+        : [];
+    return rows;
+  }, [sources, dashSources]);
 
-  const byService = useMemo(() => {
-    const m = new Map();
-    sales.forEach((r) => {
-      const key = String(r.service_display || "—");
-      const sum = Number(r.service_price) || 0;
-      const prev = m.get(key) || { count: 0, sum: 0 };
-      m.set(key, { count: prev.count + 1, sum: prev.sum + sum });
-    });
-    return Array.from(m, ([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.sum - a.sum)
-      .slice(0, 8);
-  }, [sales]);
+  const sourcesByDay = useMemo(() => {
+    const rows = Array.isArray(sources?.by_day) ? sources.by_day : [];
+    return rows.map((r) => ({
+      date: r.date,
+      label: formatChartDate(r.date),
+      count: Number(r.count) || 0,
+    }));
+  }, [sources]);
 
-  const byEmployee = useMemo(() => {
-    const m = new Map();
-    sales.forEach((r) => {
-      const key = String(r.user_display || "—");
-      const sum = Number(r.service_price) || 0;
-      const prev = m.get(key) || { count: 0, sum: 0 };
-      m.set(key, { count: prev.count + 1, sum: prev.sum + sum });
-    });
-    return Array.from(m, ([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.sum - a.sum)
-      .slice(0, 8);
-  }, [sales]);
+  const managersList = useMemo(() => {
+    const rows = Array.isArray(managers?.managers)
+      ? managers.managers
+      : dashManagers;
+    return rows.map((m) => ({
+      ...m,
+      name: m.user_id == null ? "Не распределено" : m.name || "—",
+    }));
+  }, [managers, dashManagers]);
 
-  // Услуга по названию — для сопоставления абонентки/тарифов с продажами.
-  const serviceByName = useMemo(() => {
-    const m = new Map();
-    (services || []).forEach((s) =>
-      m.set(String(s.name ?? s.title ?? "").trim(), s),
-    );
-    return m;
-  }, [services]);
+  const operators = useMemo(() => {
+    const rows = Array.isArray(messenger?.by_operator)
+      ? messenger.by_operator
+      : [];
+    return rows.map((o) => ({
+      ...o,
+      name: o.user_id == null ? "Без ответственного" : o.name || "—",
+    }));
+  }, [messenger]);
 
-  // Детализация по каждой услуге отдельно: продажи, выручка, средний чек,
-  // уникальные клиенты, доля выручки и разбивка по тарифам.
-  const byServiceDetailed = useMemo(() => {
-    const m = new Map();
-    sales.forEach((r) => {
-      const name = String(r.service_display || "—");
-      const amount = Number(r.total ?? r.service_price) || 0;
-      if (!m.has(name)) {
-        m.set(name, {
-          name,
-          count: 0,
-          sum: 0,
-          clients: new Set(),
-          tariffs: new Map(),
-        });
-      }
-      const g = m.get(name);
-      g.count += 1;
-      g.sum += amount;
-      const clientKey = String(r.client || r.client_display || "");
-      if (clientKey) g.clients.add(clientKey);
-      const tName = String(r.tariff_display || "Без тарифа");
-      const t = g.tariffs.get(tName) || { name: tName, count: 0, sum: 0 };
-      t.count += 1;
-      t.sum += amount;
-      g.tariffs.set(tName, t);
-    });
-    const total = revenue || 1;
-    return Array.from(m.values())
-      .map((g) => ({
-        name: g.name,
-        count: g.count,
-        sum: g.sum,
-        avg: g.count ? g.sum / g.count : 0,
-        clients: g.clients.size,
-        share: Math.round((g.sum * 100) / total),
-        tariffs: Array.from(g.tariffs.values()).sort((a, b) => b.sum - a.sum),
-      }))
-      .sort((a, b) => b.sum - a.sum);
-  }, [sales, revenue]);
-
-  // Оценка абонентской выручки в месяц (MRR): сопоставляем проданный тариф с
-  // его абонплатой из справочника услуг; годовые приводим к месяцу.
-  const subscriptionMrr = useMemo(() => {
-    let mrr = 0;
-    sales.forEach((r) => {
-      const s = serviceByName.get(String(r.service_display || "").trim());
-      if (!s) return;
-      const t = (s.tariffs || []).find((x) => x.name === r.tariff_display);
-      const amt = Number(t?.subscription_amount) || 0;
-      if (!amt) return;
-      mrr += t.subscription_period === "year" ? amt / 12 : amt;
-    });
-    return mrr;
-  }, [sales, serviceByName]);
-
-  // Клиентская аналитика: уникальные и повторные клиенты за период.
-  const clientStats = useMemo(() => {
-    const counts = new Map();
-    sales.forEach((r) => {
-      const key = String(r.client || r.client_display || "");
-      if (!key) return;
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-    const unique = counts.size;
-    const repeat = [...counts.values()].filter((c) => c > 1).length;
-    return {
-      unique,
-      repeat,
-      repeatPct: unique ? Math.round((repeat * 100) / unique) : 0,
-    };
-  }, [sales]);
-
-  const statusCounts = useMemo(() => {
-    const m = { new: 0, in_work: 0, done: 0, canceled: 0, other: 0 };
-    reqs.forEach((r) => {
-      const k = String(r.status || "").toLowerCase();
-      if (k in m) m[k] += 1;
-      else m.other += 1;
-    });
-    return m;
-  }, [reqs]);
-
-  const statusPieData = useMemo(
-    () =>
-      [
-        { name: "Новые", value: statusCounts.new, color: "#3b82f6" },
-        { name: "В работе", value: statusCounts.in_work, color: "#f7d617" },
-        { name: "Завершены", value: statusCounts.done, color: "#10b981" },
-        { name: "Отменены", value: statusCounts.canceled, color: "#ef4444" },
-        { name: "Прочие", value: statusCounts.other, color: "#9ca3af" },
-      ].filter((item) => item.value > 0),
-    [statusCounts],
-  );
-
-  const dailyChartData = useMemo(() => {
-    const start = new Date(from);
-    const end = new Date(to);
-    const days = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      days.push(ymd(d));
-    }
-    return days.map((iso) => {
-      const daySales = sales.filter(
-        (r) => ymd(new Date(r.created_at || r.date)) === iso,
-      );
-      const dayReqs = reqs.filter(
-        (r) => ymd(new Date(r.created_at)) === iso,
-      );
-      return {
-        date: iso,
-        label: formatChartDate(iso),
-        revenue: daySales.reduce(
-          (sum, r) => sum + (Number(r.service_price) || 0),
-          0,
-        ),
-        sales: daySales.length,
-        requests: dayReqs.length,
-      };
-    });
-  }, [sales, reqs, from, to]);
-
-  const serviceBarData = useMemo(
-    () =>
-      byService.map((item) => ({
-        name:
-          item.name.length > 22
-            ? `${item.name.slice(0, 22)}…`
-            : item.name,
-        fullName: item.name,
-        sum: item.sum,
-        count: item.count,
-      })),
-    [byService],
-  );
-
-  const employeeBarData = useMemo(
-    () =>
-      byEmployee.map((item) => ({
-        name:
-          item.name.length > 22
-            ? `${item.name.slice(0, 22)}…`
-            : item.name,
-        fullName: item.name,
-        sum: item.sum,
-        count: item.count,
-      })),
-    [byEmployee],
-  );
-
-  const resetFilters = () => {
-    setShowPeriodModal(false);
-    applyPreset("30");
-    setEmpSel([]);
-    setSrvSel([]);
-  };
+  const activeTab = TABS.find((t) => t.id === tab) || TABS[0];
+  const hasTabData =
+    (tab === "overview" && dashboard) ||
+    (tab === "messenger" && messenger) ||
+    (tab === "sources" && sources) ||
+    (tab === "managers" && (managers || dashboard));
 
   return (
     <section className={BEM}>
       <header className={`${BEM}__header`}>
-        <div>
+        <div className={`${BEM}__heading`}>
           <h2 className={`${BEM}__title`}>Аналитика</h2>
           <p className={`${BEM}__subtitle`}>
-            Срез по продажам, заявкам и сотрудникам
-            {loadingConsulting ? " · загрузка…" : ""}
+            {activeTab.hint} · {formatDateRu(from)} — {formatDateRu(to)}
           </p>
         </div>
 
         <div className={`${BEM}__toolbar`}>
           <div className={`${BEM}__seg`} role="tablist" aria-label="Период">
             {[
-              { value: "7", label: "7 дней" },
-              { value: "30", label: "30 дней" },
-              { value: "90", label: "90 дней" },
+              { value: "7", label: "7 дн." },
+              { value: "30", label: "30 дн." },
+              { value: "90", label: "90 дн." },
             ].map((item) => (
               <button
                 key={item.value}
@@ -690,20 +501,14 @@ const ConsultingAnalytics = () => {
               type="button"
               role="tab"
               aria-selected={preset === "custom"}
-              className={`${BEM}__segBtn ${BEM}__segBtn--custom ${
+              className={`${BEM}__segBtn ${
                 preset === "custom" ? "is-active" : ""
               }`}
               onClick={openPeriodModal}
             >
-              <span className={`${BEM}__segBtnTitle`}>Свой период</span>
-              {preset === "custom" && (
-                <span className={`${BEM}__segBtnRange`}>
-                  {formatDateRu(from)} — {formatDateRu(to)}
-                </span>
-              )}
+              Свой
             </button>
           </div>
-
           <button
             type="button"
             className={`${BEM}__btnGhost`}
@@ -714,330 +519,733 @@ const ConsultingAnalytics = () => {
         </div>
       </header>
 
-      {!!err && <div className={`${BEM}__alert`}>{err}</div>}
-
-      <div className={`${BEM}__filters`}>
-        <FilterField
-          label="Сотрудники"
-          emptyHint="Все сотрудники"
-          items={employees}
-          selectedIds={empSel}
-          onRemove={removeEmp}
-          comboProps={{
-            title: "Сотрудники",
-            items: employees,
-            onPick: onPickEmp,
-            placeholder: "Найти сотрудника…",
-          }}
-        />
-        <FilterField
-          label="Услуги"
-          emptyHint="Все услуги"
-          items={serviceOpts}
-          selectedIds={srvSel}
-          onRemove={removeSrv}
-          comboProps={{
-            title: "Услуги",
-            items: serviceOpts,
-            onPick: onPickSrv,
-            placeholder: "Найти услугу…",
-          }}
-        />
+      <div className={`${BEM}__tabs`} role="tablist" aria-label="Разделы">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`${BEM}__tab ${tab === t.id ? "is-active" : ""}`}
+            onClick={() => setTab(t.id)}
+            title={t.hint}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className={`${BEM}__kpis`}>
-        <KpiCard
-          label="Выручка"
-          value={money(revenue)}
-          description="За выбранный период"
-          icon={Banknote}
-        />
-        <KpiCard
-          label="Продаж"
-          value={salesCount}
-          description={`Средний чек: ${money(avgCheck)}`}
-          icon={ShoppingBag}
-        />
-        <KpiCard
-          label="Заявок"
-          value={reqCount}
-          description={`Конверсия: ${pct(salesCount, reqCount)}`}
-          icon={FileText}
-        />
-        <KpiCard
-          label="Средний чек"
-          value={money(avgCheck)}
-          description={`${salesCount} продаж за период`}
-          icon={TrendingUp}
-        />
-      </div>
+      {(rangeErr || error) && (
+        <div className={`${BEM}__alert`}>{rangeErr || error}</div>
+      )}
 
-      {/* CRM-детализация: клиентская база и абонентская выручка */}
-      <div className={`${BEM}__kpis`}>
-        <KpiCard
-          label="Уникальных клиентов"
-          value={clientStats.unique}
-          description={`Повторных: ${clientStats.repeat} (${clientStats.repeatPct}%)`}
-          icon={FileText}
-        />
-        <KpiCard
-          label="Абонентка (MRR)"
-          value={money(subscriptionMrr)}
-          description="Оценка регулярной выручки в месяц"
-          icon={Banknote}
-        />
-        <KpiCard
-          label="Конверсия заявок"
-          value={pct(salesCount, reqCount)}
-          description={`${salesCount} продаж из ${reqCount} заявок`}
-          icon={TrendingUp}
-        />
-        <KpiCard
-          label="Услуг продано"
-          value={byServiceDetailed.length}
-          description="Разных услуг за период"
-          icon={ShoppingBag}
-        />
-      </div>
-
-      <div className={`${BEM}__chartsRow`}>
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>Динамика выручки</div>
-          <div className={`${BEM}__chartWrap`}>
-            {dailyChartData.some((d) => d.revenue > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={dailyChartData}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="consultingRevenueFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f7d617" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#f7d617" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => money(v)} width={72} />
-                  <Tooltip
-                    formatter={(value) => [money(value), "Выручка"]}
-                    labelFormatter={(_, payload) =>
-                      payload?.[0]?.payload?.date
-                        ? `Дата: ${formatChartDate(payload[0].payload.date)}`
-                        : ""
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#ca8a04"
-                    strokeWidth={2}
-                    fill="url(#consultingRevenueFill)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className={`${BEM}__chartWrap--empty`}>Нет данных за период</div>
-            )}
-          </div>
+      {notReady && (
+        <div className={`${BEM}__notice`}>
+          <b>Аналитика на сервере ещё не подключена</b>
+          <p>
+            После деплоя здесь появятся продажи, мессенджер, источники и
+            менеджеры. Сейчас можно выбрать период — данные подтянутся
+            автоматически.
+          </p>
         </div>
+      )}
 
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>Динамика продаж и заявок</div>
-          <div className={`${BEM}__chartWrap`}>
-            {dailyChartData.some((d) => d.sales > 0 || d.requests > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={dailyChartData}
-                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={36} />
-                  <Tooltip
-                    labelFormatter={(_, payload) =>
-                      payload?.[0]?.payload?.date
-                        ? `Дата: ${formatChartDate(payload[0].payload.date)}`
-                        : ""
-                    }
-                  />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="sales" name="Продажи" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="requests" name="Заявки" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className={`${BEM}__chartWrap--empty`}>Нет данных за период</div>
-            )}
+      {!notReady && loading && !hasTabData && <LoadingBlock />}
+
+      {!notReady && tab === "overview" && dashboard && (
+        <div className={`${BEM}__body${loading ? " is-loading" : ""}`}>
+          <SectionLabel>Деньги и продажи</SectionLabel>
+          <div className={`${BEM}__kpis`}>
+            <KpiCard
+              label="Выручка"
+              value={money(kpiValue(kpis.revenue))}
+              percent={kpiMeta(kpis.revenue).percent}
+              description="Сумма продаж за период"
+              icon={Banknote}
+              tone="money"
+            />
+            <KpiCard
+              label="Оплачено"
+              value={money(kpiValue(kpis.paid_income))}
+              percent={kpiMeta(kpis.paid_income).percent}
+              description="Фактически полученные деньги"
+              icon={Banknote}
+              tone="success"
+            />
+            <KpiCard
+              label="Продаж"
+              value={num(kpiValue(kpis.sales_count))}
+              percent={kpiMeta(kpis.sales_count).percent}
+              description={`Средний чек: ${money(kpiValue(kpis.avg_check))}`}
+              icon={ShoppingBag}
+            />
+            <KpiCard
+              label="Абонентка (MRR)"
+              value={money(kpiValue(kpis.subscription_mrr))}
+              percent={kpiMeta(kpis.subscription_mrr).percent}
+              description="Регулярная выручка в месяц"
+              icon={TrendingUp}
+              tone="money"
+            />
           </div>
-        </div>
-      </div>
 
-      <div className={`${BEM}__chartsRow`}>
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>Статусы заявок</div>
-          <div className={`${BEM}__chartWrap`}>
-            {statusPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusPieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={58}
-                    outerRadius={92}
-                    paddingAngle={2}
+          <SectionLabel>Лиды и ответы</SectionLabel>
+          <div className={`${BEM}__kpis`}>
+            <KpiCard
+              label="Лиды"
+              value={num(kpiValue(kpis.leads) ?? leads.total)}
+              percent={kpiMeta(kpis.leads).percent}
+              description={`В работе: ${num(leads.in_work)} · Win rate: ${pct(leads.win_rate)}`}
+              icon={Users}
+            />
+            <KpiCard
+              label="Заявки"
+              value={num(kpiValue(kpis.requests))}
+              percent={kpiMeta(kpis.requests).percent}
+              description="Входящие обращения"
+              icon={FileText}
+            />
+            <KpiCard
+              label="Ср. время ответа"
+              value={minutesLabel(kpiValue(kpis.avg_response_minutes))}
+              percent={kpiMeta(kpis.avg_response_minutes).percent}
+              invertDelta
+              description={`Сообщений: ${num(kpiValue(kpis.messages))}`}
+              icon={Clock}
+              tone="warning"
+            />
+            <KpiCard
+              label="Ждут ответа"
+              value={num(waitingOverview.count)}
+              description="Диалоги без ответа дольше 15 мин"
+              icon={MessageSquare}
+              tone={waitingOverview.count > 0 ? "danger" : "success"}
+            />
+          </div>
+
+          <div className={`${BEM}__chartsRow`}>
+            <SectionCard
+              title="Воронка лидов"
+              subtitle="Как движутся сделки в периоде"
+            >
+              <div className={`${BEM}__funnelStats`}>
+                <div className={`${BEM}__funnelItem`}>
+                  <span>Всего</span>
+                  <b>{num(leads.total)}</b>
+                </div>
+                <div className={`${BEM}__funnelItem ${BEM}__funnelItem--ok`}>
+                  <span>Выиграно</span>
+                  <b>{num(leads.won)}</b>
+                </div>
+                <div className={`${BEM}__funnelItem ${BEM}__funnelItem--bad`}>
+                  <span>Проиграно</span>
+                  <b>{num(leads.lost)}</b>
+                </div>
+                <div className={`${BEM}__funnelItem ${BEM}__funnelItem--work`}>
+                  <span>В работе</span>
+                  <b>{num(leads.in_work)}</b>
+                </div>
+                <div className={`${BEM}__funnelItem`}>
+                  <span>В пайплайне</span>
+                  <b>{money(leads.pipeline_value)}</b>
+                </div>
+                <div className={`${BEM}__funnelItem ${BEM}__funnelItem--risk`}>
+                  <span>Под риском</span>
+                  <b>{num(leads.at_risk)}</b>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Нужно ответить"
+              subtitle="Клиенты ждут ответа прямо сейчас"
+              action={
+                waitingOverview.count > 0 ? (
+                  <button
+                    type="button"
+                    className={`${BEM}__linkBtn`}
+                    onClick={() => setTab("messenger")}
                   >
-                    {statusPieData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
+                    Смотреть список
+                  </button>
+                ) : null
+              }
+            >
+              <div
+                className={`${BEM}__waitingHero${
+                  waitingOverview.count > 0 ? "" : " is-ok"
+                }`}
+              >
+                <MessageSquare size={22} />
+                <div>
+                  <b>{waitingOverview.count}</b>
+                  <span>
+                    {waitingOverview.count > 0
+                      ? "диалогов ждут ответа больше 15 минут"
+                      : "все диалоги под контролем"}
+                  </span>
+                </div>
+              </div>
+            </SectionCard>
+          </div>
+
+          <div className={`${BEM}__chartsRow`}>
+            <SectionCard
+              title="Динамика выручки"
+              subtitle="По дням выбранного периода"
+            >
+              <div className={`${BEM}__chartWrap`}>
+                {salesByDay.some((d) => d.revenue > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={salesByDay}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="caRevenueFill"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#f7d617"
+                            stopOpacity={0.45}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#f7d617"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => money(v)}
+                        width={72}
+                      />
+                      <Tooltip
+                        formatter={(value) => [money(value), "Выручка"]}
+                        labelFormatter={(_, payload) =>
+                          payload?.[0]?.payload?.date
+                            ? `Дата: ${formatChartDate(payload[0].payload.date)}`
+                            : ""
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#ca8a04"
+                        strokeWidth={2}
+                        fill="url(#caRevenueFill)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Нет выручки" />
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="ТОП менеджеров"
+              subtitle="По числу лидов и пайплайну"
+            >
+              {managersList.length ? (
+                <ul className={`${BEM}__rankList`}>
+                  {managersList.slice(0, 8).map((m, i) => (
+                    <li
+                      key={m.user_id ?? `none-${i}`}
+                      className={`${BEM}__rankRow`}
+                    >
+                      <span className={`${BEM}__rankIndex`}>{i + 1}</span>
+                      <div className={`${BEM}__rankMain`}>
+                        <div className={`${BEM}__rankTitle`} title={m.name}>
+                          {m.name}
+                        </div>
+                        <div className={`${BEM}__rankSub`}>
+                          Лидов: {num(m.leads)} · Win: {pct(m.win_rate)}
+                        </div>
+                      </div>
+                      <div className={`${BEM}__rankMeta`}>
+                        <b>{money(m.pipeline_value)}</b>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Empty title="Нет менеджеров" />
+              )}
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Услуги по выручке"
+            subtitle="Что продавали в этом периоде"
+            full
+          >
+            {Array.isArray(dashSales.by_service) &&
+            dashSales.by_service.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Услуга</th>
+                      <th>Продаж</th>
+                      <th>Выручка</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashSales.by_service.map((s, i) => (
+                      <tr key={s.service_id || s.name || i}>
+                        <td>{s.service_name || s.name || "—"}</td>
+                        <td>{num(s.count ?? s.sales)}</td>
+                        <td>
+                          <b>{money(s.revenue ?? s.sum)}</b>
+                        </td>
+                      </tr>
                     ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} шт.`, name]} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
+                  </tbody>
+                </table>
+              </div>
             ) : (
-              <div className={`${BEM}__chartWrap--empty`}>Нет заявок за период</div>
+              <Empty title="Нет продаж" />
             )}
+          </SectionCard>
+        </div>
+      )}
+
+      {!notReady && tab === "messenger" && messenger && (
+        <div className={`${BEM}__body${loading ? " is-loading" : ""}`}>
+          <SectionLabel>Скорость и объём переписки</SectionLabel>
+          <div className={`${BEM}__kpis`}>
+            <KpiCard
+              label="Сообщений"
+              value={num(messenger.totals?.messages)}
+              description={`Вх: ${num(messenger.totals?.inbound)} · Исх: ${num(messenger.totals?.outbound)}`}
+              icon={MessageSquare}
+            />
+            <KpiCard
+              label="Чатов"
+              value={num(messenger.totals?.chats)}
+              description={`Ошибки отправки: ${pct(messenger.totals?.failure_rate)}`}
+              icon={Users}
+            />
+            <KpiCard
+              label="Медиана ответа"
+              value={minutesLabel(messenger.response?.median_minutes)}
+              description={`Среднее: ${minutesLabel(messenger.response?.avg_minutes)}`}
+              icon={Clock}
+              tone="warning"
+              invertDelta
+            />
+            <KpiCard
+              label="Доля ответов"
+              value={pct(messenger.response?.answer_rate)}
+              description={`Без ответа: ${num(messenger.response?.never_answered_chats)}`}
+              icon={TrendingUp}
+              tone="success"
+            />
           </div>
-        </div>
 
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>ТОП услуг по выручке</div>
-          <div className={`${BEM}__chartWrap`}>
-            {serviceBarData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={serviceBarData}
-                  layout="vertical"
-                  margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => money(v)} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={110}
-                    tick={{ fontSize: 11 }}
-                  />
-                  <Tooltip
-                    formatter={(value) => [money(value), "Выручка"]}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ""}
-                  />
-                  <Bar dataKey="sum" name="Выручка" fill="#f7d617" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className={`${BEM}__chartWrap--empty`}>Нет данных</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className={`${BEM}__chartsRow`}>
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>ТОП сотрудников по выручке</div>
-          <RankList items={byEmployee} />
-        </div>
-
-        <div className={`${BEM}__card`}>
-          <div className={`${BEM}__cardTitle`}>ТОП услуг (список)</div>
-          <RankList items={byService} />
-        </div>
-      </div>
-
-      {/* Детализация по каждой услуге отдельно (с разбивкой по тарифам) */}
-      <div className={`${BEM}__card ${BEM}__card--full`}>
-        <div className={`${BEM}__cardTitle`}>Детализация по услугам</div>
-        {byServiceDetailed.length ? (
-          <div className={`${BEM}__detailTableWrap`}>
-            <table className={`${BEM}__detailTable`}>
-              <thead>
-                <tr>
-                  <th>Услуга</th>
-                  <th>Продаж</th>
-                  <th>Клиентов</th>
-                  <th>Выручка</th>
-                  <th>Ср. чек</th>
-                  <th>Доля</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byServiceDetailed.map((s) => {
-                  const open = expandedSvc.has(s.name);
-                  const hasTariffs =
-                    s.tariffs.length > 1 ||
-                    (s.tariffs[0] && s.tariffs[0].name !== "Без тарифа");
-                  return (
-                    <React.Fragment key={s.name}>
+          <SectionCard
+            title={`Ждут ответа · ${waitingMessenger.count}`}
+            subtitle="Последнее сообщение от клиента, ждут дольше 15 минут"
+            full
+          >
+            {waitingMessenger.items.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Клиент</th>
+                      <th>Ответственный</th>
+                      <th>Последнее сообщение</th>
+                      <th>Ждёт</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waitingMessenger.items.map((item) => (
                       <tr
-                        className={`${BEM}__detailRow${
-                          hasTariffs ? " is-clickable" : ""
-                        }`}
-                        onClick={() => hasTariffs && toggleSvc(s.name)}
+                        key={
+                          item.lead_id ||
+                          `${item.phone}-${item.last_message_at}`
+                        }
                       >
                         <td>
-                          {hasTariffs && (
-                            <span className={`${BEM}__detailCaret`}>
-                              {open ? "▾" : "▸"}
-                            </span>
-                          )}
-                          {s.name}
+                          <div className={`${BEM}__personCell`}>
+                            <b>{item.name || "Без имени"}</b>
+                            <span>{item.phone || "—"}</span>
+                          </div>
                         </td>
-                        <td>{s.count}</td>
-                        <td>{s.clients}</td>
+                        <td>{item.owner || "—"}</td>
+                        <td>{formatDateTime(item.last_message_at)}</td>
                         <td>
-                          <b>{money(s.sum)}</b>
+                          <span className={`${BEM}__waitBadge`}>
+                            {minutesLabel(item.waiting_minutes)}
+                          </span>
                         </td>
-                        <td>{money(s.avg)}</td>
+                        <td>
+                          {item.lead_id ? (
+                            <Link
+                              className={`${BEM}__linkBtn`}
+                              to={consultingFunnelLeadPath(item.lead_id) || "#"}
+                            >
+                              Открыть
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Никто не ждёт">
+                Сейчас все диалоги с ответом
+              </Empty>
+            )}
+          </SectionCard>
+
+          <div className={`${BEM}__chartsRow`}>
+            <SectionCard
+              title="Сообщения по дням"
+              subtitle="Входящие и исходящие"
+            >
+              <div className={`${BEM}__chartWrap`}>
+                {msgByDay.some((d) => d.total > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={msgByDay}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11 }}
+                        width={36}
+                      />
+                      <Tooltip />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 12 }}
+                      />
+                      <Bar
+                        dataKey="inbound"
+                        name="Входящие"
+                        fill="#3b82f6"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="outbound"
+                        name="Исходящие"
+                        fill="#10b981"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Нет сообщений" />
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Когда пишут клиенты"
+              subtitle="По часам суток — удобно планировать смены"
+            >
+              <div className={`${BEM}__chartWrap`}>
+                {msgByHour.some((d) => d.inbound > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={msgByHour}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="hour"
+                        tick={{ fontSize: 10 }}
+                        interval={2}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11 }}
+                        width={36}
+                      />
+                      <Tooltip />
+                      <Area
+                        type="monotone"
+                        dataKey="inbound"
+                        name="Входящие"
+                        stroke="#8b5cf6"
+                        fill="#ddd6fe"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Нет данных по часам" />
+                )}
+              </div>
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="По операторам"
+            subtitle="Атрибуция по ответственному за лида"
+            full
+          >
+            {operators.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Оператор</th>
+                      <th>Входящие</th>
+                      <th>Исходящие</th>
+                      <th>Ответил</th>
+                      <th>Ср. ответ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operators.map((o, i) => (
+                      <tr key={o.user_id ?? `op-${i}`}>
+                        <td>{o.name}</td>
+                        <td>{num(o.inbound)}</td>
+                        <td>{num(o.outbound)}</td>
+                        <td>{num(o.answered)}</td>
+                        <td>{minutesLabel(o.avg_response_minutes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Нет операторов" />
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {!notReady && tab === "sources" && sources && (
+        <div className={`${BEM}__body${loading ? " is-loading" : ""}`}>
+          <SectionLabel>Воронка источников</SectionLabel>
+          <div className={`${BEM}__kpis`}>
+            <KpiCard
+              label="Заявок"
+              value={num(sources.totals?.requests)}
+              description={`Связано с лидами: ${num(sources.totals?.linked_leads)}`}
+              icon={FileText}
+            />
+            <KpiCard
+              label="→ в лид"
+              value={pct(sources.totals?.conversion_to_lead)}
+              description="Заявка стала карточкой лида"
+              icon={Users}
+              tone="success"
+            />
+            <KpiCard
+              label="→ выиграно"
+              value={pct(sources.totals?.conversion_to_won)}
+              description={`Выиграно сделок: ${num(sources.totals?.won)}`}
+              icon={TrendingUp}
+              tone="money"
+            />
+            <KpiCard
+              label="Источников"
+              value={num(sourcesBySource.length)}
+              description="Уникальных каналов за период"
+              icon={MessageSquare}
+            />
+          </div>
+
+          <div className={`${BEM}__chartsRow`}>
+            <SectionCard
+              title="Статусы заявок"
+              subtitle="Распределение по статусам"
+            >
+              <div className={`${BEM}__chartWrap`}>
+                {sourceStatusPie.length ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={sourceStatusPie}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={58}
+                        outerRadius={92}
+                        paddingAngle={2}
+                      >
+                        {sourceStatusPie.map((entry) => (
+                          <Cell key={entry.key} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, name) => [`${value} шт.`, name]}
+                      />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Нет заявок" />
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Заявки по дням" subtitle="Динамика потока">
+              <div className={`${BEM}__chartWrap`}>
+                {sourcesByDay.some((d) => d.count > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={sourcesByDay}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 11 }}
+                        width={36}
+                      />
+                      <Tooltip />
+                      <Bar
+                        dataKey="count"
+                        name="Заявки"
+                        fill="#8b5cf6"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Нет динамики" />
+                )}
+              </div>
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Источники и конверсия"
+            subtitle="Откуда приходят заявки и сколько доходят до сделки"
+            full
+          >
+            {sourcesBySource.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Источник</th>
+                      <th>Заявок</th>
+                      <th>Лидов</th>
+                      <th>Выиграно</th>
+                      <th>→ лид</th>
+                      <th>→ won</th>
+                      <th>Доля</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sourcesBySource.map((s, i) => (
+                      <tr key={s.source || i}>
+                        <td>{s.source || "—"}</td>
+                        <td>{num(s.count)}</td>
+                        <td>{num(s.linked_leads)}</td>
+                        <td>{num(s.won)}</td>
+                        <td>{pct(s.conversion_to_lead)}</td>
+                        <td>{pct(s.conversion_to_won)}</td>
                         <td>
                           <div className={`${BEM}__shareCell`}>
                             <span
                               className={`${BEM}__shareBar`}
-                              style={{ width: `${Math.min(100, s.share)}%` }}
+                              style={{
+                                width: `${Math.min(100, Number(s.share) || 0)}%`,
+                              }}
                             />
-                            <span className={`${BEM}__shareVal`}>{s.share}%</span>
+                            <span className={`${BEM}__shareVal`}>
+                              {pct(s.share, {
+                                alreadyPercent: true,
+                                digits: 1,
+                              })}
+                            </span>
                           </div>
                         </td>
                       </tr>
-                      {open &&
-                        s.tariffs.map((t) => (
-                          <tr
-                            key={`${s.name}-${t.name}`}
-                            className={`${BEM}__detailSubRow`}
-                          >
-                            <td className={`${BEM}__detailSubName`}>↳ {t.name}</td>
-                            <td>{t.count}</td>
-                            <td>—</td>
-                            <td>{money(t.sum)}</td>
-                            <td>{money(t.count ? t.sum / t.count : 0)}</td>
-                            <td>—</td>
-                          </tr>
-                        ))}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>Итого</td>
-                  <td>{salesCount}</td>
-                  <td>{clientStats.unique}</td>
-                  <td>
-                    <b>{money(revenue)}</b>
-                  </td>
-                  <td>{money(avgCheck)}</td>
-                  <td>100%</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        ) : (
-          <div className={`${BEM}__empty`}>Нет продаж за период</div>
-        )}
-      </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Нет источников" />
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {!notReady && tab === "managers" && (managers || dashboard) && (
+        <div className={`${BEM}__body${loading ? " is-loading" : ""}`}>
+          <SectionCard
+            title="Менеджеры"
+            subtitle="Нагрузка, win rate и скорость ответа"
+            full
+          >
+            {managersList.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Менеджер</th>
+                      <th>Лиды</th>
+                      <th>Выиграно</th>
+                      <th>Проиграно</th>
+                      <th>Win rate</th>
+                      <th>Риск</th>
+                      <th>Пайплайн</th>
+                      <th>Исх. сообщ.</th>
+                      <th>Ср. ответ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {managersList.map((m, i) => (
+                      <tr key={m.user_id ?? `mgr-${i}`}>
+                        <td>
+                          <b>{m.name}</b>
+                        </td>
+                        <td>{num(m.leads)}</td>
+                        <td>{num(m.won)}</td>
+                        <td>{num(m.lost)}</td>
+                        <td>{pct(m.win_rate)}</td>
+                        <td>{num(m.at_risk)}</td>
+                        <td>{money(m.pipeline_value)}</td>
+                        <td>{num(m.messages_out)}</td>
+                        <td>{minutesLabel(m.avg_response_minutes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Нет менеджеров" />
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {!notReady && !loading && tab === "overview" && !dashboard && !error && (
+        <Empty title="Нет данных дашборда" />
+      )}
 
       <Modal
         open={showPeriodModal}
@@ -1105,6 +1313,4 @@ const ConsultingAnalytics = () => {
       </Modal>
     </section>
   );
-};
-
-export default ConsultingAnalytics;
+}

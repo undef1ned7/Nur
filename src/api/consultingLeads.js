@@ -1,10 +1,12 @@
 /**
- * Консалтинг: Лиды из WhatsApp (входящие) и настройки их распределения.
+ * Консалтинг: входящие лиды (Wazzup WhatsApp/Instagram/Telegram) и
+ * настройки авто-распределения.
  *
- * Лиды приходят автоматически по webhook от WhatsApp-провайдера (Wazzup/др.)
- * и распределяются между сотрудниками с выбранными ролями «поровну»
- * (round-robin) либо по наименьшей загрузке. Бэкенд ещё не реализован —
- * полная спецификация: docs/consulting/leads-whatsapp.md
+ * Контракт: docs/consulting/leads-whatsapp.md,
+ * docs/consulting/wazzup-integration.md.
+ * Аккаунты Wazzup / send-message — src/api/consultingWazzup.js.
+ *
+ * Пока эндпоинт отвечает 404/501, UI показывает понятную заглушку.
  */
 import api from ".";
 

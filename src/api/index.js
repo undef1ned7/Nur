@@ -18,6 +18,25 @@ api.interceptors.request.use(
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
+    // Для multipart (FormData) дефолтный application/json ломает тело запроса
+    // (сервер видит file: {} вместо бинарника). Даем браузеру/axios самой
+    // выставить Content-Type с boundary.
+    const isFormData =
+      typeof FormData !== "undefined" &&
+      (config.data instanceof FormData ||
+        // fallback на случай, если экземпляр FormData не проходит instanceof
+        (config.data &&
+          typeof config.data.append === "function" &&
+          typeof config.data.entries === "function"));
+
+    if (isFormData) {
+      if (typeof config.headers?.delete === "function") {
+        config.headers.delete("Content-Type");
+      } else if (config.headers) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+      }
+    }
     return config;
   },
   (error) => {

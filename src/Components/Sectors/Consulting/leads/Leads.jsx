@@ -1,7 +1,12 @@
-// src/Components/Sectors/Consulting/leads/Leads.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
+  FaComments,
+  FaInstagram,
+  FaLayerGroup,
   FaPlus,
+  FaSearch,
+  FaTelegram,
   FaTimes,
   FaWhatsapp,
   FaSyncAlt,
@@ -18,15 +23,25 @@ import {
 } from "../../../../api/consultingLeads";
 import { useAlert } from "../../../../hooks/useDialog";
 import {
+  LEAD_SOURCES,
+  consultingChatPath,
+  consultingFunnelLeadPath,
+  isConsultingChatRealtimeEvent,
+  leadSourceMeta,
+} from "../../../../utils/consultingLeadSources";
+import {
   ensurePushPermission,
   useConsultingRealtime,
 } from "../common/useConsultingRealtime";
+import WazzupAccountsTab from "./WazzupAccountsTab";
 import "./leads.scss";
 
-// Персональные события лидов текущего пользователя (назначение/новый лид).
-const isLeadEvent = (n) => {
-  const t = String(n?.type || n?.category || n?.event || "").toLowerCase();
-  return t.includes("lead") || t.includes("лид");
+const SourceIcon = ({ source }) => {
+  const s = String(source || "").toLowerCase();
+  if (s === "instagram") return <FaInstagram aria-hidden />;
+  if (s === "telegram") return <FaTelegram aria-hidden />;
+  if (s === "whatsapp") return <FaWhatsapp aria-hidden />;
+  return null;
 };
 
 const ROLES_URL = "/users/roles/";
@@ -70,12 +85,48 @@ const STRATEGIES = [
 const fmtDateTime = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("ru-RU");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const initials = (name) => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
 };
 
 export default function ConsultingLeads() {
   const alert = useAlert();
-  const [tab, setTab] = useState("inbox"); // inbox | settings
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const tab =
+    tabFromUrl === "integration" || tabFromUrl === "settings"
+      ? tabFromUrl
+      : "inbox";
+
+  const selectTab = (next) => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === "inbox") p.delete("tab");
+        else p.set("tab", next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
 
   /* справочники */
   const [roles, setRoles] = useState([]);
@@ -112,21 +163,22 @@ export default function ConsultingLeads() {
   return (
     <section className="leads">
       <header className="leads__header">
-        <div>
-          <h2 className="leads__title">
-            <FaWhatsapp className="leads__titleIcon" /> Лиды
-          </h2>
+        <div className="leads__heading">
+          <h2 className="leads__title">Лиды</h2>
           <p className="leads__subtitle">
-            Входящие обращения из WhatsApp и правила их распределения
+            Входящие из WhatsApp, Instagram и Telegram
           </p>
         </div>
-        <div className="leads__tabs" role="tablist">
+      </header>
+
+      <div className="leads__tabsRow">
+        <div className="leads__tabs" role="tablist" aria-label="Разделы лидов">
           <button
             type="button"
             role="tab"
             aria-selected={tab === "inbox"}
             className={`leads__tab ${tab === "inbox" ? "is-active" : ""}`}
-            onClick={() => setTab("inbox")}
+            onClick={() => selectTab("inbox")}
           >
             Входящие
           </button>
@@ -135,18 +187,29 @@ export default function ConsultingLeads() {
             role="tab"
             aria-selected={tab === "settings"}
             className={`leads__tab ${tab === "settings" ? "is-active" : ""}`}
-            onClick={() => setTab("settings")}
+            onClick={() => selectTab("settings")}
           >
             Распределение
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "integration"}
+            className={`leads__tab ${tab === "integration" ? "is-active" : ""}`}
+            onClick={() => selectTab("integration")}
+          >
+            Интеграция
+          </button>
         </div>
-      </header>
+      </div>
 
-      {tab === "inbox" ? (
+      {tab === "inbox" && (
         <InboxTab empById={empById} employees={employees} alert={alert} />
-      ) : (
+      )}
+      {tab === "settings" && (
         <SettingsTab roles={roles} employees={employees} alert={alert} />
       )}
+      {tab === "integration" && <WazzupAccountsTab />}
     </section>
   );
 }
@@ -157,6 +220,7 @@ function InboxTab({ empById, employees, alert }) {
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
+  const [source, setSource] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [notReady, setNotReady] = useState(false);
@@ -174,6 +238,7 @@ function InboxTab({ empById, employees, alert }) {
           page: pageNum,
           page_size: PER_PAGE,
           status: status || undefined,
+          source: source || undefined,
           search: q.trim() || undefined,
         });
         const rows = asArray(data);
@@ -193,7 +258,7 @@ function InboxTab({ empById, employees, alert }) {
         setLoading(false);
       }
     },
-    [status, q],
+    [status, source, q],
   );
 
   useEffect(() => {
@@ -205,9 +270,12 @@ function InboxTab({ empById, employees, alert }) {
     ensurePushPermission();
   }, []);
 
-  // Реалтайм: когда ЛИЧНО мне назначили/пришёл лид — обновляем список.
+  // Реалтайм: назначение / сообщение / «долго не отвечали» — только «мои» события.
   const onLeadSignal = useCallback(() => fetchLeads(1), [fetchLeads]);
-  useConsultingRealtime({ match: isLeadEvent, onSignal: onLeadSignal });
+  useConsultingRealtime({
+    match: isConsultingChatRealtimeEvent,
+    onSignal: onLeadSignal,
+  });
 
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
 
@@ -215,16 +283,31 @@ function InboxTab({ empById, employees, alert }) {
     <>
       <div className="leads__toolbar">
         <div className="leads__filters">
-          <input
-            className="leads__input"
-            placeholder="Поиск по имени / телефону…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <label className="leads__search">
+            <FaSearch className="leads__searchIcon" aria-hidden />
+            <input
+              className="leads__searchInput"
+              placeholder="Имя или телефон…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Поиск лидов"
+            />
+            {!!q && (
+              <button
+                type="button"
+                className="leads__searchClear"
+                onClick={() => setQ("")}
+                aria-label="Очистить поиск"
+              >
+                <FaTimes />
+              </button>
+            )}
+          </label>
           <select
             className="leads__input"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
+            aria-label="Статус"
           >
             <option value="">Все статусы</option>
             {Object.entries(STATUS_RU).map(([v, l]) => (
@@ -233,22 +316,41 @@ function InboxTab({ empById, employees, alert }) {
               </option>
             ))}
           </select>
+          <select
+            className="leads__input"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            aria-label="Источник"
+          >
+            <option value="">Все источники</option>
+            {LEAD_SOURCES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="leads__toolbarActions">
+          {!loading && !notReady && (
+            <span className="leads__count">
+              {count} {pluralLeads(count)}
+            </span>
+          )}
           <button
             type="button"
             className="leads__btn"
             onClick={() => fetchLeads(page)}
             title="Обновить"
+            disabled={loading}
           >
-            <FaSyncAlt /> Обновить
+            <FaSyncAlt aria-hidden />
           </button>
           <button
             type="button"
             className="leads__btn leads__btn--primary"
             onClick={() => setCreateOpen(true)}
           >
-            <FaPlus /> Лид вручную
+            <FaPlus aria-hidden /> Лид
           </button>
         </div>
       </div>
@@ -259,12 +361,11 @@ function InboxTab({ empById, employees, alert }) {
         <div className="leads__notice">
           <FaWhatsapp className="leads__noticeIcon" />
           <div>
-            <b>Интеграция с WhatsApp ещё не подключена.</b>
+            <b>Входящие лиды пока недоступны</b>
             <p>
-              Как только бэкенд подключит webhook, входящие сообщения из WhatsApp
-              будут автоматически появляться здесь и распределяться между
-              сотрудниками по правилам из вкладки «Распределение». Пока можно
-              добавлять лиды вручную.
+              Сообщения из WhatsApp, Instagram и Telegram появятся здесь после
+              подключения на сервере. Каналы — во вкладке «Интеграция», правила
+              раздачи — в «Распределение». Пока можно добавить лид вручную.
             </p>
           </div>
         </div>
@@ -275,70 +376,148 @@ function InboxTab({ empById, employees, alert }) {
           <table className="leads__table">
             <thead>
               <tr>
-                <th>Получен</th>
-                <th>Имя</th>
-                <th>Телефон</th>
-                <th>Источник</th>
-                <th>Назначен</th>
-                <th>Статус</th>
-                <th />
+                <th className="leads__colLead">Лид</th>
+                <th className="leads__colDate">Получен</th>
+                <th className="leads__colSource">Источник</th>
+                <th className="leads__colMsg">Сообщение</th>
+                <th className="leads__colOwner">Назначен</th>
+                <th className="leads__colStatus">Статус</th>
+                <th className="leads__colActions" aria-label="Действия" />
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td className="leads__empty" colSpan={7}>
-                    Загрузка…
+                    Загрузка списка лидов…
                   </td>
                 </tr>
               ) : items.length ? (
-                items.map((l) => (
-                  <tr key={l.id}>
-                    <td>{fmtDateTime(l.created_at || l.received_at)}</td>
-                    <td>{l.full_name || l.name || "—"}</td>
-                    <td>{l.phone || "—"}</td>
-                    <td>
-                      <span className="leads__sourceTag">
-                        {l.source === "whatsapp" ? (
-                          <>
-                            <FaWhatsapp /> WhatsApp
-                          </>
+                items.map((l) => {
+                  const src = leadSourceMeta(l.source || "manual");
+                  const name = l.full_name || l.name || "";
+                  const ownerName = l.owner
+                    ? empById.get(String(l.owner)) ||
+                      l.owner_display ||
+                      "—"
+                    : null;
+                  return (
+                    <tr key={l.id} className="leads__row">
+                      <td className="leads__colLead">
+                        <div className="leads__person">
+                          <span className="leads__avatar" aria-hidden>
+                            {initials(name)}
+                          </span>
+                          <div className="leads__personText">
+                            <div className="leads__name" title={name || undefined}>
+                              {name || "Без имени"}
+                            </div>
+                            <div
+                              className="leads__phone"
+                              title={l.phone || undefined}
+                            >
+                              {l.phone || "Телефон не указан"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="leads__colDate leads__date">
+                        {fmtDateTime(l.created_at || l.received_at)}
+                      </td>
+                      <td className="leads__colSource">
+                        <span
+                          className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
+                          style={{ color: src.color }}
+                        >
+                          <SourceIcon source={src.value} /> {src.label}
+                        </span>
+                      </td>
+                      <td
+                        className="leads__colMsg leads__msgPreview"
+                        title={l.message || ""}
+                      >
+                        {l.message
+                          ? String(l.message).slice(0, 80) +
+                            (String(l.message).length > 80 ? "…" : "")
+                          : "—"}
+                      </td>
+                      <td
+                        className="leads__colOwner"
+                        title={ownerName || undefined}
+                      >
+                        {ownerName ? (
+                          <span className="leads__cellText">{ownerName}</span>
                         ) : (
-                          l.source || "Вручную"
+                          <span className="leads__unassigned">Не назначен</span>
                         )}
-                      </span>
-                    </td>
-                    <td>
-                      {l.owner
-                        ? empById.get(String(l.owner)) ||
-                          l.owner_display ||
-                          "—"
-                        : "— не распределён —"}
-                    </td>
-                    <td>
-                      <span
-                        className={`leads__status leads__status--${
-                          l.status || "new"
-                        }`}
-                      >
-                        {STATUS_RU[l.status] || l.status || "Новый"}
-                      </span>
-                    </td>
-                    <td className="leads__rowActions">
-                      <button
-                        type="button"
-                        className="leads__btn leads__btn--sm"
-                        onClick={() => setAssignFor(l)}
-                      >
-                        <FaUserCheck /> Назначить
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="leads__colStatus">
+                        <span
+                          className={`leads__status leads__status--${
+                            l.status || "new"
+                          }`}
+                        >
+                          {STATUS_RU[l.status] || l.status || "Новый"}
+                        </span>
+                      </td>
+                      <td className="leads__colActions">
+                        <div className="leads__rowActions">
+                          {l.lead && (
+                            <>
+                              <Link
+                                to={
+                                  consultingChatPath(
+                                    l.lead,
+                                    l.source || "whatsapp",
+                                  ) || "#"
+                                }
+                                className="leads__btn leads__btn--sm"
+                                title="Открыть чат"
+                              >
+                                <FaComments aria-hidden />
+                                <span>Чат</span>
+                              </Link>
+                              <Link
+                                to={consultingFunnelLeadPath(l.lead) || "#"}
+                                className="leads__btn leads__btn--sm"
+                                title="Открыть на воронке"
+                              >
+                                <FaLayerGroup aria-hidden />
+                                <span>Воронка</span>
+                              </Link>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            className="leads__btn leads__btn--sm"
+                            onClick={() => setAssignFor(l)}
+                            title="Назначить"
+                          >
+                            <FaUserCheck aria-hidden />
+                            <span>Назначить</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td className="leads__empty" colSpan={7}>
-                    Пока нет входящих лидов
+                    <div className="leads__emptyState">
+                      <strong>Пока нет входящих лидов</strong>
+                      <p>
+                        Новые обращения из мессенджеров появятся здесь. Можно
+                        добавить лид вручную.
+                      </p>
+                      <button
+                        type="button"
+                        className="leads__btn leads__btn--primary"
+                        onClick={() => setCreateOpen(true)}
+                      >
+                        <FaPlus aria-hidden /> Добавить лид
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -350,6 +529,7 @@ function InboxTab({ empById, employees, alert }) {
       {count > PER_PAGE && (
         <div className="leads__pager">
           <button
+            type="button"
             className="leads__btn"
             disabled={page <= 1}
             onClick={() => fetchLeads(page - 1)}
@@ -360,6 +540,7 @@ function InboxTab({ empById, employees, alert }) {
             Стр. {page} из {totalPages}
           </span>
           <button
+            type="button"
             className="leads__btn"
             disabled={page >= totalPages}
             onClick={() => fetchLeads(page + 1)}
@@ -394,6 +575,15 @@ function InboxTab({ empById, employees, alert }) {
       )}
     </>
   );
+}
+
+function pluralLeads(n) {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return "лидов";
+  if (last === 1) return "лид";
+  if (last >= 2 && last <= 4) return "лида";
+  return "лидов";
 }
 
 function CreateLeadModal({ onClose, onCreated, onError }) {
@@ -455,6 +645,20 @@ function CreateLeadModal({ onClose, onCreated, onError }) {
               onChange={set("phone")}
               placeholder="+996700000000"
             />
+          </div>
+          <div className="leads__field">
+            <label className="leads__label">Источник</label>
+            <select
+              className="leads__input"
+              value={form.source}
+              onChange={set("source")}
+            >
+              {LEAD_SOURCES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="leads__field">
             <label className="leads__label">Сообщение / комментарий</label>
@@ -644,10 +848,10 @@ function SettingsTab({ roles, employees, alert }) {
         <div className="leads__notice">
           <FaWhatsapp className="leads__noticeIcon" />
           <div>
-            <b>Хранение настроек на бэкенде ещё не реализовано.</b>
+            <b>Сохранение настроек пока недоступно</b>
             <p>
-              Можно задать желаемые правила заранее — они вступят в силу после
-              подключения. Контракт для бэка: docs/consulting/leads-whatsapp.md.
+              Можно задать правила заранее — они заработают после подключения на
+              сервере.
             </p>
           </div>
         </div>
@@ -663,8 +867,8 @@ function SettingsTab({ roles, employees, alert }) {
           <span>
             <b>Авто-распределение входящих лидов</b>
             <small>
-              Когда включено, каждый новый лид из WhatsApp сразу назначается
-              сотруднику по выбранной стратегии.
+              Новый лид из мессенджера сразу назначается сотруднику по выбранной
+              стратегии.
             </small>
           </span>
         </label>

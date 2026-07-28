@@ -64,8 +64,19 @@ export function moveLeadOnBoard(board, leadId, toStageId) {
 
 export function upsertLeadOnBoard(board, lead) {
   if (!board || !lead) return board;
+  const existing = findLeadOnBoard(board, lead.id);
+  // Частичный WS-апдейт (status → in_work) без stage/funnel — мержим с карточкой
+  const merged = existing ? { ...existing, ...lead } : lead;
+  if (existing) {
+    if (lead.stage === undefined || lead.stage === null) {
+      merged.stage = existing.stage;
+    }
+    if (lead.funnel === undefined || lead.funnel === null) {
+      merged.funnel = existing.funnel;
+    }
+  }
   const { board: without } = pluckLeadFromBoard(board, lead.id);
-  return placeLeadOnBoard(without, lead);
+  return placeLeadOnBoard(without, merged);
 }
 
 export function removeLeadFromBoard(board, leadId) {
