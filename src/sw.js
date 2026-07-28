@@ -8,17 +8,40 @@ import {
   StaleWhileRevalidate,
 } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
+import { CacheableResponsePlugin } from "workbox-cacheable-response";
+
+const PAGES_CACHE = "pages";
 
 // Precache build assets injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// HTML navigations: online-first (fallback to cache)
+// Единоразовая чистка «отравленного» кэша страниц: раньше при таймауте 5с в
+// кэш pages могли попасть 503-ответы, из-за чего навигация вечно отдавала 503
+// из кэша. Удаляем этот рантайм-кэш при активации нового SW.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete(PAGES_CACHE));
+});
+
+// API и WebSocket никогда не кэшируем сервис-воркером — только сеть.
+registerRoute(
+  ({ url }) => url.pathname.startsWith("/api") || url.pathname.startsWith("/ws"),
+  new NetworkOnly()
+);
+
+// HTML-навигации: сеть-первым с запасным таймаутом и кэшированием ТОЛЬКО 200.
+// - networkTimeoutSeconds увеличен до 30с, чтобы тяжёлые/медленные страницы
+//   успевали загрузиться и не сбрасывались в кэш преждевременно;
+// - CacheableResponsePlugin([200]) не даёт сохранять 5xx (503/500/502) в кэш,
+//   поэтому ошибочные ответы больше не «залипают».
 registerRoute(
   ({ request }) => request.mode === "navigate",
   new NetworkFirst({
-    cacheName: "pages",
-    networkTimeoutSeconds: 5,
+    cacheName: PAGES_CACHE,
+    networkTimeoutSeconds: 30,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+    ],
   })
 );
 

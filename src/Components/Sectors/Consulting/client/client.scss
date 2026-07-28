@@ -197,7 +197,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 70;
+    /* Выше сайдбара (z-index: 100), иначе модалка уходит под меню. */
+    z-index: 1000;
     padding: 12px;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
