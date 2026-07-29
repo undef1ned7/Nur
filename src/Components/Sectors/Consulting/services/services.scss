@@ -86,7 +86,8 @@
   /* ===== Modals ===== */
   &__overlay {
     position: fixed; inset: 0; background: rgba(15,23,42,.45);
-    display: grid; place-items: center; z-index: 70; padding: 12px;
+    /* Выше сайдбара (z-index: 100), иначе модалка уходит под меню. */
+    display: grid; place-items: center; z-index: 1000; padding: 12px;
     backdrop-filter: blur(2px);
   }
   &__modal {

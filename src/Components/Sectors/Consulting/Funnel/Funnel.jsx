@@ -605,17 +605,12 @@ export default function ConsultingFunnel() {
     [isManager],
   );
 
-  // предикат фильтрации одной карточки
-  const matchLead = useMemo(() => {
+  // Предикат фильтрации без учёта среза «мои/все/пул»: нужен и для доски,
+  // и для счётчиков на переключателе (счётчик должен учитывать остальные
+  // фильтры, иначе цифра врёт).
+  const matchLeadBase = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (lead) => {
-      if (effectiveOwnerScope === "mine") {
-        // Пока нет user id (WS/профиль) — не прячем всю доску
-        if (myUserId && String(lead.owner) !== String(myUserId)) return false;
-      } else if (effectiveOwnerScope === "pool") {
-        if (lead.owner) return false;
-      }
-      // effectiveOwnerScope === "all" — без ограничения по владельцу (только менеджер)
       if (riskOnly && !lead.is_at_risk) return false;
       if (needsReplyOnly) {
         const unread =
@@ -642,10 +637,48 @@ export default function ConsultingFunnel() {
     unreadByLeadId,
     ownerFilter,
     gradeFilter,
-    effectiveOwnerScope,
-    myUserId,
     isManager,
   ]);
+
+  const inScope = useCallback(
+    (lead, scope) => {
+      if (scope === "mine") {
+        // Пока нет user id (WS/профиль) — не прячем всю доску
+        return !myUserId || String(lead.owner) === String(myUserId);
+      }
+      if (scope === "pool") return !lead.owner;
+      return true; // "all" — без ограничения по владельцу (только менеджер)
+    },
+    [myUserId],
+  );
+
+  const matchLead = useMemo(
+    () => (lead) =>
+      inScope(lead, effectiveOwnerScope) && matchLeadBase(lead),
+    [inScope, effectiveOwnerScope, matchLeadBase],
+  );
+
+  /**
+   * Счётчики на переключателе «Мои / Все / Пул» (ТЗ №4).
+   * Считаем по уже загруженным доскам всех видимых воронок с учётом остальных
+   * фильтров — так менеджер сразу видит, что в пуле лежат ничьи лиды.
+   */
+  const scopeCounts = useMemo(() => {
+    const counts = { mine: 0, all: 0, pool: 0 };
+    for (const board of Object.values(boardsMap)) {
+      const leads = [
+        ...(board?.columns || []).flatMap((c) => c.leads || []),
+        ...(board?.unassigned || []),
+      ];
+      for (const lead of leads) {
+        if (!matchLeadBase(lead)) continue;
+        counts.all += 1;
+        if (inScope(lead, "mine")) counts.mine += 1;
+        if (inScope(lead, "pool")) counts.pool += 1;
+      }
+    }
+    return counts;
+  }, [boardsMap, matchLeadBase, inScope]);
 
   const hasFilters = !!(
     query.trim() ||
@@ -991,18 +1024,32 @@ export default function ConsultingFunnel() {
                   { id: "mine", label: "Мои" },
                   { id: "pool", label: "Пул" },
                 ]
-            ).map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`funnel__scopeBtn${
-                  effectiveOwnerScope === s.id ? " funnel__scopeBtn--active" : ""
-                }`}
-                onClick={() => persistOwnerScope(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
+            ).map((s) => {
+              const count = scopeCounts[s.id] || 0;
+              const highlight = s.id === "pool" && count > 0;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`funnel__scopeBtn${
+                    effectiveOwnerScope === s.id
+                      ? " funnel__scopeBtn--active"
+                      : ""
+                  }`}
+                  onClick={() => persistOwnerScope(s.id)}
+                  title={`${s.label}: ${count}`}
+                >
+                  {s.label}
+                  <span
+                    className={`funnel__scopeCount${
+                      highlight ? " funnel__scopeCount--alert" : ""
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="funnel__searchWrap">
@@ -1143,6 +1190,9 @@ export default function ConsultingFunnel() {
 
       {funnelFormOpen && (
         <FunnelForm
+          funnels={visibleFunnels}
+          boardsMap={boardsMap}
+          employees={owners}
           onClose={() => {
             setFunnelFormOpen(false);
             dispatch(getFunnels());
@@ -1153,6 +1203,9 @@ export default function ConsultingFunnel() {
       {funnelEditTarget && (
         <FunnelForm
           funnel={funnelEditTarget}
+          funnels={visibleFunnels}
+          boardsMap={boardsMap}
+          employees={owners}
           onClose={() => {
             setFunnelEditTarget(null);
             refreshBoard(funnelEditTarget.id);
@@ -1512,7 +1565,21 @@ function FormActions({ saving, onClose }) {
 }
 
 /* ===================== Форма воронки ===================== */
-function FunnelForm({ funnel: existing, onClose }) {
+/** Кому достаётся лид после перехода в следующую воронку (ТЗ №3). */
+const NEXT_ASSIGN_MODES = [
+  { value: "keep", label: "Оставить текущего ответственного" },
+  { value: "pool", label: "Вернуть в общий пул" },
+  { value: "auto", label: "Распределить автоматически" },
+  { value: "user", label: "Назначить конкретному сотруднику" },
+];
+
+function FunnelForm({
+  funnel: existing,
+  funnels = [],
+  boardsMap = {},
+  employees = [],
+  onClose,
+}) {
   const dispatch = useDispatch();
   const isEdit = !!existing?.id;
   const roleFunnel = isRoleFunnel(existing);
@@ -1522,19 +1589,63 @@ function FunnelForm({ funnel: existing, onClose }) {
   const [isMain, setIsMain] = useState(() =>
     existing ? isMainFunnel(existing) : false,
   );
+
+  /* --------- иерархия воронок: «что дальше» (ТЗ №3) --------- */
+  const [nextFunnel, setNextFunnel] = useState(
+    existing?.next_funnel ? String(existing.next_funnel) : "",
+  );
+  const [nextStage, setNextStage] = useState(
+    existing?.next_stage ? String(existing.next_stage) : "",
+  );
+  const [nextAssign, setNextAssign] = useState(
+    existing?.next_assign || "keep",
+  );
+  const [nextAssignUser, setNextAssignUser] = useState(
+    existing?.next_assign_user ? String(existing.next_assign_user) : "",
+  );
+  const [isFinal, setIsFinal] = useState(existing?.is_final ?? !existing?.next_funnel);
+  const [slaHours, setSlaHours] = useState(
+    existing?.stage_sla_hours ? String(existing.stage_sla_hours) : "",
+  );
+
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Воронка не может быть следующей для самой себя — иначе получится петля.
+  const nextFunnelOptions = useMemo(
+    () => funnels.filter((f) => String(f.id) !== String(existing?.id)),
+    [funnels, existing?.id],
+  );
+
+  const nextStageOptions = useMemo(() => {
+    if (!nextFunnel) return [];
+    const board = boardsMap[nextFunnel];
+    return (board?.columns || []).map((c) => c.stage).filter(Boolean);
+  }, [boardsMap, nextFunnel]);
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
     if (!name.trim()) return setErr("Введите название воронки.");
+    if (nextFunnel && nextAssign === "user" && !nextAssignUser) {
+      return setErr("Выберите сотрудника, которому назначать лид дальше.");
+    }
     setSaving(true);
     try {
       const payload = {
         name: name.trim(),
         description: description.trim(),
         is_active: isActive,
+        // Цепочка обработки: куда лид уходит после завершения в этой воронке.
+        next_funnel: nextFunnel || null,
+        next_stage: nextFunnel ? nextStage || null : null,
+        next_assign: nextFunnel ? nextAssign : null,
+        next_assign_user:
+          nextFunnel && nextAssign === "user" ? nextAssignUser || null : null,
+        // Продажа, абонентка и зарплата оформляются только в финальной воронке —
+        // иначе успех в промежуточной воронке задвоит сделку.
+        is_final: !nextFunnel ? true : !!isFinal,
+        stage_sla_hours: slaHours ? Number(slaHours) : null,
       };
       // Ролевые воронки не становятся главными — туда идут заявки роли.
       if (!roleFunnel) {
@@ -1608,6 +1719,127 @@ function FunnelForm({ funnel: existing, onClose }) {
             </p>
           </>
         )}
+
+        <div className="funnel__chainBlock">
+          <div className="funnel__chainTitle">Что дальше</div>
+          <p className="funnel__hint">
+            Куда лид уходит автоматически после завершения в этой воронке. Вся
+            история — клиент, переписка, сумма — переносится вместе с ним.
+          </p>
+
+          <div className="funnel__field">
+            <label className="funnel__label">Следующая воронка</label>
+            <select
+              className="funnel__input"
+              value={nextFunnel}
+              onChange={(e) => {
+                setNextFunnel(e.target.value);
+                setNextStage("");
+                if (e.target.value) setIsFinal(false);
+              }}
+            >
+              <option value="">Нет — конец цепочки</option>
+              {nextFunnelOptions.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {getFunnelDisplayName(f)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {!!nextFunnel && (
+            <>
+              <div className="funnel__field">
+                <label className="funnel__label">В какую стадию</label>
+                <select
+                  className="funnel__input"
+                  value={nextStage}
+                  onChange={(e) => setNextStage(e.target.value)}
+                >
+                  <option value="">Первая стадия</option>
+                  {nextStageOptions.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name}
+                    </option>
+                  ))}
+                </select>
+                {!nextStageOptions.length && (
+                  <small className="funnel__hint">
+                    Стадии подтянутся после открытия доски целевой воронки.
+                  </small>
+                )}
+              </div>
+
+              <div className="funnel__field">
+                <label className="funnel__label">Кому назначить</label>
+                <select
+                  className="funnel__input"
+                  value={nextAssign}
+                  onChange={(e) => setNextAssign(e.target.value)}
+                >
+                  {NEXT_ASSIGN_MODES.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {nextAssign === "user" && (
+                <div className="funnel__field">
+                  <label className="funnel__label">Сотрудник</label>
+                  <select
+                    className="funnel__input"
+                    value={nextAssignUser}
+                    onChange={(e) => setNextAssignUser(e.target.value)}
+                  >
+                    <option value="">Выберите сотрудника</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          <label className="funnel__check">
+            <input
+              type="checkbox"
+              checked={!nextFunnel ? true : isFinal}
+              disabled={!nextFunnel}
+              onChange={(e) => setIsFinal(e.target.checked)}
+            />
+            Финальная воронка — при завершении оформляется продажа
+          </label>
+          <p className="funnel__hint">
+            Только в финальной воронке создаётся сделка, абонентская плата и
+            начисление зарплаты. В промежуточной «успех» означает «передан
+            дальше».
+          </p>
+
+          <div className="funnel__field">
+            <label className="funnel__label">
+              Срок на стадию, часов (необязательно)
+            </label>
+            <input
+              className="funnel__input"
+              type="number"
+              min="1"
+              step="1"
+              value={slaHours}
+              onChange={(e) => setSlaHours(e.target.value)}
+              placeholder="например, 48"
+            />
+            <small className="funnel__hint">
+              Лид, зависший на стадии дольше срока, подсветится и попадёт в
+              аналитику сотрудника.
+            </small>
+          </div>
+        </div>
+
         <FormActions saving={saving} onClose={onClose} />
       </form>
     </Modal>

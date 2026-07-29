@@ -700,7 +700,8 @@
 .bookings__overlay {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  /* Выше сайдбара (z-index: 100), иначе модалка уходит под меню. */
+  z-index: 1000;
   min-height: 100dvh;
   background: rgba(15, 23, 42, 0.5);
   backdrop-filter: saturate(140%) blur(2px);

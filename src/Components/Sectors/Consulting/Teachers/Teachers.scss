@@ -599,3 +599,253 @@
   .Schoolteachers__formGrid { grid-template-columns: 1fr; }
   .Schoolteachers__modal { width: 96vw; }
 }
+
+/* ===================================================================
+   Карточка сотрудника и рейтинг (ТЗ №6, №7)
+   =================================================================== */
+.teachers {
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__cardHead {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  &__cardTitle {
+    h3 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+  }
+
+  &__cardRole {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  &__cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__sectionTitle {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #f8fafc;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--primary {
+      border-color: #ffd84d;
+      background: #ffd84d;
+
+      &:hover:not(:disabled) {
+        background: #f2c400;
+      }
+    }
+  }
+
+  &__chip {
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &.is-active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
+  }
+
+  &__financeActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__financeHint {
+    color: #64748b;
+    font-size: 12.5px;
+  }
+
+  &__totalsRow {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  &__row--overdue {
+    background: #fff7ed;
+  }
+
+  &__cellDanger {
+    color: #b91c1c;
+    font-weight: 700;
+  }
+
+  &__badgeDanger {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  /* --------------------------- КПД --------------------------- */
+  &__kpi {
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    gap: 20px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  &__kpiScore {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  &__kpiValue {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1;
+    color: #0f172a;
+  }
+
+  &__kpiOf {
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  &__kpiRank {
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #ffd84d;
+    color: #0f172a;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  &__kpiBars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__kpiBar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__kpiBarHead {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: #475569;
+  }
+
+  &__kpiBarTrack {
+    height: 8px;
+    border-radius: 999px;
+    background: #eef2f7;
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ffd84d, #22c55e);
+    }
+  }
+
+  /* -------------------------- рейтинг ------------------------- */
+  &__rating {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  &__ratingPlace {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-right: 8px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  @media (max-width: 720px) {
+    &__kpi {
+      grid-template-columns: 1fr;
+    }
+  }
+}

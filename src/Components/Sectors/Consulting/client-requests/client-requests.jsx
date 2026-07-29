@@ -15,6 +15,10 @@ import {
 } from "../../../../store/creators/clientCreators";
 import { useSelector } from "react-redux";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import useConsultingList from "../common/useConsultingList";
+import { Pagination } from "../common/ListControls";
+import { plural } from "../common/listUtils";
+import { listConsultingRequests } from "../../../../api/consultingCatalog";
 
 const clean = (s) => String(s || "").trim();
 const toLocalDT = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
@@ -31,12 +35,27 @@ export default function ConsultingClientRequests() {
   const confirm = useConfirm();
   const alert = useAlert();
 
-  const { requests = [], loading, error } = useSelector((s) => s.consulting);
+  const { error } = useSelector((s) => s.consulting);
   const clients = useSelector((s) => s.client?.list ?? []); // адаптируй под свой слайс клиентов
 
+  /**
+   * Запросы клиентов грузятся с сервера: поиск и статус уходят в параметры
+   * запроса, а не фильтруют весь массив на клиенте.
+   */
+  const requestsList = useConsultingList({
+    fetcher: listConsultingRequests,
+    filters: { status: "" },
+    prefix: "rq",
+  });
+  const requests = requestsList.items;
+  const loading = requestsList.loading;
+
   /* ui */
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("all");
+  const q = requestsList.searchInput;
+  const setQ = requestsList.setSearch;
+  const status = requestsList.filters.status || "all";
+  const setStatus = (value) =>
+    requestsList.setFilter("status", value === "all" ? "" : value);
   const [formOpen, setFormOpen] = useState(false);
   const [formErr, setFormErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,6 +81,9 @@ export default function ConsultingClientRequests() {
     dispatch(getConsultingRequests());
   }, [dispatch]);
 
+  // После создания/изменения/удаления перечитываем текущую страницу.
+  const reloadRequests = requestsList.refresh;
+
   /* индексы по клиентам */
   const clientById = useMemo(() => {
     const m = new Map();
@@ -69,28 +91,18 @@ export default function ConsultingClientRequests() {
     return m;
   }, [clients]);
 
-  /* фильтрация */
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    let base = (requests || []).slice();
-    if (t) {
-      base = base.filter((r) =>
-        [
-          r.client_display,
-          r.name, // заголовок заявки
-          r.description, // заметка
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(t))
-      );
-    }
-    if (status !== "all") base = base.filter((r) => r.status === status);
-    return base.sort(
-      (a, b) =>
-        new Date(b.updated_at || b.created_at || 0) -
-        new Date(a.updated_at || a.created_at || 0)
-    );
-  }, [requests, q, status]);
+  /* Поиск и фильтр по статусу делает сервер — здесь только порядок вывода. */
+  const filtered = useMemo(
+    () =>
+      requests
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || 0) -
+            new Date(a.updated_at || a.created_at || 0)
+        ),
+    [requests]
+  );
 
   /* CRUD */
   const openCreate = () => {
@@ -151,7 +163,7 @@ export default function ConsultingClientRequests() {
       setNewClientOpen(false);
       setNewClient({ full_name: "", phone: "" });
       // Перезагрузить список (если редьюсер сам не обновляет):
-      // await dispatch(getConsultingRequests());
+      reloadRequests();
     } catch (e2) {
       console.error(e2);
       setFormErr(
@@ -170,7 +182,7 @@ export default function ConsultingClientRequests() {
       try {
         await dispatch(deleteConsultingRequest(r.id)).unwrap();
         // можно рефетчнуть при необходимости:
-        // await dispatch(getConsultingRequests());
+        reloadRequests();
       } catch (e) {
         console.error(e);
         alert("Не удалось удалить заявку.", true);
@@ -356,6 +368,17 @@ export default function ConsultingClientRequests() {
       )}
 
       {/* ====== Модалка формы ====== */}
+      <Pagination
+        page={requestsList.page}
+        totalPages={requestsList.totalPages}
+        count={requestsList.count}
+        pageSize={requestsList.pageSize}
+        onPage={requestsList.setPage}
+        onPageSize={requestsList.setPageSize}
+        unitLabel={plural.requests}
+        loading={requestsList.loading}
+      />
+
       {formOpen && (
         <div
           className="clientreqs__overlay"

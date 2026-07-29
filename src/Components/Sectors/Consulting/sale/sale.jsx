@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./sale.scss";
-import { FaPlus, FaTimes, FaTrash } from "react-icons/fa";
+import { FaBan, FaPlus, FaSyncAlt, FaTimes, FaTrash } from "react-icons/fa";
 import { DEAL_STATUS_RU } from "../../../pages/Sell/Sell";
 import { useDispatch } from "react-redux";
 import {
   createConsultingSale,
   getConsultingRows,
   getConsultingServices,
-  deleteConsultingSale,
 } from "../../../../store/creators/consultingThunk";
+import {
+  SALE_STATUS,
+  SALE_STATUS_LABELS,
+  listConsultingSales,
+} from "../../../../api/consultingSales";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
 import {
   createClientAsync,
@@ -33,7 +37,16 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
-import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import { useAlert } from "../../../../hooks/useDialog";
+import useConsultingList from "../common/useConsultingList";
+import {
+  ListState,
+  Pagination,
+  PeriodFilter,
+  SearchInput,
+} from "../common/ListControls";
+import { fmtDateTime, plural } from "../common/listUtils";
+import SaleCancelModal from "./SaleCancelModal";
 
 const SALES_VIEW_STORAGE_KEY = "consulting_sales_view_mode";
 
@@ -113,13 +126,24 @@ function ExtraItemsEditor({ items, onChange, disabled }) {
 export default function ConsultingSale({
   employees = [],
   onCreateSale, // оставил поддержку, но теперь используем thunk
-  onDeleteSale, // оставил поддержку, но теперь используем thunk
   disabled = false,
 }) {
   const dispatch = useDispatch();
-  const confirm = useConfirm();
   const alert = useAlert();
-  const { services = [], rows = [] } = useConsulting();
+  const { services = [] } = useConsulting();
+
+  /**
+   * Список продаж грузится с сервера постранично: поиск, статус и период
+   * уходят в query-параметры. Справочники (услуги, клиенты) по-прежнему берём
+   * из стора — они нужны формам целиком.
+   */
+  const salesList = useConsultingList({
+    fetcher: listConsultingSales,
+    filters: { status: "", date_from: "", date_to: "" },
+    prefix: "s",
+  });
+  const rows = salesList.items;
+  const [cancelFor, setCancelFor] = useState(null);
   const { list: clients = [] } = useClient();
   const { company, profile } = useUser();
   // Роль продавца определяет цену услуги/тарифа (цены по ролям).
@@ -293,6 +317,7 @@ export default function ConsultingSale({
       setOpen(false);
       resetForm();
       dispatch(getConsultingRows());
+      salesList.refresh();
     } catch (err) {
       setFormErr(
         (typeof err === "string" ? err : err?.detail) ||
@@ -335,27 +360,12 @@ export default function ConsultingSale({
     }
   };
 
-  /* удалить продажу — через thunk */
-  const removeSale = (row) => {
-    if (!row?.id) return;
-    confirm("Удалить эту продажу?", async (result) => {
-      if (!result) return;
-      try {
-        if (onDeleteSale) {
-          await onDeleteSale(row);
-        } else {
-          await dispatch(deleteConsultingSale(row.id)).unwrap();
-        }
-        dispatch(getConsultingRows());
-      } catch (err) {
-        alert(
-          (typeof err === "string" ? err : err?.detail) ||
-            "Не удалось удалить продажу.",
-          true
-        );
-      }
-    });
-  };
+  /**
+   * Отмена продажи (ТЗ №8): вместо удаления записи открываем окно с причиной —
+   * сервер откатывает абонентку, зарплату, кассу и аналитику.
+   */
+  const isCanceled = (row) =>
+    row?.status === SALE_STATUS.CANCELED || row?.status === SALE_STATUS.REFUNDED;
 
   /* начальные загрузки */
   useEffect(() => {
@@ -399,8 +409,43 @@ export default function ConsultingSale({
         </div>
       </header>
 
-      <div className="sale__meta">
-        <span>Всего продаж: {rows?.length || 0}</span>
+      <div className="cList__toolbar sale__filters">
+        <SearchInput
+          value={salesList.searchInput}
+          onChange={salesList.setSearch}
+          placeholder="Клиент, услуга, продавец…"
+          ariaLabel="Поиск продаж"
+        />
+        <select
+          className="cList__input"
+          value={salesList.filters.status}
+          onChange={(e) => salesList.setFilter("status", e.target.value)}
+          aria-label="Статус продажи"
+        >
+          <option value="">Все статусы</option>
+          {Object.entries(SALE_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <PeriodFilter
+          dateFrom={salesList.filters.date_from}
+          dateTo={salesList.filters.date_to}
+          onChange={({ date_from, date_to }) =>
+            salesList.setFilters({ date_from, date_to })
+          }
+        />
+        <span className="cList__toolbarSpacer" />
+        <button
+          type="button"
+          className="sale__btn"
+          onClick={salesList.refresh}
+          title="Обновить"
+          disabled={salesList.loading}
+        >
+          <FaSyncAlt aria-hidden />
+        </button>
       </div>
 
       {/* подсказки, если пустые справочники */}
@@ -410,7 +455,23 @@ export default function ConsultingSale({
         </div>
       )}
 
-      {viewMode === VIEW_MODES.TABLE && (
+      {(salesList.loading ||
+        salesList.error ||
+        salesList.notReady ||
+        !rows.length) && (
+        <ListState
+          loading={salesList.loading}
+          error={salesList.error}
+          notReady={salesList.notReady}
+          empty={!rows.length}
+          emptyTitle="Пока нет продаж"
+          emptyText="Оформите первую продажу — она сразу попадёт в кассу и аналитику."
+          hasActiveFilters={salesList.hasActiveFilters}
+          onResetFilters={salesList.resetFilters}
+        />
+      )}
+
+      {!!rows.length && viewMode === VIEW_MODES.TABLE && (
         <div className="sale__tableWrap">
           <table className="sale__table">
             <thead>
@@ -421,53 +482,56 @@ export default function ConsultingSale({
                 <th>Услуга</th>
                 <th>Тариф</th>
                 <th>Итого</th>
+                <th>Статус</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {rows?.length ? (
-                rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      {r.created_at
-                        ? new Date(r.created_at).toLocaleString()
-                        : ""}
-                    </td>
-                    <td>{r.user_display}</td>
-                    <td>{r.client_display}</td>
-                    <td className="sale__ellipsis" title={r.service_display}>
-                      {r.service_display}
-                    </td>
-                    <td>{r.tariff_display || "—"}</td>
-                    <td>{money(r.total ?? r.service_price)}</td>
-                    <td className="sale__rowActions">
-                      <button
-                        className="sale__btn sale__btn--danger"
-                        onClick={() => removeSale(r)}
-                        title="Удалить продажу"
-                        disabled={disabled}
-                      >
-                        <FaTrash /> Удалить
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="sale__empty" colSpan={7}>
-                    Пока нет продаж
+              {rows.map((r) => (
+                <tr
+                  key={r.id}
+                  className={isCanceled(r) ? "sale__row--canceled" : undefined}
+                >
+                  <td>{fmtDateTime(r.created_at)}</td>
+                  <td>{r.user_display}</td>
+                  <td>{r.client_display}</td>
+                  <td className="sale__ellipsis" title={r.service_display}>
+                    {r.service_display}
+                  </td>
+                  <td>{r.tariff_display || "—"}</td>
+                  <td>{money(r.total ?? r.service_price)}</td>
+                  <td>
+                    <span
+                      className={`sale__status sale__status--${r.status || "completed"}`}
+                    >
+                      {SALE_STATUS_LABELS[r.status] || "Проведена"}
+                    </span>
+                    {r.canceled_reason_display && (
+                      <div className="sale__statusHint">
+                        {r.canceled_reason_display}
+                      </div>
+                    )}
+                  </td>
+                  <td className="sale__rowActions">
+                    <button
+                      className="sale__btn sale__btn--danger"
+                      onClick={() => setCancelFor(r)}
+                      title="Отменить продажу или оформить возврат"
+                      disabled={disabled || isCanceled(r)}
+                    >
+                      <FaBan /> Отменить
+                    </button>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {viewMode === VIEW_MODES.CARDS && (
+      {!!rows.length && viewMode === VIEW_MODES.CARDS && (
         <div className="sale__cards">
-          {rows?.length ? (
-            rows.map((r) => (
+          {rows.map((r) => (
               <article key={r.id} className="sale__card">
                 <div className="sale__cardHead">
                   <time className="sale__cardDate">
@@ -504,21 +568,48 @@ export default function ConsultingSale({
                   ) : null}
                 </dl>
                 <div className="sale__cardActions">
+                  <span
+                    className={`sale__status sale__status--${r.status || "completed"}`}
+                  >
+                    {SALE_STATUS_LABELS[r.status] || "Проведена"}
+                  </span>
                   <button
                     className="sale__btn sale__btn--danger"
-                    onClick={() => removeSale(r)}
-                    title="Удалить продажу"
-                    disabled={disabled}
+                    onClick={() => setCancelFor(r)}
+                    title="Отменить продажу или оформить возврат"
+                    disabled={disabled || isCanceled(r)}
                   >
-                    <FaTrash /> Удалить
+                    <FaBan /> Отменить
                   </button>
                 </div>
               </article>
-            ))
-          ) : (
-            <div className="sale__cardsEmpty">Пока нет продаж</div>
-          )}
+          ))}
         </div>
+      )}
+
+      <Pagination
+        page={salesList.page}
+        totalPages={salesList.totalPages}
+        count={salesList.count}
+        pageSize={salesList.pageSize}
+        onPage={salesList.setPage}
+        onPageSize={salesList.setPageSize}
+        unitLabel={plural.sales}
+        loading={salesList.loading}
+      />
+
+      {cancelFor && (
+        <SaleCancelModal
+          sale={cancelFor}
+          onClose={() => setCancelFor(null)}
+          onDone={() => {
+            setCancelFor(null);
+            salesList.refresh();
+            dispatch(getConsultingRows());
+            alert("Продажа отменена, последствия откачены.");
+          }}
+          onError={(m) => alert(m, true)}
+        />
       )}
 
       {/* ====== Модалка «Новая продажа» ====== */}

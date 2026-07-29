@@ -398,7 +398,9 @@
     background: rgba(15, 23, 42, 0.45);
     display: grid;
     place-items: center;
-    z-index: 70;
+    /* Выше сайдбара (z-index: 100), иначе модалка уходит под меню.
+       Совпадает с остальными модалками консалтинга (1000). */
+    z-index: 1000;
     padding: 12px;
     backdrop-filter: blur(2px);
   }

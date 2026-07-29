@@ -2065,3 +2065,96 @@
     box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.05);
   }
 }
+
+/* ===================================================================
+   Абонентская плата при оформлении оплаты по лиду (ТЗ №5)
+   =================================================================== */
+.funnel {
+  &__subBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid #ffe89a;
+    border-radius: 12px;
+    background: #fffdf2;
+  }
+
+  &__subToggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+
+    input {
+      margin-top: 3px;
+    }
+
+    b {
+      display: block;
+      font-size: 13.5px;
+    }
+
+    small {
+      display: block;
+      margin-top: 2px;
+      color: #92400e;
+      font-size: 12px;
+    }
+  }
+
+  &__hint {
+    display: block;
+    margin-top: 4px;
+    color: #94a3b8;
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+}
+
+/* Счётчики на переключателе «Мои / Все / Пул» (ТЗ №4) */
+.funnel {
+  &__scopeCount {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.09);
+    color: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+
+    &--alert {
+      background: #f59e0b;
+      color: #fff;
+    }
+  }
+
+  &__scopeBtn--active &__scopeCount {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Иерархия воронок: блок «Что дальше» в форме воронки (ТЗ №3) */
+.funnel {
+  &__chainBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  &__chainTitle {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+}
