@@ -1032,3 +1032,228 @@
     }
   }
 }
+
+/* ===================================================================
+   Очередь лидов: табы-статусы, отложенные, аналитика (ТЗ №1)
+   =================================================================== */
+.leads {
+  &__queueTabs {
+    margin-bottom: 4px;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--leads-border);
+    border-radius: 10px;
+    background: #fff;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+    &:hover:not(:disabled) {
+      background: #f8fafc;
+    }
+
+    &.is-active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    .leads__chip {
+      height: 32px;
+      padding: 0 10px;
+      font-size: 12.5px;
+    }
+  }
+
+  &__row--overdue {
+    background: #fff7ed;
+
+    &:hover {
+      background: #ffedd5;
+    }
+  }
+
+  &__deferHint {
+    margin-top: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--leads-muted);
+    font-size: 11.5px;
+    white-space: normal;
+
+    &--overdue {
+      color: #b91c1c;
+      font-weight: 600;
+    }
+  }
+
+  &__cellDanger {
+    color: #b91c1c;
+    font-weight: 700;
+  }
+
+  &__warn {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 13px;
+  }
+
+  &__btn--success {
+    color: #166534;
+
+    &:hover:not(:disabled) {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+  }
+
+  &__btn--danger {
+    color: #b91c1c;
+
+    &:hover:not(:disabled) {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+  }
+
+  /* ------------------------------ аналитика ------------------------------ */
+  &__analytics {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  &__statsGrid {
+    margin-bottom: 4px;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    &--compact {
+      flex: 1 1 320px;
+      min-width: 0;
+    }
+  }
+
+  &__sectionTitle {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--leads-text);
+  }
+
+  &__reasonsRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  /* Лёгкий график без внешних библиотек: колонки «лиды / покупки». */
+  &__chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 160px;
+    padding: 12px 12px 0;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+    overflow-x: auto;
+  }
+
+  &__chartCol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 26px;
+    height: 100%;
+  }
+
+  &__chartBars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 100%;
+  }
+
+  &__chartBar {
+    display: block;
+    width: 9px;
+    min-height: 2px;
+    border-radius: 3px 3px 0 0;
+
+    &--leads {
+      background: #cbd5e1;
+    }
+
+    &--converted {
+      background: #22c55e;
+    }
+  }
+
+  &__chartLabel {
+    color: var(--leads-muted);
+    font-size: 10.5px;
+  }
+
+  &__legend {
+    display: flex;
+    gap: 14px;
+    color: var(--leads-muted);
+    font-size: 12px;
+  }
+
+  &__legendItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__legendDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+
+    &--leads {
+      background: #cbd5e1;
+    }
+
+    &--converted {
+      background: #22c55e;
+    }
+  }
+
+  &__status--deferred {
+    background: #fff7ed;
+    color: #c2410c;
+  }
+}

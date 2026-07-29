@@ -143,3 +143,146 @@
 .kassa__content { flex: 1; min-width: 0; }
 .reports__chartLabels { --cols: 8; }
 .kassa__content .reports__tableWrap { margin-top: 8px; }
+
+/* ===================================================================
+   Подтверждение поступлений (ТЗ №9)
+   =================================================================== */
+.kassa {
+  &__tabBadge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  &__requests {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  &__pendingBanner {
+    padding: 10px 14px;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 13px;
+  }
+
+  &__row--overdue {
+    background: #fff7ed;
+  }
+
+  &__reqStatus {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: #e2e8f0;
+    color: #334155;
+
+    &--pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    &--confirmed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    &--rejected {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+  }
+
+  &__reqHint {
+    margin-top: 3px;
+    color: #94a3b8;
+    font-size: 11px;
+  }
+
+  &__reqActions {
+    display: inline-flex;
+    gap: 6px;
+  }
+
+  &__btn--success {
+    border-color: #bbf7d0;
+    color: #166534;
+
+    &:hover:not(:disabled) {
+      background: #f0fdf4;
+    }
+  }
+
+  &__btn--danger {
+    border-color: #fecaca;
+    color: #b91c1c;
+
+    &:hover:not(:disabled) {
+      background: #fef2f2;
+    }
+  }
+
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  &__modal {
+    width: min(460px, 100%);
+    padding: 20px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  }
+
+  &__modalTitle {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  &__modalNote {
+    margin: 0 0 14px;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__label {
+    color: #475569;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  &__formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+  }
+}

@@ -2,7 +2,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 import ConsultingReports from "./Reports/Reports";
+import CashRequests from "./CashRequests";
 import { useAlert } from "../../../../hooks/useDialog";
+import useCounters from "../common/useCounters";
+import { getCashRequestCounters } from "../../../../api/consultingCashbox";
 import "./kassa.scss";
 
 /* helpers */
@@ -15,8 +18,23 @@ const when = (iso) => (iso ? new Date(iso).toLocaleDateString() : "—");
 
 /* =========================== ВЕРХНИЙ КОМПОНЕНТ =========================== */
 export default function ConsultingCafeKassa() {
-  const [tab, setTab] = useState("list"); // list | reports | detail
+  const [tab, setTab] = useState("list"); // list | requests | reports | detail
   const [selectedId, setSelectedId] = useState(null);
+  const [employees, setEmployees] = useState([]);
+
+  // Счётчик неподтверждённых заявок висит на вкладке: пока приход не
+  // подтверждён, деньги не входят в остаток кассы — это нельзя пропустить.
+  const { data: requestCounters } = useCounters(getCashRequestCounters, null);
+  const pendingCount = Number(requestCounters?.pending) || 0;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .get("/users/employees/", { signal: controller.signal })
+      .then((res) => setEmployees(asArray(res.data)))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   const openDetail = (id) => {
     setSelectedId(id);
@@ -53,6 +71,17 @@ export default function ConsultingCafeKassa() {
               </button>
               <button
                 className={`kassa__tab ${
+                  tab === "requests" ? "kassa__tab--active" : ""
+                }`}
+                onClick={() => setTab("requests")}
+              >
+                Подтверждения
+                {pendingCount > 0 && (
+                  <span className="kassa__tabBadge">{pendingCount}</span>
+                )}
+              </button>
+              <button
+                className={`kassa__tab ${
                   tab === "reports" ? "kassa__tab--active" : ""
                 }`}
                 onClick={() => setTab("reports")}
@@ -65,6 +94,8 @@ export default function ConsultingCafeKassa() {
       </div>
 
       {tab === "list" && <CashboxList onOpenDetail={openDetail} />}
+
+      {tab === "requests" && <CashRequests employees={employees} />}
 
       {tab === "reports" && (
         <div style={{ marginTop: 8 }}>

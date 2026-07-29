@@ -1,0 +1,449 @@
+/**
+ * Общие стили элементов управления списками сектора «Консалтинг».
+ * Классы с префиксом cList — используются на всех экранах сектора.
+ */
+.cList {
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  &__toolbarSpacer {
+    flex: 1 1 auto;
+  }
+
+  /* ------------------------------ поиск ------------------------------ */
+  &__search {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-width: 240px;
+    flex: 0 1 320px;
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 12px;
+    color: #94a3b8;
+    font-size: 13px;
+    pointer-events: none;
+  }
+
+  &__searchInput {
+    width: 100%;
+    height: 40px;
+    padding: 0 34px 0 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+
+    &::-webkit-search-cancel-button {
+      appearance: none;
+    }
+
+    &:focus {
+      border-color: #ffd84d;
+      box-shadow: 0 0 0 3px rgba(255, 216, 77, 0.25);
+    }
+  }
+
+  &__searchClear {
+    position: absolute;
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: pointer;
+
+    &:hover {
+      background: #e2e8f0;
+    }
+  }
+
+  /* ------------------------- поля и селекты -------------------------- */
+  &__input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    color: #0f172a;
+    outline: none;
+
+    &:focus {
+      border-color: #ffd84d;
+      box-shadow: 0 0 0 3px rgba(255, 216, 77, 0.25);
+    }
+  }
+
+  /* ------------------------------ табы ------------------------------- */
+  &__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover {
+      background: #eef2f7;
+    }
+
+    &.is-active {
+      background: #0f172a;
+      color: #fff;
+    }
+  }
+
+  &__tabCount {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-size: 11px;
+    font-weight: 700;
+
+    .cList__tab.is-active & {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+
+    &--danger {
+      background: #fee2e2;
+      color: #b91c1c;
+
+      .cList__tab.is-active & {
+        background: #ef4444;
+        color: #fff;
+      }
+    }
+
+    &--warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    &--success {
+      background: #dcfce7;
+      color: #166534;
+    }
+  }
+
+  /* ---------------------------- пагинация ---------------------------- */
+  &__pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eef2f7;
+  }
+
+  &__pagerInfo {
+    color: #64748b;
+    font-size: 13px;
+
+    b {
+      color: #0f172a;
+    }
+  }
+
+  &__pagerControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__pagerSize {
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    background: #fff;
+    font-size: 13px;
+    color: #0f172a;
+  }
+
+  &__pagerBtn {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    background: #fff;
+    color: #0f172a;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #f8fafc;
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+
+  &__pagerPage {
+    min-width: 56px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  /* -------------------------- состояния ------------------------------ */
+  &__state {
+    padding: 28px 16px;
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+
+    strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #0f172a;
+      font-size: 15px;
+    }
+
+    p {
+      margin: 0 auto;
+      max-width: 460px;
+      line-height: 1.5;
+    }
+
+    &--error {
+      color: #b91c1c;
+    }
+  }
+
+  &__resetBtn {
+    margin-top: 12px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: #f8fafc;
+    }
+  }
+
+  &__notice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px 18px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+
+    b {
+      color: #0f172a;
+      font-size: 14px;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+
+  /* ---------------------------- период ------------------------------- */
+  &__period {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__periodPresets {
+    display: inline-flex;
+    gap: 4px;
+    padding: 3px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+  }
+
+  &__periodBtn {
+    height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: #eef2f7;
+    }
+
+    &.is-active {
+      background: #0f172a;
+      color: #fff;
+    }
+  }
+
+  &__periodDates {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__periodDash {
+    color: #94a3b8;
+  }
+
+  /* -------------------------- карточки KPI --------------------------- */
+  &__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  &__stat {
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+
+    &--success {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+
+    &--danger {
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    &--warn {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+
+    &--accent {
+      border-color: #ffe89a;
+      background: #fffdf2;
+    }
+  }
+
+  &__statLabel {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  &__statValue {
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+
+  &__statHint {
+    margin-top: 4px;
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  /* --------------------------- таблицы ------------------------------- */
+  &__tableWrap {
+    overflow-x: auto;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      z-index: 1;
+    }
+
+    tbody tr:hover {
+      background: #fcfdff;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+  }
+
+  &__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__muted {
+    color: #94a3b8;
+  }
+}

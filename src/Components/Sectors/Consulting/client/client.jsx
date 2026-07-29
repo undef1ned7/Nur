@@ -14,6 +14,10 @@ import { getConsultingServices } from "../../../../store/creators/consultingThun
 import { getProfile, useUser } from "../../../../store/slices/userSlice";
 import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
 import SubscriptionMatrix from "./SubscriptionMatrix";
+import useConsultingList from "../common/useConsultingList";
+import { Pagination } from "../common/ListControls";
+import { plural } from "../common/listUtils";
+import { listConsultingClients } from "../../../../api/consultingCatalog";
 
 const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString("ru-RU") + " с";
@@ -39,10 +43,22 @@ const initials = (name) => {
 
 export default function ConsultingClients() {
   const dispatch = useDispatch();
-  const { list: rows = [], loading = false, error: err = "" } = useClient();
+  const { error: err = "" } = useClient();
+
+  /**
+   * Клиенты грузятся с сервера постранично: поиск уходит в `search`.
+   * Redux-список остаётся для форм (выпадающие списки клиентов).
+   */
+  const clientsList = useConsultingList({
+    fetcher: listConsultingClients,
+    prefix: "cl",
+  });
+  const rows = clientsList.items;
+  const loading = clientsList.loading;
 
   const [tab, setTab] = useState("list");
-  const [q, setQ] = useState("");
+  const q = clientsList.searchInput;
+  const setQ = clientsList.setSearch;
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
 
@@ -53,29 +69,18 @@ export default function ConsultingClients() {
     dispatch(fetchClientsAsync());
   }, [dispatch]);
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    let base = (rows || []).slice();
-    if (t) {
-      base = base.filter((r) =>
-        [
-          r.full_name,
-          r.phone,
-          r.seller,
-          r.salesperson_display,
-          r.service,
-          r.service_display,
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(t))
-      );
-    }
-    return base.sort(
-      (a, b) =>
-        new Date(b.updated_at || b.created_at || 0) -
-        new Date(a.updated_at || a.created_at || 0)
-    );
-  }, [rows, q]);
+  /* Поиск и постраничность на сервере — здесь только порядок вывода. */
+  const filtered = useMemo(
+    () =>
+      rows
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || 0) -
+            new Date(a.updated_at || a.created_at || 0)
+        ),
+    [rows]
+  );
 
   const onCreate = () => {
     setEditId(null);
@@ -93,6 +98,7 @@ export default function ConsultingClients() {
     setDeletingId(idStr);
     try {
       await dispatch(deleteClientAsync(id)).unwrap();
+      clientsList.refresh();
     } catch (e) {
       console.error(e);
     } finally {
@@ -102,7 +108,7 @@ export default function ConsultingClients() {
   };
   const navigate = useNavigate();
 
-  const totalCount = (rows || []).length;
+  const totalCount = clientsList.count;
   const shownCount = filtered.length;
 
   return (
@@ -343,6 +349,19 @@ export default function ConsultingClients() {
             </table>
           </div>
         </>
+      )}
+
+      {tab === "list" && (
+        <Pagination
+          page={clientsList.page}
+          totalPages={clientsList.totalPages}
+          count={clientsList.count}
+          pageSize={clientsList.pageSize}
+          onPage={clientsList.setPage}
+          onPageSize={clientsList.setPageSize}
+          unitLabel={plural.clients}
+          loading={clientsList.loading}
+        />
       )}
 
       {isFormOpen && (

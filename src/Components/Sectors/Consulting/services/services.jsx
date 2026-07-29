@@ -18,6 +18,10 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
+import useConsultingList from "../common/useConsultingList";
+import { Pagination } from "../common/ListControls";
+import { plural } from "../common/listUtils";
+import { listConsultingServices } from "../../../../api/consultingCatalog";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import api from "../../../../api";
 import "./services.scss";
@@ -251,11 +255,20 @@ export default function ConsultingServices({
     error: errorFromSlice,
   } = useConsulting();
 
-  const effLoading = loading || loadingFromSlice;
-  const effError = error || errorFromSlice;
+  const effLoading = loading || loadingFromSlice || servicesList.loading;
+  const effError = error || errorFromSlice || servicesList.error;
 
-  /* поиск */
-  const [q, setQ] = useState("");
+  /**
+   * Список услуг тянем с сервера постранично: поиск уходит в `search`, а не
+   * фильтруется по всему массиву на клиенте. Redux остаётся источником услуг
+   * для форм продаж и воронки.
+   */
+  const servicesList = useConsultingList({
+    fetcher: listConsultingServices,
+    prefix: "sv",
+  });
+  const q = servicesList.searchInput;
+  const setQ = servicesList.setSearch;
   const [viewMode, setViewMode] = usePersistedViewMode(SERVICES_VIEW_STORAGE_KEY);
 
   /* создание */
@@ -315,25 +328,18 @@ export default function ConsultingServices({
     };
   }, []);
 
-  /* фильтр */
-  const filtered = useMemo(() => {
-    const text = q.trim().toLowerCase();
-    let base = (rows || []).slice();
-    if (text) {
-      base = base.filter((r) =>
-        [r.title ?? r.name, r.description].some((v) =>
-          String(v || "")
-            .toLowerCase()
-            .includes(text)
-        )
-      );
-    }
-    return base.sort(
-      (a, b) =>
-        new Date(b.updated_at || b.created_at || 0) -
-        new Date(a.updated_at || a.created_at || 0)
-    );
-  }, [rows, q]);
+  /* Поиск и постраничность делает сервер — здесь только порядок вывода. */
+  const filtered = useMemo(
+    () =>
+      servicesList.items
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || 0) -
+            new Date(a.updated_at || a.created_at || 0)
+        ),
+    [servicesList.items]
+  );
 
   /* группировка услуг по ролям: каждая роль — отдельный блок,
      услуги без роли уходят в «Общие услуги» (всегда внизу) */
@@ -416,6 +422,7 @@ export default function ConsultingServices({
       setCreateOpen(false);
       setCreateForm(emptyServiceForm());
       dispatch(getConsultingServices());
+      servicesList.refresh();
     } catch (err) {
       setCreateErr(
         (typeof err === "string" ? err : err?.detail) ||
@@ -470,6 +477,7 @@ export default function ConsultingServices({
       setEditOpen(false);
       setEditForm(emptyServiceForm());
       dispatch(getConsultingServices());
+      servicesList.refresh();
     } catch (err) {
       setEditErr(
         (typeof err === "string" ? err : err?.detail) ||
@@ -491,6 +499,7 @@ export default function ConsultingServices({
         try {
           await dispatch(deleteConsultingService(s.id)).unwrap();
           dispatch(getConsultingServices());
+      servicesList.refresh();
         } catch (err) {
           alert(
             (typeof err === "string" ? err : err?.detail) ||
@@ -598,7 +607,9 @@ export default function ConsultingServices({
       </header>
 
       <div className="services__meta">
-        <span>Найдено: {filtered.length}</span>
+        <span>
+          Найдено: {servicesList.count} {plural.services(servicesList.count)}
+        </span>
       </div>
 
       {effLoading && <div className="services__alert">Загрузка…</div>}
@@ -739,6 +750,17 @@ export default function ConsultingServices({
       )}
 
       {/* ====== CREATE MODAL ====== */}
+      <Pagination
+        page={servicesList.page}
+        totalPages={servicesList.totalPages}
+        count={servicesList.count}
+        pageSize={servicesList.pageSize}
+        onPage={servicesList.setPage}
+        onPageSize={servicesList.setPageSize}
+        unitLabel={plural.services}
+        loading={servicesList.loading}
+      />
+
       {createOpen && (
         <div
           className="services__overlay"

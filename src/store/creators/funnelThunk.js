@@ -640,13 +640,36 @@ export const createClientFromLead = createAsyncThunk(
 export const registerLeadPayment = createAsyncThunk(
   "funnel/registerLeadPayment",
   async (
-    { leadId, payment_mode, amount, debt_months, prepayment, note },
+    {
+      leadId,
+      payment_mode,
+      amount,
+      debt_months,
+      prepayment,
+      note,
+      // Абонентская плата (ТЗ №5): передаём явно, чтобы сервер создал график
+      // списаний с нужной даты, а не «угадывал» его по тарифу.
+      subscription_enabled,
+      subscription_amount,
+      subscription_period,
+      subscription_start,
+    },
     { rejectWithValue },
   ) => {
     try {
       const { data } = await api.post(
         `${BASE}/leads/${leadId}/register-payment/`,
-        { payment_mode, amount, debt_months, prepayment, note },
+        {
+          payment_mode,
+          amount,
+          debt_months,
+          prepayment,
+          note,
+          subscription_enabled,
+          subscription_amount,
+          subscription_period,
+          subscription_start,
+        },
       );
       return data;
     } catch (e) {

@@ -12,8 +12,11 @@ import {
   FaCheck,
   FaCopy,
   FaLock,
+  FaChartLine,
 } from "react-icons/fa";
 import "./Teachers.scss";
+import EmployeeCard from "./EmployeeCard";
+import EmployeesRating from "./EmployeesRating";
 import api from "../../../../api";
 import { useUser, getProfile } from "../../../../store/slices/userSlice";
 import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefaultAccess";
@@ -171,7 +174,9 @@ function ConsultingSchoolTeachers() {
   const alert = useAlert();
   const { company, profile, tariff } = useUser();
   /* ===== tabs ===== */
-  const [tab, setTab] = useState("employees"); // 'employees' | 'roles'
+  const [tab, setTab] = useState("employees"); // 'employees' | 'roles' | 'rating'
+  // Открытая карточка сотрудника (ТЗ №6/№7): показатели, КПД и его финансы.
+  const [cardEmployee, setCardEmployee] = useState(null);
 
   /* ===== data ===== */
   const [employees, setEmployees] = useState([]);
@@ -902,6 +907,18 @@ function ConsultingSchoolTeachers() {
   };
 
   /* ===== RENDER ===== */
+  if (cardEmployee) {
+    return (
+      <div className="Schoolteachers">
+        <EmployeeCard
+          employee={cardEmployee}
+          isManager={profile?.role === "owner" || profile?.role === "admin"}
+          onBack={() => setCardEmployee(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="Schoolteachers">
       <div className="Schoolteachers__header">
@@ -930,8 +947,18 @@ function ConsultingSchoolTeachers() {
             >
               Сотрудники
             </button>
+            <button
+              type="button"
+              className={`Schoolteachers__tab ${
+                tab === "rating" ? "is-active" : ""
+              }`}
+              onClick={() => setTab("rating")}
+            >
+              Рейтинг
+            </button>
           </div>
 
+          {tab !== "rating" && (
           <div className="Schoolteachers__search">
             <FaSearch className="Schoolteachers__searchIcon" aria-hidden />
             <input
@@ -944,8 +971,9 @@ function ConsultingSchoolTeachers() {
               aria-label="Поиск"
             />
           </div>
+          )}
 
-          {tab === "roles" ? (
+          {tab === "rating" ? null : tab === "roles" ? (
             <button
               type="button"
               className="Schoolteachers__btn Schoolteachers__btn--primary"
@@ -969,6 +997,17 @@ function ConsultingSchoolTeachers() {
       {!!error && <div className="Schoolteachers__alert">{error}</div>}
       {!!pageNotice && (
         <div className="Schoolteachers__notice">{pageNotice}</div>
+      )}
+
+      {!loading && tab === "rating" && (
+        <EmployeesRating
+          onOpenEmployee={(row) => {
+            const found = employees.find(
+              (e) => String(e.id) === String(row.user),
+            );
+            if (found) setCardEmployee(found);
+          }}
+        />
       )}
 
       {/* ===== ROLES TAB ===== */}
@@ -1098,6 +1137,14 @@ function ConsultingSchoolTeachers() {
                 </div>
 
                 <div className="Schoolteachers__rowActions">
+                  <button
+                    type="button"
+                    className="Schoolteachers__btn Schoolteachers__btn--primary"
+                    onClick={() => setCardEmployee(u)}
+                    title="Карточка сотрудника: показатели, КПД, финансы"
+                  >
+                    <FaChartLine /> Карточка
+                  </button>
                   <button
                     type="button"
                     className="Schoolteachers__btn Schoolteachers__btn--secondary"

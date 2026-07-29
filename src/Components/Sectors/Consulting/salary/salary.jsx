@@ -12,12 +12,35 @@ import {
   updateSalaryRate,
 } from "../../../../api/consultingSalary";
 import { useAlert } from "../../../../hooks/useDialog";
+import SalaryAdjustments from "./SalaryAdjustments";
+import SalaryBonusRules from "./SalaryBonusRules";
+import SalaryPayslip from "./SalaryPayslip";
+import SalarySchemes from "./SalarySchemes";
 import "./salary.scss";
 
 const EMPLOYEES_URL = "/users/employees/";
 const PER_PAGE = 12;
 
-const TABS = { ACCRUALS: "accruals", RATES: "rates", PAYOUTS: "payouts" };
+const TABS = {
+  ACCRUALS: "accruals",
+  PAYSLIP: "payslip",
+  SCHEMES: "schemes",
+  BONUSES: "bonuses",
+  ADJUSTMENTS: "adjustments",
+  RATES: "rates",
+  PAYOUTS: "payouts",
+};
+
+/** Порядок вкладок: сначала «что начислено», потом настройки мотивации. */
+const TAB_LIST = [
+  { value: TABS.ACCRUALS, label: "Начисления" },
+  { value: TABS.PAYSLIP, label: "Расчётный лист" },
+  { value: TABS.SCHEMES, label: "Схемы оплаты", adminOnly: true },
+  { value: TABS.BONUSES, label: "Правила премий", adminOnly: true },
+  { value: TABS.ADJUSTMENTS, label: "Штрафы и премии" },
+  { value: TABS.RATES, label: "Ставки услуг", adminOnly: true },
+  { value: TABS.PAYOUTS, label: "Выплаты" },
+];
 
 const STATUS_LABELS = {
   pending: "Ожидает",
@@ -83,11 +106,25 @@ const Salary = () => {
     return m;
   }, [employees]);
 
+  /* Услуги и роли нужны схемам оплаты и правилам премий. */
+  const [services, setServices] = useState([]);
+  const [roles, setRoles] = useState([]);
+
   useEffect(() => {
+    const controller = new AbortController();
     api
-      .get(EMPLOYEES_URL)
+      .get(EMPLOYEES_URL, { signal: controller.signal })
       .then((res) => setEmployees(asArray(res.data)))
       .catch(() => {});
+    api
+      .get("/consalting/services/", { signal: controller.signal })
+      .then((res) => setServices(asArray(res.data)))
+      .catch(() => {});
+    api
+      .get("/users/roles/", { signal: controller.signal })
+      .then((res) => setRoles(asArray(res.data)))
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   /* Общие фильтры по периоду/сотруднику */
@@ -105,33 +142,22 @@ const Salary = () => {
           </div>
         </div>
         <div className="salary__tabs" role="tablist">
-          <button
-            type="button"
-            className={`salary__tab ${tab === TABS.ACCRUALS ? "is-active" : ""}`}
-            onClick={() => setTab(TABS.ACCRUALS)}
-          >
-            Начисления
-          </button>
-          {isOwnerOrAdmin && (
+          {TAB_LIST.filter((t) => !t.adminOnly || isOwnerOrAdmin).map((t) => (
             <button
+              key={t.value}
               type="button"
-              className={`salary__tab ${tab === TABS.RATES ? "is-active" : ""}`}
-              onClick={() => setTab(TABS.RATES)}
+              role="tab"
+              aria-selected={tab === t.value}
+              className={`salary__tab ${tab === t.value ? "is-active" : ""}`}
+              onClick={() => setTab(t.value)}
             >
-              Ставки
+              {t.label}
             </button>
-          )}
-          <button
-            type="button"
-            className={`salary__tab ${tab === TABS.PAYOUTS ? "is-active" : ""}`}
-            onClick={() => setTab(TABS.PAYOUTS)}
-          >
-            Выплаты
-          </button>
+          ))}
         </div>
       </div>
 
-      {tab !== TABS.RATES && (
+      {(tab === TABS.ACCRUALS || tab === TABS.PAYOUTS) && (
         <div className="salary__filters">
           <label className="salary__filterField">
             <span>С</span>
@@ -183,6 +209,31 @@ const Salary = () => {
         />
       )}
       {tab === TABS.RATES && isOwnerOrAdmin && <RatesTab alert={alert} />}
+      {tab === TABS.PAYSLIP && (
+        <SalaryPayslip
+          employees={employees}
+          isOwnerOrAdmin={isOwnerOrAdmin}
+          myUserId={profile?.id ? String(profile.id) : ""}
+        />
+      )}
+      {tab === TABS.SCHEMES && isOwnerOrAdmin && (
+        <SalarySchemes services={services} alert={alert} />
+      )}
+      {tab === TABS.BONUSES && isOwnerOrAdmin && (
+        <SalaryBonusRules
+          services={services}
+          employees={employees}
+          roles={roles}
+          alert={alert}
+        />
+      )}
+      {tab === TABS.ADJUSTMENTS && (
+        <SalaryAdjustments
+          employees={employees}
+          isOwnerOrAdmin={isOwnerOrAdmin}
+          alert={alert}
+        />
+      )}
       {tab === TABS.PAYOUTS && (
         <PayoutsTab
           dateFrom={dateFrom}

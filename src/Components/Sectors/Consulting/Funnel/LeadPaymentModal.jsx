@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { registerLeadPayment } from "../../../../store/creators/funnelThunk";
+import api from "../../../../api";
+import { toISODate } from "../common/listUtils";
 
 const PAYMENT_MODES = [
   { value: "cash", label: "Наличными" },
@@ -38,6 +40,53 @@ export default function LeadPaymentModal({ lead, onClose, onSuccess }) {
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
+  /* ---------------- абонентская плата (ТЗ №5) ---------------- */
+  // Тариф лида может нести абонплату. Раньше она нигде не подтверждалась и
+  // после продажи не появлялась у клиента — теперь менеджер видит и
+  // подтверждает сумму, период и дату старта списаний.
+  const [services, setServices] = useState([]);
+  const [subEnabled, setSubEnabled] = useState(true);
+  const [subStart, setSubStart] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setSubStart(toISODate(new Date()));
+    if (!lead?.service) return () => controller.abort();
+    api
+      .get("/consalting/services/", { signal: controller.signal })
+      .then((res) => {
+        const data = res?.data;
+        setServices(Array.isArray(data?.results) ? data.results : data || []);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [lead?.service]);
+
+  const subscription = useMemo(() => {
+    // Сервер может прислать абонплату прямо в лиде — тогда справочник не нужен.
+    const direct = Number(lead?.subscription_amount);
+    if (Number.isFinite(direct) && direct > 0) {
+      return {
+        amount: direct,
+        period: lead?.subscription_period === "year" ? "year" : "month",
+        source: lead?.tariff_display || lead?.service_display || "",
+      };
+    }
+    const service = services.find(
+      (s) => String(s.id) === String(lead?.service),
+    );
+    const tariff = (service?.tariffs || []).find(
+      (t) => String(t.id) === String(lead?.tariff),
+    );
+    const amount = Number(tariff?.subscription_amount);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    return {
+      amount,
+      period: tariff?.subscription_period === "year" ? "year" : "month",
+      source: [service?.name, tariff?.name].filter(Boolean).join(" · "),
+    };
+  }, [services, lead]);
+
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const needsSchedule =
     form.payment_mode === "debt" || form.payment_mode === "installment";
@@ -67,6 +116,14 @@ export default function LeadPaymentModal({ lead, onClose, onSuccess }) {
               ? Number(form.prepayment)
               : undefined,
           note: form.note.trim(),
+          ...(subscription
+            ? {
+                subscription_enabled: subEnabled,
+                subscription_amount: subEnabled ? subscription.amount : 0,
+                subscription_period: subscription.period,
+                subscription_start: subEnabled ? subStart : undefined,
+              }
+            : {}),
         }),
       ).unwrap();
       onSuccess?.(result);
@@ -136,6 +193,45 @@ export default function LeadPaymentModal({ lead, onClose, onSuccess }) {
               />
             </div>
           </div>
+          {subscription && (
+            <div className="funnel__subBlock">
+              <label className="funnel__subToggle">
+                <input
+                  type="checkbox"
+                  checked={subEnabled}
+                  onChange={(e) => setSubEnabled(e.target.checked)}
+                  disabled={!clientId || saving}
+                />
+                <span>
+                  <b>Подключить абонентскую плату</b>
+                  <small>
+                    {subscription.source
+                      ? `${subscription.source}: `
+                      : ""}
+                    {subscription.amount.toLocaleString("ru-RU")} с /{" "}
+                    {subscription.period === "year" ? "год" : "мес."}
+                  </small>
+                </span>
+              </label>
+              {subEnabled && (
+                <div className="funnel__field">
+                  <label className="funnel__label">Дата первого списания</label>
+                  <input
+                    className="funnel__input"
+                    type="date"
+                    value={subStart}
+                    onChange={(e) => setSubStart(e.target.value)}
+                    disabled={!clientId || saving}
+                  />
+                  <small className="funnel__hint">
+                    График платежей появится в карточке клиента и в абонентской
+                    матрице сразу после оформления.
+                  </small>
+                </div>
+              )}
+            </div>
+          )}
+
           {needsSchedule && (
             <div className="funnel__grid2">
               <div className="funnel__field">
