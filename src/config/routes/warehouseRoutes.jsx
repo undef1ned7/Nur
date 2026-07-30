@@ -105,9 +105,12 @@ const WarehouseAnalyticsRoute = () => {
 };
 
 export const warehouseRoutes = (profile) => [
+  // Складами управляют владелец и админ, остальные видят свои остатки
   createProtectedRoute(
     "warehouse/warehouses",
-    profile?.role !== "owner" ? AgentStocks : Warehouses,
+    profile?.role === "owner" || profile?.role === "admin"
+      ? Warehouses
+      : AgentStocks,
   ),
   createProtectedRoute("warehouse/partners/analytics", () => (
     <PartnerAnalyticsOwnerGate>

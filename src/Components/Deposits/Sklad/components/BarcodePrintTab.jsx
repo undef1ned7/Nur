@@ -33,6 +33,8 @@ const BarcodePrintTab = ({
 }) => {
   const [printingIds, setPrintingIds] = useState(() => new Set());
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  // Количество копий для каждой позиции отдельно: { [productId]: number }
+  const [copiesById, setCopiesById] = useState({});
   const [isBatchPrinting, setIsBatchPrinting] = useState(false);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -81,6 +83,23 @@ const BarcodePrintTab = ({
   } = printSettings;
   const textScaleValue = Math.max(0.5, Number(textScale) || 1);
   const copiesValue = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
+
+  // Копии конкретной позиции: своё значение, иначе общее из шапки
+  const getProductCopies = useCallback(
+    (id) => {
+      const own = copiesById[id];
+      if (own === undefined || own === null || own === "") return copiesValue;
+      return Math.max(1, Math.min(100, Math.round(Number(own) || 1)));
+    },
+    [copiesById, copiesValue]
+  );
+
+  const setProductCopies = useCallback((id, value) => {
+    setCopiesById((prev) => ({
+      ...prev,
+      [id]: Math.max(1, Math.min(100, Math.round(Number(value) || 1))),
+    }));
+  }, []);
   const availableFonts = useMemo(
     () => [
       { value: "__RASTER__", label: "Растер (без кодировок) — рекомендовано" },
@@ -408,6 +427,12 @@ const BarcodePrintTab = ({
     );
   }, [filteredProducts, selectedIds]);
 
+  // Всего этикеток с учётом копий каждой позиции
+  const selectedLabelsTotal = useMemo(
+    () => selectedWithBarcode.reduce((sum, p) => sum + getProductCopies(p.id), 0),
+    [selectedWithBarcode, getProductCopies]
+  );
+
   const toggleSelection = useCallback((id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -474,7 +499,7 @@ const BarcodePrintTab = ({
     const textScaleForPrint = Math.max(1, Math.round(textScaleValue));
     const barcodeHeightDots = Math.max(1, Math.round(barcodeHeight));
     const barcodeBarWidthDots = Math.max(1, Math.round(barcodeBarWidth));
-    const copiesForPrint = copiesValue;
+    const copiesForPrint = getProductCopies(previewProduct.id);
 
     setIsPrinting(true);
     setPrintingIds((prev) => {
@@ -544,7 +569,6 @@ const BarcodePrintTab = ({
     const textScaleForPrint = Math.max(1, Math.round(textScaleValue));
     const barcodeHeightDots = Math.max(1, Math.round(barcodeHeight));
     const barcodeBarWidthDots = Math.max(1, Math.round(barcodeBarWidth));
-    const copiesForPrint = copiesValue;
 
     setIsBatchPrinting(true);
     setPrintingIds((prev) => {
@@ -554,15 +578,21 @@ const BarcodePrintTab = ({
     });
 
     let printed = 0;
+    let printedLabels = 0;
     const total = selectedWithBarcode.length;
+    const totalLabelsPlanned = selectedWithBarcode.reduce(
+      (sum, p) => sum + getProductCopies(p.id),
+      0
+    );
 
     try {
       for (const product of selectedWithBarcode) {
+        const productCopies = getProductCopies(product.id);
         await printXp365bBarcodeLabel({
           barcode: String(product.barcode),
           title: showName ? product.name || "Товар" : "",
           price: showPrice ? product.price : "",
-          copies: copiesForPrint,
+          copies: productCopies,
           widthMm,
           heightMm,
           gapAfterTitle: gapTitle,
@@ -575,6 +605,7 @@ const BarcodePrintTab = ({
           barcodeBarWidth: barcodeBarWidthDots,
         });
         printed += 1;
+        printedLabels += productCopies;
         setPrintingIds((prev) => {
           const next = new Set(prev);
           next.delete(product.id);
@@ -586,11 +617,9 @@ const BarcodePrintTab = ({
       setIsPrinterConnected(connected);
       setSelectedIds(new Set());
       if (printed === total) {
-        const copiesN = copiesForPrint;
-        const totalLabels = printed * copiesN;
         alert(
-          copiesN > 1
-            ? `Напечатано: ${printed} товаров × ${copiesN} копий = ${totalLabels} этикеток`
+          printedLabels > printed
+            ? `Напечатано: ${printed} товаров, ${printedLabels} этикеток (с учётом копий)`
             : `Напечатано этикеток: ${printed}`
         );
       }
@@ -605,11 +634,9 @@ const BarcodePrintTab = ({
       } else if (msg.includes("не найден") || msg.includes("не найдено")) {
         errorMessage = "Принтер не подключен. Подключите принтер XP-365B и попробуйте снова.";
       } else if (msg) errorMessage = msg;
-      const copiesN = copiesForPrint;
-      const totalLabels = printed * copiesN;
       alert(
-        copiesN > 1
-          ? `${errorMessage}\nНапечатано до ошибки: ${printed} из ${total} товаров (${totalLabels} этикеток)`
+        totalLabelsPlanned > total
+          ? `${errorMessage}\nНапечатано до ошибки: ${printed} из ${total} товаров (${printedLabels} из ${totalLabelsPlanned} этикеток)`
           : `${errorMessage}\nНапечатано до ошибки: ${printed} из ${total}`
       );
     } finally {
@@ -624,7 +651,7 @@ const BarcodePrintTab = ({
     selectedWithBarcode,
     isPrinterConnected,
     currentLabel,
-    copiesValue,
+    getProductCopies,
     gapAfterTitle,
     gapAfterPrice,
     barcodeRaise,
@@ -795,7 +822,7 @@ const BarcodePrintTab = ({
             )}
 
             <label className="barcode-print-tab__size-label">
-              Копий:
+              Копий (по умолчанию):
               <input
                 className="barcode-print-tab__copies-input"
                 type="number"
@@ -809,9 +836,20 @@ const BarcodePrintTab = ({
                     copies: e.target.value,
                   }))
                 }
-                title="Сколько раз печатать одну и ту же этикетку"
+                title="Значение копий для позиций, у которых не задано своё количество"
               />
             </label>
+
+            {Object.keys(copiesById).length > 0 && (
+              <button
+                type="button"
+                className="barcode-print-tab__selection-btn"
+                onClick={() => setCopiesById({})}
+                title="Вернуть всем позициям количество копий по умолчанию"
+              >
+                Сбросить копии позиций
+              </button>
+            )}
           </div>
 
           <div className="barcode-print-tab__printer-status">
@@ -963,9 +1001,7 @@ const BarcodePrintTab = ({
                       ? "Подключите принтер"
                       : selectedWithBarcode.length === 0
                       ? "Выберите товары с штрих-кодом"
-                      : copiesValue > 1
-                      ? `Распечатать ${selectedWithBarcode.length} × ${copiesValue} этикеток`
-                      : `Распечатать ${selectedWithBarcode.length} этикеток`
+                      : `Распечатать ${selectedLabelsTotal} этикеток (${selectedWithBarcode.length} позиций)`
                   }
                 >
                   {isBatchPrinting ? (
@@ -977,7 +1013,10 @@ const BarcodePrintTab = ({
                     <>
                       <span className="barcode-print-tab__print-icon">🖨️</span>
                       Печать выбранных ({selectedWithBarcode.length}
-                      {copiesValue > 1 ? ` × ${copiesValue}` : ""})
+                      {selectedLabelsTotal > selectedWithBarcode.length
+                        ? ` · ${selectedLabelsTotal} эт.`
+                        : ""}
+                      )
                     </>
                   )}
                 </button>
@@ -1038,6 +1077,25 @@ const BarcodePrintTab = ({
                       </button>
 
                       <div className="barcode-print-tab__product-name">{product.name}</div>
+
+                      <label
+                        className="barcode-print-tab__card-copies"
+                        title="Сколько копий этикетки печатать для этой позиции"
+                      >
+                        Копий:
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={getProductCopies(product.id)}
+                          onChange={(e) =>
+                            setProductCopies(product.id, e.target.value)
+                          }
+                          disabled={!hasBarcode || isBatchPrinting}
+                          className="barcode-print-tab__card-copies-input"
+                        />
+                      </label>
                     </div>
                   </div>
                 );
@@ -1080,11 +1138,10 @@ const BarcodePrintTab = ({
 
       {showA4Modal && (
         <BarcodeA4PrintModal
-          products={
-            selectedWithBarcode.length > 0
-              ? selectedWithBarcode
-              : filteredProducts.filter((p) => String(p.barcode || "").trim())
-          }
+          products={(selectedWithBarcode.length > 0
+            ? selectedWithBarcode
+            : filteredProducts.filter((p) => String(p.barcode || "").trim())
+          ).map((p) => ({ ...p, __copies: getProductCopies(p.id) }))}
           onClose={() => setShowA4Modal(false)}
         />
       )}
@@ -1147,15 +1204,12 @@ const BarcodePrintTab = ({
                   min={1}
                   max={100}
                   step={1}
-                  value={copiesValue}
+                  value={getProductCopies(previewProduct.id)}
                   onChange={(e) =>
-                    setPrintSettings((prev) => ({
-                      ...prev,
-                      copies: e.target.value,
-                    }))
+                    setProductCopies(previewProduct.id, e.target.value)
                   }
                   style={{ width: 80 }}
-                  title="Сколько раз печатать одну и ту же этикетку"
+                  title="Сколько копий этикетки печатать для этой позиции"
                 />
               </label>
 

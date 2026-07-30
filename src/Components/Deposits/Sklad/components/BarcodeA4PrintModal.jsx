@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import JsBarcode from "jsbarcode";
 import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
 import "./BarcodeA4PrintModal.scss";
@@ -115,15 +116,114 @@ const FieldStyleRow = ({ label, enabled, onToggle, style, onStyle, noFont }) => 
   </div>
 );
 
+/** Одна этикетка на листе A4. */
+const A4Label = ({
+  p,
+  showName,
+  showBarcode,
+  showPrice,
+  showDiscount,
+  showPlu,
+  showDescription,
+  fieldStyles,
+  barcodeHeight,
+}) => {
+  const priceNow = fmtPrice(p.price);
+  const dp = Number(p.discount_percent ?? p.discount ?? 0) || 0;
+  let oldPrice = "";
+  let newPrice = priceNow;
+  if (showDiscount) {
+    const explicitOld = fmtPrice(
+      p.old_price ?? p.price_old ?? p.compare_at_price ?? "",
+    );
+    if (explicitOld && numPrice(explicitOld) > numPrice(priceNow)) {
+      oldPrice = explicitOld;
+      newPrice = priceNow;
+    } else if (dp > 0) {
+      oldPrice = priceNow;
+      newPrice = fmtPrice(numPrice(p.price) * (1 - dp / 100));
+    }
+  }
+  const hasDiscount = Boolean(oldPrice && oldPrice !== newPrice);
+
+  return (
+    <div className="barcode-a4__label">
+      {showName && (
+        <div className="barcode-a4__name" style={styleToCss(fieldStyles.name)}>
+          {p.name}
+        </div>
+      )}
+      {showBarcode && (
+        <div className="barcode-a4__bc">
+          <A4Barcode value={p.barcode} height={barcodeHeight} />
+        </div>
+      )}
+      {showPrice &&
+        priceNow &&
+        (hasDiscount ? (
+          <div className="barcode-a4__price-wrap">
+            <span
+              className="barcode-a4__old"
+              style={{
+                ...styleToCss(fieldStyles.oldPrice),
+                textDecoration: fieldStyles.oldPrice.underline
+                  ? "line-through underline"
+                  : "line-through",
+              }}
+            >
+              {oldPrice} с
+            </span>
+            <span
+              className="barcode-a4__price"
+              style={styleToCss(fieldStyles.price)}
+            >
+              {newPrice} с
+            </span>
+            {dp > 0 && <span className="barcode-a4__badge">−{dp}%</span>}
+          </div>
+        ) : (
+          <div
+            className="barcode-a4__price"
+            style={styleToCss(fieldStyles.price)}
+          >
+            {priceNow} с
+          </div>
+        ))}
+      {showPlu && String(p.plu ?? "").trim() && (
+        <div className="barcode-a4__plu" style={styleToCss(fieldStyles.plu)}>
+          ПЛУ: {p.plu}
+        </div>
+      )}
+      {showDescription && String(p.description || p.desc || "").trim() && (
+        <div
+          className="barcode-a4__desc"
+          style={styleToCss(fieldStyles.description)}
+        >
+          {p.description || p.desc}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const clampCopies = (value, fallback = 1) => {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(50, n));
+};
+
 /**
  * Печать штрих-кодов на листе A4.
- * Динамически: кол-во товаров в ряд, копии, какие данные показывать
- * (штрих-код, цена, название, описание) + заголовок листа.
+ * Динамически: кол-во товаров в ряд, копии (общие и для каждой позиции),
+ * какие данные показывать (штрих-код, цена, название, описание) + заголовок листа.
+ * Этикетки разбиваются на отдельные листы A4 (cols × rows на лист).
  */
 const BarcodeA4PrintModal = ({ products = [], onClose }) => {
   const [cols, setCols] = useState(3);
   const [rows, setRows] = useState(8);
   const [copies, setCopies] = useState(1);
+  // Копии для каждой позиции отдельно: { [productId]: number }
+  const [copiesById, setCopiesById] = useState({});
   const [showName, setShowName] = useState(true);
   const [showBarcode, setShowBarcode] = useState(true);
   const [showPrice, setShowPrice] = useState(true);
@@ -148,19 +248,40 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
   const rowsValue = Math.max(1, Math.min(20, Math.round(Number(rows) || 1)));
   const copiesValue = Math.max(1, Math.min(50, Math.round(Number(copies) || 1)));
 
-  // Разворачиваем список: каждый товар × копии
+  const printable = useMemo(
+    () => (products || []).filter((p) => String(p.barcode || "").trim()),
+    [products],
+  );
+
+  // Копии позиции: своё значение, иначе значение из карточки товара, иначе общее
+  const getCopies = useCallback(
+    (p) => clampCopies(copiesById[p.id] ?? p.__copies ?? copiesValue, copiesValue),
+    [copiesById, copiesValue],
+  );
+
+  // Разворачиваем список: каждый товар × его копии
   const labels = useMemo(() => {
-    const withBc = (products || []).filter((p) =>
-      String(p.barcode || "").trim(),
-    );
     const out = [];
-    withBc.forEach((p) => {
-      for (let i = 0; i < copiesValue; i += 1) out.push(p);
+    printable.forEach((p) => {
+      const n = getCopies(p);
+      for (let i = 0; i < n; i += 1) out.push(p);
     });
     return out;
-  }, [products, copiesValue]);
+  }, [printable, getCopies]);
 
-  return (
+  // Разбиение на листы: cols × rows этикеток на один лист A4
+  const perPage = Math.max(1, colsValue * rowsValue);
+  const pages = useMemo(() => {
+    const out = [];
+    for (let i = 0; i < labels.length; i += perPage) {
+      out.push(labels.slice(i, i + perPage));
+    }
+    return out;
+  }, [labels, perPage]);
+
+  /* Рендерим в body: иначе при печати листы остаются внутри слоёв CRM
+     (overflow/transform у Layout), браузер обрезает всё после первой страницы. */
+  return createPortal(
     <div className="barcode-a4-overlay" role="presentation" onClick={onClose}>
       <div
         className="barcode-a4-modal"
@@ -234,8 +355,60 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
                 max={50}
                 value={copies}
                 onChange={(e) => setCopies(e.target.value)}
+                title="Значение по умолчанию для всех позиций"
               />
             </label>
+          </div>
+
+          {/* Копии для каждой позиции отдельно */}
+          <div className="barcode-a4-modal__field">
+            <span>Копии по позициям</span>
+            <div className="barcode-a4-copies">
+              <div className="barcode-a4-copies__head">
+                <button
+                  type="button"
+                  className="barcode-a4-copies__reset"
+                  onClick={() => setCopiesById({})}
+                  disabled={Object.keys(copiesById).length === 0}
+                  title="Вернуть всем позициям общее значение"
+                >
+                  Сбросить к общему ({copiesValue})
+                </button>
+              </div>
+              <div className="barcode-a4-copies__list">
+                {printable.length === 0 ? (
+                  <div className="barcode-a4-copies__empty">
+                    Нет товаров с штрих-кодом
+                  </div>
+                ) : (
+                  printable.map((p) => (
+                    <div className="barcode-a4-copies__row" key={p.id}>
+                      <span
+                        className="barcode-a4-copies__name"
+                        title={`${p.name || "Товар"} · ${p.barcode}`}
+                      >
+                        {p.name || "Товар"}
+                      </span>
+                      <input
+                        className="barcode-a4-copies__input"
+                        type="number"
+                        min={1}
+                        max={50}
+                        step={1}
+                        value={getCopies(p)}
+                        onChange={(e) =>
+                          setCopiesById((prev) => ({
+                            ...prev,
+                            [p.id]: clampCopies(e.target.value, copiesValue),
+                          }))
+                        }
+                        title="Сколько копий этой позиции печатать"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
           <label className="barcode-a4-modal__field">
@@ -294,9 +467,9 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
           </div>
 
           <div className="barcode-a4-modal__summary">
-            Товаров с штрих-кодом:{" "}
-            {(products || []).filter((p) => String(p.barcode || "").trim()).length}
-            {" · "}Этикеток на листах: {labels.length}
+            Товаров с штрих-кодом: {printable.length}
+            {" · "}Этикеток: {labels.length}
+            {" · "}Листов: {pages.length} (по {perPage} на лист)
           </div>
 
           <div className="barcode-a4-modal__actions">
@@ -321,117 +494,59 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
         {/* Ориентация листа при печати (динамически) */}
         <style>{`@media print { @page { size: A4 ${orientation}; margin: 10mm; } }`}</style>
 
-        {/* Область печати — лист A4 */}
+        {/* Область печати — листы A4 (по одному на каждые cols × rows этикеток) */}
         <div className="barcode-a4-modal__previewWrap">
           <div className="barcode-a4-print-area">
-            <div
-              className={`barcode-a4-sheet${isLandscape ? " barcode-a4-sheet--landscape" : ""}`}
-            >
-              {headerText.trim() && (
-                <div className="barcode-a4-sheet__header">{headerText}</div>
-              )}
-              {labels.length === 0 ? (
+            {pages.length === 0 ? (
+              <div
+                className={`barcode-a4-sheet${isLandscape ? " barcode-a4-sheet--landscape" : ""}`}
+              >
                 <div className="barcode-a4-sheet__empty barcode-a4-no-print">
                   Нет товаров с штрих-кодом для печати.
                 </div>
-              ) : (
-                <div
-                  className="barcode-a4-sheet__grid"
-                  style={{ "--a4-cols": colsValue, "--a4-rows": rowsValue }}
-                >
-                  {labels.map((p, idx) => {
-                    const priceNow = fmtPrice(p.price);
-                    const dp = Number(p.discount_percent ?? p.discount ?? 0) || 0;
-                    let oldPrice = "";
-                    let newPrice = priceNow;
-                    if (showDiscount) {
-                      const explicitOld = fmtPrice(
-                        p.old_price ?? p.price_old ?? p.compare_at_price ?? "",
-                      );
-                      if (explicitOld && numPrice(explicitOld) > numPrice(priceNow)) {
-                        oldPrice = explicitOld;
-                        newPrice = priceNow;
-                      } else if (dp > 0) {
-                        oldPrice = priceNow;
-                        newPrice = fmtPrice(numPrice(p.price) * (1 - dp / 100));
-                      }
-                    }
-                    const hasDiscount = Boolean(oldPrice && oldPrice !== newPrice);
-                    return (
-                      <div className="barcode-a4__label" key={`${p.id}-${idx}`}>
-                        {showName && (
-                          <div
-                            className="barcode-a4__name"
-                            style={styleToCss(fieldStyles.name)}
-                          >
-                            {p.name}
-                          </div>
-                        )}
-                        {showBarcode && (
-                          <div className="barcode-a4__bc">
-                            <A4Barcode value={p.barcode} height={barcodeHeight} />
-                          </div>
-                        )}
-                        {showPrice &&
-                          priceNow &&
-                          (hasDiscount ? (
-                            <div className="barcode-a4__price-wrap">
-                              <span
-                                className="barcode-a4__old"
-                                style={{
-                                  ...styleToCss(fieldStyles.oldPrice),
-                                  textDecoration: fieldStyles.oldPrice.underline
-                                    ? "line-through underline"
-                                    : "line-through",
-                                }}
-                              >
-                                {oldPrice} с
-                              </span>
-                              <span
-                                className="barcode-a4__price"
-                                style={styleToCss(fieldStyles.price)}
-                              >
-                                {newPrice} с
-                              </span>
-                              {dp > 0 && (
-                                <span className="barcode-a4__badge">−{dp}%</span>
-                              )}
-                            </div>
-                          ) : (
-                            <div
-                              className="barcode-a4__price"
-                              style={styleToCss(fieldStyles.price)}
-                            >
-                              {priceNow} с
-                            </div>
-                          ))}
-                        {showPlu && String(p.plu ?? "").trim() && (
-                          <div
-                            className="barcode-a4__plu"
-                            style={styleToCss(fieldStyles.plu)}
-                          >
-                            ПЛУ: {p.plu}
-                          </div>
-                        )}
-                        {showDescription &&
-                          String(p.description || p.desc || "").trim() && (
-                            <div
-                              className="barcode-a4__desc"
-                              style={styleToCss(fieldStyles.description)}
-                            >
-                              {p.description || p.desc}
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })}
+              </div>
+            ) : (
+              pages.map((pageLabels, pageIdx) => (
+                <div className="barcode-a4-page" key={`page-${pageIdx}`}>
+                  <div
+                    className={`barcode-a4-sheet${isLandscape ? " barcode-a4-sheet--landscape" : ""}${
+                      headerText.trim() ? " barcode-a4-sheet--with-header" : ""
+                    }`}
+                  >
+                    {headerText.trim() && (
+                      <div className="barcode-a4-sheet__header">{headerText}</div>
+                    )}
+                    <div
+                      className="barcode-a4-sheet__grid"
+                      style={{ "--a4-cols": colsValue, "--a4-rows": rowsValue }}
+                    >
+                      {pageLabels.map((p, idx) => (
+                        <A4Label
+                          key={`${p.id}-${pageIdx}-${idx}`}
+                          p={p}
+                          showName={showName}
+                          showBarcode={showBarcode}
+                          showPrice={showPrice}
+                          showDiscount={showDiscount}
+                          showPlu={showPlu}
+                          showDescription={showDescription}
+                          fieldStyles={fieldStyles}
+                          barcodeHeight={barcodeHeight}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="barcode-a4-page__caption barcode-a4-no-print">
+                    Лист {pageIdx + 1} из {pages.length}
+                  </div>
                 </div>
-              )}
-            </div>
+              ))
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
