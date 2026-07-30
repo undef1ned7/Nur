@@ -143,29 +143,147 @@
   }
 }
 
+/* Список копий по позициям (панель, не печатается) */
+.barcode-a4-copies {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 6px;
+
+  &__head {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 6px;
+  }
+
+  &__reset {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #f1f5f9;
+    }
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 4px 6px;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__input {
+    flex: 0 0 56px;
+    width: 56px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  &__empty {
+    font-size: 12px;
+    color: #94a3b8;
+    padding: 6px;
+  }
+}
+
+/* Область печати: листы идут друг за другом */
+.barcode-a4-print-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Обёртка одного листа (лист + подпись «Лист X из Y» на экране) */
+.barcode-a4-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  &__caption {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+}
+
 /* Лист A4 */
 .barcode-a4-sheet {
-  --a4-page-h: 277mm; /* печатная высота листа (297 − поля) */
+  /* печатная высота листа (297 − поля 2×10mm) минус 1mm запаса:
+     без запаса округление в устройстве даёт лишнюю пустую страницу */
+  --a4-page-h: 276mm;
+  --a4-header-h: 0mm;
   width: 210mm;
-  min-height: 297mm;
+  height: 297mm;
+  box-sizing: border-box;
   background: #fff;
   padding: 10mm;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   transform-origin: top center;
+  overflow: hidden;
 
   &--landscape {
-    --a4-page-h: 190mm; /* печатная высота альбомного листа (210 − поля) */
+    --a4-page-h: 189mm; /* печатная высота альбомного листа (210 − поля − запас) */
     width: 297mm;
-    min-height: 210mm;
+    height: 210mm;
   }
 
+  /* заголовок съедает часть печатной высоты — учитываем в высоте строк */
+  &--with-header {
+    --a4-header-h: 16mm;
+  }
+
+  /* Высота заголовка фиксирована (10mm + 6mm отступ = --a4-header-h),
+     иначе сетка не совпадёт с высотой листа и последняя строка уедет. */
   &__header {
+    box-sizing: border-box;
+    height: 10mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     text-align: center;
     font-size: 14px;
     font-weight: 700;
     color: #0f172a;
-    margin-bottom: 8mm;
-    padding-bottom: 3mm;
+    margin-bottom: 6mm;
+    padding-bottom: 2mm;
     border-bottom: 1px solid #cbd5e1;
   }
 
@@ -175,8 +293,10 @@
     /* Высота этикетки = высота печатной области / кол-во строк:
        меньше строк — крупнее этикетки (напр. 2 строки на весь лист). */
     grid-auto-rows: calc(
-      (var(--a4-page-h, 277mm) - 6mm * (var(--a4-rows, 8) - 1)) /
-        var(--a4-rows, 8)
+      (
+          var(--a4-page-h, 277mm) - var(--a4-header-h, 0mm) - 6mm *
+            (var(--a4-rows, 8) - 1)
+        ) / var(--a4-rows, 8)
     );
     gap: 6mm;
   }
@@ -330,43 +450,83 @@
   }
 }
 
-/* Уменьшенный превью листа на экране (чтобы влезал), при печати — реальный размер */
+/* Уменьшенный превью листов на экране (чтобы влезали), при печати — реальный размер.
+   zoom (а не transform) — чтобы уменьшалась и занимаемая листом высота
+   и между листами не оставалось пустот. */
 @media screen and (max-width: 1200px) {
-  .barcode-a4-sheet {
-    transform: scale(0.8);
+  .barcode-a4-page {
+    zoom: 0.8;
   }
 }
 
-/* ==== Печать: только лист A4 ==== */
+/* ==== Печать: только листы A4 ====
+   Важно: печатная область остаётся в обычном потоке (без position: absolute
+   и без visibility-хака) — иначе Chrome не разбивает её на страницы и печатает
+   только первый лист. Всё лишнее скрываем через display: none. Модалка
+   рендерится порталом в body, поэтому достаточно спрятать соседей по body. */
 @media print {
-  body * {
-    visibility: hidden !important;
+  html,
+  body {
+    /* глобальные min-height/overflow-x мешают многостраничной печати */
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
   }
-  .barcode-a4-print-area,
-  .barcode-a4-print-area * {
-    visibility: visible !important;
-  }
-  .barcode-a4-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+  body > *:not(.barcode-a4-overlay) {
+    display: none !important;
   }
   .barcode-a4-no-print {
     display: none !important;
   }
   .barcode-a4-overlay {
-    position: static;
-    background: none;
-    padding: 0;
-    overflow: visible;
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    background: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .barcode-a4-modal {
+    display: block;
+    max-width: none;
+    width: auto;
+    margin: 0;
+    gap: 0;
+  }
+  .barcode-a4-modal__previewWrap {
+    display: block;
+    width: auto;
+  }
+  .barcode-a4-print-area {
+    display: block;
+    gap: 0;
+  }
+  /* Каждый лист — отдельная страница печати */
+  .barcode-a4-page {
+    display: block;
+    gap: 0;
+    zoom: 1;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .barcode-a4-page + .barcode-a4-page {
+    break-before: page;
+    page-break-before: always;
   }
   .barcode-a4-sheet {
     box-shadow: none;
     transform: none;
+    /* поля даёт @page, а высоту листа — сетка (ровно --a4-page-h).
+       Фиксированную height не ставим: лишний миллиметр → пустая страница. */
     width: auto;
-    min-height: auto;
+    height: auto;
+    /* но не выше печатной области: иначе лишний контент уедет на пустую страницу */
+    max-height: var(--a4-page-h, 276mm);
     padding: 0;
+    overflow: hidden;
   }
   /* размер/ориентация @page задаётся динамически из компонента */
   @page {
