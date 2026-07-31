@@ -230,6 +230,9 @@ const formatDiscountPercentFromLine = (discountSom, lineTotal) => {
   return stripTrailingZerosAfterDecimal(pctNum) || "0";
 };
 
+// Сколько живёт догруженная карточка товара для строки корзины
+const CART_LINE_PRODUCT_TTL_MS = 5000;
+
 const CashierPage = () => {
   const alert = useAlert();
   const confirm = useConfirm();
@@ -960,6 +963,40 @@ const CashierPage = () => {
         return data || local;
       } catch {
         return local;
+      }
+    },
+    [products],
+  );
+
+  const cartLineProductCacheRef = React.useRef(new Map());
+
+  /**
+   * `products` — только текущая страница каталога (PAGE_SIZE), поэтому товара,
+   * добавленного сканером, в списке может не быть. Догружаем карточку по id,
+   * чтобы проверки остатка не «съедали» изменение количества.
+   * Вернёт null, если товар недоступен — тогда остаток валидирует сервер.
+   */
+  const resolveCartLineProduct = useCallback(
+    async (productId) => {
+      if (!productId) return null;
+      const local = products.find((p) => p.id === productId);
+      if (local) return local;
+      // Ввод количества летит через debounce — короткий TTL склеивает серию
+      // правок в один запрос, но остаток не устаревает надолго.
+      const cached = cartLineProductCacheRef.current.get(productId);
+      if (cached && Date.now() - cached.at < CART_LINE_PRODUCT_TTL_MS) {
+        return cached.product;
+      }
+      try {
+        const { data } = await api.get(`/main/products/${productId}/`);
+        const product = data || null;
+        cartLineProductCacheRef.current.set(productId, {
+          product,
+          at: Date.now(),
+        });
+        return product;
+      } catch {
+        return null;
       }
     },
     [products],
@@ -2507,17 +2544,21 @@ const CashierPage = () => {
 
     try {
       if (!item?.itemId || !item?.productId) return;
-      // Находим товар в списке продуктов для проверки наличия
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) return;
+      // Находим товар в списке продуктов для проверки наличия.
+      // Товара может не быть на текущей странице каталога (например, после
+      // скана) — тогда догружаем его; если не вышло, локальные проверки
+      // пропускаем и полагаемся на валидацию сервера, но количество
+      // обязательно отправляем (иначе итог молча не пересчитается).
+      const product = await resolveCartLineProduct(item.productId);
 
       const qtyNum = normalizeQuantity(
         Math.max(0, parseFloat(newQuantity) || 0),
       );
-      const availableQuantity = parseFloat(product.quantity || 0);
+      const availableQuantity = product ? parseFloat(product.quantity || 0) : 0;
 
       // Проверяем наличие (услуги — без ограничения по остатку)
       if (
+        product &&
         !isMarketWarehouseServiceProduct(product) &&
         !item.salePackage &&
         availableQuantity > 0 &&
@@ -2529,7 +2570,11 @@ const CashierPage = () => {
           `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
         );
         return;
-      } else if (item.salePackage && !isMarketWarehouseServiceProduct(product)) {
+      } else if (
+        product &&
+        item.salePackage &&
+        !isMarketWarehouseServiceProduct(product)
+      ) {
         if (!(availableQuantity > 0)) {
           showAlert(
             "warning",
@@ -2553,11 +2598,11 @@ const CashierPage = () => {
           );
           return;
         }
-        const totalConsume = calcTotalConsumeForProduct(
-          items,
-          item.productId,
-          products,
-        );
+        // Передаём именно resolved-товар: его может не быть в products
+        // (текущая страница каталога), а без packages расход считается неверно.
+        const totalConsume = calcTotalConsumeForProduct(items, item.productId, [
+          product,
+        ]);
         const newTotalConsume = totalConsume - currentQty / qip + qtyNum / qip;
         if (newTotalConsume > availableQuantity) {
           showAlert(
@@ -4139,6 +4184,13 @@ const CashierPage = () => {
                             }
                           }}
                           onFocus={(e) => {
+                            // Флаг живёт только до blur, который идёт сразу за
+                            // Enter/сканом. Если тот blur не случился (строка
+                            // перерисовалась), «зависший» флаг молча отменил бы
+                            // следующее изменение — снимаем его на фокусе.
+                            delete suppressQtyBlurUpdateRef.current[
+                              String(item.id)
+                            ];
                             qtyInputFocusRef.current = {
                               itemId: String(item.id),
                               prevValue:
@@ -4168,12 +4220,16 @@ const CashierPage = () => {
                             if (e.key === "Enter") {
                               e.preventDefault();
                               const lineKey = String(item.id);
+                              // currentTarget обнуляется React'ом сразу после
+                              // обработчика — держим сам узел и значение.
+                              const inputNode = e.currentTarget;
+                              const rawValue = inputNode.value;
                               suppressQtyBlurUpdateRef.current[lineKey] = true;
                               void commitCartLineQuantityInput(
                                 item,
-                                e.currentTarget.value,
+                                rawValue,
                               ).finally(() => {
-                                e.currentTarget.blur();
+                                inputNode.blur();
                               });
                             }
                           }}
