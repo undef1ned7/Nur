@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getBarcodeAmbiguity,
+  isBarcodeNotFoundError,
   serializeApiError,
 } from "./barcodeAmbiguity";
 
@@ -43,5 +44,36 @@ describe("barcodeAmbiguity", () => {
     expect(
       getBarcodeAmbiguity({ status: 404, data: { message: "Не найдено" } }),
     ).toBeNull();
+  });
+});
+
+describe("isBarcodeNotFoundError", () => {
+  it("detects 404 responses", () => {
+    expect(isBarcodeNotFoundError({ response: { status: 404, data: {} } })).toBe(
+      true,
+    );
+    expect(isBarcodeNotFoundError({ status: 404 })).toBe(true);
+  });
+
+  it("detects «не найден» in the error text", () => {
+    expect(
+      isBarcodeNotFoundError({
+        status: 400,
+        data: { detail: "Товар с таким штрих-кодом не найден" },
+      }),
+    ).toBe(true);
+    expect(isBarcodeNotFoundError({ message: "Product not found" })).toBe(true);
+  });
+
+  it("ignores other scan errors", () => {
+    expect(
+      isBarcodeNotFoundError({
+        status: 400,
+        data: { detail: "Недостаточно товара на складе" },
+      }),
+    ).toBe(false);
+    expect(isBarcodeNotFoundError({ status: 409, data: { ambiguous: true } })).toBe(
+      false,
+    );
   });
 });

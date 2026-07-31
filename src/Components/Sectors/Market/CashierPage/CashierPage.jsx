@@ -18,6 +18,7 @@ import { useDebounce, useDebounceByKey } from "../../../../hooks/useDebounce";
 import { useCashierQtyScanGuard } from "../../../../hooks/useCashierQtyScanGuard";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import { fetchProductsApi } from "../../../../api/products";
 import {
   addCustomItem,
   deleteProductInCart,
@@ -80,7 +81,10 @@ import {
   isOwnOpenShift,
   resolveCashierId,
 } from "../../../../tools/cashierOpenShift";
-import { getBarcodeAmbiguity } from "../../../../../tools/barcodeAmbiguity";
+import {
+  getBarcodeAmbiguity,
+  isBarcodeNotFoundError,
+} from "../../../../../tools/barcodeAmbiguity";
 
 const HOTKEY_GROUP_PATTERN = /^F(?:[1-9]|1[0-2])$/;
 const MARKET_CASHIER_WHOLESALE_MODE_KEY = "market_cashier_is_wholesale";
@@ -1321,6 +1325,51 @@ const CashierPage = () => {
   const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
   const [barcodeAmbiguityLoading, setBarcodeAmbiguityLoading] = useState(false);
 
+  /**
+   * Поиск товара по любому его штрих-коду (основной + `alternate_barcodes`).
+   * Сначала по загруженной странице каталога, затем через поиск на бэке.
+   */
+  const findProductByAnyBarcode = useCallback(
+    async (barcode) => {
+      const code = String(barcode || "").trim();
+      if (!code) return null;
+
+      const local = products.find((p) => productMatchesBarcode(p, code));
+      if (local) return local;
+
+      try {
+        const data = await fetchProductsApi({
+          search: code,
+          page: 1,
+          page_size: 50,
+        });
+        const list = Array.isArray(data) ? data : data?.results || [];
+        return list.find((p) => productMatchesBarcode(p, code)) || null;
+      } catch {
+        return null;
+      }
+    },
+    [products],
+  );
+
+  const addToCartRef = React.useRef(null);
+
+  /**
+   * Фолбэк сканирования: POS-эндпоинт ищет товар только по основному
+   * штрих-коду, поэтому при «товар не найден» пробуем добавить позицию по
+   * дополнительному штрих-коду сами. Возвращает true, если товар добавлен.
+   */
+  const addProductByAlternateBarcode = useCallback(
+    async (barcode) => {
+      const product = await findProductByAnyBarcode(barcode);
+      if (!product) return false;
+      if (openPieceSaleChoice(product, "click")) return true;
+      await addToCartRef.current?.(product);
+      return true;
+    },
+    [findProductByAnyBarcode, openPieceSaleChoice],
+  );
+
   useScanDetection({
     minLength: 3,
     onComplete: async (barcode) => {
@@ -1492,6 +1541,14 @@ const CashierPage = () => {
             typeof res.error === "string"
               ? res.error
               : "Товар с таким штрих-кодом не найден";
+          // Возможно, отсканирован дополнительный штрих-код — пробуем сами.
+          if (
+            isBarcodeNotFoundError({ message: msg }) &&
+            (await addProductByAlternateBarcode(barcode))
+          ) {
+            lastScanTimeRef.current = Date.now();
+            return;
+          }
           showAlert("error", "Ошибка сканирования", msg);
           return;
         }
@@ -1580,6 +1637,15 @@ const CashierPage = () => {
           error,
           "Не удалось добавить товар по штрих-коду",
         );
+        // Сервер ищет только по основному штрих-коду: если товар «не найден»,
+        // пробуем добавить его по дополнительному (alternate_barcodes).
+        if (
+          isBarcodeNotFoundError(error) &&
+          (await addProductByAlternateBarcode(barcode))
+        ) {
+          lastScanTimeRef.current = Date.now();
+          return;
+        }
         if (isShiftNotOpenApiError(error)) {
           await findOpenShift();
           dispatch(fetchShiftsAsync());
@@ -2462,6 +2528,12 @@ const CashierPage = () => {
   const addToCart = async (product) => {
     return addToCartWithPackage(product, null);
   };
+
+  // Фолбэк сканирования по доп. штрих-кодам вызывает addToCart через ref:
+  // сама функция объявлена ниже по файлу.
+  useEffect(() => {
+    addToCartRef.current = addToCart;
+  });
 
   const handleAmbiguousCashierProductSelect = async (match) => {
     const saleId =

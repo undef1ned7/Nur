@@ -10,7 +10,10 @@ import UniversalModal from "../../../Sectors/Production/ProductionAgents/Univers
 import BarcodeA4PrintModal from "./BarcodeA4PrintModal";
 import Loading from "../../../common/Loading/Loading";
 import JsBarcode from "jsbarcode";
-import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
+import {
+  getBarcodePrintEncoding,
+  getProductBarcodes,
+} from "../../../../../tools/productBarcode";
 
 /**
  * Компонент таба для печати штрих-кодов
@@ -99,6 +102,31 @@ const BarcodePrintTab = ({
       ...prev,
       [id]: Math.max(1, Math.min(100, Math.round(Number(value) || 1))),
     }));
+  }, []);
+
+  // Какой штрих-код печатать для позиции: { [productId]: barcode }.
+  // По умолчанию — основной; товар может иметь ещё и дополнительные.
+  const [barcodeById, setBarcodeById] = useState({});
+
+  const getProductBarcodeOptions = useCallback(
+    (product) => getProductBarcodes(product),
+    []
+  );
+
+  /** Выбранный (или основной) штрих-код позиции. */
+  const getSelectedBarcode = useCallback(
+    (product) => {
+      if (!product) return "";
+      const options = getProductBarcodes(product);
+      const chosen = String(barcodeById[product.id] ?? "").trim();
+      if (chosen && options.includes(chosen)) return chosen;
+      return options[0] || "";
+    },
+    [barcodeById]
+  );
+
+  const setSelectedBarcode = useCallback((id, barcode) => {
+    setBarcodeById((prev) => ({ ...prev, [id]: String(barcode || "") }));
   }, []);
   const availableFonts = useMemo(
     () => [
@@ -350,7 +378,7 @@ const BarcodePrintTab = ({
     const priceY = previewPriceText ? Math.min(desiredPriceY, maxPriceY) : null;
     const textX = safeLeft;
     const priceX = safeLeft;
-    const barcodeModules = getBarcodeModuleCount(previewProduct?.barcode);
+    const barcodeModules = getBarcodeModuleCount(getSelectedBarcode(previewProduct));
     const barcodeWidthDots = Math.round(barcodeModules * Math.max(1, barcodeBarWidth));
     const barcodeShiftX = Math.round(previewLayout.widthDots * 0.03);
     const barcodeX =
@@ -383,6 +411,7 @@ const BarcodePrintTab = ({
     barcodeBarWidth,
     fontBaseMap,
     getBarcodeModuleCount,
+    getSelectedBarcode,
   ]);
 
 
@@ -420,12 +449,13 @@ const BarcodePrintTab = ({
     [products],
   );
 
-  // выбранные товары с штрих-кодом (для массовой печати)
+  // выбранные товары с штрих-кодом (для массовой печати).
+  // Штрих-код может быть как основным, так и дополнительным (alternate_barcodes).
   const selectedWithBarcode = useMemo(() => {
     return filteredProducts.filter(
-      (p) => selectedIds.has(p.id) && String(p.barcode || "").trim()
+      (p) => selectedIds.has(p.id) && getSelectedBarcode(p)
     );
-  }, [filteredProducts, selectedIds]);
+  }, [filteredProducts, selectedIds, getSelectedBarcode]);
 
   // Всего этикеток с учётом копий каждой позиции
   const selectedLabelsTotal = useMemo(
@@ -446,11 +476,11 @@ const BarcodePrintTab = ({
     setSelectedIds((prev) => {
       const next = new Set(prev);
       filteredProducts.forEach((p) => {
-        if (String(p.barcode || "").trim()) next.add(p.id);
+        if (getSelectedBarcode(p)) next.add(p.id);
       });
       return next;
     });
-  }, [filteredProducts]);
+  }, [filteredProducts, getSelectedBarcode]);
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -475,7 +505,7 @@ const BarcodePrintTab = ({
   };
 
   const handleOpenPreview = (product) => {
-    const bc = String(product?.barcode || "").trim();
+    const bc = getSelectedBarcode(product);
     if (!bc) {
       alert("У товара отсутствует штрих-код");
       return;
@@ -489,7 +519,8 @@ const BarcodePrintTab = ({
   };
 
   const handlePrintFromPreview = async () => {
-    if (!previewProduct?.barcode) return;
+    const previewBarcode = getSelectedBarcode(previewProduct);
+    if (!previewBarcode) return;
 
     const { widthMm, heightMm } = currentLabel;
     const gapTitle = Math.max(0, Math.round(gapAfterTitle));
@@ -510,7 +541,7 @@ const BarcodePrintTab = ({
 
     try {
       await printXp365bBarcodeLabel({
-        barcode: String(previewProduct.barcode),
+        barcode: previewBarcode,
         title: showName ? previewProduct.name || "Товар" : "",
         price: showPrice ? previewProduct.price : "",
         copies: copiesForPrint,
@@ -589,7 +620,7 @@ const BarcodePrintTab = ({
       for (const product of selectedWithBarcode) {
         const productCopies = getProductCopies(product.id);
         await printXp365bBarcodeLabel({
-          barcode: String(product.barcode),
+          barcode: getSelectedBarcode(product),
           title: showName ? product.name || "Товар" : "",
           price: showPrice ? product.price : "",
           copies: productCopies,
@@ -662,6 +693,7 @@ const BarcodePrintTab = ({
     fontId,
     showName,
     showPrice,
+    getSelectedBarcode,
   ]);
 
   // Генерация визуализации штрих-кода для предпросмотра
@@ -669,7 +701,7 @@ const BarcodePrintTab = ({
     if (!previewProduct || !barcodeCanvasRef.current) return;
 
     const canvas = barcodeCanvasRef.current;
-    const barcode = String(previewProduct.barcode || "").trim();
+    const barcode = getSelectedBarcode(previewProduct);
     if (!barcode) return;
 
     let printCode = barcode;
@@ -744,6 +776,7 @@ const BarcodePrintTab = ({
     lineGap,
     textScaleValue,
     isRasterFont,
+    getSelectedBarcode,
   ]);
 
   const hasProducts = Array.isArray(products) && products.length > 0;
@@ -1026,7 +1059,9 @@ const BarcodePrintTab = ({
             <div className="barcode-print-tab__grid">
               {filteredProducts.map((product) => {
                 const isItemPrinting = printingIds.has(product.id);
-                const hasBarcode = Boolean(String(product.barcode || "").trim());
+                const barcodeOptions = getProductBarcodeOptions(product);
+                const selectedBarcode = getSelectedBarcode(product);
+                const hasBarcode = Boolean(selectedBarcode);
                 const isSelected = selectedIds.has(product.id);
 
                 return (
@@ -1054,9 +1089,28 @@ const BarcodePrintTab = ({
                         </span>
                       </label>
                       <div className="barcode-print-tab__barcode-label">Штрих-код:</div>
-                      <div className="barcode-print-tab__barcode-value">
-                        {product.barcode || "—"}
-                      </div>
+                      {barcodeOptions.length > 1 ? (
+                        <select
+                          className="barcode-print-tab__barcode-select"
+                          value={selectedBarcode}
+                          onChange={(e) =>
+                            setSelectedBarcode(product.id, e.target.value)
+                          }
+                          disabled={isBatchPrinting}
+                          title="У товара несколько штрих-кодов — выберите, какой печатать"
+                        >
+                          {barcodeOptions.map((code, idx) => (
+                            <option key={code} value={code}>
+                              {code}
+                              {idx === 0 ? " (основной)" : " (доп.)"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="barcode-print-tab__barcode-value">
+                          {selectedBarcode || "—"}
+                        </div>
+                      )}
                     </div>
 
                     <div className="barcode-print-tab__card-body">
@@ -1140,8 +1194,13 @@ const BarcodePrintTab = ({
         <BarcodeA4PrintModal
           products={(selectedWithBarcode.length > 0
             ? selectedWithBarcode
-            : filteredProducts.filter((p) => String(p.barcode || "").trim())
-          ).map((p) => ({ ...p, __copies: getProductCopies(p.id) }))}
+            : filteredProducts.filter((p) => getSelectedBarcode(p))
+          ).map((p) => ({
+            ...p,
+            // Печатаем выбранный код позиции (основной или дополнительный)
+            barcode: getSelectedBarcode(p),
+            __copies: getProductCopies(p.id),
+          }))}
           onClose={() => setShowA4Modal(false)}
         />
       )}
@@ -1196,6 +1255,26 @@ const BarcodePrintTab = ({
                   <option value="3">3×</option>
                 </select>
               </label>
+
+              {getProductBarcodeOptions(previewProduct).length > 1 && (
+                <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  Штрих-код:
+                  <select
+                    value={getSelectedBarcode(previewProduct)}
+                    onChange={(e) =>
+                      setSelectedBarcode(previewProduct.id, e.target.value)
+                    }
+                    title="У товара несколько штрих-кодов — выберите, какой печатать"
+                  >
+                    {getProductBarcodeOptions(previewProduct).map((code, idx) => (
+                      <option key={code} value={code}>
+                        {code}
+                        {idx === 0 ? " (основной)" : " (доп.)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 Копий:

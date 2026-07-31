@@ -385,6 +385,26 @@
     text-overflow: ellipsis;
   }
 
+  // Выбор штрих-кода, когда у товара есть дополнительные (alternate_barcodes)
+  &__barcode-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 4px 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #007bff;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
   &__card-body {
     display: flex;
     flex-direction: column;

@@ -3,6 +3,11 @@ const normalize = (value) =>
     .trim()
     .toLowerCase();
 
+/**
+ * Все штрих-коды товара: основной первым, затем дополнительные
+ * (`alternate_barcodes` / `barcodes` / `codes`). Без пустых и дублей.
+ * @returns {string[]}
+ */
 const getBarcodeCandidates = (product) => {
   const set = new Set();
 
@@ -40,7 +45,17 @@ const getBarcodeCandidates = (product) => {
     }
   }
 
-  return Array.from(set);
+  return Array.from(set).map((value) => value.trim()).filter(Boolean);
+};
+
+/** Публичный доступ к списку штрих-кодов товара (основной + дополнительные). */
+export const getProductBarcodes = (product) => getBarcodeCandidates(product);
+
+/** Основной штрих-код; если его нет — первый из дополнительных. */
+export const getPrimaryProductBarcode = (product) => {
+  const direct = String(product?.barcode ?? "").trim();
+  if (direct) return direct;
+  return getBarcodeCandidates(product)[0] || "";
 };
 
 export const productSearchHaystackLower = (product) => {
