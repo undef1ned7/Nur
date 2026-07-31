@@ -1,7 +1,9 @@
 import {
+  fetchProductsApi,
   getProductByBarcodeApi,
   lookupWarehouseProductByBarcodeApi,
 } from "../src/api/products";
+import { productMatchesBarcode } from "./productBarcode";
 
 /** Нормализует ответ lookup / global-barcode / обёртку product. */
 export const normalizeWarehouseBarcodeProduct = (data) => {
@@ -48,9 +50,27 @@ export async function lookupMarketWarehouseProductByBarcode(barcode, params = {}
     const product = normalizeWarehouseBarcodeProduct(data);
     if (product) return { product };
   } catch (err) {
-    if (isBarcodeNotFound(err)) return null;
-    throw err;
+    if (!isBarcodeNotFound(err)) throw err;
   }
 
-  return null;
+  // Фолбэк по дополнительным штрихкодам (`alternate_barcodes`):
+  // barcode-эндпоинты ищут только по основному коду.
+  const product = await findProductByAlternateBarcode(code);
+  return product ? { product } : null;
+}
+
+/** Поиск товара по доп. штрихкоду через обычный список товаров. */
+async function findProductByAlternateBarcode(code) {
+  try {
+    const data = await fetchProductsApi({
+      search: code,
+      page: 1,
+      page_size: 50,
+    });
+    const list = Array.isArray(data) ? data : data?.results || [];
+    const match = list.find((item) => productMatchesBarcode(item, code));
+    return match ? normalizeWarehouseBarcodeProduct(match) : null;
+  } catch {
+    return null;
+  }
 }
