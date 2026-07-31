@@ -65,7 +65,7 @@ import React, { useMemo } from "react";
 import "./Tabs.scss";
 import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
 
-const allTabs = ["Моя компания", "Безопасность", "Токен для весов", "Интерфейс", "Печать", "Онлайн"];
+const allTabs = ["Моя компания", "Безопасность", "Касса", "Токен для весов", "Интерфейс", "Печать", "Онлайн"];
 
 const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
@@ -91,6 +91,13 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   }, [sectorName]);
 
   const isOwner = useMemo(() => profile?.role === "owner", [profile?.role]);
+
+  // Настройки кассы магазина доступны только владельцу и админу
+  const isAdmin = useMemo(() => profile?.role === "admin", [profile?.role]);
+  const canViewMarketCashierSettings = useMemo(
+    () => isMarketSector && (isOwner || isAdmin),
+    [isMarketSector, isOwner, isAdmin]
+  );
 
   const canViewOnline = useMemo(() => {
     const hasSlug = Boolean(company?.slug);
@@ -119,13 +126,20 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   const visibleTabs = useMemo(() => {
     return allTabs.filter((tab) => {
       if (tab === "Моя компания") return isOwner;
+      if (tab === "Касса") return canViewMarketCashierSettings;
       if (tab === "Токен для весов") return isMarketSector;
       if (tab === "Печать") return isCafeSector;
       if (tab === "Онлайн") return canViewOnline;
       // "Безопасность" и "Интерфейс" всегда видны
       return true;
     });
-  }, [isOwner, isMarketSector, canViewOnline]);
+  }, [
+    isOwner,
+    isMarketSector,
+    isCafeSector,
+    canViewOnline,
+    canViewMarketCashierSettings,
+  ]);
 
   return (
     <div className="settings-tabs">

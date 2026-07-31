@@ -63,7 +63,9 @@ import {
   useMarketCashierMultiCart,
 } from "../../../../hooks/useMarketCashierMultiCart";
 import CashierCartsBar from "./components/CashierCartsBar";
+import DeleteCodeModal from "./components/DeleteCodeModal";
 import PieceSaleModal from "./components/PieceSaleModal";
+import { useMarketCashierSettings } from "../../../../hooks/useMarketCashierSettings";
 import {
   cartItemUnitLabel,
   cartLinesMatchProductAndPackage,
@@ -680,6 +682,58 @@ const CashierPage = () => {
     isPrivilegedRole ||
     permissionsSource?.can_view_market_delete_cart_item === true;
 
+  // Настройки кассы: код на удаление из корзины и максимальная скидка.
+  // Владелец/админ их задают и сами под ограничения не попадают.
+  const {
+    deleteCodeRequired,
+    maxDiscountPercent,
+    verifyDeleteCode,
+  } = useMarketCashierSettings();
+  const requireDeleteCode = deleteCodeRequired && !isPrivilegedRole;
+  const discountLimitPercent =
+    !isPrivilegedRole && maxDiscountPercent != null ? maxDiscountPercent : null;
+
+  const [deleteCodePrompt, setDeleteCodePrompt] = useState(null);
+  const deleteCodeResolveRef = useRef(null);
+
+  const closeDeleteCodePrompt = useCallback((granted) => {
+    setDeleteCodePrompt(null);
+    const resolve = deleteCodeResolveRef.current;
+    deleteCodeResolveRef.current = null;
+    resolve?.(Boolean(granted));
+  }, []);
+
+  /**
+   * Спрашивает код подтверждения перед удалением. Если код не задан
+   * (или роль привилегированная) — удаление проходит без запроса.
+   */
+  const ensureDeleteCode = useCallback(
+    (options = {}) => {
+      if (!requireDeleteCode) return Promise.resolve(true);
+      // Предыдущий запрос кода (если остался) отменяем.
+      deleteCodeResolveRef.current?.(false);
+      return new Promise((resolve) => {
+        deleteCodeResolveRef.current = resolve;
+        setDeleteCodePrompt({
+          title: options.title || "Удаление из корзины",
+          description:
+            options.description ||
+            "Введите код подтверждения, чтобы удалить позицию из корзины.",
+        });
+      });
+    },
+    [requireDeleteCode],
+  );
+
+  const handleDeleteCodeConfirm = useCallback(
+    async (code) => {
+      const ok = await verifyDeleteCode(code);
+      if (ok) closeDeleteCodePrompt(true);
+      return ok;
+    },
+    [verifyDeleteCode, closeDeleteCodePrompt],
+  );
+
   const handleDeleteCashierCart = useCallback(
     async (saleId) => {
       if (!saleId) return;
@@ -694,6 +748,13 @@ const CashierPage = () => {
       }
       confirm("Удалить эту корзину?", async (ok) => {
         if (!ok) return;
+
+        const codeAccepted = await ensureDeleteCode({
+          title: "Удаление корзины",
+          description:
+            "Введите код подтверждения, чтобы удалить корзину целиком.",
+        });
+        if (!codeAccepted) return;
 
         try {
           const deletingActiveCart =
@@ -739,6 +800,7 @@ const CashierPage = () => {
       setSearchParams,
       urlSaleId,
       canMarketDeleteCartItem,
+      ensureDeleteCode,
     ],
   );
   const [searchTerm, setSearchTerm] = useState("");
@@ -1061,7 +1123,35 @@ const CashierPage = () => {
   }, 600);
 
   const handleDiscountChange = (discount, mode = "amount") => {
-    const num = parseFloat(discount) || 0;
+    let num = Math.max(0, parseFloat(discount) || 0);
+
+    // Ограничение максимальной скидки для сотрудников (настройка кассы).
+    if (discountLimitPercent != null) {
+      const limitLabel = stripTrailingZerosAfterDecimal(discountLimitPercent);
+      if (mode === "percent") {
+        if (num > discountLimitPercent) {
+          num = discountLimitPercent;
+          showAlert(
+            "warning",
+            "Скидка",
+            `Максимальная скидка — ${limitLabel}%. Установлено ${limitLabel}%.`,
+          );
+        }
+      } else {
+        const subtotal = parseFloat(currentSale?.subtotal || 0) || 0;
+        const maxDiscountSom = normalizePrice(
+          (subtotal * discountLimitPercent) / 100,
+        );
+        if (subtotal > 0 && num > maxDiscountSom) {
+          num = maxDiscountSom;
+          showAlert(
+            "warning",
+            "Скидка",
+            `Максимальная скидка — ${limitLabel}% (${formatPrice(maxDiscountSom)} сом). Установлено ${formatPrice(maxDiscountSom)} сом.`,
+          );
+        }
+      }
+    }
 
     if (mode === "percent") {
       // В процентах отправляем order_discount_percent
@@ -1168,7 +1258,8 @@ const CashierPage = () => {
         showDeletionsLogModal ||
         showReceiptsModal ||
         showCustomServiceModal ||
-        showDiscountModal
+        showDiscountModal ||
+        deleteCodePrompt
       ) {
         return;
       }
@@ -1194,6 +1285,7 @@ const CashierPage = () => {
     showOpenShiftPage,
     showPaymentPage,
     showShiftPage,
+    deleteCodePrompt,
   ]);
 
   // Защита кнопок +/- от потока символов сканера.
@@ -1251,6 +1343,7 @@ const CashierPage = () => {
         showHotkeyProductsModal ||
         showCustomServiceModal ||
         showDiscountModal ||
+        deleteCodePrompt ||
         barcodeAmbiguity
       ) {
         return;
@@ -1852,6 +1945,7 @@ const CashierPage = () => {
           );
           return;
         }
+        if (!(await ensureDeleteCode())) return;
         await dispatch(
           deleteProductInCart({
             id: saleId,
@@ -1966,6 +2060,14 @@ const CashierPage = () => {
         "Нет доступа",
         "У вас нет доступа на удаление позиций из корзины",
       );
+      return;
+    }
+
+    if (!(await ensureDeleteCode())) {
+      setCartQuantities((prev) => ({
+        ...prev,
+        [cartItem.id]: formatQuantity(cartItem.quantity || 0),
+      }));
       return;
     }
 
@@ -2117,7 +2219,8 @@ const CashierPage = () => {
         showReceiptsModal ||
         showHotkeyProductsModal ||
         showCustomServiceModal ||
-        showDiscountModal
+        showDiscountModal ||
+        deleteCodePrompt
       ) {
         return;
       }
@@ -2226,6 +2329,7 @@ const CashierPage = () => {
     showHotkeyProductsModal,
     showCustomServiceModal,
     showDiscountModal,
+    deleteCodePrompt,
   ]);
 
   useEffect(() => {
@@ -2488,6 +2592,7 @@ const CashierPage = () => {
           );
           return;
         }
+        if (!(await ensureDeleteCode())) return;
         // Удаляем товар из корзины
         await dispatch(
           deleteProductInCart({
@@ -2708,6 +2813,14 @@ const CashierPage = () => {
         "Нет доступа",
         "У вас нет доступа на удаление позиций из корзины",
       );
+      return;
+    }
+
+    if (!(await ensureDeleteCode())) {
+      setCartQuantities((prev) => ({
+        ...prev,
+        [item.id]: formatQuantity(item.quantity || 0),
+      }));
       return;
     }
 
@@ -2949,7 +3062,8 @@ const CashierPage = () => {
   // API хранит line_discount (сумма); в запросе — discount_total. Итог по строке: (unit_price × quantity) - line_discount.
   // Скидка не может превышать сумму строки (итог не уходит в минус).
   const patchCartItemDiscount = async (item, value, options = {}) => {
-    const { mode = "amount", displayValue } = options;
+    const { mode = "amount" } = options;
+    let displayValue = options.displayValue;
     const saleId = getCartLineSaleId(item);
     if (!saleId) return;
     if (!canMarketDiscount) {
@@ -2970,6 +3084,21 @@ const CashierPage = () => {
         "Скидка",
         `Скидка не может быть больше суммы по строке (${formatPrice(lineTotal)} сом). Установлено ${formatPrice(lineTotal)} сом.`,
       );
+    }
+    // Ограничение максимальной скидки для сотрудников (настройка кассы).
+    if (discountLimitPercent != null && lineTotal > 0) {
+      const maxDiscountSom = normalizePrice((lineTotal * discountLimitPercent) / 100);
+      if (num > maxDiscountSom) {
+        num = maxDiscountSom;
+        if (mode === "percent") {
+          displayValue = stripTrailingZerosAfterDecimal(discountLimitPercent);
+        }
+        showAlert(
+          "warning",
+          "Скидка",
+          `Максимальная скидка — ${stripTrailingZerosAfterDecimal(discountLimitPercent)}%. Установлено ${formatPrice(maxDiscountSom)} сом.`,
+        );
+      }
     }
     const data = { discount_total: String(num.toFixed(2)) };
     const lineKey = String(item.id);
@@ -3967,6 +4096,9 @@ const CashierPage = () => {
                       <label className="cashier-page__cart-item-field">
                         <span className="cashier-page__cart-item-field-label">
                           Скидка
+                          {discountLimitPercent != null
+                            ? ` (до ${stripTrailingZerosAfterDecimal(discountLimitPercent)}%)`
+                            : ""}
                         </span>
                         <input
                           type="text"
@@ -4356,6 +4488,15 @@ const CashierPage = () => {
         <DeletionsLogModal onClose={() => setShowDeletionsLogModal(false)} />
       )}
 
+      {deleteCodePrompt && (
+        <DeleteCodeModal
+          title={deleteCodePrompt.title}
+          description={deleteCodePrompt.description}
+          onConfirm={handleDeleteCodeConfirm}
+          onCancel={() => closeDeleteCodePrompt(false)}
+        />
+      )}
+
       {showCustomServiceModal && (
         <CustomServiceModal
           show={showCustomServiceModal}
@@ -4380,6 +4521,11 @@ const CashierPage = () => {
           currentSubtotal={currentSale?.subtotal || 0}
           mode={discountMode}
           setMode={setDiscountMode}
+          maxPercent={
+            discountLimitPercent != null
+              ? stripTrailingZerosAfterDecimal(discountLimitPercent)
+              : null
+          }
           onApply={(discount) => {
             handleDiscountChange(discount, discountMode);
             setShowDiscountModal(false);

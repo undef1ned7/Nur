@@ -1235,6 +1235,11 @@ import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
+import {
+  fetchMarketCashierSettings,
+  normalizeMarketCashierSettings,
+  updateMarketCashierSettings,
+} from "../../../../api/marketCashierSettings";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -1266,6 +1271,13 @@ const Settings = () => {
 
   // Определяем, является ли пользователь владельцем
   const isOwner = useMemo(() => profile?.role === "owner", [profile?.role]);
+  const isAdmin = useMemo(() => profile?.role === "admin", [profile?.role]);
+
+  // Вкладка «Касса» (код удаления и лимит скидки) — только владелец/админ магазина
+  const canViewMarketCashierSettings = useMemo(
+    () => isMarketSector && (isOwner || isAdmin),
+    [isMarketSector, isOwner, isAdmin]
+  );
 
   const canViewOnline = useMemo(() => {
     const hasSlug = Boolean(company?.slug);
@@ -1337,8 +1349,117 @@ const Settings = () => {
             ? "Токен для весов"
             : "Безопасность"
       );
+    } else if (activeTab === "Касса" && !canViewMarketCashierSettings) {
+      setActiveTab(
+        isOwner
+          ? "Моя компания"
+          : isMarketSector
+            ? "Токен для весов"
+            : "Безопасность"
+      );
     }
-  }, [isMarketSector, isOwner, activeTab, isInitialized, canViewOnline]);
+  }, [
+    isMarketSector,
+    isOwner,
+    activeTab,
+    isInitialized,
+    canViewOnline,
+    canViewMarketCashierSettings,
+  ]);
+
+  /* ===== Вкладка «Касса»: код удаления из корзины и максимальная скидка ===== */
+  const [cashierSettings, setCashierSettings] = useState({
+    deleteCode: "",
+    maxDiscountPercent: "",
+  });
+  const [cashierSettingsLoading, setCashierSettingsLoading] = useState(false);
+  const [cashierSettingsSaving, setCashierSettingsSaving] = useState(false);
+  const [cashierSettingsError, setCashierSettingsError] = useState("");
+  const [showCashierDeleteCode, setShowCashierDeleteCode] = useState(false);
+
+  useEffect(() => {
+    if (!canViewMarketCashierSettings) return undefined;
+    let cancelled = false;
+
+    const load = async () => {
+      setCashierSettingsLoading(true);
+      setCashierSettingsError("");
+      try {
+        const data = await fetchMarketCashierSettings();
+        if (cancelled) return;
+        const normalized = normalizeMarketCashierSettings(data);
+        setCashierSettings({
+          deleteCode: normalized.deleteCode,
+          maxDiscountPercent:
+            normalized.maxDiscountPercent == null
+              ? ""
+              : String(normalized.maxDiscountPercent),
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setCashierSettingsError(
+          validateResErrors(err, "Не удалось загрузить настройки кассы")
+        );
+      } finally {
+        if (!cancelled) setCashierSettingsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewMarketCashierSettings]);
+
+  const handleSaveCashierSettings = async (e) => {
+    e.preventDefault();
+    if (!canViewMarketCashierSettings) return;
+
+    const code = String(cashierSettings.deleteCode || "").trim();
+    if (code && !/^\d{4,8}$/.test(code)) {
+      showAlert("error", "Код удаления должен состоять из 4–8 цифр");
+      return;
+    }
+
+    const rawPercent = String(cashierSettings.maxDiscountPercent || "")
+      .trim()
+      .replace(",", ".");
+    let percent = null;
+    if (rawPercent !== "") {
+      percent = parseFloat(rawPercent);
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+        showAlert("error", "Максимальная скидка должна быть от 0 до 100 %");
+        return;
+      }
+    }
+
+    setCashierSettingsSaving(true);
+    try {
+      const data = await updateMarketCashierSettings({
+        delete_item_code: code || null,
+        max_discount_percent: percent === null ? null : String(percent),
+      });
+      const normalized = normalizeMarketCashierSettings(data);
+      setCashierSettings({
+        deleteCode: normalized.deleteCode || code,
+        maxDiscountPercent:
+          normalized.maxDiscountPercent == null
+            ? percent === null
+              ? ""
+              : String(percent)
+            : String(normalized.maxDiscountPercent),
+      });
+      setCashierSettingsError("");
+      showAlert("success", "Настройки кассы сохранены");
+    } catch (err) {
+      showAlert(
+        "error",
+        validateResErrors(err, "Не удалось сохранить настройки кассы")
+      );
+    } finally {
+      setCashierSettingsSaving(false);
+    }
+  };
 
   const [saving, setSaving] = useState(false);
 
@@ -2188,6 +2309,143 @@ const Settings = () => {
                 disabled={saving}
               >
                 Отменить
+              </button>
+            </div>
+          </form>
+        );
+
+      case "Касса":
+        return (
+          <form
+            onSubmit={handleSaveCashierSettings}
+            className="settings__tab-form"
+          >
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <span className="settings__emoji">🔐</span> Код на удаление из
+                корзины
+              </h2>
+
+              <div className="settings__form-group">
+                <p className="settings__mutedText">
+                  Если код задан, кассир сможет удалить товар из корзины только
+                  после его ввода. Оставьте поле пустым — товары будут удаляться
+                  без подтверждения. Владелец и админ удаляют без кода.
+                </p>
+
+                <label className="settings__label" htmlFor="delete_item_code">
+                  Код подтверждения (4–8 цифр)
+                </label>
+                <div className="settings__input-wrapper">
+                  <input
+                    id="delete_item_code"
+                    name="delete_item_code"
+                    type={showCashierDeleteCode ? "text" : "password"}
+                    inputMode="numeric"
+                    className="settings__input"
+                    placeholder="Например, 1234"
+                    autoComplete="off"
+                    disabled={cashierSettingsLoading}
+                    value={cashierSettings.deleteCode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 8);
+                      setCashierSettings((prev) => ({
+                        ...prev,
+                        deleteCode: value,
+                      }));
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="settings__password-toggle"
+                    onClick={() => setShowCashierDeleteCode((prev) => !prev)}
+                    aria-label="Показать/скрыть код"
+                  >
+                    {showCashierDeleteCode ? "🙈" : "👁️"}
+                  </button>
+                </div>
+
+                {cashierSettings.deleteCode ? (
+                  <button
+                    type="button"
+                    className="settings__btn settings__btn--secondary"
+                    style={{ marginTop: 10, width: "auto" }}
+                    onClick={() =>
+                      setCashierSettings((prev) => ({
+                        ...prev,
+                        deleteCode: "",
+                      }))
+                    }
+                  >
+                    Убрать код
+                  </button>
+                ) : (
+                  <p
+                    className="settings__mutedText"
+                    style={{ marginTop: 8 }}
+                  >
+                    Сейчас код не требуется — удаление проходит без
+                    подтверждения.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <span className="settings__emoji">％</span> Максимальная скидка
+              </h2>
+
+              <div className="settings__form-group">
+                <p className="settings__mutedText">
+                  Ограничение для сотрудников: скидка на позицию и на весь чек
+                  не сможет превысить указанный процент. Пустое поле — без
+                  ограничения. На владельца и админа ограничение не действует.
+                </p>
+
+                <label
+                  className="settings__label"
+                  htmlFor="max_discount_percent"
+                >
+                  Максимальная скидка, %
+                </label>
+                <input
+                  id="max_discount_percent"
+                  name="max_discount_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="settings__input"
+                  placeholder="Без ограничения"
+                  disabled={cashierSettingsLoading}
+                  value={cashierSettings.maxDiscountPercent}
+                  onChange={(e) =>
+                    setCashierSettings((prev) => ({
+                      ...prev,
+                      maxDiscountPercent: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            {cashierSettingsError ? (
+              <p
+                className="settings__mutedText"
+                style={{ color: "#dc2626", marginBottom: 12 }}
+              >
+                {cashierSettingsError}
+              </p>
+            ) : null}
+
+            <div className="settings__actions">
+              <button
+                className="settings__btn settings__btn--primary"
+                type="submit"
+                disabled={cashierSettingsSaving || cashierSettingsLoading}
+              >
+                {cashierSettingsSaving ? "Сохранение..." : "Сохранить изменения"}
               </button>
             </div>
           </form>
