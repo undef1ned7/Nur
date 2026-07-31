@@ -10,6 +10,7 @@ const DiscountModal = ({
   onApply,
   mode = "amount", // "amount" | "percent"
   setMode, // опционально, если нужно менять режим из модалки
+  maxPercent = null, // максимальная скидка в % (null — без ограничения)
 }) => {
   const handleClose = useCallback(() => {
     onClose();
@@ -90,6 +91,11 @@ const DiscountModal = ({
           {currentSubtotal && mode === "amount" && (
             <p style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>
               Сумма без скидки: {currentSubtotal}
+            </p>
+          )}
+          {maxPercent != null && (
+            <p style={{ fontSize: "12px", color: "#b45309", marginTop: "5px" }}>
+              Максимальная скидка: {maxPercent}%
             </p>
           )}
         </div>
