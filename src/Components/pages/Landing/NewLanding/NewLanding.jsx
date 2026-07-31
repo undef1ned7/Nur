@@ -19,6 +19,7 @@ const Base = lazy(() => import("./sections/Base/Base"));
 const Demo = lazy(() => import("./sections/Demo/Demo"));
 
 const SUPPORT_PHONE_HREF = "tel:+996551900556";
+const SUPPORT_PHONE_SECOND_HREF = "tel:+996559900556";
 
 const NewLanding = () => {
   const { t } = useTranslation("newLanding");
@@ -93,12 +94,24 @@ const NewLanding = () => {
       <LazySection minHeight={320}>
         <Footer />
       </LazySection>
-      <a
-        className="new-landing-page__support-phone"
-        href={SUPPORT_PHONE_HREF}
-      >
-        {t("supportPhone.label")}: {t("supportPhone.number")}
-      </a>
+      <div className="new-landing-page__support-phone">
+        <span className="new-landing-page__support-phone-label">
+          {t("supportPhone.label")}:
+        </span>
+        <a
+          className="new-landing-page__support-phone-link"
+          href={SUPPORT_PHONE_HREF}
+        >
+          {t("supportPhone.number")}
+        </a>
+        <span className="new-landing-page__support-phone-sep">/</span>
+        <a
+          className="new-landing-page__support-phone-link"
+          href={SUPPORT_PHONE_SECOND_HREF}
+        >
+          {t("supportPhone.numberSecond")}
+        </a>
+      </div>
     </div>
   );
 };
