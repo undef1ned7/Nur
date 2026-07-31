@@ -1,5 +1,5 @@
 import React from "react";
-import { Trash2, X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import "./BulkActionsBar.scss";
 
 /**
@@ -9,7 +9,9 @@ const BulkActionsBar = ({
   selectedCount,
   onClearSelection,
   onBulkDelete,
+  onBulkEdit,
   isDeleting,
+  isUpdating,
 }) => {
   if (selectedCount === 0) return null;
 
@@ -42,6 +44,17 @@ const BulkActionsBar = ({
             <X size={16} />
             Сбросить
           </button>
+          {onBulkEdit && (
+            <button
+              className="warehouse-bulk-actions__edit-btn"
+              onClick={onBulkEdit}
+              disabled={isDeleting || isUpdating}
+              title="Изменить бренд, категорию или поставщика у выбранных товаров"
+            >
+              <Pencil size={16} />
+              {isUpdating ? "Сохранение..." : "Изменить выбранные"}
+            </button>
+          )}
           <button
             className="warehouse-bulk-actions__delete-btn"
             onClick={onBulkDelete}

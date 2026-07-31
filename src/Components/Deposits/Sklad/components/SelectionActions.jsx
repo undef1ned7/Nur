@@ -8,8 +8,10 @@ const SelectionActions = ({
   selectedIds,
   toggleSelectAllOnPage,
   onBulkDelete,
+  onBulkEdit,
   onClearSelection,
   bulkDeleting,
+  bulkUpdating,
 }) => {
   const allOnPageChecked =
     pageItems.length > 0 && pageItems.every((i) => selectedIds.has(i.id));
@@ -31,6 +33,16 @@ const SelectionActions = ({
             Выбрано: {selectedIds.size}
           </span>
           <div className="selection-actions__actions">
+            {onBulkEdit && (
+              <button
+                className="selection-actions__edit-btn"
+                onClick={onBulkEdit}
+                disabled={bulkUpdating || bulkDeleting}
+                title="Изменить бренд, категорию или поставщика у выбранных товаров"
+              >
+                {bulkUpdating ? "Сохраняем..." : "Изменить выбранные"}
+              </button>
+            )}
             <button
               className="selection-actions__delete-btn"
               onClick={onBulkDelete}

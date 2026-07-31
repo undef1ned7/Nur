@@ -9,11 +9,13 @@ import BarcodeAmbiguityModal from "../../../common/BarcodeAmbiguityModal/Barcode
 import WarehouseHeader from "./components/WarehouseHeader";
 import SearchSection from "./components/SearchSection";
 import BulkActionsBar from "./components/BulkActionsBar";
+import BulkEditModal from "./components/BulkEditModal";
 import ProductTable from "./components/ProductTable";
 import ProductCards from "./components/ProductCards";
 import Pagination from "./components/Pagination";
 import {
   bulkDeleteProductsAsync,
+  bulkUpdateProductsAsync,
   fetchProductsAsync,
 } from "../../../../store/creators/productCreators";
 import useScanDetection from "use-scan-detection";
@@ -82,6 +84,8 @@ const Warehouse = () => {
   const [scanLookupLoading, setScanLookupLoading] = useState(false);
   const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -288,6 +292,49 @@ const Warehouse = () => {
     }
   }, [dispatch, selectedRows, requestParams]);
 
+  const handleBulkEdit = useCallback(() => {
+    if (selectedCount === 0) return;
+    setShowBulkEditModal(true);
+  }, [selectedCount]);
+
+  const confirmBulkEdit = useCallback(
+    async (changes) => {
+      if (selectedRows.size === 0) return;
+      setBulkUpdating(true);
+      try {
+        const result = await dispatch(
+          bulkUpdateProductsAsync({
+            ids: Array.from(selectedRows),
+            ...changes,
+            require_all: false,
+          })
+        ).unwrap();
+
+        setShowBulkEditModal(false);
+        setSelectedRows(new Set());
+
+        const failed = Number(result?.failed) || 0;
+        if (failed > 0) {
+          alert(
+            `Обновлено товаров: ${result?.updated ?? 0}, не удалось: ${failed}`,
+            true,
+          );
+        }
+
+        dispatch(fetchProductsAsync(requestParams));
+      } catch (e) {
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при изменении товаров",
+        );
+        alert(errorMessage, true);
+      } finally {
+        setBulkUpdating(false);
+      }
+    },
+    [dispatch, selectedRows, setSelectedRows, requestParams, alert],
+  );
+
   const handleApplyFilters = useCallback(
     (newFilters) => {
       setFilters(newFilters);
@@ -341,7 +388,13 @@ const Warehouse = () => {
       ) {
         return;
       }
-      if (showFilterModal || showDeleteConfirmModal || barcodeAmbiguity) return;
+      if (
+        showFilterModal ||
+        showDeleteConfirmModal ||
+        showBulkEditModal ||
+        barcodeAmbiguity
+      )
+        return;
 
       const now = Date.now();
       const isDuplicateScan =
@@ -414,7 +467,9 @@ const Warehouse = () => {
         selectedCount={selectedCount}
         onClearSelection={clearSelection}
         onBulkDelete={handleBulkDelete}
+        onBulkEdit={handleBulkEdit}
         isDeleting={bulkDeleting}
+        isUpdating={bulkUpdating}
       />
       <DataContainer>
         <div className="warehouse-table-container w-full">
@@ -461,6 +516,21 @@ const Warehouse = () => {
             currentFilters={filters}
             onApplyFilters={handleApplyFilters}
             onResetFilters={handleResetFilters}
+            brands={brands}
+            categories={categories}
+            suppliers={suppliers}
+            suppliersLoading={suppliersLoading}
+          />
+        </ReactPortal>
+      )}
+
+      {showBulkEditModal && (
+        <ReactPortal modalId="warehouse-bulk-edit-modal">
+          <BulkEditModal
+            selectedCount={selectedCount}
+            onClose={() => setShowBulkEditModal(false)}
+            onApply={confirmBulkEdit}
+            saving={bulkUpdating}
             brands={brands}
             categories={categories}
             suppliers={suppliers}

@@ -31,8 +31,10 @@ const HistoryTab = ({
   onPreviousPage,
   selectedIds,
   onBulkDelete,
+  onBulkEdit,
   onClearSelection,
   bulkDeleting,
+  bulkUpdating,
 }) => {
   const filteredHistory = products.filter((item) => item.status === "history");
 
@@ -57,8 +59,10 @@ const HistoryTab = ({
           selectedIds={selectedIds}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
           onBulkDelete={onBulkDelete}
+          onBulkEdit={onBulkEdit}
           onClearSelection={onClearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       )}
 

@@ -30,12 +30,14 @@ import AcceptPendingModal from "./components/modals/AcceptPendingModal";
 import AcceptHistoryModal from "./components/modals/AcceptHistoryModal";
 import AddModal from "./components/modals/AddModal";
 import SellModal from "./components/modals/SellModal";
+import BulkEditModal from "./components/modals/BulkEditModal";
 
 // Хуки
 import { useBulkSelection } from "./hooks/useBulkSelection";
 import { useSkladFilters } from "./hooks/useSkladFilters";
 import { useSkladPagination } from "./hooks/useSkladPagination";
 import { useBulkDelete } from "./hooks/useBulkDelete";
+import { useBulkUpdate } from "./hooks/useBulkUpdate";
 import DataContainer from "../../common/DataContainer/DataContainer";
 
 export default function Sklad() {
@@ -117,6 +119,20 @@ export default function Sklad() {
     currentFilters
   );
 
+  const {
+    showBulkEditModal,
+    openBulkEdit,
+    closeBulkEdit,
+    handleBulkUpdate,
+    bulkUpdating,
+  } = useBulkUpdate(
+    selectedIds,
+    clearSelection,
+    currentPage,
+    searchTerm,
+    currentFilters
+  );
+
   // Определение сектора и тарифа
   const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
   const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
@@ -176,12 +192,13 @@ export default function Sklad() {
         setShowHistoryModal(false);
         setShowAddProductModal(false);
         setShowMarriageModal(false);
+        closeBulkEdit();
       }
     };
 
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, []);
+  }, [closeBulkEdit]);
 
   // Обработчики
   const handleEdit = (item) => {
@@ -340,8 +357,10 @@ export default function Sklad() {
           onPreviousPage={() => handlePreviousPage(previous)}
           selectedIds={selectedIds}
           onBulkDelete={handleBulkDelete}
+          onBulkEdit={openBulkEdit}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
           showHeader={true}
         />
         </DataContainer>
@@ -375,8 +394,10 @@ export default function Sklad() {
           onPreviousPage={() => handlePreviousPage(previous)}
           selectedIds={selectedIds}
           onBulkDelete={handleBulkDelete}
+          onBulkEdit={openBulkEdit}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       ),
     },
@@ -424,8 +445,10 @@ export default function Sklad() {
           onPreviousPage={() => handlePreviousPage(previous)}
           selectedIds={selectedIds}
           onBulkDelete={handleBulkDelete}
+          onBulkEdit={openBulkEdit}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       ),
     },
@@ -469,8 +492,10 @@ export default function Sklad() {
           onPreviousPage={() => handlePreviousPage(previous)}
           selectedIds={selectedIds}
           onBulkDelete={handleBulkDelete}
+          onBulkEdit={openBulkEdit}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       ),
     },
@@ -514,8 +539,10 @@ export default function Sklad() {
           onPreviousPage={() => handlePreviousPage(previous)}
           selectedIds={selectedIds}
           onBulkDelete={handleBulkDelete}
+          onBulkEdit={openBulkEdit}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       ),
     },
@@ -576,8 +603,10 @@ export default function Sklad() {
             onPreviousPage={() => handlePreviousPage(previous)}
             selectedIds={selectedIds}
             onBulkDelete={handleBulkDelete}
+            onBulkEdit={openBulkEdit}
             onClearSelection={clearSelection}
             bulkDeleting={bulkDeleting}
+            bulkUpdating={bulkUpdating}
             showHeader={false}
           />
         </>
@@ -686,6 +715,15 @@ export default function Sklad() {
       )}
 
       {showSellModal && <SellModal onClose={() => setShowSellModal(false)} />}
+
+      {showBulkEditModal && (
+        <BulkEditModal
+          selectedCount={selectedIds.size}
+          onClose={closeBulkEdit}
+          onApply={handleBulkUpdate}
+          saving={bulkUpdating}
+        />
+      )}
 
       {showBrandModal && (
         <AddBrandModal onClose={() => setShowBrandModal(false)} />

@@ -1878,6 +1878,43 @@
     }
   }
 
+  &__edit-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: var(--primary);
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(247, 215, 79, 0.35);
+    font-family: "Montserrat", sans-serif;
+
+    &:hover:not(:disabled) {
+      box-shadow: 0 6px 16px rgba(247, 215, 79, 0.45);
+      transform: translateY(-2px);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
   &__delete-btn {
     display: flex;
     align-items: center;
@@ -2001,6 +2038,7 @@
     }
 
     &__clear-btn,
+    &__edit-btn,
     &__delete-btn {
       flex: 1;
       justify-content: center;

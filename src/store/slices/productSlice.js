@@ -6,6 +6,7 @@ import {
   updateProductAsync,
   deleteProductAsync,
   bulkDeleteProductsAsync,
+  bulkUpdateProductsAsync,
   fetchBrandsAsync,
   fetchCategoriesAsync,
   createBrandAsync,
@@ -65,6 +66,8 @@ const initialState = {
   createError: null,
   updating: false,
   updateError: null,
+  bulkUpdating: false,
+  bulkUpdateError: null,
   deleting: false,
   deleteError: null,
   barcodeError: null,
@@ -431,6 +434,40 @@ const productSlice = createSlice({
       .addCase(deleteProductAsync.rejected, (state, action) => {
         state.deleting = false;
         state.deleteError = action.payload;
+      })
+      .addCase(bulkUpdateProductsAsync.pending, (state) => {
+        state.bulkUpdating = true;
+        state.bulkUpdateError = null;
+      })
+      .addCase(bulkUpdateProductsAsync.fulfilled, (state, action) => {
+        state.bulkUpdating = false;
+        state.productsCache = {};
+        // Оптимистично проставляем новые значения в текущем списке
+        const {
+          ids = [],
+          brand_name,
+          category_name,
+          client,
+        } = action.meta.arg || {};
+        const idSet = new Set(ids.map((id) => String(id)));
+        state.list = state.list.map((product) =>
+          idSet.has(String(product.id))
+            ? {
+                ...product,
+                ...(brand_name !== undefined
+                  ? { brand: brand_name, brand_name }
+                  : {}),
+                ...(category_name !== undefined
+                  ? { category: category_name, category_name }
+                  : {}),
+                ...(client !== undefined ? { client } : {}),
+              }
+            : product
+        );
+      })
+      .addCase(bulkUpdateProductsAsync.rejected, (state, action) => {
+        state.bulkUpdating = false;
+        state.bulkUpdateError = action.payload;
       })
       .addCase(bulkDeleteProductsAsync.pending, (state) => {
         state.deleting = true;

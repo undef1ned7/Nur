@@ -9,6 +9,7 @@ import {
   createProductApi,
   updateProductApi,
   deleteProductApi,
+  bulkUpdateProductsApi, // PATCH /main/products/bulk-update/
   fetchBrands, // GET /main/brands/
   createBrand as createBrandApi,
   updateBrand as updateBrandApi,
@@ -87,6 +88,43 @@ export const bulkDeleteProductsAsync = createAsyncThunk(
       });
       return data;
     } catch (error) {
+      return handleThunkError(error, rejectWithValue);
+    }
+  }
+);
+
+/* bulk-update: массовая смена бренда / категории / поставщика */
+export const bulkUpdateProductsAsync = createAsyncThunk(
+  "products/bulkUpdate",
+  async (
+    { ids, brand_name, category_name, client, require_all = false },
+    { rejectWithValue }
+  ) => {
+    // В payload попадают только реально выбранные для изменения поля
+    const changes = {};
+    if (brand_name !== undefined) changes.brand_name = brand_name;
+    if (category_name !== undefined) changes.category_name = category_name;
+    if (client !== undefined) changes.client = client;
+
+    try {
+      return await bulkUpdateProductsApi({ ids, ...changes, require_all });
+    } catch (error) {
+      // Пока бэкенд не поднял /bulk-update/ — падаем на последовательный PATCH
+      const status = error?.status ?? error?.response?.status;
+      if (status === 404 || status === 405) {
+        const results = await Promise.allSettled(
+          ids.map((id) => updateProductApi(id, changes))
+        );
+        const failed = results.filter((r) => r.status === "rejected");
+        if (failed.length === ids.length) {
+          return handleThunkError(failed[0]?.reason ?? error, rejectWithValue);
+        }
+        return {
+          updated: ids.length - failed.length,
+          failed: failed.length,
+          ids,
+        };
+      }
       return handleThunkError(error, rejectWithValue);
     }
   }

@@ -94,6 +94,25 @@ export const updateProductApi = async (productId, productData) => {
   }
 };
 
+/**
+ * Массовое изменение бренда / категории / поставщика у выбранных товаров.
+ * См. docs/market/bulk_update_products.md
+ * payload: { ids: [uuid], brand?, category?, client?, require_all? }
+ */
+export const bulkUpdateProductsApi = async (payload) => {
+  try {
+    const response = await api.patch("main/products/bulk-update/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Bulk Update Products Error Data:", error.response.data);
+      console.error("Bulk Update Products Error Status:", error.response.status);
+      return Promise.reject(error.response);
+    }
+    return Promise.reject(error);
+  }
+};
+
 export const deleteProductApi = async (productId) => {
   try {
     await api.delete(`main/products/${productId}/`);
