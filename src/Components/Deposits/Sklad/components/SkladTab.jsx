@@ -42,8 +42,10 @@ const SkladTab = ({
   onPreviousPage,
   selectedIds,
   onBulkDelete,
+  onBulkEdit,
   onClearSelection,
   bulkDeleting,
+  bulkUpdating,
   onShowFilterModal,
   showHeader = true,
 }) => {
@@ -73,8 +75,10 @@ const SkladTab = ({
           selectedIds={selectedIds}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
           onBulkDelete={onBulkDelete}
+          onBulkEdit={onBulkEdit}
           onClearSelection={onClearSelection}
           bulkDeleting={bulkDeleting}
+          bulkUpdating={bulkUpdating}
         />
       )}
 

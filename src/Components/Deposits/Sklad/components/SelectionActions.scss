@@ -40,6 +40,27 @@
     margin-left: auto;
   }
 
+  &__edit-btn {
+    padding: 10px 20px;
+    background: #ffd400;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f2c900;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
   &__delete-btn {
     padding: 10px 20px;
     background: #ff5a5a;
