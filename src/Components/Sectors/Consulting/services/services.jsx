@@ -249,14 +249,7 @@ export default function ConsultingServices({
   const dispatch = useDispatch();
   const confirm = useConfirm();
   const alert = useAlert();
-  const {
-    services: rows,
-    loading: loadingFromSlice,
-    error: errorFromSlice,
-  } = useConsulting();
-
-  const effLoading = loading || loadingFromSlice || servicesList.loading;
-  const effError = error || errorFromSlice || servicesList.error;
+  const { loading: loadingFromSlice, error: errorFromSlice } = useConsulting();
 
   /**
    * Список услуг тянем с сервера постранично: поиск уходит в `search`, а не
@@ -269,6 +262,9 @@ export default function ConsultingServices({
   });
   const q = servicesList.searchInput;
   const setQ = servicesList.setSearch;
+
+  const effLoading = loading || loadingFromSlice || servicesList.loading;
+  const effError = error || errorFromSlice || servicesList.error;
   const [viewMode, setViewMode] = usePersistedViewMode(SERVICES_VIEW_STORAGE_KEY);
 
   /* создание */
