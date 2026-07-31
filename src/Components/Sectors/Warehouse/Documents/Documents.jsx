@@ -359,11 +359,22 @@ const Documents = () => {
     status === "DRAFT" || status === "SALE_REQUEST";
   const isSaleRequestStatus = (status) => status === "SALE_REQUEST";
 
+  /** Документ-заявка от агента: флаг is_sale_request живёт у документа всегда,
+   *  он не зависит от того, проведён документ или нет. */
+  const isAgentSaleRequestDocument = (doc) =>
+    doc?.doc_type === "SALE" && doc?.is_sale_request === true;
+
   // Нормализация статуса согласно бизнес-правилу:
-  // SALE + is_sale_request=true -> SALE_REQUEST.
+  // SALE + is_sale_request=true -> SALE_REQUEST, но только пока документ
+  // не обработан (DRAFT). После проведения бэкенд отдаёт реальный статус
+  // (POSTED / CASH_PENDING / REJECTED) — его и показываем, иначе документ
+  // навсегда остаётся с подписью «Заявка на продажу».
   const resolveDocumentStatus = (doc) => {
     if (!doc) return "";
-    if (doc.doc_type === "SALE" && doc.is_sale_request === true) {
+    if (
+      isAgentSaleRequestDocument(doc) &&
+      (!doc.status || doc.status === "DRAFT")
+    ) {
       return "SALE_REQUEST";
     }
     return doc.status;
@@ -386,17 +397,13 @@ const Documents = () => {
   }, [documents, docType, agentFilterId]);
 
   // В табе "Продажи по заявкам" источник — /warehouse/documents?doc_type=SALE,
-  // и показываем только SALE_REQUEST.
+  // и показываем все заявки агентов (в т.ч. уже проведённые) — их текущий
+  // статус выводится в колонке «Статус документа».
   const agentSalesRequestDocuments = useMemo(() => {
     return (documents || []).filter((doc) => {
-      const resolvedStatus = resolveDocumentStatus(doc);
       const byAgent =
         !agentFilterId || String(doc.agent || "") === String(agentFilterId);
-      return (
-        doc.doc_type === "SALE" &&
-        isSaleRequestStatus(resolvedStatus) &&
-        byAgent
-      );
+      return isAgentSaleRequestDocument(doc) && byAgent;
     });
   }, [documents, agentFilterId]);
 
