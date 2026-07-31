@@ -15,6 +15,7 @@ import {
 } from "../../../../store/creators/clientCreators";
 import { useSelector } from "react-redux";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import ConsultingShell from "../common/ConsultingShell";
 import useConsultingList from "../common/useConsultingList";
 import { Pagination } from "../common/ListControls";
 import { plural } from "../common/listUtils";
@@ -29,6 +30,25 @@ const statusRu = (v) =>
     done: "Завершена",
     canceled: "Отменена",
   }[v] || "—");
+const badgeClassFor = (v) =>
+  v === "new"
+    ? "is-new"
+    : v === "in_work"
+    ? "is-work"
+    : v === "done"
+    ? "is-done"
+    : "is-canceled";
+const initials = (name) => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+};
 
 export default function ConsultingClientRequests() {
   const dispatch = useDispatch();
@@ -228,15 +248,22 @@ export default function ConsultingClientRequests() {
   };
 
   return (
-    <section className="clientreqs">
-      <header className="clientreqs__header">
-        <div>
-          <h2 className="clientreqs__title">Запросы клиентов</h2>
-          <p className="clientreqs__subtitle">
-            Лиды/заявки по услугам (сервер)
-          </p>
-        </div>
-
+    <ConsultingShell
+      eyebrow="Консалтинг · Заявки"
+      title="Запросы клиентов"
+      subtitle="Лиды/заявки по услугам (сервер)"
+      panelTitle="Очередь заявок"
+      headerActions={
+        <button
+          type="button"
+          className="cShell__btn cShell__btn--primary"
+          onClick={openCreate}
+        >
+          <FaPlus aria-hidden /> Новая заявка
+        </button>
+      }
+    >
+      <div className="clientreqs clientreqs--embedded">
         <div className="clientreqs__toolbar">
           <div className="clientreqs__search">
             <FaSearch className="clientreqs__searchIcon" aria-hidden />
@@ -260,385 +287,369 @@ export default function ConsultingClientRequests() {
             <option value="done">Завершена</option>
             <option value="canceled">Отменена</option>
           </select>
-
-          <button
-            className="clientreqs__btn clientreqs__btn--primary"
-            onClick={openCreate}
-          >
-            <FaPlus /> Новая заявка
-          </button>
         </div>
-      </header>
 
-      {loading && <div className="clientreqs__alert">Загрузка…</div>}
-      {!!error && (
-        <div className="clientreqs__alert clientreqs__alert--error">
-          {String(error)}
-        </div>
-      )}
+        {loading && <div className="clientreqs__alert">Загрузка…</div>}
+        {!!error && (
+          <div className="clientreqs__alert clientreqs__alert--error">
+            {String(error)}
+          </div>
+        )}
 
-      {!loading && (
-        <div className="clientreqs__tableWrap">
-          <table className="clientreqs__table">
-            <thead>
-              <tr>
-                <th>Клиент</th>
-                <th>Заявка</th>
-                <th>Статус</th>
-                <th>Создано</th>
-                <th aria-label="Действия" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length ? (
-                filtered.map((r) => {
-                  const isDone = r.status === "done";
-                  const isCanceled = r.status === "canceled";
-                  return (
-                    <tr key={r.id} className={`status-${r.status}`}>
-                      <td
-                        className="clientreqs__ellipsis"
-                        title={r.client_display}
-                      >
-                        {r.client_display ||
-                          clientById.get(String(r.client))?.full_name ||
-                          "—"}
-                      </td>
-                      <td className="clientreqs__ellipsis" title={r.name}>
-                        {r.name || "—"}
-                      </td>
-                      <td>
-                        <span
-                          className={`clientreqs__badge ${
-                            r.status === "new"
-                              ? "is-new"
-                              : r.status === "in_work"
-                              ? "is-work"
-                              : r.status === "done"
-                              ? "is-done"
-                              : "is-canceled"
-                          }`}
-                        >
-                          {statusRu(r.status)}
-                        </span>
-                      </td>
-                      <td>{toLocalDT(r.created_at)}</td>
-                      <td className="clientreqs__rowActions">
-                        {isDone ? (
-                          <button
-                            className="clientreqs__btn clientreqs__btn--secondary"
-                            onClick={() => openView(r)}
-                            title="Открыть"
-                          >
-                            <FaSearch /> Открыть
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              className="clientreqs__btn clientreqs__btn--secondary"
-                              onClick={() => openEdit(r)}
-                              title="Изменить"
-                              disabled={isCanceled}
-                            >
-                              <FaEdit /> Изм.
-                            </button>
-                            <button
-                              className="clientreqs__btn clientreqs__btn--danger"
-                              onClick={() => removeReq(r)}
-                              title="Удалить"
-                            >
-                              <FaTrash /> Удалить
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td className="clientreqs__empty" colSpan={5}>
-                    Ничего не найдено
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ====== Модалка формы ====== */}
-      <Pagination
-        page={requestsList.page}
-        totalPages={requestsList.totalPages}
-        count={requestsList.count}
-        pageSize={requestsList.pageSize}
-        onPage={requestsList.setPage}
-        onPageSize={requestsList.setPageSize}
-        unitLabel={plural.requests}
-        loading={requestsList.loading}
-      />
-
-      {formOpen && (
-        <div
-          className="clientreqs__overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !saving && setFormOpen(false)}
-        >
-          <div
-            className="clientreqs__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="clientreqs__modalHeader">
-              <h3 className="clientreqs__modalTitle">
-                {editingId ? "Изменить заявку" : "Новая заявка"}
-              </h3>
-              <button
-                className="clientreqs__iconBtn"
-                onClick={() => !saving && setFormOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {!!formErr && (
-              <div className="clientreqs__alert clientreqs__alert--error">
-                {formErr}
-              </div>
-            )}
-
-            <form className="clientreqs__form" onSubmit={submitForm} noValidate>
-              <div className="clientreqs__grid">
-                {/* Клиент */}
-                <div className="clientreqs__field">
-                  <label className="clientreqs__label">
-                    Клиент <span className="clientreqs__req">*</span>
-                  </label>
-                  <div className="clientreqs__row">
-                    <select
-                      ref={clientSelectRef}
-                      className="clientreqs__input clientreqs__control"
-                      value={form.client}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, client: e.target.value }))
-                      }
-                      required
-                    >
-                      <option value="">— выберите клиента —</option>
-                      {clients.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.full_name || "—"}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="clientreqs__btn clientreqs__btn--secondary clientreqs__control"
-                      onClick={() => {
-                        setNewClientOpen((v) => !v);
-                        setNewClientErr("");
-                      }}
-                    >
-                      {newClientOpen ? "Отмена" : "Новый клиент"}
-                    </button>
-                  </div>
-
-                  {newClientOpen && (
-                    <div className="clientreqs__inlineCard">
-                      <div className="clientreqs__inlineGrid">
-                        <div className="clientreqs__miniCol">
-                          <label className="clientreqs__miniLabel">ФИО *</label>
-                          <input
-                            className="clientreqs__input clientreqs__control"
-                            placeholder="Например: Алия Жумалиева"
-                            value={newClient.full_name}
-                            onChange={(e) =>
-                              setNewClient((p) => ({
-                                ...p,
-                                full_name: e.target.value,
-                              }))
-                            }
-                            required
-                          />
+        {!loading && (
+          <ul className="cShell__feed" aria-label="Заявки">
+            {filtered.length ? (
+              filtered.map((r) => {
+                const isDone = r.status === "done";
+                const isCanceled = r.status === "canceled";
+                const clientName =
+                  r.client_display ||
+                  clientById.get(String(r.client))?.full_name ||
+                  "—";
+                return (
+                  <li key={r.id} className="cShell__card">
+                    <div className="cShell__cardMain">
+                      <span className="cShell__avatar" aria-hidden>
+                        {initials(clientName)}
+                      </span>
+                      <div className="cShell__cardBody">
+                        <div className="cShell__cardTitle" title={r.name}>
+                          {r.name || "—"}
                         </div>
-                        <div className="clientreqs__miniCol">
-                          <label className="clientreqs__miniLabel">
-                            Телефон
-                          </label>
-                          <input
-                            className="clientreqs__input clientreqs__control"
-                            placeholder="+996 700 000 000"
-                            value={newClient.phone}
-                            onChange={(e) =>
-                              setNewClient((p) => ({
-                                ...p,
-                                phone: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="clientreqs__miniCol clientreqs__miniCol--actions">
-                          <button
-                            type="button"
-                            className="clientreqs__btn clientreqs__btn--primary clientreqs__control"
-                            onClick={submitNewClient}
-                            disabled={creatingClient}
+                        <div className="cShell__cardMeta">
+                          {clientName} · {toLocalDT(r.created_at)}{" "}
+                          <span
+                            className={`clientreqs__badge ${badgeClassFor(
+                              r.status
+                            )}`}
                           >
-                            {creatingClient ? "Создание…" : "Создать клиента"}
-                          </button>
-                          {!!newClientErr && (
-                            <div className="clientreqs__miniErr">
-                              {newClientErr}
-                            </div>
-                          )}
+                            {statusRu(r.status)}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
+                    <div className="cShell__cardActions">
+                      {isDone ? (
+                        <button
+                          className="clientreqs__btn clientreqs__btn--secondary"
+                          onClick={() => openView(r)}
+                          title="Открыть"
+                        >
+                          <FaSearch /> Открыть
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="clientreqs__btn clientreqs__btn--secondary"
+                            onClick={() => openEdit(r)}
+                            title="Изменить"
+                            disabled={isCanceled}
+                          >
+                            <FaEdit /> Изм.
+                          </button>
+                          <button
+                            className="clientreqs__btn clientreqs__btn--danger"
+                            onClick={() => removeReq(r)}
+                            title="Удалить"
+                          >
+                            <FaTrash /> Удалить
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="clientreqs__empty">Ничего не найдено</li>
+            )}
+          </ul>
+        )}
 
-                {/* Заявка */}
-                <div className="clientreqs__field">
-                  <label className="clientreqs__label">
-                    Заявка <span className="clientreqs__req">*</span>
-                  </label>
-                  <input
-                    className="clientreqs__input clientreqs__control"
-                    placeholder="Например: Консультация по визе"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, title: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
+        <Pagination
+          page={requestsList.page}
+          totalPages={requestsList.totalPages}
+          count={requestsList.count}
+          pageSize={requestsList.pageSize}
+          onPage={requestsList.setPage}
+          onPageSize={requestsList.setPageSize}
+          unitLabel={plural.requests}
+          loading={requestsList.loading}
+        />
 
-                {/* Статус */}
-                <div className="clientreqs__field">
-                  <label className="clientreqs__label">Статус</label>
-                  <select
-                    className="clientreqs__input clientreqs__control"
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, status: e.target.value }))
-                    }
-                  >
-                    <option value="new">Новая</option>
-                    <option value="in_work">В работе</option>
-                    <option value="done">Завершена</option>
-                    <option value="canceled">Отменена</option>
-                  </select>
-                </div>
-                <div />
-
-                {/* Заметка */}
-                <div className="clientreqs__field clientreqs__field--full">
-                  <label className="clientreqs__label">Заметка</label>
-                  <textarea
-                    className="clientreqs__input"
-                    rows={4}
-                    placeholder="Комментарий по заявке"
-                    value={form.note}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, note: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="clientreqs__actions">
-                <button
-                  type="button"
-                  className="clientreqs__btn"
-                  onClick={() => setFormOpen(false)}
-                  disabled={saving}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="clientreqs__btn clientreqs__btn--primary"
-                  disabled={saving}
-                >
-                  {saving
-                    ? "Сохранение…"
-                    : editingId
-                    ? "Сохранить изменения"
-                    : "Создать заявку"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Просмотр (read-only) для «Завершена» */}
-      {viewOpen && viewRow && (
-        <div
-          className="clientreqs__overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setViewOpen(false)}
-        >
+        {formOpen && (
           <div
-            className="clientreqs__modal"
-            onClick={(e) => e.stopPropagation()}
+            className="clientreqs__overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !saving && setFormOpen(false)}
           >
-            <div className="clientreqs__modalHeader">
-              <h3 className="clientreqs__modalTitle">Заявка — подробности</h3>
-              <button
-                className="clientreqs__iconBtn"
-                onClick={() => setViewOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
+            <div
+              className="clientreqs__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="clientreqs__modalHeader">
+                <h3 className="clientreqs__modalTitle">
+                  {editingId ? "Изменить заявку" : "Новая заявка"}
+                </h3>
+                <button
+                  className="clientreqs__iconBtn"
+                  onClick={() => !saving && setFormOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-            <div className="clientreqs__view">
-              <div className="clientreqs__viewRow">
-                <span>Клиент</span>
-                <b>
-                  {viewRow.client_display ||
-                    clientById.get(String(viewRow.client))?.full_name ||
-                    "—"}
-                </b>
-              </div>
-              <div className="clientreqs__viewRow">
-                <span>Заявка</span>
-                <b>{viewRow.name || "—"}</b>
-              </div>
-              <div className="clientreqs__viewRow">
-                <span>Статус</span>
-                <b>{statusRu(viewRow.status)}</b>
-              </div>
-              <div className="clientreqs__viewRow">
-                <span>Создано</span>
-                <b>{toLocalDT(viewRow.created_at)}</b>
-              </div>
-              <div className="clientreqs__viewRow">
-                <span>Обновлено</span>
-                <b>{toLocalDT(viewRow.updated_at)}</b>
-              </div>
-              <div className="clientreqs__viewRow clientreqs__viewRow--full">
-                <span>Заметка</span>
-                <b className="clientreqs__pre">{viewRow.description || "—"}</b>
-              </div>
-            </div>
+              {!!formErr && (
+                <div className="clientreqs__alert clientreqs__alert--error">
+                  {formErr}
+                </div>
+              )}
 
-            <div className="clientreqs__formActions">
-              <button
-                className="clientreqs__btn"
-                onClick={() => setViewOpen(false)}
+              <form
+                className="clientreqs__form"
+                onSubmit={submitForm}
+                noValidate
               >
-                Закрыть
-              </button>
+                <div className="clientreqs__grid">
+                  {/* Клиент */}
+                  <div className="clientreqs__field">
+                    <label className="clientreqs__label">
+                      Клиент <span className="clientreqs__req">*</span>
+                    </label>
+                    <div className="clientreqs__row">
+                      <select
+                        ref={clientSelectRef}
+                        className="clientreqs__input clientreqs__control"
+                        value={form.client}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, client: e.target.value }))
+                        }
+                        required
+                      >
+                        <option value="">— выберите клиента —</option>
+                        {clients.map((c) => (
+                          <option key={c.id} value={String(c.id)}>
+                            {c.full_name || "—"}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="clientreqs__btn clientreqs__btn--secondary clientreqs__control"
+                        onClick={() => {
+                          setNewClientOpen((v) => !v);
+                          setNewClientErr("");
+                        }}
+                      >
+                        {newClientOpen ? "Отмена" : "Новый клиент"}
+                      </button>
+                    </div>
+
+                    {newClientOpen && (
+                      <div className="clientreqs__inlineCard">
+                        <div className="clientreqs__inlineGrid">
+                          <div className="clientreqs__miniCol">
+                            <label className="clientreqs__miniLabel">
+                              ФИО *
+                            </label>
+                            <input
+                              className="clientreqs__input clientreqs__control"
+                              placeholder="Например: Алия Жумалиева"
+                              value={newClient.full_name}
+                              onChange={(e) =>
+                                setNewClient((p) => ({
+                                  ...p,
+                                  full_name: e.target.value,
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                          <div className="clientreqs__miniCol">
+                            <label className="clientreqs__miniLabel">
+                              Телефон
+                            </label>
+                            <input
+                              className="clientreqs__input clientreqs__control"
+                              placeholder="+996 700 000 000"
+                              value={newClient.phone}
+                              onChange={(e) =>
+                                setNewClient((p) => ({
+                                  ...p,
+                                  phone: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="clientreqs__miniCol clientreqs__miniCol--actions">
+                            <button
+                              type="button"
+                              className="clientreqs__btn clientreqs__btn--primary clientreqs__control"
+                              onClick={submitNewClient}
+                              disabled={creatingClient}
+                            >
+                              {creatingClient
+                                ? "Создание…"
+                                : "Создать клиента"}
+                            </button>
+                            {!!newClientErr && (
+                              <div className="clientreqs__miniErr">
+                                {newClientErr}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Заявка */}
+                  <div className="clientreqs__field">
+                    <label className="clientreqs__label">
+                      Заявка <span className="clientreqs__req">*</span>
+                    </label>
+                    <input
+                      className="clientreqs__input clientreqs__control"
+                      placeholder="Например: Консультация по визе"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, title: e.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  {/* Статус */}
+                  <div className="clientreqs__field">
+                    <label className="clientreqs__label">Статус</label>
+                    <select
+                      className="clientreqs__input clientreqs__control"
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, status: e.target.value }))
+                      }
+                    >
+                      <option value="new">Новая</option>
+                      <option value="in_work">В работе</option>
+                      <option value="done">Завершена</option>
+                      <option value="canceled">Отменена</option>
+                    </select>
+                  </div>
+                  <div />
+
+                  {/* Заметка */}
+                  <div className="clientreqs__field clientreqs__field--full">
+                    <label className="clientreqs__label">Заметка</label>
+                    <textarea
+                      className="clientreqs__input"
+                      rows={4}
+                      placeholder="Комментарий по заявке"
+                      value={form.note}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, note: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="clientreqs__actions">
+                  <button
+                    type="button"
+                    className="clientreqs__btn"
+                    onClick={() => setFormOpen(false)}
+                    disabled={saving}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="clientreqs__btn clientreqs__btn--primary"
+                    disabled={saving}
+                  >
+                    {saving
+                      ? "Сохранение…"
+                      : editingId
+                      ? "Сохранить изменения"
+                      : "Создать заявку"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
-    </section>
+        )}
+
+        {/* Просмотр (read-only) для «Завершена» */}
+        {viewOpen && viewRow && (
+          <div
+            className="clientreqs__overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setViewOpen(false)}
+          >
+            <div
+              className="clientreqs__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="clientreqs__modalHeader">
+                <h3 className="clientreqs__modalTitle">
+                  Заявка — подробности
+                </h3>
+                <button
+                  className="clientreqs__iconBtn"
+                  onClick={() => setViewOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="clientreqs__view">
+                <div className="clientreqs__viewRow">
+                  <span>Клиент</span>
+                  <b>
+                    {viewRow.client_display ||
+                      clientById.get(String(viewRow.client))?.full_name ||
+                      "—"}
+                  </b>
+                </div>
+                <div className="clientreqs__viewRow">
+                  <span>Заявка</span>
+                  <b>{viewRow.name || "—"}</b>
+                </div>
+                <div className="clientreqs__viewRow">
+                  <span>Статус</span>
+                  <b>{statusRu(viewRow.status)}</b>
+                </div>
+                <div className="clientreqs__viewRow">
+                  <span>Создано</span>
+                  <b>{toLocalDT(viewRow.created_at)}</b>
+                </div>
+                <div className="clientreqs__viewRow">
+                  <span>Обновлено</span>
+                  <b>{toLocalDT(viewRow.updated_at)}</b>
+                </div>
+                <div className="clientreqs__viewRow clientreqs__viewRow--full">
+                  <span>Заметка</span>
+                  <b className="clientreqs__pre">
+                    {viewRow.description || "—"}
+                  </b>
+                </div>
+              </div>
+
+              <div className="clientreqs__formActions">
+                <button
+                  className="clientreqs__btn"
+                  onClick={() => setViewOpen(false)}
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </ConsultingShell>
   );
 }

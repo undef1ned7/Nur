@@ -21,6 +21,13 @@
   display: grid;
   gap: 12px;
   color: var(--text);
+
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
 }
 
 /* Header */

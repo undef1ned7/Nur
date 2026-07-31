@@ -1,19 +1,49 @@
 import { createProtectedRoute } from "./helpers";
 import { lazy } from "react";
-const ConsultingClients = lazy(() => import("../../Components/Sectors/Consulting/client/client"));
-const ConsultingClientDetail = lazy(() => import("../../Components/Sectors/Consulting/client/ConsultingClientDetail"));
-const ConsultingClientRequests = lazy(() => import("../../Components/Sectors/Consulting/client-requests/client-requests"));
-const ConsultingCafeKassa = lazy(() => import("../../Components/Sectors/Consulting/Kassa/Kassa"));
-const ConsultingSchoolTeachers = lazy(() => import("../../Components/Sectors/Consulting/Teachers/Teachers"));
-const ConsultingAnalytics = lazy(() => import("../../Components/Sectors/Consulting/Analytics/Analytics"));
-const ConsultingBookings = lazy(() => import("../../Components/Sectors/Consulting/Bookings/Bookings"));
-const ConsultingSalary = lazy(() => import("../../Components/Sectors/Consulting/salary/salary"));
-const ConsultingSale = lazy(() => import("../../Components/Sectors/Consulting/sale/sale"));
-const ConsultingServices = lazy(() => import("../../Components/Sectors/Consulting/services/services"));
-const ConsultingFunnel = lazy(() => import("../../Components/Sectors/Consulting/Funnel/Funnel"));
-const ConsultingLeads = lazy(() => import("../../Components/Sectors/Consulting/leads/Leads"));
-const ConsultingChatsHub = lazy(() => import("../../Components/Sectors/Consulting/Chats/ChatsHub"));
-const ConsultingChatsInbox = lazy(() => import("../../Components/Sectors/Consulting/Chats/ChatsInbox"));
+const ConsultingClients = lazy(
+  () => import("../../Components/Sectors/Consulting/client/client"),
+);
+const ConsultingClientDetail = lazy(
+  () =>
+    import("../../Components/Sectors/Consulting/client/ConsultingClientDetail"),
+);
+const ConsultingClientRequests = lazy(
+  () =>
+    import("../../Components/Sectors/Consulting/client-requests/client-requests"),
+);
+const ConsultingCafeKassa = lazy(
+  () => import("../../Components/Sectors/Consulting/Kassa/Kassa"),
+);
+const ConsultingSchoolTeachers = lazy(
+  () => import("../../Components/Sectors/Consulting/Teachers/Teachers"),
+);
+const ConsultingAnalytics = lazy(
+  () => import("../../Components/Sectors/Consulting/Analytics/Analytics"),
+);
+const ConsultingBookings = lazy(
+  () => import("../../Components/Sectors/Consulting/Bookings/Bookings"),
+);
+const ConsultingSalary = lazy(
+  () => import("../../Components/Sectors/Consulting/salary/salary"),
+);
+const ConsultingSale = lazy(
+  () => import("../../Components/Sectors/Consulting/sale/sale"),
+);
+const ConsultingServices = lazy(
+  () => import("../../Components/Sectors/Consulting/services/services"),
+);
+const ConsultingFunnel = lazy(
+  () => import("../../Components/Sectors/Consulting/Funnel/Funnel"),
+);
+const ConsultingLeads = lazy(
+  () => import("../../Components/Sectors/Consulting/leads/Leads"),
+);
+const ConsultingChatsHub = lazy(
+  () => import("../../Components/Sectors/Consulting/Chats/ChatsHub"),
+);
+const ConsultingChatsInbox = lazy(
+  () => import("../../Components/Sectors/Consulting/Chats/ChatsInbox"),
+);
 
 export const consultingRoutes = () => [
   createProtectedRoute("consulting/client", ConsultingClients),
@@ -30,5 +60,8 @@ export const consultingRoutes = () => [
   createProtectedRoute("consulting/leads", ConsultingLeads),
   createProtectedRoute("consulting/chats", ConsultingChatsHub),
   createProtectedRoute("consulting/chats/:channel", ConsultingChatsInbox),
-  createProtectedRoute("consulting/chats/:channel/:leadId", ConsultingChatsInbox),
+  createProtectedRoute(
+    "consulting/chats/:channel/:leadId",
+    ConsultingChatsInbox,
+  ),
 ];

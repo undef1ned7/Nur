@@ -1,6 +1,17 @@
 // src/Components/Sectors/Consulting/salary/salary.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaPercent, FaSave, FaSyncAlt, FaWallet, FaTimes } from "react-icons/fa";
+import {
+  FaAward,
+  FaCoins,
+  FaExchangeAlt,
+  FaFileInvoiceDollar,
+  FaPercent,
+  FaSave,
+  FaSitemap,
+  FaSyncAlt,
+  FaWallet,
+  FaTimes,
+} from "react-icons/fa";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
@@ -12,6 +23,7 @@ import {
   updateSalaryRate,
 } from "../../../../api/consultingSalary";
 import { useAlert } from "../../../../hooks/useDialog";
+import ConsultingShell from "../common/ConsultingShell";
 import SalaryAdjustments from "./SalaryAdjustments";
 import SalaryBonusRules from "./SalaryBonusRules";
 import SalaryPayslip from "./SalaryPayslip";
@@ -33,13 +45,51 @@ const TABS = {
 
 /** Порядок вкладок: сначала «что начислено», потом настройки мотивации. */
 const TAB_LIST = [
-  { value: TABS.ACCRUALS, label: "Начисления" },
-  { value: TABS.PAYSLIP, label: "Расчётный лист" },
-  { value: TABS.SCHEMES, label: "Схемы оплаты", adminOnly: true },
-  { value: TABS.BONUSES, label: "Правила премий", adminOnly: true },
-  { value: TABS.ADJUSTMENTS, label: "Штрафы и премии" },
-  { value: TABS.RATES, label: "Ставки услуг", adminOnly: true },
-  { value: TABS.PAYOUTS, label: "Выплаты" },
+  {
+    value: TABS.ACCRUALS,
+    label: "Начисления",
+    hint: "Что начислено по продажам",
+    icon: FaCoins,
+  },
+  {
+    value: TABS.PAYSLIP,
+    label: "Расчётный лист",
+    hint: "Итог за период по сотруднику",
+    icon: FaFileInvoiceDollar,
+  },
+  {
+    value: TABS.SCHEMES,
+    label: "Схемы оплаты",
+    hint: "Ставки и мотивация",
+    icon: FaSitemap,
+    adminOnly: true,
+  },
+  {
+    value: TABS.BONUSES,
+    label: "Правила премий",
+    hint: "Бонусы за показатели",
+    icon: FaAward,
+    adminOnly: true,
+  },
+  {
+    value: TABS.ADJUSTMENTS,
+    label: "Штрафы и премии",
+    hint: "Ручные корректировки",
+    icon: FaExchangeAlt,
+  },
+  {
+    value: TABS.RATES,
+    label: "Ставки услуг",
+    hint: "Процент по каждой услуге",
+    icon: FaPercent,
+    adminOnly: true,
+  },
+  {
+    value: TABS.PAYOUTS,
+    label: "Выплаты",
+    hint: "История выплат сотрудникам",
+    icon: FaWallet,
+  },
 ];
 
 const STATUS_LABELS = {
@@ -132,31 +182,21 @@ const Salary = () => {
   const [dateTo, setDateTo] = useState(todayISO);
   const [userFilter, setUserFilter] = useState("");
 
-  return (
-    <div className="salary">
-      <div className="salary__header">
-        <div className="salary__titleWrap">
-          <h2 className="salary__title">Зарплата</h2>
-          <div className="salary__subtitle">
-            Автоматическое начисление процента с закрытых продаж
-          </div>
-        </div>
-        <div className="salary__tabs" role="tablist">
-          {TAB_LIST.filter((t) => !t.adminOnly || isOwnerOrAdmin).map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.value}
-              className={`salary__tab ${tab === t.value ? "is-active" : ""}`}
-              onClick={() => setTab(t.value)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+  const visibleTabs = useMemo(
+    () => TAB_LIST.filter((t) => !t.adminOnly || isOwnerOrAdmin),
+    [isOwnerOrAdmin],
+  );
 
+  return (
+    <ConsultingShell
+      eyebrow="Консалтинг · Деньги"
+      title="Зарплата"
+      subtitle="Автоматическое начисление процента с закрытых продаж"
+      nav={visibleTabs}
+      navValue={tab}
+      onNavChange={setTab}
+    >
+      <div className="salary salary--embedded">
       {(tab === TABS.ACCRUALS || tab === TABS.PAYOUTS) && (
         <div className="salary__filters">
           <label className="salary__filterField">
@@ -245,7 +285,8 @@ const Salary = () => {
           alert={alert}
         />
       )}
-    </div>
+      </div>
+    </ConsultingShell>
   );
 };
 

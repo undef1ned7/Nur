@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaInstagram, FaTelegram, FaWhatsapp, FaComments } from "react-icons/fa";
+import { FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
+import ConsultingShell from "../common/ConsultingShell";
 import "./chats.scss";
 
 const CHANNELS = [
@@ -42,20 +43,12 @@ export default function ChatsHub() {
   };
 
   return (
-    <section className="crmChats">
-      <header className="crmChats__hero">
-        <div className="crmChats__heroIcon" aria-hidden>
-          <FaComments />
-        </div>
-        <div>
-          <h1 className="crmChats__title">Чаты</h1>
-          <p className="crmChats__subtitle">
-            Выберите мессенджер — откроется список всех чатов. Можно зайти в
-            любой диалог и ответить клиенту.
-          </p>
-        </div>
-      </header>
-
+    <ConsultingShell
+      eyebrow="Консалтинг · Чаты"
+      title="Чаты"
+      subtitle="Выберите мессенджер — откроется список всех чатов. Можно зайти в любой диалог и ответить клиенту."
+    >
+      <div className="crmChats crmChats--embedded">
       {!!notice && (
         <div
           className="crmChats__notice"
@@ -108,6 +101,7 @@ export default function ChatsHub() {
         </Link>
         {" — "}просто отвечайте клиентам в чатах.
       </p>
-    </section>
+      </div>
+    </ConsultingShell>
   );
 }

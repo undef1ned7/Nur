@@ -37,6 +37,7 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
+import ConsultingShell from "../common/ConsultingShell";
 import { useAlert } from "../../../../hooks/useDialog";
 import useConsultingList from "../common/useConsultingList";
 import {
@@ -387,28 +388,26 @@ export default function ConsultingSale({
   }, [cashBoxes, cashboxId]);
 
   return (
-    <section className="sale">
-      <header className="sale__header">
-        <div>
-          <h2 className="sale__title">Продажи</h2>
-          <p className="sale__subtitle">
-            Выбор продавца, клиента и услуги (сервер)
-          </p>
-        </div>
-        <div className="sale__toolbar">
+    <ConsultingShell
+      eyebrow="Консалтинг · Продажи"
+      title="Продажи"
+      subtitle="История продаж: продавец, клиент, услуга и итог"
+      headerActions={
+        <>
           <ViewModeToggle viewMode={viewMode} onChange={setViewMode} disabled={disabled} />
-
           <button
-            className="sale__btn sale__btn--primary"
+            className="cShell__btn cShell__btn--primary"
             onClick={() => setOpen(true)}
             disabled={disabled}
           >
             <FaPlus />
             Продажа
           </button>
-        </div>
-      </header>
-
+        </>
+      }
+      panelTitle="Список продаж"
+    >
+      <div className="sale sale--embedded">
       <div className="cList__toolbar sale__filters">
         <SearchInput
           value={salesList.searchInput}
@@ -940,6 +939,7 @@ export default function ConsultingSale({
           </div>
         </div>
       )}
-    </section>
+      </div>
+    </ConsultingShell>
   );
 }

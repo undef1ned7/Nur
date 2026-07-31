@@ -431,6 +431,7 @@ export default function ChatsInbox() {
           <div className="crmInbox__brand">
             <Icon className="crmInbox__brandIcon" />
             <div>
+              <p className="crmInbox__eyebrow">Консалтинг · Чаты</p>
               <h1 className="crmInbox__title">{meta.title}</h1>
               <p className="crmInbox__sub">Пока не доступно</p>
             </div>
@@ -462,6 +463,7 @@ export default function ChatsInbox() {
         <div className="crmInbox__brand">
           <Icon className="crmInbox__brandIcon" />
           <div>
+            <p className="crmInbox__eyebrow">Консалтинг · Чаты</p>
             <h1 className="crmInbox__title">{meta.title}</h1>
             <p className="crmInbox__sub">
               {loading ? "Загрузка…" : `${filtered.length} чатов`}

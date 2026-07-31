@@ -1,6 +1,6 @@
 .clients {
-  --primary: #ffd84d;
-  --primary-hover: #f2c400;
+  --primary: #f7d74f;
+  --primary-hover: #ecc62a;
   --text: #0f172a;
   --muted: #64748b;
   --border: #e5e7eb;
@@ -20,7 +20,14 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
+
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
 
   *,
   *::before,
@@ -423,6 +430,26 @@
     .clients__btn {
       margin-top: 8px;
     }
+  }
+
+  &__card {
+    cursor: pointer;
+  }
+
+  &__cardFoot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  &__state {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-weight: 600;
   }
 
   &__muted {

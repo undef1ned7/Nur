@@ -19,7 +19,9 @@ import {
   Banknote,
   Clock,
   FileText,
+  LayoutDashboard,
   MessageSquare,
+  Radio,
   ShoppingBag,
   TrendingDown,
   TrendingUp,
@@ -33,15 +35,36 @@ import {
 } from "../../../../api/consultingAnalytics";
 import { consultingFunnelLeadPath } from "../../../../utils/consultingLeadSources";
 import Modal from "../../../common/Modal/Modal";
+import ConsultingShell from "../common/ConsultingShell";
 import "./Analytics.scss";
 
 const BEM = "consulting-analytics";
 
 const TABS = [
-  { id: "overview", label: "Обзор", hint: "Главные показатели" },
-  { id: "messenger", label: "Мессенджер", hint: "Ответы и ожидание" },
-  { id: "sources", label: "Источники", hint: "Откуда приходят заявки" },
-  { id: "managers", label: "Менеджеры", hint: "Нагрузка команды" },
+  {
+    value: "overview",
+    label: "Обзор",
+    hint: "Главные показатели",
+    icon: LayoutDashboard,
+  },
+  {
+    value: "messenger",
+    label: "Мессенджер",
+    hint: "Ответы и ожидание",
+    icon: MessageSquare,
+  },
+  {
+    value: "sources",
+    label: "Источники",
+    hint: "Откуда приходят заявки",
+    icon: Radio,
+  },
+  {
+    value: "managers",
+    label: "Менеджеры",
+    hint: "Нагрузка команды",
+    icon: Users,
+  },
 ];
 
 const pad = (n) => String(n).padStart(2, "0");
@@ -460,7 +483,6 @@ export default function ConsultingAnalytics() {
     }));
   }, [messenger]);
 
-  const activeTab = TABS.find((t) => t.id === tab) || TABS[0];
   const hasTabData =
     (tab === "overview" && dashboard) ||
     (tab === "messenger" && messenger) ||
@@ -468,16 +490,16 @@ export default function ConsultingAnalytics() {
     (tab === "managers" && (managers || dashboard));
 
   return (
-    <section className={BEM}>
-      <header className={`${BEM}__header`}>
-        <div className={`${BEM}__heading`}>
-          <h2 className={`${BEM}__title`}>Аналитика</h2>
-          <p className={`${BEM}__subtitle`}>
-            {activeTab.hint} · {formatDateRu(from)} — {formatDateRu(to)}
-          </p>
-        </div>
-
-        <div className={`${BEM}__toolbar`}>
+    <ConsultingShell
+      eyebrow="Консалтинг · Отчёты"
+      title="Аналитика"
+      subtitle="Продажи, лиды, мессенджер и источники — в одном отчёте"
+      nav={TABS}
+      navValue={tab}
+      onNavChange={setTab}
+      panelHint={`${formatDateRu(from)} — ${formatDateRu(to)}`}
+      headerActions={
+        <>
           <div className={`${BEM}__seg`} role="tablist" aria-label="Период">
             {[
               { value: "7", label: "7 дн." },
@@ -511,30 +533,15 @@ export default function ConsultingAnalytics() {
           </div>
           <button
             type="button"
-            className={`${BEM}__btnGhost`}
+            className="cShell__btn cShell__btn--sm"
             onClick={resetFilters}
           >
             Сброс
           </button>
-        </div>
-      </header>
-
-      <div className={`${BEM}__tabs`} role="tablist" aria-label="Разделы">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`${BEM}__tab ${tab === t.id ? "is-active" : ""}`}
-            onClick={() => setTab(t.id)}
-            title={t.hint}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
+        </>
+      }
+    >
+      <div className={`${BEM} ${BEM}--embedded`}>
       {(rangeErr || error) && (
         <div className={`${BEM}__alert`}>{rangeErr || error}</div>
       )}
@@ -1311,6 +1318,7 @@ export default function ConsultingAnalytics() {
           </button>
         </div>
       </Modal>
-    </section>
+      </div>
+    </ConsultingShell>
   );
 }

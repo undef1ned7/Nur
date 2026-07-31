@@ -148,6 +148,13 @@
    Подтверждение поступлений (ТЗ №9)
    =================================================================== */
 .kassa {
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
   &__tabBadge {
     display: inline-grid;
     place-items: center;

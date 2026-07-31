@@ -5,7 +5,7 @@
   --muted: #6b7280;
   --text: #0f172a;
   --primary: #f7d74f;
-  --primary-dark: #d4b800;
+  --primary-dark: #ecc62a;
   --danger: #b91c1c;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 
@@ -17,6 +17,16 @@
   width: 100%;
   max-width: none;
   box-sizing: border-box;
+  font-family: inherit;
+
+  /* Внутри ConsultingShell панель уже даёт белую карточку и отступы —
+     здесь просто убираем собственную рамку/фон, чтобы не дублировать её. */
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
 
   &__header {
     display: flex;

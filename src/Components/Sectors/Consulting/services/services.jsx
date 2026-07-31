@@ -18,6 +18,7 @@ import {
   VIEW_MODES,
 } from "../../../../utils/consultingViewMode";
 import ViewModeToggle from "../common/ViewModeToggle";
+import ConsultingShell from "../common/ConsultingShell";
 import useConsultingList from "../common/useConsultingList";
 import { Pagination } from "../common/ListControls";
 import { plural } from "../common/listUtils";
@@ -566,41 +567,42 @@ export default function ConsultingServices({
       : "—";
 
   return (
-    <section className="services">
-      <header className="services__header">
-        <div>
-          <h2 className="services__title">Услуги</h2>
-          <p className="services__subtitle">Справочник услуг (сервер)</p>
-        </div>
-
-        <div className="services__toolbar">
-          <div className="services__search">
-            <FaSearch className="services__mutedIcon" aria-hidden />
-            <input
-              className="services__input"
-              placeholder="Поиск по названию и описанию…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              aria-label="Поиск услуг"
-              disabled={disabled}
-            />
-          </div>
-
+    <ConsultingShell
+      eyebrow="Консалтинг · Каталог"
+      title="Услуги"
+      subtitle="Справочник услуг, тарифов и цен по ролям"
+      headerActions={
+        <>
           <ViewModeToggle
             viewMode={viewMode}
             onChange={setViewMode}
             disabled={disabled || effLoading}
           />
-
           <button
-            className="services__btn services__btn--primary"
+            className="cShell__btn cShell__btn--primary"
             onClick={() => setCreateOpen(true)}
             disabled={disabled}
           >
             <FaPlus /> Добавить услугу
           </button>
+        </>
+      }
+      panelTitle="Список услуг"
+    >
+      <div className="services services--embedded">
+      <div className="services__toolbar services__toolbar--search">
+        <div className="services__search">
+          <FaSearch className="services__mutedIcon" aria-hidden />
+          <input
+            className="services__input"
+            placeholder="Поиск по названию и описанию…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Поиск услуг"
+            disabled={disabled}
+          />
         </div>
-      </header>
+      </div>
 
       <div className="services__meta">
         <span>
@@ -1031,6 +1033,7 @@ export default function ConsultingServices({
           </div>
         </div>
       )}
-    </section>
+      </div>
+    </ConsultingShell>
   );
 }
