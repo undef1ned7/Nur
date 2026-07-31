@@ -137,6 +137,17 @@ export function canEditFunnelMeta(profile, funnel) {
   return !isProtectedFunnel(funnel);
 }
 
+/**
+ * Настройки поведения воронки — цепочка «что дальше», признак финальной, SLA —
+ * доступны владельцу/админу у ЛЮБОЙ воронки, включая основную и ролевые.
+ * Защита статичных воронок закрывает переименование и удаление, а не
+ * маршрутизацию лидов: иначе цепочку обработки негде настроить, ведь в
+ * консалтинге почти все воронки либо основная, либо ролевые.
+ */
+export function canEditFunnelSettings(profile) {
+  return isConsultingFunnelManager(profile);
+}
+
 /** Список воронок для выдачи доп. доступа (исключая воронку роли сотрудника). */
 export function funnelsForGrantPicker(funnels, employee) {
   const roleId = resolveCustomRoleId(employee);

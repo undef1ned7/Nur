@@ -1,0 +1,176 @@
+# Документация по выполненным работам (сектор Консалтинг: 01–09)
+
+**Проект:** NurCRM (Приложение `apps/consalting`)  
+**Дата выполнения:** 30 июля 2026 г.  
+**Базовый URL API:** `/api/consalting/`
+
+---
+
+## 1. Очередь лидов (`01-leads.md`)
+
+### Что сделано:
+- **Расширение статусов лида**: Добавлен статус `deferred` («Отложен»), а также поля `deferred_until`, `defer_reason`, `won_at`, `closed_at` в модель `LeadConsalting`.
+- **Модель входящих лидов**: `InboundLeadConsalting` для фиксации первичных заявок из внешних каналов (WhatsApp, сайт, звонки).
+- **Автоматическое распределение**: Модель `LeadDistributionSettingsConsalting` и алгоритм дежурства менеджерской группы (`round_robin` / `load_balanced`).
+- **Напоминания Celery**: Периодическая задача `check_deferred_lead_reminders` проверяет отложенные лиды и автоматически переводит их в `in_work` при наступлении времени.
+
+### API-эндпоинты:
+- `POST /api/consalting/inbound-leads/{id}/defer/` — Отложить обработку лида.
+- `POST /api/consalting/inbound-leads/{id}/resume/` — Возобновить работу по лиду.
+- `GET /api/consalting/inbound-leads/counters/` — Счётчики по входящим лидам.
+- `GET /api/consalting/inbound-leads/cohort-analytics/` — Отчёт по когортному анализу входящих лидов.
+
+---
+
+## 2. Схемы оплаты и зарплата (`02-salary.md`)
+
+### Что сделано:
+- **Гибкая система мотивации**:
+  - `SalarySchemeConsalting` — базовые процентные и фиксированные ставки сотрудника.
+  - `SalarySchemeServiceOverrideConsalting` — индивидуальные ставки по конкретным услугам.
+  - `SalaryDefaultsConsalting` — корпоративные настройки ставок по умолчанию.
+- **Шкала премий**: `BonusRuleConsalting` и `BonusTierConsalting` для начисления ступенчатых бонусов при выполнении объема продаж.
+- **Штрафы и удержания**: Модель `SalaryAdjustmentConsalting` с типами (`fine`, `manual_bonus`, `deduction`, `shortage`, `sale_canceled`).
+- **Автоматический расчет ЗП**: `SalaryAccrualConsalting` и `SalaryPayoutConsalting` с формированием итогового расчётного листа.
+- **Celery Задача**: `calculate_monthly_bonus_rules` ежемесячно рассчитывает премии за выполнение планов.
+
+### API-эндпоинты:
+- `GET/PUT /api/consalting/salary/schemes/{user_id}/` — Управление ставками сотрудника.
+- `GET/POST/DELETE /api/consalting/salary/bonus-rules/` — Настройки правил премий.
+- `GET/POST /api/consalting/salary/adjustments/` — Штрафы, удержания и разовые премии.
+- `GET /api/consalting/salary/payslip/{user_id}/` — Расчётный лист сотрудника.
+
+---
+
+## 3. Иерархия воронок и SLA (`03-funnel-hierarchy.md`)
+
+### Что сделано:
+- **Связывание воронок**: В `FunnelConsalting` добавлены поля `is_final` (промежуточная vs финальная воронка), `next_funnel`, `next_stage`, `next_assign`, `next_assign_user`, `stage_sla_hours`.
+- **Автоматический переход между воронками**:
+  - Если воронка промежуточная (`is_final=False`), выигрыш лида **не создаёт продажу**, а переводит его на первую стадию следующей воронки `next_funnel`.
+  - Если воронка финальная (`is_final=True`), создаётся продажа `SaleConsalting`.
+- **Защита от циклов**: Валидация цепочки воронок предотвращает зацикливание (`400 Bad Request`).
+- **Мониторинг SLA и история**: Модель `LeadFunnelHistoryConsalting` фиксирует время входа/выхода из каждой воронки и вычисляет флаг просрочки `is_sla_overdue`.
+
+### API-эндпоинты:
+- `GET /api/consalting/leads/{id}/funnel-history/` — Полная история прохождения воронок.
+
+---
+
+## 4. Счётчики и агрегаты на доске (`04-board-counters.md`)
+
+### Что сделано:
+- **Серверная агрегация**: Обновлён метод `_serialize_board` для расчета агрегатов без загрузки всех лидов на фронтенд:
+  - `scope_counts`: `mine`, `pool`, `all`.
+  - `totals`: `count`, `amount`.
+  - Колонки (стадии): `count`, `amount`, `overdue_count`.
+- **Мультитенантность и безопасность**: Сотруднику без администраторских прав запрещен `all` scope (автоматически сужается до `mine`).
+
+---
+
+## 5. Абонентские подписки (`05-subscription.md`)
+
+### Что сделано:
+- **Управление подписками**: Созданы модели `SubscriptionConsalting` и `SubscriptionPaymentConsalting`.
+- **Скользящее окно графика**: Функция `generate_schedule` автоматически строит помесячный график платежей на 12 месяцев вперёд.
+- **Интеграция с продажами**: Модуль `completion.py` автоматически активирует подписку при закрытии лида с абонентской услугой.
+- **Celery Задача**: `process_subscription_schedules` ежедневно обновляет статусы просрочек и продлевает горизонт подписок.
+
+### API-эндпоинты:
+- `POST /api/consalting/subscription-payments/{id}/pay/` — Приём очередного абонентского платежа.
+- `GET /api/consalting/clients/{id}/subscriptions/` — Подписки клиента.
+- `GET /api/consalting/subscription-matrix/` — Матрица абонентских платежей.
+
+---
+
+## 6. Карточка сотрудника и КПД (`06-employee-card.md`)
+
+### Что сделано:
+- **Плановые показатели**: Модель `SalesPlanConsalting` для установки ежемесячных планов по продажам.
+- **Формула КПД**: Модуль `employee_stats.py` вычисляет единый индекс КПД по весам (`KpiWeightsConsalting`): Конверсия (35%), План (30%), Скорость (20%), Дисциплина (15%). При отсутствии плана его вес пропорционально перераспределяется.
+- **Лента активности**: События звонков, встреч, задач и смен статусов.
+
+### API-эндпоинты:
+- `GET /api/consalting/employees/{id}/stats/` — Статистика, рейтинг и КПД.
+- `GET /api/consalting/employees/rating/` — Общий рейтинг команды.
+- `GET /api/consalting/employees/{id}/activity/` — Лента активности сотрудника.
+- `GET/POST /api/consalting/sales-plans/` — Управление планами продаж.
+
+---
+
+## 7. Финансы сотрудника и кассовый подотчёт (`07-employee-finance.md`)
+
+### Что сделано:
+- **Модели кассы**: `CashOperationConsalting` и `CashRequestConsalting`.
+- **Расчёт подотчёта (`on_hands`)**: Модуль `employee_finance.py` рассчитывает сумму на руках у сотрудника нарастающим итогом за всё время (`all_cash_received - handed_over - pending_handover`).
+- **Сдача наличных**: Заявка сдачи наличных с жёсткой проверкой `0 < amount <= on_hands` (`400 Bad Request` при превышении).
+- **Сверка кассы**: Отчёт о расхождениях по кассирам.
+- **Удержание недостач**: Кнопка автоматического создания удержания из ЗП при обнаружении недостачи.
+
+### API-эндпоинты:
+- `GET /api/consalting/employees/{id}/finance/` — Финансовая сводка сотрудника.
+- `GET /api/consalting/employees/{id}/sales/` — Список продаж и начислений ЗП.
+- `GET /api/consalting/employees/{id}/handovers/` — История сдачи наличных.
+- `GET /api/consalting/employees/{id}/debts/` — Задолженности клиентов по рассрочкам.
+- `POST /api/consalting/cashbox/handovers/` — Оформление сдачи наличных.
+- `GET /api/consalting/cashbox/reconciliation/` — Сверка остатков кассы.
+- `POST /api/consalting/employees/{id}/deduct-shortage/` — Удержание недостачи.
+
+---
+
+## 8. Отмена и возврат продажи (`08-sale-cancel.md`)
+
+### Что сделано:
+- **Статусы продаж и возвраты**: В `SaleConsalting` добавлены статусы (`completed`, `pending_confirmation`, `canceled`, `refunded`), поля аудита отмены и создана модель частичных возвратов `SaleRefundConsalting`.
+- **Атомарный алгоритм отката (`cancel_sale`)**:
+  - Аннулирование будущих платежей по подписке и рассрочкам.
+  - Отмена начислений ЗП (или создание удержания, если ЗП уже выплачена).
+  - Снятие неподтвержденных кассовых заявок и создание расходных заявок при возврате наличных.
+  - Возврат лида в работу (`in_work`) или перевод в проигранные (`lost`).
+
+### API-эндпоинты:
+- `POST /api/consalting/sales/{id}/cancel/` — Полная отмена продажи.
+- `POST /api/consalting/sales/{id}/refund/` — Частичный возврат с валидацией остатка.
+- `GET /api/consalting/sales/cancellations/` — Отчёт по отменам и возвратам.
+
+---
+
+## 9. Подтверждение кассовых поступлений (`09-cash-confirmation.md`)
+
+### Что сделано:
+- **Разделение продаж и поступлений**: Продажа наличными создает заявку `CashRequestConsalting(status="pending")`, продажа получает статус `pending_confirmation`, и деньги **не поступают в баланс кассы** до подтверждения.
+- **Настройки кассы**: `CashConfirmationSettingsConsalting` (`mode`: `always`, `cash_only`, `off`; `skip_for_cashier`, `overdue_hours`).
+- **Алгоритм подтверждения/отклонения (`confirm_request` & `reject_request`)**:
+  - Подтверждение создаёт кассовую операцию `CashOperationConsalting` (автор — продавец), переводит продажу в `completed`.
+  - Отклонение требует указания причины (`no_money`, `amount_mismatch` и др.).
+
+### API-эндпоинты:
+- `GET /api/consalting/cashbox/requests/` — Список заявок.
+- `GET /api/consalting/cashbox/requests/counters/` — Счётчики и неподтвержденная сумма `pending_amount`.
+- `POST /api/consalting/cashbox/requests/{id}/confirm/` — Подтверждение заявки.
+- `POST /api/consalting/cashbox/requests/{id}/reject/` — Отклонение заявки.
+- `GET /api/consalting/cashbox/operations/` — Подтверждённые кассовые операции.
+- `GET/PUT /api/consalting/cashbox/confirmation-settings/` — Настройки подтверждения.
+
+---
+
+## 🧪 Покрытие тестами
+
+Все 9 модулей полностью покрыты модульными и интеграционными тестами (`42/42 OK`):
+1. `apps.consalting.tests_inbound`
+2. `apps.consalting.tests_salary`
+3. `apps.consalting.tests_hierarchy`
+4. `apps.consalting.tests_board_counters`
+5. `apps.consalting.tests_subscription`
+6. `apps.consalting.tests_employee_card`
+7. `apps.consalting.tests_employee_finance`
+8. `apps.consalting.tests_sale_cancel`
+9. `apps.consalting.tests_cash_confirmation`
+
+---
+
+## 🌐 Деплой и инфраструктура
+
+- Код задеплоен в репозиторий на ветку **`feature/summary-products-aggregation`**.
+- На сервере (`167.233.194.233`) выполнен pull, применены миграции `0022`–`0028` и перезапущены демоны `gunicorn`, `daphne-ws` и `celery`.
+- Фронтенд-сборка задеплоена в `/var/www/build` с перезапуском `nginx`.

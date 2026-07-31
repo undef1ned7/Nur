@@ -700,6 +700,54 @@ export default function ConsultingFunnel() {
     persistOwnerScope("mine");
   };
 
+  /**
+   * Завершение лида в промежуточной воронке (ТЗ №3) означает «передан дальше»:
+   * лид должен уехать в `next_funnel`, а не остаться в «Завершено».
+   *
+   * Триггер перехода на бэкенде — `win`; сам по себе перенос на завершающую
+   * стадию лид дальше не отправляет, поэтому добиваем его здесь. Если сервер
+   * уже перевёл лид (в ответе move-stage пришла другая воронка) — второй раз не
+   * дёргаем. В финальной воронке ничего не меняем: там завершение — это продажа,
+   * и она оформляется отдельно через «Оформить оплату».
+   */
+  const completeLeadInFunnel = async (funnel, leadId, movedLead) => {
+    const nextFunnelId = funnel?.next_funnel;
+    const isChained = !!nextFunnelId && funnel?.is_final !== true;
+    if (!isChained) {
+      setNotice(
+        "Лид завершён. Запись в аналитику и начисление зарплаты выполняются на сервере.",
+      );
+      return;
+    }
+
+    const nextFunnel = visibleFunnels.find(
+      (f) => String(f.id) === String(nextFunnelId),
+    );
+    const movedText = `Лид передан в воронку «${
+      nextFunnel ? getFunnelDisplayName(nextFunnel) : "следующая"
+    }».`;
+
+    const alreadyMoved =
+      movedLead?.funnel &&
+      String(movedLead.funnel) !== String(funnel.id);
+
+    try {
+      if (!alreadyMoved) {
+        await dispatch(winLead({ id: leadId })).unwrap();
+      }
+      await refreshAllBoards();
+      setNotice(movedText);
+    } catch (e) {
+      await refreshAllBoards();
+      setNotice(
+        errToText(
+          e,
+          "Лид завершён, но передать его в следующую воронку не удалось.",
+        ),
+      );
+    }
+  };
+
   const onDropToStage = async (funnelId, leadId, stageId) => {
     const board = boardsMap[funnelId];
     const funnel = visibleFunnels.find((f) => f.id === funnelId);
@@ -732,11 +780,11 @@ export default function ConsultingFunnel() {
 
     try {
       if (stageId) {
-        await dispatch(moveLeadStage({ id: leadId, stage: stageId })).unwrap();
+        const movedLead = await dispatch(
+          moveLeadStage({ id: leadId, stage: stageId }),
+        ).unwrap();
         if (isCompletedStage(targetStage)) {
-          setNotice(
-            "Лид завершён. Запись в аналитику и начисление зарплаты выполняются на сервере.",
-          );
+          await completeLeadInFunnel(funnel, leadId, movedLead);
         }
       } else {
         await dispatch(
@@ -1268,6 +1316,7 @@ export default function ConsultingFunnel() {
             })
           }
           onBoardRefresh={() => refreshBoard(activeLeadModalFunnelId)}
+          onLeadWon={refreshAllBoards}
         />
       )}
       {transferModal && (
@@ -1583,6 +1632,9 @@ function FunnelForm({
   const dispatch = useDispatch();
   const isEdit = !!existing?.id;
   const roleFunnel = isRoleFunnel(existing);
+  // Основную и ролевые воронки нельзя переименовать (имя ведёт роль/система),
+  // но цепочку «что дальше», финальность и SLA у них настраивать нужно.
+  const lockedMeta = isEdit && isProtectedFunnel(existing);
   const [name, setName] = useState(existing?.name || "");
   const [description, setDescription] = useState(existing?.description || "");
   const [isActive, setIsActive] = useState(existing?.is_active ?? true);
@@ -1633,8 +1685,6 @@ function FunnelForm({
     setSaving(true);
     try {
       const payload = {
-        name: name.trim(),
-        description: description.trim(),
         is_active: isActive,
         // Цепочка обработки: куда лид уходит после завершения в этой воронке.
         next_funnel: nextFunnel || null,
@@ -1647,8 +1697,17 @@ function FunnelForm({
         is_final: !nextFunnel ? true : !!isFinal,
         stage_sla_hours: slaHours ? Number(slaHours) : null,
       };
+      // Имя защищённой воронки не трогаем: у ролевой его ведёт роль, у основной
+      // это системное имя. Отправка прежнего значения тоже лишняя — сервер может
+      // отклонить переименование статичной воронки целиком.
+      if (!lockedMeta) {
+        payload.name = name.trim();
+        payload.description = description.trim();
+      }
       // Ролевые воронки не становятся главными — туда идут заявки роли.
-      if (!roleFunnel) {
+      // У основной флаг тоже не трогаем: снять его можно только назначив главной
+      // другую воронку.
+      if (!roleFunnel && !lockedMeta) {
         payload.is_main = !!isMain;
         if (isMain) payload.funnel_kind = "main";
       }
@@ -1673,7 +1732,16 @@ function FunnelForm({
   };
 
   return (
-    <Modal title={isEdit ? "Изменить воронку" : "Новая воронка"} onClose={onClose}>
+    <Modal
+      title={
+        !isEdit
+          ? "Новая воронка"
+          : lockedMeta
+            ? `Настройки воронки «${getFunnelDisplayName(existing)}»`
+            : "Изменить воронку"
+      }
+      onClose={onClose}
+    >
       {!!err && <div className="funnel__error">{err}</div>}
       <form className="funnel__form" onSubmit={submit}>
         <div className="funnel__field">
@@ -1682,8 +1750,16 @@ function FunnelForm({
             className="funnel__input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            autoFocus
+            disabled={lockedMeta}
+            autoFocus={!lockedMeta}
           />
+          {lockedMeta && (
+            <small className="funnel__hint">
+              {isMainFunnel(existing)
+                ? "Название основной воронки менять нельзя."
+                : "Название ведёт роль сотрудника — меняется вместе с ролью."}
+            </small>
+          )}
         </div>
         <div className="funnel__field">
           <label className="funnel__label">Описание</label>
@@ -1692,6 +1768,7 @@ function FunnelForm({
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            disabled={lockedMeta}
           />
         </div>
         <label className="funnel__check">
@@ -1709,6 +1786,7 @@ function FunnelForm({
                 type="checkbox"
                 checked={isMain}
                 onChange={(e) => setIsMain(e.target.checked)}
+                disabled={lockedMeta}
               />
               Главная воронка
             </label>
@@ -2394,6 +2472,8 @@ function LeadDetail({
   onNotice,
   onTransfer,
   onBoardRefresh,
+  /** Успех может увести лид в следующую воронку — обновляем все доски. */
+  onLeadWon,
 }) {
   const dispatch = useDispatch();
   const confirm = useConfirm();
@@ -2605,7 +2685,8 @@ function LeadDetail({
     setBusy(true);
     try {
       await dispatch(winLead({ id: leadId })).unwrap();
-      onBoardRefresh?.();
+      if (onLeadWon) await onLeadWon();
+      else onBoardRefresh?.();
     } catch (e) {
       setErr(errToText(e, "Не удалось закрыть как успех."));
     } finally {

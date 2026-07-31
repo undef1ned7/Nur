@@ -16,6 +16,7 @@ import {
   canManageLeadsInFunnel,
   canManageStagesInFunnel,
   canEditFunnelMeta,
+  canEditFunnelSettings,
 } from "../../../../utils/consultingFunnelAccess";
 import {
   canDragLead,
@@ -306,6 +307,7 @@ export default function FunnelBoardRow({
   const canManageLeads  = canManageLeadsInFunnel(profile, funnel);
   const canManageStages = canManageStagesInFunnel(profile, funnel);
   const canEditMeta     = canEditFunnelMeta(profile, funnel);
+  const canEditSettings = canEditFunnelSettings(profile);
   const tag             = funnelProtectionLabel(funnel);
   const currentUserId   = currentUserIdProp || resolveCurrentUserId(profile);
 
@@ -494,9 +496,11 @@ export default function FunnelBoardRow({
         )}
 
         <div className="funnel__rowActions">
-          {isManager && canEditMeta && (
+          {canEditSettings && (
             <button type="button" className="funnel__btn funnel__btn--sm"
-              onClick={() => onEditFunnel?.(funnel)}>Изменить</button>
+              onClick={() => onEditFunnel?.(funnel)}>
+              {canEditMeta ? "Изменить" : "Настройки"}
+            </button>
           )}
           {isManager && canEditMeta && (
             <button type="button" className="funnel__btn funnel__btn--sm funnel__btn--danger"
