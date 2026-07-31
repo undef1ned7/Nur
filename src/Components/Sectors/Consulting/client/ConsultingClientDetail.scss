@@ -1,7 +1,8 @@
 .clientDetail {
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-  font-family: "Montserrat", system-ui, sans-serif;
+  --primary: #f7d74f;
+  font-family: inherit;
   background: #fff;
   border-radius: var(--radius);
   padding: 24px;
@@ -10,36 +11,13 @@
   box-shadow: var(--shadow);
   color: #0f172a;
 
-  &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-
-  &__back {
-    display: inline-block;
-    margin-bottom: 8px;
-    color: #6b7280;
-    text-decoration: none;
-    font-size: 13px;
-    &:hover {
-      color: #0f172a;
-    }
-  }
-
-  &__title {
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
     margin: 0;
-    font-size: 22px;
-    font-weight: 700;
-  }
-
-  &__subtitle {
-    margin: 4px 0 0;
-    color: #6b7280;
-    font-size: 14px;
+    max-width: none;
+    border-radius: 0;
   }
 
   &__subBadge {

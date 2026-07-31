@@ -1020,6 +1020,7 @@ export default function ConsultingFunnel() {
     <section className="funnel">
       <header className="funnel__header">
         <div>
+          <p className="funnel__eyebrow">Консалтинг · Воронка</p>
           <h2 className="funnel__title">Воронка продаж</h2>
           <p className="funnel__subtitle">
             {visibleFunnels.length

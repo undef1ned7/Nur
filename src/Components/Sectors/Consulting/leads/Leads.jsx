@@ -1,16 +1,20 @@
 /**
  * Консалтинг → Лиды.
  *
- * Верхние разделы: Очередь (входящие) · Аналитика · Распределение · Интеграция.
- * Сама очередь разложена по табам-статусам со счётчиками, есть отложенные лиды
- * с напоминанием, фильтры по сотруднику/источнику/периоду и серверная
- * пагинация — всё состояние живёт в query-параметрах (ссылку можно переслать).
+ * Верхние разделы: Очередь · Аналитика · Распределение · Интеграция.
+ * Состояние разделов — в query (`tab`), очередь и фильтры живут в LeadsInbox.
  *
  * ТЗ: docs/consulting/tz-consulting-2026-07.md §ТЗ-1
  * Контракт бэкенда: docs/consulting/backend/01-leads.md
  */
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  FaChartPie,
+  FaInbox,
+  FaPlug,
+  FaRandom,
+} from "react-icons/fa";
 import api from "../../../../api";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -26,10 +30,30 @@ const ROLES_URL = "/users/roles/";
 const EMPLOYEES_URL = "/users/employees/";
 
 const SECTIONS = [
-  { value: "inbox", label: "Очередь" },
-  { value: "analytics", label: "Аналитика" },
-  { value: "settings", label: "Распределение" },
-  { value: "integration", label: "Интеграция" },
+  {
+    value: "inbox",
+    label: "Очередь",
+    hint: "Входящие и отложенные",
+    icon: FaInbox,
+  },
+  {
+    value: "analytics",
+    label: "Аналитика",
+    hint: "Конверсия по когортам",
+    icon: FaChartPie,
+  },
+  {
+    value: "settings",
+    label: "Распределение",
+    hint: "Кто получает лиды",
+    icon: FaRandom,
+  },
+  {
+    value: "integration",
+    label: "Интеграция",
+    hint: "Wazzup и каналы",
+    icon: FaPlug,
+  },
 ];
 
 const asArray = (d) =>
@@ -50,6 +74,7 @@ export default function ConsultingLeads() {
   const section = SECTIONS.some((s) => s.value === sectionFromUrl)
     ? sectionFromUrl
     : "inbox";
+  const activeSection = SECTIONS.find((s) => s.value === section) || SECTIONS[0];
 
   const selectSection = (next) => {
     setSearchParams(
@@ -63,7 +88,6 @@ export default function ConsultingLeads() {
     );
   };
 
-  /* Справочники: нужны для фильтра по сотруднику, назначения и настроек. */
   const [roles, setRoles] = useState([]);
   const [employees, setEmployees] = useState([]);
 
@@ -72,7 +96,9 @@ export default function ConsultingLeads() {
     api
       .get(ROLES_URL, { signal: controller.signal })
       .then((res) =>
-        setRoles(asArray(res.data).map((r) => ({ id: r.id, name: r.name || "—" }))),
+        setRoles(
+          asArray(res.data).map((r) => ({ id: r.id, name: r.name || "—" })),
+        ),
       )
       .catch(() => {});
     api
@@ -88,8 +114,6 @@ export default function ConsultingLeads() {
     return m;
   }, [employees]);
 
-  // Разрешение на десктоп-пуш спрашиваем один раз при открытии раздела:
-  // напоминания по отложенным лидам приходят именно так.
   useEffect(() => {
     ensurePushPermission();
   }, []);
@@ -98,46 +122,66 @@ export default function ConsultingLeads() {
     <section className="leads">
       <header className="leads__header">
         <div className="leads__heading">
-          <h2 className="leads__title">Лиды</h2>
+          <p className="leads__eyebrow">Консалтинг · Входящие</p>
+          <h1 className="leads__title">Лиды</h1>
           <p className="leads__subtitle">
-            Входящие из WhatsApp, Instagram и Telegram — очередь, отложенные и
-            результат по каждому обращению
+            WhatsApp, Instagram и Telegram — от первого сообщения до покупки
+            или отказа
           </p>
+        </div>
+        <div className="leads__headerMeta" aria-hidden>
+          <span className="leads__channelDot leads__channelDot--wa" />
+          <span className="leads__channelDot leads__channelDot--ig" />
+          <span className="leads__channelDot leads__channelDot--tg" />
         </div>
       </header>
 
-      <div className="leads__tabsRow">
-        <div className="leads__tabs" role="tablist" aria-label="Разделы лидов">
-          {SECTIONS.map((s) => (
+      <nav className="leads__nav" aria-label="Разделы лидов">
+        {SECTIONS.map((s) => {
+          const Icon = s.icon;
+          const active = section === s.value;
+          return (
             <button
               key={s.value}
               type="button"
-              role="tab"
-              aria-selected={section === s.value}
-              className={`leads__tab ${section === s.value ? "is-active" : ""}`}
+              className={`leads__navItem${active ? " is-active" : ""}`}
+              aria-current={active ? "page" : undefined}
               onClick={() => selectSection(s.value)}
             >
-              {s.label}
+              <span className="leads__navIcon" aria-hidden>
+                <Icon />
+              </span>
+              <span className="leads__navText">
+                <span className="leads__navLabel">{s.label}</span>
+                <span className="leads__navHint">{s.hint}</span>
+              </span>
             </button>
-          ))}
-        </div>
-      </div>
+          );
+        })}
+      </nav>
 
-      {section === "inbox" && (
-        <LeadsInbox
-          employees={employees}
-          empById={empById}
-          isManager={isManager}
-          alert={alert}
-        />
-      )}
-      {section === "analytics" && (
-        <LeadsAnalytics employees={employees} isManager={isManager} />
-      )}
-      {section === "settings" && (
-        <LeadsDistribution roles={roles} employees={employees} alert={alert} />
-      )}
-      {section === "integration" && <WazzupAccountsTab />}
+      <div className="leads__panel">
+        <div className="leads__panelHead">
+          <h2 className="leads__panelTitle">{activeSection.label}</h2>
+          <p className="leads__panelHint">{activeSection.hint}</p>
+        </div>
+
+        {section === "inbox" && (
+          <LeadsInbox
+            employees={employees}
+            empById={empById}
+            isManager={isManager}
+            alert={alert}
+          />
+        )}
+        {section === "analytics" && (
+          <LeadsAnalytics employees={employees} isManager={isManager} />
+        )}
+        {section === "settings" && (
+          <LeadsDistribution roles={roles} employees={employees} alert={alert} />
+        )}
+        {section === "integration" && <WazzupAccountsTab />}
+      </div>
     </section>
   );
 }

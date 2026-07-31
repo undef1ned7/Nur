@@ -12,12 +12,36 @@ import { useNavigate } from "react-router-dom";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
 import { getConsultingServices } from "../../../../store/creators/consultingThunk";
 import { getProfile, useUser } from "../../../../store/slices/userSlice";
-import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
+import {
+  FaPlus,
+  FaSearch,
+  FaTimes,
+  FaEdit,
+  FaTrash,
+  FaTh,
+  FaUsers,
+} from "react-icons/fa";
 import SubscriptionMatrix from "./SubscriptionMatrix";
+import ConsultingShell from "../common/ConsultingShell";
 import useConsultingList from "../common/useConsultingList";
 import { Pagination } from "../common/ListControls";
 import { plural } from "../common/listUtils";
 import { listConsultingClients } from "../../../../api/consultingCatalog";
+
+const CLIENT_NAV = [
+  {
+    value: "list",
+    label: "Список",
+    hint: "Контакты и продажи",
+    icon: FaUsers,
+  },
+  {
+    value: "matrix",
+    label: "Абонентка",
+    hint: "Матрица подписок",
+    icon: FaTh,
+  },
+];
 
 const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString("ru-RU") + " с";
@@ -112,15 +136,26 @@ export default function ConsultingClients() {
   const shownCount = filtered.length;
 
   return (
-    <section className="clients">
-      <header className="clients__header">
-        <div className="clients__heading">
-          <h2 className="clients__title">Клиенты</h2>
-          <p className="clients__subtitle">
-            Контакты, услуги и история продаж
-          </p>
-        </div>
-
+    <ConsultingShell
+      eyebrow="Консалтинг · Клиенты"
+      title="Клиенты"
+      subtitle="Контакты, услуги и история продаж"
+      nav={CLIENT_NAV}
+      navValue={tab}
+      onNavChange={setTab}
+      headerActions={
+        tab === "list" ? (
+          <button
+            type="button"
+            className="cShell__btn cShell__btn--primary"
+            onClick={onCreate}
+          >
+            <FaPlus aria-hidden /> Клиент
+          </button>
+        ) : null
+      }
+    >
+      <div className="clients clients--embedded">
         {tab === "list" && (
           <div className="clients__toolbar">
             <label className="clients__search">
@@ -143,231 +178,165 @@ export default function ConsultingClients() {
                 </button>
               )}
             </label>
-
-            <button
-              type="button"
-              className="clients__btn clients__btn--primary"
-              onClick={onCreate}
-            >
-              <FaPlus aria-hidden /> Клиент
-            </button>
+            {!loading && (
+              <span className="clients__count">
+                {q.trim()
+                  ? `${shownCount} из ${totalCount}`
+                  : `${totalCount} ${pluralClients(totalCount)}`}
+              </span>
+            )}
           </div>
         )}
-      </header>
 
-      <div className="clients__tabsRow">
-        <div className="clients__tabs" role="tablist" aria-label="Разделы клиентов">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "list"}
-            className={`clients__tab ${tab === "list" ? "is-active" : ""}`}
-            onClick={() => setTab("list")}
-          >
-            Список
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "matrix"}
-            className={`clients__tab ${tab === "matrix" ? "is-active" : ""}`}
-            onClick={() => setTab("matrix")}
-          >
-            Абонентская матрица
-          </button>
-        </div>
+        {tab === "matrix" && <SubscriptionMatrix />}
 
-        {tab === "list" && !loading && (
-          <span className="clients__count">
-            {q.trim()
-              ? `${shownCount} из ${totalCount}`
-              : `${totalCount} ${pluralClients(totalCount)}`}
-          </span>
-        )}
-      </div>
+        {tab === "list" && (
+          <>
+            {!!err && <div className="clients__error">{String(err)}</div>}
 
-      {tab === "matrix" && <SubscriptionMatrix />}
-
-      {tab === "list" && (
-        <>
-          {!!err && <div className="clients__error">{String(err)}</div>}
-
-          <div className="clients__tableWrap">
-            <table className="clients__table">
-              <thead>
-                <tr>
-                  <th className="clients__colClient">Клиент</th>
-                  <th className="clients__colDate">Дата</th>
-                  <th className="clients__colSeller">Продавец</th>
-                  <th className="clients__colService">Услуга</th>
-                  <th className="clients__colSum">Сумма</th>
-                  <th className="clients__colActions" aria-label="Действия" />
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td className="clients__empty" colSpan={6}>
-                      Загрузка списка клиентов…
-                    </td>
-                  </tr>
-                ) : filtered.length ? (
-                  filtered.map((c) => {
-                    const isConfirm = String(c.id) === String(confirmId);
-                    const isDeleting = String(c.id) === String(deletingId);
-                    return (
-                      <tr
-                        key={c.id}
-                        className="clients__row"
-                        onClick={() =>
-                          navigate(`/crm/consulting/client/${c.id}`)
-                        }
-                      >
-                        <td className="clients__colClient">
-                          <div className="clients__person">
-                            <span className="clients__avatar" aria-hidden>
-                              {initials(c.full_name)}
-                            </span>
-                            <div className="clients__personText">
+            {loading ? (
+              <div className="clients__state">Загрузка списка клиентов…</div>
+            ) : filtered.length ? (
+              <ul className="cShell__feed clients__feed" aria-label="Клиенты">
+                {filtered.map((c) => {
+                  const isConfirm = String(c.id) === String(confirmId);
+                  const isDeleting = String(c.id) === String(deletingId);
+                  return (
+                    <li
+                      key={c.id}
+                      className="cShell__card clients__card"
+                      onClick={() =>
+                        navigate(`/crm/consulting/client/${c.id}`)
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter")
+                          navigate(`/crm/consulting/client/${c.id}`);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="cShell__cardMain">
+                        <span className="cShell__avatar" aria-hidden>
+                          {initials(c.full_name)}
+                        </span>
+                        <div className="cShell__cardBody">
+                          <div className="cShell__cardTop">
+                            <div>
                               <div
-                                className="clients__name"
+                                className="cShell__cardTitle"
                                 title={c.full_name}
                               >
                                 {c.full_name || "Без имени"}
                               </div>
-                              <div
-                                className="clients__phone"
-                                title={c.phone || undefined}
-                              >
+                              <div className="cShell__cardMeta">
                                 {c.phone || "Телефон не указан"}
                               </div>
                             </div>
+                            <span className="clients__money">
+                              {fmtMoney(c.score)}
+                            </span>
                           </div>
-                        </td>
-                        <td className="clients__colDate clients__date">
-                          {fmtDate(c.date || c.created_at)}
-                        </td>
-                        <td
-                          className="clients__colSeller"
-                          title={c.salesperson_display || undefined}
-                        >
-                          <span className="clients__cellText">
-                            {c.salesperson_display || "—"}
-                          </span>
-                        </td>
-                        <td
-                          className="clients__colService"
-                          title={c.service_display || undefined}
-                        >
-                          <span className="clients__cellText">
-                            {c.service_display || "—"}
-                          </span>
-                        </td>
-                        <td className="clients__colSum clients__money">
-                          {fmtMoney(c.score)}
-                        </td>
-                        <td
-                          className="clients__colActions"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {isConfirm ? (
-                            <div className="clients__confirm">
-                              <span className="clients__confirmText">
-                                Удалить?
-                              </span>
-                              <button
-                                type="button"
-                                className="clients__btn clients__btn--sm clients__btn--danger"
-                                onClick={() => doDelete(c.id)}
-                                disabled={isDeleting}
-                              >
-                                {isDeleting ? "…" : "Да"}
-                              </button>
-                              <button
-                                type="button"
-                                className="clients__btn clients__btn--sm"
-                                onClick={cancelDelete}
-                                disabled={isDeleting}
-                              >
-                                Нет
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="clients__rowActions">
-                              <button
-                                type="button"
-                                className="clients__btn clients__btn--sm"
-                                onClick={() => onEdit(c.id)}
-                                title="Изменить"
-                              >
-                                <FaEdit aria-hidden />
-                                <span>Изм.</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="clients__btn clients__btn--sm clients__btn--danger"
-                                onClick={() => askDelete(c.id)}
-                                title="Удалить"
-                              >
-                                <FaTrash aria-hidden />
-                                <span>Удал.</span>
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td className="clients__empty" colSpan={6}>
-                      <div className="clients__emptyState">
-                        <strong>
-                          {q.trim()
-                            ? "Ничего не найдено"
-                            : "Пока нет клиентов"}
-                        </strong>
-                        <p>
-                          {q.trim()
-                            ? "Попробуйте изменить запрос или очистить поиск."
-                            : "Добавьте первого клиента, чтобы вести продажи и абонентку."}
-                        </p>
-                        {!q.trim() && (
-                          <button
-                            type="button"
-                            className="clients__btn clients__btn--primary"
-                            onClick={onCreate}
-                          >
-                            <FaPlus aria-hidden /> Добавить клиента
-                          </button>
+                          <div className="clients__cardFoot">
+                            <span>{fmtDate(c.date || c.created_at)}</span>
+                            <span>{c.service_display || "Без услуги"}</span>
+                            <span>{c.salesperson_display || "—"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className="cShell__cardActions"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {isConfirm ? (
+                          <div className="clients__confirm">
+                            <span className="clients__confirmText">
+                              Удалить?
+                            </span>
+                            <button
+                              type="button"
+                              className="clients__btn clients__btn--sm clients__btn--danger"
+                              onClick={() => doDelete(c.id)}
+                              disabled={isDeleting}
+                            >
+                              {isDeleting ? "…" : "Да"}
+                            </button>
+                            <button
+                              type="button"
+                              className="clients__btn clients__btn--sm"
+                              onClick={cancelDelete}
+                              disabled={isDeleting}
+                            >
+                              Нет
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="clients__btn clients__btn--sm"
+                              onClick={() => onEdit(c.id)}
+                              title="Изменить"
+                            >
+                              <FaEdit aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="clients__btn clients__btn--sm clients__btn--danger"
+                              onClick={() => askDelete(c.id)}
+                              title="Удалить"
+                            >
+                              <FaTrash aria-hidden />
+                            </button>
+                          </>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="clients__emptyState">
+                <strong>
+                  {q.trim() ? "Ничего не найдено" : "Пока нет клиентов"}
+                </strong>
+                <p>
+                  {q.trim()
+                    ? "Попробуйте изменить запрос или очистить поиск."
+                    : "Добавьте первого клиента, чтобы вести продажи и абонентку."}
+                </p>
+                {!q.trim() && (
+                  <button
+                    type="button"
+                    className="clients__btn clients__btn--primary"
+                    onClick={onCreate}
+                  >
+                    <FaPlus aria-hidden /> Добавить клиента
+                  </button>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              </div>
+            )}
+          </>
+        )}
 
-      {tab === "list" && (
-        <Pagination
-          page={clientsList.page}
-          totalPages={clientsList.totalPages}
-          count={clientsList.count}
-          pageSize={clientsList.pageSize}
-          onPage={clientsList.setPage}
-          onPageSize={clientsList.setPageSize}
-          unitLabel={plural.clients}
-          loading={clientsList.loading}
-        />
-      )}
+        {tab === "list" && (
+          <Pagination
+            page={clientsList.page}
+            totalPages={clientsList.totalPages}
+            count={clientsList.count}
+            pageSize={clientsList.pageSize}
+            onPage={clientsList.setPage}
+            onPageSize={clientsList.setPageSize}
+            unitLabel={plural.clients}
+            loading={clientsList.loading}
+          />
+        )}
 
-      {isFormOpen && (
-        <ClientForm id={editId} onClose={() => setIsFormOpen(false)} />
-      )}
-    </section>
+        {isFormOpen && (
+          <ClientForm id={editId} onClose={() => setIsFormOpen(false)} />
+        )}
+      </div>
+    </ConsultingShell>
   );
 }
 

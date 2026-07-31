@@ -13,6 +13,9 @@ import {
   FaCopy,
   FaLock,
   FaChartLine,
+  FaUserTag,
+  FaUsers,
+  FaTrophy,
 } from "react-icons/fa";
 import "./Teachers.scss";
 import EmployeeCard from "./EmployeeCard";
@@ -23,9 +26,26 @@ import { getNewEmployeeAccessDefaults } from "../../../../utils/newEmployeeDefau
 import { provisionFunnelForCustomRole } from "../../../../utils/consultingFunnelDefaults";
 import { convertEmployeeAccessesToLabels } from "../../Barber/Masters/employeeAccessLabels";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
+import ConsultingShell from "../common/ConsultingShell";
 
 import { normalizeFunnelGrants } from "../../../../utils/consultingFunnelAccess";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+
+const TEACHERS_NAV = [
+  { value: "roles", label: "Роли", hint: "Права доступа", icon: FaUserTag },
+  {
+    value: "employees",
+    label: "Сотрудники",
+    hint: "Список и доступы",
+    icon: FaUsers,
+  },
+  {
+    value: "rating",
+    label: "Рейтинг",
+    hint: "КПД по сотрудникам",
+    icon: FaTrophy,
+  },
+];
 
 /* ===== API ===== */
 const EMPLOYEES_LIST_URL = "/users/employees/"; // GET
@@ -909,90 +929,74 @@ function ConsultingSchoolTeachers() {
   /* ===== RENDER ===== */
   if (cardEmployee) {
     return (
-      <div className="Schoolteachers">
-        <EmployeeCard
-          employee={cardEmployee}
-          isManager={profile?.role === "owner" || profile?.role === "admin"}
-          onBack={() => setCardEmployee(null)}
-        />
-      </div>
+      <ConsultingShell
+        eyebrow="Консалтинг · Команда"
+        title="Сотрудники"
+        subtitle="Роли, сотрудники и рейтинг эффективности"
+        nav={TEACHERS_NAV}
+        navValue="employees"
+        onNavChange={(v) => {
+          setCardEmployee(null);
+          setTab(v);
+        }}
+      >
+        <div className="Schoolteachers Schoolteachers--embedded">
+          <EmployeeCard
+            employee={cardEmployee}
+            isManager={profile?.role === "owner" || profile?.role === "admin"}
+            onBack={() => setCardEmployee(null)}
+          />
+        </div>
+      </ConsultingShell>
     );
   }
 
   return (
-    <div className="Schoolteachers">
-      <div className="Schoolteachers__header">
-        <div className="Schoolteachers__titleWrap">
-          <h2 className="Schoolteachers__title">Сотрудники</h2>
-          <p className="Schoolteachers__subtitle">Роли и сотрудники</p>
-        </div>
+    <ConsultingShell
+      eyebrow="Консалтинг · Команда"
+      title="Сотрудники"
+      subtitle="Роли, сотрудники и рейтинг эффективности"
+      nav={TEACHERS_NAV}
+      navValue={tab}
+      onNavChange={setTab}
+      headerActions={
+        tab === "rating" ? null : (
+          <>
+            <div className="Schoolteachers__search Schoolteachers__search--inline">
+              <FaSearch className="Schoolteachers__searchIcon" aria-hidden />
+              <input
+                className="Schoolteachers__searchInput"
+                placeholder={
+                  tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам…"
+                }
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label="Поиск"
+              />
+            </div>
 
-        <div className="Schoolteachers__toolbar">
-          <div className="Schoolteachers__tabs">
-            <button
-              type="button"
-              className={`Schoolteachers__tab ${
-                tab === "roles" ? "is-active" : ""
-              }`}
-              onClick={() => setTab("roles")}
-            >
-              Роли
-            </button>
-            <button
-              type="button"
-              className={`Schoolteachers__tab ${
-                tab === "employees" ? "is-active" : ""
-              }`}
-              onClick={() => setTab("employees")}
-            >
-              Сотрудники
-            </button>
-            <button
-              type="button"
-              className={`Schoolteachers__tab ${
-                tab === "rating" ? "is-active" : ""
-              }`}
-              onClick={() => setTab("rating")}
-            >
-              Рейтинг
-            </button>
-          </div>
-
-          {tab !== "rating" && (
-          <div className="Schoolteachers__search">
-            <FaSearch className="Schoolteachers__searchIcon" aria-hidden />
-            <input
-              className="Schoolteachers__searchInput"
-              placeholder={
-                tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам…"
-              }
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              aria-label="Поиск"
-            />
-          </div>
-          )}
-
-          {tab === "rating" ? null : tab === "roles" ? (
-            <button
-              type="button"
-              className="Schoolteachers__btn Schoolteachers__btn--primary"
-              onClick={() => setRoleCreateOpen(true)}
-            >
-              <FaPlus /> Создать роль
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="Schoolteachers__btn Schoolteachers__btn--primary"
-              onClick={() => setEmpCreateOpen(true)}
-            >
-              <FaPlus /> Создать сотрудника
-            </button>
-          )}
-        </div>
-      </div>
-
+            {tab === "roles" ? (
+              <button
+                type="button"
+                className="cShell__btn cShell__btn--primary"
+                onClick={() => setRoleCreateOpen(true)}
+              >
+                <FaPlus /> Создать роль
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="cShell__btn cShell__btn--primary"
+                onClick={() => setEmpCreateOpen(true)}
+              >
+                <FaPlus /> Создать сотрудника
+              </button>
+            )}
+          </>
+        )
+      }
+    >
+      <div className="Schoolteachers Schoolteachers--embedded">
       {loading && <div className="Schoolteachers__alert">Загрузка…</div>}
       {!!error && <div className="Schoolteachers__alert">{error}</div>}
       {!!pageNotice && (
@@ -2057,7 +2061,8 @@ function ConsultingSchoolTeachers() {
         funnelGrants={funnelGrantsDraft}
         onFunnelGrantsChange={setFunnelGrantsDraft}
       />
-    </div>
+      </div>
+    </ConsultingShell>
   );
 }
 

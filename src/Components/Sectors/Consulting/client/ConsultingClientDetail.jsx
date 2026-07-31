@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   getItemClient,
   getClientDeals,
@@ -9,6 +9,7 @@ import {
 } from "../../../../store/creators/clientCreators";
 import { kindLabel, formatDateDDMMYYYY } from "../../../../tools/clientDeals";
 import { useAlert } from "../../../../hooks/useDialog";
+import ConsultingShell from "../common/ConsultingShell";
 import "./ConsultingClientDetail.scss";
 
 const money = (v) => {
@@ -35,7 +36,6 @@ const parsePeriod = (label) => {
 export default function ConsultingClientDetail() {
   const { id } = useParams();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const alert = useAlert();
   const [client, setClient] = useState(null);
   const [deals, setDeals] = useState([]);
@@ -158,148 +158,175 @@ export default function ConsultingClientDetail() {
     [payTarget, dispatch, id, reload],
   );
 
+  const backLink = (
+    <Link to="/crm/consulting/client" className="cShell__btn">
+      ← Клиенты
+    </Link>
+  );
+
   if (loading) {
     return (
-      <section className="clientDetail">
-        <p className="clientDetail__muted">Загрузка…</p>
-      </section>
+      <ConsultingShell
+        eyebrow="Консалтинг · Клиент"
+        title="Клиент"
+        headerActions={backLink}
+      >
+        <div className="clientDetail clientDetail--embedded">
+          <p className="clientDetail__muted">Загрузка…</p>
+        </div>
+      </ConsultingShell>
     );
   }
 
   if (err && !client) {
     return (
-      <section className="clientDetail">
-        <div className="clientDetail__error">{err}</div>
-        <button
-          type="button"
-          className="clientDetail__btn"
-          onClick={() => navigate("/crm/consulting/client")}
-        >
-          ← К списку
-        </button>
-      </section>
+      <ConsultingShell
+        eyebrow="Консалтинг · Клиент"
+        title="Клиент"
+        headerActions={backLink}
+      >
+        <div className="clientDetail clientDetail--embedded">
+          <div className="clientDetail__error">{err}</div>
+        </div>
+      </ConsultingShell>
     );
   }
 
   return (
-    <section className="clientDetail">
-      <header className="clientDetail__header">
-        <div>
-          <Link to="/crm/consulting/client" className="clientDetail__back">
-            ← Клиенты
-          </Link>
-          <h1 className="clientDetail__title">{client?.full_name || "Клиент"}</h1>
-          <p className="clientDetail__subtitle">
-            {[client?.phone, client?.email].filter(Boolean).join(" · ") || "—"}
-          </p>
-        </div>
-        {activeSubscription && (
-          <div className="clientDetail__subBadge">
-            Абон. {money(activeSubscription.amount || activeSubscription.subscription_amount)}
-            {activeSubscription.period === "year" || activeSubscription.subscription_period === "year"
-              ? " / год"
-              : " / мес."}
+    <ConsultingShell
+      eyebrow="Консалтинг · Клиент"
+      title={client?.full_name || "Клиент"}
+      subtitle={
+        [client?.phone, client?.email].filter(Boolean).join(" · ") || "—"
+      }
+      headerActions={
+        <>
+          {activeSubscription && (
+            <span className="clientDetail__subBadge">
+              Абон.{" "}
+              {money(
+                activeSubscription.amount ||
+                  activeSubscription.subscription_amount
+              )}
+              {activeSubscription.period === "year" ||
+              activeSubscription.subscription_period === "year"
+                ? " / год"
+                : " / мес."}
+            </span>
+          )}
+          {backLink}
+        </>
+      }
+    >
+      <div className="clientDetail clientDetail--embedded">
+        {!!err && <div className="clientDetail__error">{err}</div>}
+
+        <div className="clientDetail__grid">
+          <div className="clientDetail__card">
+            <h2 className="clientDetail__cardTitle">Абонентские платежи</h2>
+            {chartData.length ? (
+              <div className="clientDetail__calendar">
+                {chartData.map((row) => {
+                  const { month, year } = parsePeriod(row.label);
+                  const payable = !row.paid && row.dealId && row.amount > 0;
+                  const cls = [
+                    "clientDetail__calCell",
+                    `clientDetail__calCell--${row.status}`,
+                    payable ? "clientDetail__calCell--payable" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <button
+                      key={row.key}
+                      type="button"
+                      className={cls}
+                      disabled={!payable}
+                      onClick={() => payable && setPayTarget(row)}
+                      title={
+                        payable
+                          ? `Оплатить ${money(row.amount)} за ${
+                              row.tooltip || row.label
+                            }`
+                          : `${row.tooltip || row.label}: ${money(
+                              row.amount
+                            )} — ${row.paid ? "Оплачено" : "Запланировано"}`
+                      }
+                    >
+                      <span className="clientDetail__calMonth">{month}</span>
+                      {year && (
+                        <span className="clientDetail__calYear">{year}</span>
+                      )}
+                      <span className="clientDetail__calAmount">
+                        {money(row.amount)}
+                      </span>
+                      <span className="clientDetail__calStatus">
+                        {row.paid
+                          ? "Оплачено"
+                          : payable
+                          ? "Оплатить"
+                          : "Запланировано"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="clientDetail__muted">
+                Нет данных по абонентской плате. Они появятся после
+                завершения лида с тарифом, где указана абонентка.
+              </p>
+            )}
           </div>
-        )}
-      </header>
 
-      {!!err && <div className="clientDetail__error">{err}</div>}
-
-      <div className="clientDetail__grid">
-        <div className="clientDetail__card">
-          <h2 className="clientDetail__cardTitle">Абонентские платежи</h2>
-          {chartData.length ? (
-            <div className="clientDetail__calendar">
-              {chartData.map((row) => {
-                const { month, year } = parsePeriod(row.label);
-                const payable = !row.paid && row.dealId && row.amount > 0;
-                const cls = [
-                  "clientDetail__calCell",
-                  `clientDetail__calCell--${row.status}`,
-                  payable ? "clientDetail__calCell--payable" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                return (
-                  <button
-                    key={row.key}
-                    type="button"
-                    className={cls}
-                    disabled={!payable}
-                    onClick={() => payable && setPayTarget(row)}
-                    title={
-                      payable
-                        ? `Оплатить ${money(row.amount)} за ${row.tooltip || row.label}`
-                        : `${row.tooltip || row.label}: ${money(row.amount)} — ${
-                            row.paid ? "Оплачено" : "Запланировано"
-                          }`
-                    }
-                  >
-                    <span className="clientDetail__calMonth">{month}</span>
-                    {year && <span className="clientDetail__calYear">{year}</span>}
-                    <span className="clientDetail__calAmount">{money(row.amount)}</span>
-                    <span className="clientDetail__calStatus">
-                      {row.paid ? "Оплачено" : payable ? "Оплатить" : "Запланировано"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="clientDetail__muted">
-              Нет данных по абонентской плате. Они появятся после завершения лида с
-              тарифом, где указана абонентка.
-            </p>
-          )}
-        </div>
-
-        <div className="clientDetail__card">
-          <h2 className="clientDetail__cardTitle">История сделок</h2>
-          {deals.length ? (
-            <div className="clientDetail__tableWrap">
-              <table className="clientDetail__table">
-                <thead>
-                  <tr>
-                    <th>Дата</th>
-                    <th>Название</th>
-                    <th>Тип</th>
-                    <th>Сумма</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deals.map((d) => (
-                    <tr key={d.id}>
-                      <td>{formatDateDDMMYYYY(d.created_at)}</td>
-                      <td>{d.title || "—"}</td>
-                      <td>{kindLabel(d.kind)}</td>
-                      <td>{money(d.amount)}</td>
+          <div className="clientDetail__card">
+            <h2 className="clientDetail__cardTitle">История сделок</h2>
+            {deals.length ? (
+              <div className="clientDetail__tableWrap">
+                <table className="clientDetail__table">
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Название</th>
+                      <th>Тип</th>
+                      <th>Сумма</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="clientDetail__muted">Сделок пока нет.</p>
-          )}
+                  </thead>
+                  <tbody>
+                    {deals.map((d) => (
+                      <tr key={d.id}>
+                        <td>{formatDateDDMMYYYY(d.created_at)}</td>
+                        <td>{d.title || "—"}</td>
+                        <td>{kindLabel(d.kind)}</td>
+                        <td>{money(d.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="clientDetail__muted">Сделок пока нет.</p>
+            )}
+          </div>
         </div>
+
+        {(client?.lead_id || client?.source_lead) && (
+          <p className="clientDetail__hint">
+            Клиент создан из лида воронки. При завершении лида сделки и
+            абонентка автоматически попадают в эту карточку и в аналитику.
+          </p>
+        )}
+
+        {payTarget && (
+          <SubPaymentModal
+            target={payTarget}
+            onClose={() => setPayTarget(null)}
+            onSubmit={handlePaySubmit}
+            onError={(msg) => alert(msg, true)}
+          />
+        )}
       </div>
-
-      {(client?.lead_id || client?.source_lead) && (
-        <p className="clientDetail__hint">
-          Клиент создан из лида воронки. При завершении лида сделки и абонентка
-          автоматически попадают в эту карточку и в аналитику.
-        </p>
-      )}
-
-      {payTarget && (
-        <SubPaymentModal
-          target={payTarget}
-          onClose={() => setPayTarget(null)}
-          onSubmit={handlePaySubmit}
-          onError={(msg) => alert(msg, true)}
-        />
-      )}
-    </section>
+    </ConsultingShell>
   );
 }
 

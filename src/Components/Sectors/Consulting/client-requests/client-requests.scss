@@ -4,8 +4,8 @@
   --text: #0f172a;
   --bg: #ffffff;
   --shadow: 0 14px 44px rgba(0, 0, 0, 0.08);
-  --primary: #ffd84d;
-  --primary-hover: #f2c400;
+  --primary: #f7d74f;
+  --primary-hover: #ecc62a;
   --danger: #ef4444;
 
   /* ЕДИНЫЕ РАЗМЕРЫ */
@@ -20,6 +20,15 @@
   padding: 20px;
   margin: 16px;
   max-width: 1200px;
+  font-family: inherit;
+
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+  }
 
   /* header / toolbar */
   &__header {

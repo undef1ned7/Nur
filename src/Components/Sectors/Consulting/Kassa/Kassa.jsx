@@ -1,11 +1,13 @@
 // src/components/Kassa/Kassa.js
 import React, { useEffect, useMemo, useState } from "react";
+import { FaCashRegister, FaChartBar, FaInbox } from "react-icons/fa";
 import api from "../../../../api";
 import ConsultingReports from "./Reports/Reports";
 import CashRequests from "./CashRequests";
 import { useAlert } from "../../../../hooks/useDialog";
 import useCounters from "../common/useCounters";
 import { getCashRequestCounters } from "../../../../api/consultingCashbox";
+import ConsultingShell from "../common/ConsultingShell";
 import "./kassa.scss";
 
 /* helpers */
@@ -45,68 +47,76 @@ export default function ConsultingCafeKassa() {
     setTab("list");
   };
 
+  const KASSA_NAV = useMemo(
+    () => [
+      {
+        value: "list",
+        label: "Касса",
+        hint: "Список касс отделов",
+        icon: FaCashRegister,
+      },
+      {
+        value: "requests",
+        label: "Запросы",
+        hint:
+          pendingCount > 0
+            ? `Ожидают подтверждения: ${pendingCount}`
+            : "Подтверждения поступлений",
+        icon: FaInbox,
+      },
+      {
+        value: "reports",
+        label: "Отчёты",
+        hint: "Аналитика по кассам",
+        icon: FaChartBar,
+      },
+    ],
+    [pendingCount],
+  );
+
+  // Детали кассы — не отдельный раздел навигации, а drill-down из «Кассы».
+  const navValue = tab === "detail" ? "list" : tab;
+  const onNavChange = (value) => {
+    setSelectedId(null);
+    setTab(value);
+  };
+
   return (
-    <div className="kassa">
-      <div className="kassa__header">
-        <div className="kassa__tabs">
-          {tab === "detail" ? (
-            <>
-              <button className="kassa__tab" onClick={backToList}>
-                ← Назад
-              </button>
-              <span className="kassa__tab kassa__tab--active">Касса</span>
-              <button className="kassa__tab" onClick={() => setTab("reports")}>
-                Отчёты
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className={`kassa__tab ${
-                  tab === "list" ? "kassa__tab--active" : ""
-                }`}
-                onClick={() => setTab("list")}
-              >
-                Кассы
-              </button>
-              <button
-                className={`kassa__tab ${
-                  tab === "requests" ? "kassa__tab--active" : ""
-                }`}
-                onClick={() => setTab("requests")}
-              >
-                Подтверждения
-                {pendingCount > 0 && (
-                  <span className="kassa__tabBadge">{pendingCount}</span>
-                )}
-              </button>
-              <button
-                className={`kassa__tab ${
-                  tab === "reports" ? "kassa__tab--active" : ""
-                }`}
-                onClick={() => setTab("reports")}
-              >
-                Отчёты
-              </button>
-            </>
-          )}
-        </div>
+    <ConsultingShell
+      eyebrow="Консалтинг · Деньги"
+      title="Касса"
+      subtitle="Кассы отделов, подтверждения поступлений и отчёты"
+      nav={KASSA_NAV}
+      navValue={navValue}
+      onNavChange={onNavChange}
+      headerActions={
+        tab === "detail" ? (
+          <button
+            type="button"
+            className="cShell__btn"
+            onClick={backToList}
+          >
+            ← Все кассы
+          </button>
+        ) : null
+      }
+    >
+      <div className="kassa kassa--embedded">
+        {tab === "list" && <CashboxList onOpenDetail={openDetail} />}
+
+        {tab === "requests" && <CashRequests employees={employees} />}
+
+        {tab === "reports" && (
+          <div style={{ marginTop: 8 }}>
+            <ConsultingReports />
+          </div>
+        )}
+
+        {tab === "detail" && selectedId && (
+          <CashboxDetailView id={selectedId} onBack={backToList} />
+        )}
       </div>
-
-      {tab === "list" && <CashboxList onOpenDetail={openDetail} />}
-
-      {tab === "requests" && <CashRequests employees={employees} />}
-
-      {tab === "reports" && (
-        <div style={{ marginTop: 8 }}>
-          <ConsultingReports />
-        </div>
-      )}
-
-      {tab === "detail" && selectedId && (
-        <CashboxDetailView id={selectedId} onBack={backToList} />
-      )}
-    </div>
+    </ConsultingShell>
   );
 }
 

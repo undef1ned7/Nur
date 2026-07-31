@@ -1,9 +1,9 @@
 /**
  * Консалтинг → Лиды → Очередь.
  *
- * Табы-статусы со счётчиками, отложенные лиды с напоминанием, фильтры
- * (сотрудник, источник, период, «только просроченные»), серверные поиск и
- * пагинация. Все параметры уходят в запрос и в URL.
+ * Табы-статусы со счётчиками, отложенные с напоминанием, фильтры
+ * (сотрудник, источник, период, «только просроченные»), серверный поиск и
+ * пагинация. Параметры — в URL (префикс `q`).
  */
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -12,12 +12,14 @@ import {
   FaClock,
   FaComments,
   FaExclamationTriangle,
+  FaFilter,
   FaInstagram,
   FaLayerGroup,
   FaPlay,
   FaPlus,
   FaSyncAlt,
   FaTelegram,
+  FaTimes,
   FaTimesCircle,
   FaUserCheck,
   FaWhatsapp,
@@ -46,7 +48,6 @@ import { useUser } from "../../../../store/slices/userSlice";
 import useConsultingList from "../common/useConsultingList";
 import useCounters from "../common/useCounters";
 import {
-  CounterTabs,
   ListState,
   Pagination,
   PeriodFilter,
@@ -67,7 +68,7 @@ const SourceIcon = ({ source }) => {
   return null;
 };
 
-/** «через 2 ч», «завтра в 10:00», «просрочено на 3 ч» — для отложенных. */
+/** «через 2 ч», «просрочено на 3 ч» — для отложенных. */
 const fmtRemind = (iso) => {
   if (!iso) return "—";
   const ts = new Date(iso).getTime();
@@ -75,19 +76,22 @@ const fmtRemind = (iso) => {
   const diff = ts - Date.now();
   const hours = Math.round(Math.abs(diff) / 3600000);
   const label =
-    hours < 24
-      ? `${hours} ч`
-      : `${Math.round(hours / 24)} дн.`;
+    hours < 24 ? `${hours} ч` : `${Math.round(hours / 24)} дн.`;
   return diff >= 0 ? `через ${label}` : `просрочено на ${label}`;
 };
 
 const initials = (name) => {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (!parts.length) return "?";
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
 };
 
-/** Таб очереди → набор статусов для сервера. */
 const queueToStatus = (queue) => {
   const tab = leadTabByValue(queue);
   return tab.statuses.length ? tab.statuses.join(",") : "";
@@ -102,8 +106,8 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
   const [deferFor, setDeferFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // `queue` — таб очереди, на сервер уходит как список статусов.
   const mapParams = useCallback((p) => {
     const { queue, ...rest } = p;
     const status = queueToStatus(queue);
@@ -145,7 +149,6 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
     refresh,
   } = list;
 
-  /* Счётчики табов считаются по тем же фильтрам, но без самого таба. */
   const counterParams = useMemo(
     () => ({
       owner: filters.owner || undefined,
@@ -167,7 +170,6 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
     reloadCounters();
   }, [refresh, reloadCounters]);
 
-  // Реалтайм: новое сообщение / назначение / напоминание — обновляем список.
   useConsultingRealtime({
     match: isConsultingChatRealtimeEvent,
     onSignal: reloadAll,
@@ -189,6 +191,15 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
   );
 
   const onlyMine = myId && String(filters.owner) === myId;
+  const overdueCount = Number(counters?.overdue) || 0;
+  const newCount = Number(counters?.new) || 0;
+  const filterCount = [
+    filters.owner,
+    filters.source,
+    filters.date_from,
+    filters.date_to,
+    filters.overdue,
+  ].filter(Boolean).length;
 
   const runAction = useCallback(
     async (lead, action, successText) => {
@@ -207,14 +218,53 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
   );
 
   return (
-    <>
-      <CounterTabs
-        tabs={tabs}
-        value={filters.queue}
-        onChange={(v) => setFilter("queue", v)}
-        ariaLabel="Статусы лидов"
+    <div className="leads__inbox">
+      {(newCount > 0 || overdueCount > 0) && (
+        <div className="leads__pulseRow" aria-live="polite">
+          {newCount > 0 && (
+            <span className="leads__pulse leads__pulse--new">
+              {newCount} новых в очереди
+            </span>
+          )}
+          {overdueCount > 0 && (
+            <span className="leads__pulse leads__pulse--overdue">
+              <FaExclamationTriangle aria-hidden /> {overdueCount} пора
+              связаться
+            </span>
+          )}
+        </div>
+      )}
+
+      <div
         className="leads__queueTabs"
-      />
+        role="tablist"
+        aria-label="Статусы лидов"
+      >
+        {tabs.map((t) => {
+          const active = String(filters.queue) === String(t.value);
+          return (
+            <button
+              key={t.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`leads__queueTab${active ? " is-active" : ""}`}
+              onClick={() => setFilter("queue", t.value)}
+            >
+              <span className="leads__queueTabLabel">{t.label}</span>
+              {Number.isFinite(t.count) && (
+                <span
+                  className={`leads__queueTabCount${
+                    t.countTone === "danger" ? " is-danger" : ""
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="leads__toolbar">
         <SearchInput
@@ -224,54 +274,29 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
           ariaLabel="Поиск лидов"
         />
 
-        {isManager && (
-          <>
-            <button
-              type="button"
-              className={`leads__chip${onlyMine ? " is-active" : ""}`}
-              onClick={() => setFilter("owner", onlyMine ? "" : myId)}
-              disabled={!myId}
-            >
-              Мои лиды
-            </button>
-            <select
-              className="cList__input"
-              value={filters.owner}
-              onChange={(e) => setFilter("owner", e.target.value)}
-              aria-label="Сотрудник"
-            >
-              <option value="">Все сотрудники</option>
-              <option value="none">Не назначен</option>
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {employeeName(e)}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-
-        <select
-          className="cList__input"
-          value={filters.source}
-          onChange={(e) => setFilter("source", e.target.value)}
-          aria-label="Источник"
+        <button
+          type="button"
+          className={`leads__chip${filtersOpen || filterCount ? " is-active" : ""}`}
+          onClick={() => setFiltersOpen((v) => !v)}
+          aria-expanded={filtersOpen}
         >
-          <option value="">Все источники</option>
-          {LEAD_SOURCES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          <FaFilter aria-hidden />
+          Фильтры
+          {filterCount > 0 && (
+            <span className="leads__chipBadge">{filterCount}</span>
+          )}
+        </button>
 
-        <PeriodFilter
-          dateFrom={filters.date_from}
-          dateTo={filters.date_to}
-          onChange={({ date_from, date_to }) =>
-            setFilters({ date_from, date_to })
-          }
-        />
+        {isManager && (
+          <button
+            type="button"
+            className={`leads__chip${onlyMine ? " is-active" : ""}`}
+            onClick={() => setFilter("owner", onlyMine ? "" : myId)}
+            disabled={!myId}
+          >
+            Мои
+          </button>
+        )}
 
         {filters.queue === "deferred" && (
           <button
@@ -279,11 +304,11 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
             className={`leads__chip${filters.overdue ? " is-active" : ""}`}
             onClick={() => setFilter("overdue", filters.overdue ? "" : "true")}
           >
-            <FaExclamationTriangle aria-hidden /> Пора связаться
+            <FaExclamationTriangle aria-hidden /> Просроченные
           </button>
         )}
 
-        <span className="cList__toolbarSpacer" />
+        <span className="leads__toolbarSpacer" />
 
         <button
           type="button"
@@ -299,9 +324,73 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
           className="leads__btn leads__btn--primary"
           onClick={() => setCreateOpen(true)}
         >
-          <FaPlus aria-hidden /> Лид
+          <FaPlus aria-hidden /> <span>Лид</span>
         </button>
       </div>
+
+      {filtersOpen && (
+        <div className="leads__filtersPanel">
+          {isManager && (
+            <label className="leads__filterField">
+              <span className="leads__filterLabel">Сотрудник</span>
+              <select
+                className="leads__input"
+                value={filters.owner}
+                onChange={(e) => setFilter("owner", e.target.value)}
+              >
+                <option value="">Все сотрудники</option>
+                <option value="none">Не назначен</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {employeeName(e)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label className="leads__filterField">
+            <span className="leads__filterLabel">Источник</span>
+            <select
+              className="leads__input"
+              value={filters.source}
+              onChange={(e) => setFilter("source", e.target.value)}
+              aria-label="Источник"
+            >
+              <option value="">Все источники</option>
+              {LEAD_SOURCES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="leads__filterField leads__filterField--period">
+            <span className="leads__filterLabel">Период</span>
+            <PeriodFilter
+              dateFrom={filters.date_from}
+              dateTo={filters.date_to}
+              onChange={({ date_from, date_to }) =>
+                setFilters({ date_from, date_to })
+              }
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="leads__chip leads__chip--ghost"
+              onClick={() => {
+                resetFilters();
+                setFiltersOpen(false);
+              }}
+            >
+              <FaTimes aria-hidden /> Сбросить
+            </button>
+          )}
+        </div>
+      )}
 
       {loading || error || notReady || !items.length ? (
         <ListState
@@ -326,85 +415,82 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
           onResetFilters={resetFilters}
         />
       ) : (
-        <div className="cList__tableWrap">
-          <table className="cList__table leads__table">
-            <thead>
-              <tr>
-                <th>Лид</th>
-                <th>Получен</th>
-                <th>Источник</th>
-                <th>Сообщение</th>
-                <th>Назначен</th>
-                <th>Статус</th>
-                <th aria-label="Действия" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((l) => {
-                const src = leadSourceMeta(l.source || "manual");
-                const name = l.full_name || l.name || "";
-                const ownerName = l.owner
-                  ? empById.get(String(l.owner)) || l.owner_display || "—"
-                  : null;
-                const overdue = isLeadOverdue(l);
-                const deferred = l.status === LEAD_STATUS.DEFERRED;
-                const closed =
-                  l.status === LEAD_STATUS.CONVERTED ||
-                  l.status === LEAD_STATUS.REJECTED;
-                const busy = busyId === l.id;
+        <ul className="leads__feed" aria-label="Список лидов">
+          {items.map((l) => {
+            const src = leadSourceMeta(l.source || "manual");
+            const name = l.full_name || l.name || "";
+            const ownerName = l.owner
+              ? empById.get(String(l.owner)) || l.owner_display || "—"
+              : null;
+            const overdue = isLeadOverdue(l);
+            const deferred = l.status === LEAD_STATUS.DEFERRED;
+            const closed =
+              l.status === LEAD_STATUS.CONVERTED ||
+              l.status === LEAD_STATUS.REJECTED;
+            const busy = busyId === l.id;
+            const chatPath =
+              l.lead &&
+              consultingChatPath(l.lead, l.source || "whatsapp");
+            const funnelPath = l.lead && consultingFunnelLeadPath(l.lead);
+            const msg = l.message ? String(l.message) : "";
 
-                return (
-                  <tr
-                    key={l.id}
-                    className={`leads__row${overdue ? " leads__row--overdue" : ""}`}
+            return (
+              <li
+                key={l.id}
+                className={`leads__card${overdue ? " is-overdue" : ""}${
+                  busy ? " is-busy" : ""
+                }`}
+              >
+                <div className="leads__cardMain">
+                  <span
+                    className={`leads__avatar leads__avatar--${src.value || "manual"}`}
+                    aria-hidden
                   >
-                    <td>
-                      <div className="leads__person">
-                        <span className="leads__avatar" aria-hidden>
-                          {initials(name)}
+                    {initials(name)}
+                  </span>
+
+                  <div className="leads__cardBody">
+                    <div className="leads__cardTop">
+                      <div className="leads__cardIdentity">
+                        <span className="leads__name" title={name || undefined}>
+                          {name || "Без имени"}
                         </span>
-                        <div className="leads__personText">
-                          <div className="leads__name" title={name || undefined}>
-                            {name || "Без имени"}
-                          </div>
-                          <div className="leads__phone">
-                            {l.phone || "Телефон не указан"}
-                          </div>
-                        </div>
+                        <span className="leads__phone">
+                          {l.phone || "Телефон не указан"}
+                        </span>
                       </div>
-                    </td>
-                    <td className="leads__date">
-                      {fmtDateTime(l.created_at || l.received_at)}
-                    </td>
-                    <td>
-                      <span
-                        className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
-                        style={{ color: src.color }}
-                      >
-                        <SourceIcon source={src.value} /> {src.label}
+                      <div className="leads__cardMeta">
+                        <span
+                          className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
+                          style={{ color: src.color }}
+                        >
+                          <SourceIcon source={src.value} /> {src.label}
+                        </span>
+                        <span
+                          className={`leads__status leads__status--${l.status || "new"}`}
+                        >
+                          {LEAD_STATUS_LABELS[l.status] || l.status || "Новый"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="leads__msg" title={msg || undefined}>
+                      {msg
+                        ? msg.slice(0, 160) + (msg.length > 160 ? "…" : "")
+                        : "Нет текста сообщения"}
+                    </p>
+
+                    <div className="leads__cardFoot">
+                      <span className="leads__date">
+                        {fmtDateTime(l.created_at || l.received_at)}
                       </span>
-                    </td>
-                    <td className="leads__msgPreview" title={l.message || ""}>
-                      {l.message
-                        ? String(l.message).slice(0, 80) +
-                          (String(l.message).length > 80 ? "…" : "")
-                        : "—"}
-                    </td>
-                    <td title={ownerName || undefined}>
                       {ownerName ? (
-                        <span className="leads__cellText">{ownerName}</span>
+                        <span className="leads__owner">{ownerName}</span>
                       ) : (
                         <span className="leads__unassigned">Не назначен</span>
                       )}
-                    </td>
-                    <td>
-                      <span
-                        className={`leads__status leads__status--${l.status || "new"}`}
-                      >
-                        {LEAD_STATUS_LABELS[l.status] || l.status || "Новый"}
-                      </span>
                       {deferred && (
-                        <div
+                        <span
                           className={`leads__deferHint${
                             overdue ? " leads__deferHint--overdue" : ""
                           }`}
@@ -416,113 +502,106 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                             ? ` · ${reasonLabel(DEFER_REASONS, l.defer_reason)}`
                             : ""}
                           {Number(l.defer_count) > 1
-                            ? ` · откладывали ${l.defer_count} раз`
+                            ? ` · ${l.defer_count}×`
                             : ""}
-                        </div>
+                        </span>
                       )}
-                    </td>
-                    <td>
-                      <div className="leads__rowActions">
-                        {l.lead && (
-                          <>
-                            <Link
-                              to={
-                                consultingChatPath(l.lead, l.source || "whatsapp") ||
-                                "#"
-                              }
-                              className="leads__btn leads__btn--sm"
-                              title="Открыть чат"
-                            >
-                              <FaComments aria-hidden />
-                            </Link>
-                            <Link
-                              to={consultingFunnelLeadPath(l.lead) || "#"}
-                              className="leads__btn leads__btn--sm"
-                              title="Открыть на воронке"
-                            >
-                              <FaLayerGroup aria-hidden />
-                            </Link>
-                          </>
-                        )}
+                    </div>
+                  </div>
+                </div>
 
-                        {!closed && (
-                          <button
-                            type="button"
-                            className="leads__btn leads__btn--sm"
-                            onClick={() => setAssignFor(l)}
-                            title="Назначить сотрудника"
-                            disabled={busy}
-                          >
-                            <FaUserCheck aria-hidden />
-                          </button>
-                        )}
-
-                        {deferred ? (
-                          <button
-                            type="button"
-                            className="leads__btn leads__btn--sm"
-                            onClick={() =>
-                              runAction(
-                                l,
-                                () => resumeInboundLead(l.id),
-                                "Лид возвращён в работу.",
-                              )
-                            }
-                            title="Вернуть в работу"
-                            disabled={busy}
-                          >
-                            <FaPlay aria-hidden />
-                          </button>
-                        ) : (
-                          !closed && (
-                            <button
-                              type="button"
-                              className="leads__btn leads__btn--sm"
-                              onClick={() => setDeferFor(l)}
-                              title="Отложить на потом"
-                              disabled={busy}
-                            >
-                              <FaClock aria-hidden />
-                            </button>
+                <div className="leads__cardActions">
+                  {chatPath && (
+                    <Link
+                      to={chatPath}
+                      className="leads__btn leads__btn--primary leads__btn--sm"
+                      title="Открыть чат"
+                    >
+                      <FaComments aria-hidden /> Чат
+                    </Link>
+                  )}
+                  {funnelPath && (
+                    <Link
+                      to={funnelPath}
+                      className="leads__btn leads__btn--sm"
+                      title="Открыть на воронке"
+                    >
+                      <FaLayerGroup aria-hidden />
+                    </Link>
+                  )}
+                  {!closed && (
+                    <button
+                      type="button"
+                      className="leads__btn leads__btn--sm"
+                      onClick={() => setAssignFor(l)}
+                      title="Назначить сотрудника"
+                      disabled={busy}
+                    >
+                      <FaUserCheck aria-hidden />
+                    </button>
+                  )}
+                  {deferred ? (
+                    <button
+                      type="button"
+                      className="leads__btn leads__btn--sm"
+                      onClick={() =>
+                        runAction(
+                          l,
+                          () => resumeInboundLead(l.id),
+                          "Лид возвращён в работу.",
+                        )
+                      }
+                      title="Вернуть в работу"
+                      disabled={busy}
+                    >
+                      <FaPlay aria-hidden />
+                    </button>
+                  ) : (
+                    !closed && (
+                      <button
+                        type="button"
+                        className="leads__btn leads__btn--sm"
+                        onClick={() => setDeferFor(l)}
+                        title="Отложить"
+                        disabled={busy}
+                      >
+                        <FaClock aria-hidden />
+                      </button>
+                    )
+                  )}
+                  {!closed && (
+                    <>
+                      <button
+                        type="button"
+                        className="leads__btn leads__btn--sm leads__btn--success"
+                        onClick={() =>
+                          runAction(
+                            l,
+                            () => markInboundLeadWon(l.id),
+                            "Лид помечен как покупка.",
                           )
-                        )}
-
-                        {!closed && (
-                          <>
-                            <button
-                              type="button"
-                              className="leads__btn leads__btn--sm leads__btn--success"
-                              onClick={() =>
-                                runAction(
-                                  l,
-                                  () => markInboundLeadWon(l.id),
-                                  "Лид помечен как покупка.",
-                                )
-                              }
-                              title="Купил"
-                              disabled={busy}
-                            >
-                              <FaCheck aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              className="leads__btn leads__btn--sm leads__btn--danger"
-                              onClick={() => setRejectFor(l)}
-                              title="Отказ"
-                              disabled={busy}
-                            >
-                              <FaTimesCircle aria-hidden />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        }
+                        title="Купил"
+                        disabled={busy}
+                      >
+                        <FaCheck aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className="leads__btn leads__btn--sm leads__btn--danger"
+                        onClick={() => setRejectFor(l)}
+                        title="Отказ"
+                        disabled={busy}
+                      >
+                        <FaTimesCircle aria-hidden />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       <Pagination
@@ -583,6 +662,6 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
           onError={(m) => alert(m, true)}
         />
       )}
-    </>
+    </div>
   );
 }

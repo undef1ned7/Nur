@@ -6,10 +6,10 @@ export const VIEW_MODES = {
 };
 
 export function getInitialViewMode(storageKey) {
-  if (typeof window === "undefined") return VIEW_MODES.TABLE;
+  if (typeof window === "undefined") return VIEW_MODES.CARDS;
   const saved = window.localStorage.getItem(storageKey);
   if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
-  return VIEW_MODES.TABLE;
+  return VIEW_MODES.CARDS;
 }
 
 export function usePersistedViewMode(storageKey) {

@@ -17,6 +17,7 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import api from "../../../../api";
+import ConsultingShell from "../common/ConsultingShell";
 
 /* ===================== API ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
@@ -532,36 +533,42 @@ const ConsultingBookings = () => {
   };
 
   return (
-    <div className="bookings">
-      <div className="bookings__header">
-        <div className="bookings__month">
-          <button
-            className="bookings__navBtn"
-            onClick={prevMonth}
-            aria-label="Предыдущий месяц"
-          >
-            <FaChevronLeft />
-          </button>
-          <h2 className="bookings__title">{monthLabelRu(ym.y, ym.m)}</h2>
-          <button
-            className="bookings__navBtn"
-            onClick={nextMonth}
-            aria-label="Следующий месяц"
-          >
-            <FaChevronRight />
-          </button>
-        </div>
-
-        <div className="bookings__actions">
+    <ConsultingShell
+      eyebrow="Консалтинг · Расписание"
+      title="Бронирование"
+      headerActions={
+        <>
+          <div className="bookings__monthSwitch">
+            <button
+              type="button"
+              className="cShell__btn cShell__btn--sm"
+              onClick={prevMonth}
+              aria-label="Предыдущий месяц"
+            >
+              <FaChevronLeft />
+            </button>
+            <span className="bookings__monthLabel">
+              {monthLabelRu(ym.y, ym.m)}
+            </span>
+            <button
+              type="button"
+              className="cShell__btn cShell__btn--sm"
+              onClick={nextMonth}
+              aria-label="Следующий месяц"
+            >
+              <FaChevronRight />
+            </button>
+          </div>
           <EmployeesCombo
             value={filterEmp}
             onChange={setFilterEmp}
             placeholder="Все сотрудники"
             clearable
           />
-        </div>
-      </div>
-
+        </>
+      }
+    >
+      <div className="bookings bookings--embedded">
       {!!notice && (
         <div className="bookings__alert bookings__alert--success">{notice}</div>
       )}
@@ -922,7 +929,8 @@ const ConsultingBookings = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ConsultingShell>
   );
 };
 

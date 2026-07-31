@@ -234,7 +234,13 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
 
-:root {
+/* Блок строго изолирован: Schoolteachers.
+   Токены — переменные CSS, скопированные под .Schoolteachers, а не :root,
+   чтобы не протекать глобально на другие секторы/страницы. */
+.Schoolteachers,
+.Schoolteachers * { box-sizing: border-box; }
+
+.Schoolteachers {
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --text: #0f172a;
@@ -243,13 +249,7 @@
   --surface: #ffffff;
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-}
 
-/* Блок строго изолирован: Schoolteachers */
-.Schoolteachers,
-.Schoolteachers * { box-sizing: border-box; }
-
-.Schoolteachers {
   font-family: "Montserrat", sans-serif;
   background: var(--surface);
   border-radius: var(--radius);
@@ -261,6 +261,14 @@
 
   min-height: 0;
   overflow: hidden;
+
+  &--embedded {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
 }
 
 /* Header */
@@ -301,6 +309,10 @@
 
 /* Search */
 .Schoolteachers__search { position: relative; }
+/* В шапке (cShell__headerActions — flex-строка) даём фиксированную ширину,
+   иначе width:100% инпута схлопывается без явного flex-basis. В модалке
+   истории сотрудника остаётся блочным на всю ширину, как раньше. */
+.Schoolteachers__search--inline { position: relative; width: 260px; max-width: 100%; flex: 0 0 auto; }
 .Schoolteachers__searchInput {
   width: 100%;
   padding: 10px 12px 10px 32px;
