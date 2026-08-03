@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { hyphenateLongWord } from "@/pdf/hyphenation";
 import { registerPdfFonts } from "@/pdf/registerFonts";
 
 const s = StyleSheet.create({
@@ -224,7 +225,10 @@ export default function ReceiptPdfDocument({ data }) {
             items.map((item, index) => (
               <View key={item.id || index} style={s.item}>
                 <View style={s.itemRow}>
-                  <Text style={s.itemName}>{item.name}</Text>
+                  {/* hyphenationCallback — перенос длинных названий без пробелов */}
+                  <Text style={s.itemName} hyphenationCallback={hyphenateLongWord}>
+                    {item.name}
+                  </Text>
                   <Text style={s.itemPrice}>
                     {n2(item.qty)} X {n2(item.unit_price)} =
                   </Text>
