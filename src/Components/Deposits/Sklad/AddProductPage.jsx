@@ -59,6 +59,33 @@ import SearchSelect from "../../common/SearchSelect/SearchSelect";
 import axios from "axios";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import { useDebouncedValue } from "../../../hooks/useDebounce";
+import { useSearchableOptions } from "../../../hooks/useSearchableOptions";
+
+// Поставщики — постоянные параметры запроса (ссылка не должна меняться)
+const SUPPLIER_SEARCH_PARAMS = { type: "suppliers" };
+
+const mapSupplierOption = (supplier) => ({
+  value: String(supplier?.id || ""),
+  label:
+    String(
+      supplier?.full_name ||
+        supplier?.llc ||
+        supplier?.phone ||
+        supplier?.email ||
+        "Без названия",
+    ).trim() || "Без названия",
+  // бэкенд ищет и по телефону/ОсОО — чтобы найденное не отсеялось локальным фильтром
+  searchText: [
+    supplier?.full_name,
+    supplier?.llc,
+    supplier?.phone,
+    supplier?.email,
+  ]
+    .filter(Boolean)
+    .join(" "),
+  // сам объект нужен наверху: телефон/ФИО поставщика используются в форме долга
+  raw: supplier,
+});
 
 const normalizeName = (value) =>
   String(value || "")
@@ -690,11 +717,21 @@ const AddProductPage = ({
     setDebtState((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Поставщик, выбранный через серверный поиск: его может не быть в общем
+  // списке клиентов (list) — он загружен отдельной страницей
+  const [searchedSupplier, setSearchedSupplier] = useState(null);
+
   // Получаем выбранного поставщика для долга
   const pickSupplier = useMemo(() => {
     if (!newItemData.client) return null;
-    return list.find((x) => String(x.id) === String(newItemData.client));
-  }, [list, newItemData.client]);
+    const fromList = list.find(
+      (x) => String(x.id) === String(newItemData.client),
+    );
+    if (fromList) return fromList;
+    return String(searchedSupplier?.id || "") === String(newItemData.client)
+      ? searchedSupplier
+      : null;
+  }, [list, newItemData.client, searchedSupplier]);
 
   // Опции для поисковых селектов «Бренд» / «Категория»
   const brandOptions = useMemo(
@@ -1284,8 +1321,16 @@ const AddProductPage = ({
               handleChange={handleChange}
               brands={brands || []}
               categories={categories || []}
+              brandsLoading={brandsLoading}
+              categoriesLoading={categoriesLoading}
+              onBrandQueryChange={setBrandQuery}
+              onCategoryQueryChange={setCategoryQuery}
+              hasMoreBrands={hasMoreBrands}
+              hasMoreCategories={hasMoreCategories}
+              onLoadMoreBrands={handleLoadMoreBrands}
+              onLoadMoreCategories={handleLoadMoreCategories}
+              onSupplierPicked={setSearchedSupplier}
               products={products || []}
-              filterClient={list.filter((item) => item.type === "suppliers")}
               handleSubmit={handleSubmit}
               creating={creating || updating}
               navigate={navigate}
@@ -1972,8 +2017,16 @@ const MarketProductForm = ({
   handleChange,
   brands,
   categories,
+  brandsLoading = false,
+  categoriesLoading = false,
+  onBrandQueryChange = null,
+  onCategoryQueryChange = null,
+  hasMoreBrands = false,
+  hasMoreCategories = false,
+  onLoadMoreBrands = null,
+  onLoadMoreCategories = null,
+  onSupplierPicked = null,
   products,
-  filterClient,
   handleSubmit,
   creating,
   navigate,
@@ -2041,6 +2094,67 @@ const MarketProductForm = ({
         .map((c) => ({ value: c.name, label: c.name })),
     [categories],
   );
+
+  // Поставщики: поиск и постраничная догрузка с бэкенда (свой список,
+  // общий store клиентов не трогаем)
+  const {
+    options: supplierOptions,
+    loading: suppliersLoading,
+    hasMore: hasMoreSuppliers,
+    loadMore: loadMoreSuppliers,
+    setQuery: setSupplierQuery,
+  } = useSearchableOptions({
+    endpoint: "/main/clients/",
+    params: SUPPLIER_SEARCH_PARAMS,
+    mapOption: mapSupplierOption,
+  });
+  // Первым пунктом — сброс выбора (в обычном select это был пустой option)
+  const supplierSelectOptions = useMemo(
+    () => [{ value: "", label: "— Без поставщика —" }, ...supplierOptions],
+    [supplierOptions],
+  );
+  // Подпись выбранного поставщика: он может быть вне текущей страницы списка
+  const [pickedSupplierLabel, setPickedSupplierLabel] = useState("");
+  const [fetchedSupplierLabel, setFetchedSupplierLabel] = useState("");
+  const selectedSupplierLabel =
+    pickedSupplierLabel ||
+    (pickSupplier ? mapSupplierOption(pickSupplier).label : "") ||
+    fetchedSupplierLabel;
+
+  // Режим редактирования: подтягиваем имя поставщика по id, если его нет
+  // ни в загруженной странице, ни в общем списке клиентов
+  useEffect(() => {
+    const clientId = String(newItemData.client || "").trim();
+    if (!clientId) {
+      setFetchedSupplierLabel("");
+      return undefined;
+    }
+    if (
+      pickedSupplierLabel ||
+      pickSupplier ||
+      supplierOptions.some((o) => String(o.value) === clientId)
+    ) {
+      return undefined;
+    }
+
+    let mounted = true;
+    api
+      .get(`/main/clients/${clientId}/`)
+      .then(({ data }) => {
+        if (!mounted) return;
+        setFetchedSupplierLabel(mapSupplierOption(data).label);
+        onSupplierPicked?.(data || null);
+      })
+      .catch(() => {
+        if (mounted) setFetchedSupplierLabel("");
+      });
+    return () => {
+      mounted = false;
+    };
+    // onSupplierPicked — стабильный сеттер из родителя
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newItemData.client, pickSupplier, pickedSupplierLabel, supplierOptions]);
+
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
@@ -2350,6 +2464,7 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.category_name}
+                valueLabel={newItemData.category_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "category_name", value: v },
@@ -2358,6 +2473,11 @@ const MarketProductForm = ({
                 options={categoryOptions}
                 placeholder="Выберите категорию"
                 emptyText="Категории не найдены"
+                maxVisible={500}
+                onQueryChange={onCategoryQueryChange}
+                loading={categoriesLoading}
+                hasMore={hasMoreCategories}
+                onLoadMore={onLoadMoreCategories}
               />
               <button
                 className="add-product-page__create-supplier"
@@ -2416,6 +2536,7 @@ const MarketProductForm = ({
             <div className="add-product-page__supplier-row">
               <SearchSelect
                 value={newItemData.brand_name}
+                valueLabel={newItemData.brand_name}
                 onChange={(v) =>
                   handleChange({
                     target: { name: "brand_name", value: v },
@@ -2424,6 +2545,11 @@ const MarketProductForm = ({
                 options={brandOptions}
                 placeholder="Выберите бренд"
                 emptyText="Бренды не найдены"
+                maxVisible={500}
+                onQueryChange={onBrandQueryChange}
+                loading={brandsLoading}
+                hasMore={hasMoreBrands}
+                onLoadMore={onLoadMoreBrands}
               />
               <button
                 className="add-product-page__create-supplier"
@@ -2956,19 +3082,26 @@ const MarketProductForm = ({
                 Выберите поставщика
               </label>
               <div className="add-product-page__supplier-row">
-                <select
-                  className="market-product-form__input"
+                <SearchSelect
                   value={newItemData.client}
-                  onChange={handleChange}
-                  name="client"
-                >
-                  <option value="">Выберите поставщика</option>
-                  {filterClient.map((client, idx) => (
-                    <option key={client.id || idx} value={client.id}>
-                      {client.full_name}
-                    </option>
-                  ))}
-                </select>
+                  valueLabel={selectedSupplierLabel}
+                  onChange={(v) => {
+                    const picked = supplierOptions.find(
+                      (o) => String(o.value) === String(v),
+                    );
+                    setPickedSupplierLabel(picked?.label || "");
+                    onSupplierPicked?.(picked?.raw || null);
+                    handleChange({ target: { name: "client", value: v } });
+                  }}
+                  options={supplierSelectOptions}
+                  placeholder="Выберите поставщика"
+                  emptyText="Поставщики не найдены"
+                  maxVisible={500}
+                  onQueryChange={setSupplierQuery}
+                  loading={suppliersLoading}
+                  hasMore={hasMoreSuppliers}
+                  onLoadMore={loadMoreSuppliers}
+                />
                 <button
                   className="add-product-page__create-supplier"
                   onClick={() => setShowInputs(!showInputs)}

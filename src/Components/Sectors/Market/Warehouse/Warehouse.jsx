@@ -526,15 +526,12 @@ const Warehouse = () => {
 
       {showBulkEditModal && (
         <ReactPortal modalId="warehouse-bulk-edit-modal">
+          {/* Справочники модалка грузит сама — с поиском и постраничной догрузкой */}
           <BulkEditModal
             selectedCount={selectedCount}
             onClose={() => setShowBulkEditModal(false)}
             onApply={confirmBulkEdit}
             saving={bulkUpdating}
-            brands={brands}
-            categories={categories}
-            suppliers={suppliers}
-            suppliersLoading={suppliersLoading}
           />
         </ReactPortal>
       )}
