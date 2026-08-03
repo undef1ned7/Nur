@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { hyphenateLongWord } from "@/pdf/hyphenation";
 import { registerPdfFonts } from "@/pdf/registerFonts";
 import { InvoicePdfPage, InvoicePdfPageContent } from "../InvoicePdfDocument";
 import { invoicePdfStyles } from "../invoicePdfDocumentStyles";
@@ -226,7 +227,8 @@ const Cell = ({ col, last, head, children }) => (
       last && s.cellLast,
     ]}
   >
-    <Text>{children}</Text>
+    {/* hyphenationCallback — перенос длинных названий без пробелов */}
+    <Text hyphenationCallback={hyphenateLongWord}>{children}</Text>
   </View>
 );
 

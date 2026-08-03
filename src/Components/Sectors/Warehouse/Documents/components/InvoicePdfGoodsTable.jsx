@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, View } from "@react-pdf/renderer";
+import { hyphenateLongWord } from "@/pdf/hyphenation";
 import { invoicePdfStyles as s } from "./invoicePdfDocumentStyles";
 import {
   fmtDiscountPct,
@@ -21,7 +22,14 @@ function HeaderCell({ style, children, align, isLast }) {
 function DataCell({ style, children, align, isLast }) {
   return (
     <View style={[s.tableCell, style, isLast ? s.tableCellLast : null]}>
-      <Text style={align ? { textAlign: align } : {}}>{children}</Text>
+      {/* hyphenationCallback — чтобы длинные названия/артикулы без пробелов
+          переносились, а не вылезали за границу колонки */}
+      <Text
+        style={align ? { textAlign: align } : {}}
+        hyphenationCallback={hyphenateLongWord}
+      >
+        {children}
+      </Text>
     </View>
   );
 }

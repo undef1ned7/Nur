@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
+import { hyphenateLongWord } from "@/pdf/hyphenation";
 import { registerPdfFonts } from "@/pdf/registerFonts";
 import { numberToWords } from "../../../../../utils/numberToWords.js";
 
@@ -240,10 +241,17 @@ export default function CommercialOfferPdfDocument({ data }) {
                     </View>
                   )}
                 </View>
-                <Text style={[s.td, s.cName]}>
+                {/* hyphenationCallback — перенос длинных названий без пробелов */}
+                <Text
+                  style={[s.td, s.cName]}
+                  hyphenationCallback={hyphenateLongWord}
+                >
                   {safe(item.name || item.product_name)}
                 </Text>
-                <Text style={[s.td, s.cCharacteristic]}>
+                <Text
+                  style={[s.td, s.cCharacteristic]}
+                  hyphenationCallback={hyphenateLongWord}
+                >
                   {formatCharacteristic(item)}
                 </Text>
                 <Text style={[s.td, s.cQty, s.centerText]}>{qty}</Text>
