@@ -1,22 +1,50 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
-import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import SearchSelect from "../../../../common/SearchSelect/SearchSelect";
+import { useSearchableOptions } from "../../../../../hooks/useSearchableOptions";
 import "../Warehouse.scss";
+
+// Постоянные параметры запросов — вне компонента, чтобы ссылка не менялась
+const SUPPLIER_PARAMS = { type: "suppliers" };
+
+const mapNameOption = (item) => ({
+  value: String(item?.name || ""),
+  label: String(item?.name || ""),
+});
+
+const mapSupplierOption = (supplier) => ({
+  value: String(supplier?.id || ""),
+  label:
+    String(
+      supplier?.full_name ||
+        supplier?.name ||
+        supplier?.company_name ||
+        supplier?.phone ||
+        supplier?.email ||
+        "Без названия",
+    ).trim() || "Без названия",
+  // бэкенд ищет и по телефону/компании — чтобы найденное не отсеялось локальным фильтром
+  searchText: [
+    supplier?.full_name,
+    supplier?.name,
+    supplier?.company_name,
+    supplier?.llc,
+    supplier?.phone,
+    supplier?.email,
+  ]
+    .filter(Boolean)
+    .join(" "),
+});
 
 /**
  * Массовое изменение бренда / категории / поставщика у выбранных товаров.
  * Изменяются только поля с включённым чекбоксом.
+ *
+ * Все три справочника грузятся с бэкенда постранично: поиск уходит параметром
+ * `search`, а если записей больше страницы — внизу списка появляется
+ * «Смотреть ещё» (см. useSearchableOptions).
  */
-const BulkEditModal = ({
-  selectedCount,
-  onClose,
-  onApply,
-  saving = false,
-  brands = [],
-  categories = [],
-  suppliers = [],
-  suppliersLoading = false,
-}) => {
+const BulkEditModal = ({ selectedCount, onClose, onApply, saving = false }) => {
   const [fields, setFields] = useState({
     brand_name: { enabled: false, value: "" },
     category_name: { enabled: false, value: "" },
@@ -24,24 +52,23 @@ const BulkEditModal = ({
   });
   const [error, setError] = useState("");
 
-  const supplierOptions = useMemo(
-    () =>
-      (Array.isArray(suppliers) ? suppliers : [])
-        .map((supplier) => ({
-          value: String(supplier.id || ""),
-          label:
-            String(
-              supplier.full_name ||
-                supplier.name ||
-                supplier.company_name ||
-                supplier.phone ||
-                supplier.email ||
-                "Без названия",
-            ).trim() || "Без названия",
-        }))
-        .filter((option) => option.value && option.label),
-    [suppliers],
-  );
+  // Справочники подгружаем только для включённых полей
+  const brandsSource = useSearchableOptions({
+    endpoint: "/main/brands/",
+    mapOption: mapNameOption,
+    enabled: fields.brand_name.enabled,
+  });
+  const categoriesSource = useSearchableOptions({
+    endpoint: "/main/categories/",
+    mapOption: mapNameOption,
+    enabled: fields.category_name.enabled,
+  });
+  const suppliersSource = useSearchableOptions({
+    endpoint: "/main/clients/",
+    params: SUPPLIER_PARAMS,
+    mapOption: mapSupplierOption,
+    enabled: fields.client.enabled,
+  });
 
   const toggleField = (key) => {
     setError("");
@@ -102,19 +129,20 @@ const BulkEditModal = ({
               />
               <span>Бренд</span>
             </label>
-            <select
-              className="warehouse-filter-modal__select"
+            <SearchSelect
               value={fields.brand_name.value}
+              valueLabel={fields.brand_name.value}
+              onChange={(value) => changeValue("brand_name", String(value || ""))}
+              options={brandsSource.options}
               disabled={!fields.brand_name.enabled}
-              onChange={(e) => changeValue("brand_name", e.target.value)}
-            >
-              <option value="">Выбрать бренд</option>
-              {brands.map((brand) => (
-                <option key={brand.id} value={brand.name}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Выбрать бренд"
+              emptyText="Бренды не найдены"
+              maxVisible={500}
+              onQueryChange={brandsSource.setQuery}
+              loading={brandsSource.loading}
+              hasMore={brandsSource.hasMore}
+              onLoadMore={brandsSource.loadMore}
+            />
           </div>
 
           <div className="warehouse-filter-modal__section">
@@ -126,19 +154,22 @@ const BulkEditModal = ({
               />
               <span>Категория</span>
             </label>
-            <select
-              className="warehouse-filter-modal__select"
+            <SearchSelect
               value={fields.category_name.value}
+              valueLabel={fields.category_name.value}
+              onChange={(value) =>
+                changeValue("category_name", String(value || ""))
+              }
+              options={categoriesSource.options}
               disabled={!fields.category_name.enabled}
-              onChange={(e) => changeValue("category_name", e.target.value)}
-            >
-              <option value="">Выбрать категорию</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Выбрать категорию"
+              emptyText="Категории не найдены"
+              maxVisible={500}
+              onQueryChange={categoriesSource.setQuery}
+              loading={categoriesSource.loading}
+              hasMore={categoriesSource.hasMore}
+              onLoadMore={categoriesSource.loadMore}
+            />
           </div>
 
           <div className="warehouse-filter-modal__section">
@@ -150,23 +181,19 @@ const BulkEditModal = ({
               />
               <span>Поставщик</span>
             </label>
-            {fields.client.enabled ? (
-              <SearchableCombobox
-                value={String(fields.client.value || "")}
-                onChange={(value) => changeValue("client", String(value || ""))}
-                options={supplierOptions}
-                placeholder={
-                  suppliersLoading
-                    ? "Загрузка поставщиков..."
-                    : "Выберите поставщика"
-                }
-                classNamePrefix="searchableCombo"
-              />
-            ) : (
-              <select className="warehouse-filter-modal__select" disabled>
-                <option>Выберите поставщика</option>
-              </select>
-            )}
+            <SearchSelect
+              value={String(fields.client.value || "")}
+              onChange={(value) => changeValue("client", String(value || ""))}
+              options={suppliersSource.options}
+              disabled={!fields.client.enabled}
+              placeholder="Выберите поставщика"
+              emptyText="Поставщики не найдены"
+              maxVisible={500}
+              onQueryChange={suppliersSource.setQuery}
+              loading={suppliersSource.loading}
+              hasMore={suppliersSource.hasMore}
+              onLoadMore={suppliersSource.loadMore}
+            />
           </div>
 
           {error ? (
