@@ -10,6 +10,13 @@ export const barberSectorMenus = {
         implemented: true,
       },
       {
+        label: "Смены",
+        to: "/crm/shifts",
+        icon: menuIcons.calendar,
+        permission: "can_view_shifts",
+        implemented: true,
+      },
+      {
         label: "Клиенты",
         to: "/crm/barber/clients",
         icon: menuIcons.filePerson,
@@ -82,6 +89,13 @@ export const barberSectorMenus = {
         implemented: true,
       },
       {
+        label: "Смены",
+        to: "/crm/shifts",
+        icon: menuIcons.calendar,
+        permission: "can_view_shifts",
+        implemented: true,
+      },
+      {
         label: "Клиенты",
         to: "/crm/services/clients",
         icon: menuIcons.filePerson,
@@ -144,6 +158,13 @@ export const barberSectorMenus = {
         to: "/crm/dentistry/cash-reports",
         icon: menuIcons.chartBar,
         permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Смены",
+        to: "/crm/shifts",
+        icon: menuIcons.calendar,
+        permission: "can_view_shifts",
         implemented: true,
       },
       {
