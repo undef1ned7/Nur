@@ -12,6 +12,7 @@ import NotificationModal from "../NotificationModal/NotificationModal";
 import { fetchNotificationsAsync } from "../../store/creators/notificationCreators";
 import { useNotificationsSocket } from "../../hooks/useNotificationsSocket";
 import ConsultingWazzupNotifyBridge from "../Sectors/Consulting/common/ConsultingWazzupNotifyBridge";
+import { mapSectorNameToSlug } from "../../utils/sectorMapping";
 import "./Header.scss";
 
 const pageTitles = {
@@ -284,10 +285,20 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     return company.sector.name.toLowerCase().trim() === "склад";
   }, [company?.sector?.name]);
 
+  // Барбершоп / Услуги / Стоматология: интерфейс кассира — общая касса продаж
+  const isBarberFamilySector = useMemo(
+    () =>
+      ["barber", "services", "dentistry"].includes(
+        mapSectorNameToSlug(company?.sector?.name),
+      ),
+    [company?.sector?.name],
+  );
+
   const cashierPath = useMemo(() => {
     if (isWarehouseSector) return "/crm/warehouse/kassa";
+    if (isBarberFamilySector) return "/crm/sell/start";
     return "/crm/market/cashier";
-  }, [isWarehouseSector]);
+  }, [isWarehouseSector, isBarberFamilySector]);
 
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {

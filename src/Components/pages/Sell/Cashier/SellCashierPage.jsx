@@ -30,12 +30,16 @@ import api from "@/api";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
 import { useClient } from "@/store/slices/ClientSlice";
 import { useProducts } from "@/store/slices/productSlice";
-import { useSale } from "@/store/slices/saleSlice";
+import { resetPosSale, useSale } from "@/store/slices/saleSlice";
 import { useShifts } from "@/store/slices/shiftSlice";
 import AlertModal from "@/components/common/AlertModal/AlertModal";
 
 import CustomServiceModal from "@/components/pages/Sell/components/CustomServiceModal";
 import DiscountModal from "@/components/pages/Sell/components/DiscountModal";
+// Экраны смены общие с кассой маркета — поведение «как в Магазине»
+import CloseShiftPage from "@/Components/Sectors/Market/CashierPage/CloseShiftPage";
+import OpenShiftPage from "@/Components/Sectors/Market/CashierPage/OpenShiftPage";
+import ShiftPage from "@/Components/Sectors/Market/CashierPage/ShiftPage";
 import "@/components/Sectors/Market/CashierPage/CashierPage.scss";
 import CustomerModal from "./components/CustomerModal";
 import DebtPaymentModal from "./components/DebtPaymentModal";
@@ -1554,9 +1558,59 @@ const SellCashierPage = () => {
       setShowReceiptsModal(true);
     }
   };
+
+  // Завершить смену — открываем экран закрытия
+  const handleCloseShift = () => {
+    if (!openShiftId) return;
+    setShowCloseShiftPage(true);
+  };
+
+  // Начать смену — открываем экран открытия
+  const handleStartShift = () => {
+    setShowOpenShiftPage(true);
+  };
+
   const filteredProducts = useMemo(() => {
     return products;
   }, [products]);
+
+  if (showShiftPage) {
+    return <ShiftPage onBack={() => setShowShiftPage(false)} />;
+  }
+
+  if (showOpenShiftPage) {
+    return (
+      <OpenShiftPage
+        onBack={() => {
+          setShowOpenShiftPage(false);
+          // Обновляем список смен и ищем свою открытую смену
+          dispatch(fetchShiftsAsync()).then(() => {
+            findOpenShift();
+          });
+        }}
+      />
+    );
+  }
+
+  if (showCloseShiftPage) {
+    return (
+      <CloseShiftPage
+        shift={openShift}
+        onBack={() => {
+          setShowCloseShiftPage(false);
+          // Сбрасываем состояние открытой смены
+          setOpenShiftState(null);
+          dispatch(fetchShiftsAsync());
+          // Продажа после закрытия смены невалидна — чистим корзину
+          dispatch(resetPosSale());
+          setCart([]);
+          cartOrderRef.current = [];
+          setSelectedCustomer(null);
+          setDiscountValue("");
+        }}
+      />
+    );
+  }
 
   if (showPaymentPage) {
     return (
@@ -1612,9 +1666,28 @@ const SellCashierPage = () => {
           </button>
           <div>
             <h1 className="cashier-page__title">Касса</h1>
+            {!openShiftId && (
+              <p className="cashier-page__subtitle">Нет открытой смены</p>
+            )}
           </div>
         </div>
         <div className="cashier-page__header-right">
+          {openShiftId && openShift?.status === "open" ? (
+            <button
+              className="cashier-page__close-shift-btn"
+              onClick={handleCloseShift}
+            >
+              Завершить смену
+            </button>
+          ) : (
+            <button
+              className="cashier-page__close-shift-btn"
+              onClick={handleStartShift}
+              style={{ backgroundColor: "#22c55e" }}
+            >
+              Начать смену
+            </button>
+          )}
           <button
             className="cashier-page__menu-btn"
             onClick={() => setShowMenuModal(true)}

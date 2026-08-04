@@ -14,7 +14,11 @@ import {
 } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 import { SERVICE_IDS } from "../../../config/additionalServiceIds";
+import { mapSectorNameToSlug } from "../../../utils/sectorMapping";
 import { menuIcons } from "./menuIcons";
+
+/** Сферы, где интерфейс кассира — общая касса продаж (/crm/sell/start). */
+const SELL_CASHIER_SECTORS = ["barber", "services", "dentistry"];
 
 const normalizeString = (value) =>
   String(value || "")
@@ -191,6 +195,11 @@ export const ADDITIONAL_SERVICES_CONFIG = [
     type: "navigational",
     label: "Интерфейс кассира",
     to: "/crm/market/cashier",
+    // В барбершопе/услугах/стоматологии касса живёт по другому пути
+    resolveTo: ({ sector }) =>
+      SELL_CASHIER_SECTORS.includes(mapSectorNameToSlug(sector))
+        ? "/crm/sell/start"
+        : "/crm/market/cashier",
     icon: menuIcons.cashRegister,
     permission: "can_view_cashier",
     permissionModel: "user",
@@ -390,6 +399,12 @@ const filterAdditionalServices = (params) => {
   );
 };
 
+/** Путь услуги: часть из них ведёт в разные разделы в зависимости от сферы. */
+const resolveServiceTo = (service, params) =>
+  typeof service.resolveTo === "function"
+    ? service.resolveTo(resolveFilterParams(params))
+    : service.to;
+
 export const getAdditionalServicesForMenu = (params) =>
   filterAdditionalServices(params)
     .filter((service) => service.type === "navigational")
@@ -405,7 +420,7 @@ export const getAdditionalServicesForMenu = (params) =>
       id: service.id,
       type: service.type,
       label: service.label,
-      to: service.to,
+      to: resolveServiceTo(service, params),
       icon: service.icon,
       permission: service.permission,
       permissionModel: service.permissionModel,
@@ -421,7 +436,7 @@ export const getAdditionalServicesForPage = (params) =>
       title: service.displayMeta.title,
       description: service.displayMeta.description,
       icon: service.displayMeta.icon,
-      to: service.to || null,
+      to: resolveServiceTo(service, params) || null,
       isConnected: checkPermissionAccess({
         ...resolveFilterParams(params),
         permission: service.permission,
