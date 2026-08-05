@@ -159,9 +159,8 @@ export default function Sklad() {
     dispatch,
     currentPage,
     searchTerm,
-    creating,
-    updating,
-    deleting,
+    // creating/updating/deleting убраны: иначе 2× list на каждую мутацию
+    // (начало + конец). Успех уже рефетчит в handleSaveSuccess / bulk handlers.
     currentFilters,
   ]);
 

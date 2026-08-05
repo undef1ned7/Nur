@@ -1,19 +1,20 @@
 // src/.../Tables.jsx
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaChair, FaTimes, FaPlus, FaFilter } from "react-icons/fa";
 import api from "../../../../api";
 import TablesHall from "./components/TablesHall";
 import TablesZones from "./components/TablesZones";
 import TablesFiltersModal from "./components/TablesFiltersModal";
 import "./Tables.scss";
-import { useCafeTablesWebSocket } from "../../../../hooks/useCafeWebSocket";
 import { useOutletContext } from "react-router-dom";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
+import { mapLimited } from "../utils/mapLimited";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
+const HYDRATE_CONCURRENCY = 5;
 
 const isActiveOrderStatus = (s) => {
   const v = String(s || "").toLowerCase();
@@ -89,13 +90,11 @@ const Tables = () => {
 
     if (!needIds.length) return list;
 
-    const details = await Promise.all(
-      needIds.map((id) =>
-        api
-          .get(`/cafe/orders/${id}/`)
-          .then((r) => ({ id, data: r.data }))
-          .catch(() => null)
-      )
+    const details = await mapLimited(needIds, HYDRATE_CONCURRENCY, (id) =>
+      api
+        .get(`/cafe/orders/${id}/`)
+        .then((r) => ({ id, data: r.data }))
+        .catch(() => null),
     );
 
     return (list || []).map((o) => {
@@ -129,12 +128,46 @@ const Tables = () => {
       alert(errorMessage, true);
       // Ошибка загрузки данных - неудачно при сетевых проблемах
     }
-  }, [hydrateOrdersDetails, socket.tables]);
+  }, [hydrateOrdersDetails]);
 
+  // Один раз при монтировании — НЕ на каждый WS-апдейт socket.tables
+  // (раньше deps на socket.tables → полный reload + N× detail GET).
   useEffect(() => {
     loadAll();
-  }, [loadAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only intentional
+  }, []);
 
+  // Инкрементально подтягиваем статусы столов из WS без перезагрузки заказов
+  const lastSocketTablesRef = useRef(null);
+  useEffect(() => {
+    const wsTables = socket?.tables;
+    if (!Array.isArray(wsTables) || !wsTables.length) return;
+    if (lastSocketTablesRef.current === wsTables) return;
+    lastSocketTablesRef.current = wsTables;
+
+    setTables((prev) => {
+      if (!prev?.length) return prev;
+      const byId = new Map(wsTables.map((t) => [asKey(t?.id), t]));
+      let changed = false;
+      const next = prev.map((t) => {
+        const patch = byId.get(asKey(t?.id));
+        if (!patch) return t;
+        if (
+          t.status === patch.status &&
+          (t.status_display || "") === (patch.status_display || "")
+        ) {
+          return t;
+        }
+        changed = true;
+        return {
+          ...t,
+          status: patch.status ?? t.status,
+          status_display: patch.status_display ?? t.status_display,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [socket?.tables]);
 
   useEffect(() => {
     const handler = () => loadAll();

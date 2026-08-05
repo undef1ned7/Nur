@@ -50,7 +50,7 @@ export default function CafeLayout() {
   const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
   const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
   const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
-  /** Только для заказов из poll GET /cafe/orders/?page_size=50&ordering=-created_at — отсечка по полю created_at. */
+  /** Отсечка по created_at для заказов из poll GET /cafe/orders/?page_size=50. */
   const POLL_CAFE_ORDERS_LIST_MAX_AGE_MS = 5 * 60 * 1000;
   /** Skip kitchen "diff" right after create when snapshot not written yet (avoids second slip vs order_created). */
   const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
@@ -58,6 +58,8 @@ export default function CafeLayout() {
   const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
   const PRINT_QUEUE_DELAY_MS = 1000;
   const PRINT_FAILURE_COOLDOWN_MS = 60 * 1000; // 1 минута
+  /** После исчерпания retry — не долбить detail GET из poll вечно. */
+  const KITCHEN_PRINT_SKIP_PREFIX = "cafe_kitchen_print_skip_";
 
   // const [kitchens, setKitchens] = useState([]);
   // const fetchKitchens = useCallback(async () => {
@@ -601,10 +603,32 @@ export default function CafeLayout() {
     return chunks.join("|");
   }, []);
 
+  const isKitchenPrintSkipped = (orderId) => {
+    const oid = String(orderId || "");
+    if (!oid) return true;
+    if (printedOrdersRef.current.has(oid)) return true;
+    try {
+      if (localStorage.getItem(`cafe_kitchen_printed_${oid}`)) return true;
+      if (localStorage.getItem(`${KITCHEN_PRINT_SKIP_PREFIX}${oid}`))
+        return true;
+    } catch {}
+    return false;
+  };
+
+  const markKitchenPrintSkipped = (orderId, why) => {
+    const oid = String(orderId || "");
+    if (!oid) return;
+    printedOrdersRef.current.add(oid);
+    permanentlyFailedPrintsRef.current.set(oid, Date.now());
+    try {
+      localStorage.setItem(`${KITCHEN_PRINT_SKIP_PREFIX}${oid}`, why || "1");
+    } catch {}
+  };
+
   const printKitchenTicketsForOrder = async (orderId, attempt = 0) => {
     const oid = String(orderId || "");
     if (!oid) return;
-    if (printedOrdersRef.current.has(oid)) return;
+    if (isKitchenPrintSkipped(oid)) return;
     if (printingOrdersRef.current.has(oid)) return;
 
     const lastFailure = permanentlyFailedPrintsRef.current.get(oid);
@@ -612,9 +636,6 @@ export default function CafeLayout() {
       return;
     }
 
-    try {
-      if (localStorage.getItem(`cafe_kitchen_printed_${oid}`)) return;
-    } catch {}
     if (!acquireKitchenPrintLock(oid)) return;
     printingOrdersRef.current.add(oid);
 
@@ -627,7 +648,8 @@ export default function CafeLayout() {
           attempt,
           why,
         });
-        permanentlyFailedPrintsRef.current.set(oid, Date.now());
+        // Permanent skip — иначе poll каждые 15с снова бьёт detail GET
+        markKitchenPrintSkipped(oid, String(why || "max-attempts"));
         return;
       }
       const delay = [400, 800, 1500, 2500, 4000][attempt] || 2000;
@@ -1119,14 +1141,11 @@ export default function CafeLayout() {
     const enabled = await shouldAutoPrintNow();
     if (!enabled) return;
     try {
-      let res;
-      try {
-        res = await api.get("/cafe/orders/", {
-          params: { page_size: 50, ordering: "-created_at" },
-        });
-      } catch {
-        res = await api.get("/cafe/orders/", { params: { page_size: 50 } });
-      }
+      // Без ordering: бэк часто отвечает 400 Bad Request на ordering=-created_at,
+      // а прежний fallback делал второй GET на каждый тик → спам 4xx.
+      const res = await api.get("/cafe/orders/", {
+        params: { page_size: 50 },
+      });
       const list = res?.data?.results ?? res?.data ?? [];
       if (!Array.isArray(list)) return;
       const cutoff = Date.now() - POLL_CAFE_ORDERS_LIST_MAX_AGE_MS;
@@ -1145,9 +1164,9 @@ export default function CafeLayout() {
           continue;
         }
 
-        if (printedOrdersRef.current.has(oid)) continue;
+        if (isKitchenPrintSkipped(oid)) continue;
         if (printingOrdersRef.current.has(oid)) continue;
-        await printKitchenTicketsForOrder(oid);
+        await printKitchenTicketsForOrderRef.current(oid);
       }
     } catch (e) {
       console.warn("CafeLayout poll recent orders:", e?.message || e);
