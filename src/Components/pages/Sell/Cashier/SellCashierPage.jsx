@@ -28,6 +28,10 @@ import { fetchShiftsAsync } from "@/store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "@/store/slices/cashSlice";
 import api from "@/api";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "@/tools/marketWarehouseFilters";
 import { useClient } from "@/store/slices/ClientSlice";
 import { useProducts } from "@/store/slices/productSlice";
 import { resetPosSale, useSale } from "@/store/slices/saleSlice";
@@ -456,7 +460,7 @@ const SellCashierPage = () => {
           productMatchesBarcode(p, barcode),
         );
 
-        if (scannedProduct) {
+        if (scannedProduct && !isMarketWarehouseServiceProduct(scannedProduct)) {
           const availableQuantity = parseFloat(scannedProduct.quantity || 0);
           const isInStock = availableQuantity > 0;
 
@@ -1113,10 +1117,12 @@ const SellCashierPage = () => {
   const addToCart = async (product) => {
     // Проверяем наличие товара
     // Для весовых товаров stock может быть false, но quantity > 0
+    // Услуги (kind === "service") остатка не имеют — их не проверяем
+    const isService = isMarketWarehouseServiceProduct(product);
     const availableQuantity = parseFloat(product.quantity || 0);
     const isInStock = availableQuantity > 0;
 
-    if (!isInStock) {
+    if (!isService && !isInStock) {
       showAlert("warning", "Товар отсутствует", "Товар отсутствует в наличии");
       return;
     }
@@ -1226,7 +1232,7 @@ const SellCashierPage = () => {
       const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
 
       // Проверяем наличие при увеличении количества
-      if (delta > 0) {
+      if (delta > 0 && !isMarketWarehouseServiceProduct(product)) {
         // Для весовых товаров stock может быть false, но quantity > 0
         const availableQuantity = parseFloat(product.quantity || 0);
         const isInStock = availableQuantity > 0;
@@ -1816,7 +1822,9 @@ const SellCashierPage = () => {
                       {formatPrice(product.price || 0)} сом
                     </div>
                     <div className="cashier-page__product-stock">
-                      {product.quantity || 0} {product.unit || "шт"}
+                      {isMarketWarehouseServiceProduct(product)
+                        ? SERVICE_STOCK_LABEL
+                        : `${product.quantity || 0} ${product.unit || "шт"}`}
                     </div>
                   </div>
                 );

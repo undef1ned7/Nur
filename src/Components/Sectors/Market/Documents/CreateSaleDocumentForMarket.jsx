@@ -11,6 +11,10 @@ import {
     Folder,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
+import {
+    SERVICE_STOCK_LABEL,
+    isMarketWarehouseServiceProduct,
+} from "../../../../tools/marketWarehouseFilters";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import {
@@ -719,7 +723,9 @@ const CreateSaleDocumentForMarket = () => {
                                                     {formatPrice(product.price)} сом
                                                 </span>
                                                 <span className="create-sale-document__product-qty">
-                                                    {product.quantity || 0} {product.unit || "шт"}
+                                                    {isMarketWarehouseServiceProduct(product)
+                                                        ? SERVICE_STOCK_LABEL
+                                                        : `${product.quantity || 0} ${product.unit || "шт"}`}
                                                 </span>
                                             </div>
                                         </div>

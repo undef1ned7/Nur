@@ -15,6 +15,12 @@ export const isMarketWarehouseServiceProduct = (item) =>
     .trim()
     .toLowerCase() === MARKET_WAREHOUSE_KIND.service;
 
+/**
+ * Подпись вместо остатка в списках товаров: у услуг количество не ведётся
+ * (при создании оно не указывается), показывать «0 шт» — неверно.
+ */
+export const SERVICE_STOCK_LABEL = "Услуга";
+
 const normalizeKind = (item) =>
   String(item?.kind ?? MARKET_WAREHOUSE_KIND.product)
     .trim()

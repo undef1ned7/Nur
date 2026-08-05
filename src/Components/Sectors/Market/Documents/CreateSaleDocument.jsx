@@ -16,6 +16,10 @@ import {
   createWarehouseDocument,
   fetchWarehouses,
 } from "../../../../store/creators/warehouseThunk";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../tools/marketWarehouseFilters";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useAlert } from "../../../../hooks/useDialog";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
@@ -687,7 +691,9 @@ const CreateSaleDocument = () => {
                           {formatPrice(product.price)} сом
                         </span>
                         <span className="create-sale-document__product-qty">
-                          {product.quantity || 0} {product.unit || "шт"}
+                          {isMarketWarehouseServiceProduct(product)
+                            ? SERVICE_STOCK_LABEL
+                            : `${product.quantity || 0} ${product.unit || "шт"}`}
                         </span>
                       </div>
                     </div>

@@ -1,6 +1,10 @@
 import React, { useMemo, useCallback } from "react";
 import { GripVertical } from "lucide-react";
 import { formatPrice, formatStock, getPrimaryImage } from "../utils";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../../tools/marketWarehouseFilters";
 import noImage from "./placeholder.png";
 import "./ProductTable.scss";
 
@@ -76,7 +80,9 @@ const ProductRow = React.memo(
         <td>{formatPrice(product.price)}</td>
         <td>{formatPrice(product.discount_percent || 0)}</td>
         <td className={outOfStock ? "text-red-600 font-semibold" : ""}>
-          {formatStock(product.quantity)}
+          {isMarketWarehouseServiceProduct(product)
+            ? SERVICE_STOCK_LABEL
+            : formatStock(product.quantity)}
         </td>
       </tr>
     );

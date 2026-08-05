@@ -34,7 +34,10 @@ import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
-import { isMarketWarehouseServiceProduct } from "../../../../tools/marketWarehouseFilters";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../tools/marketWarehouseFilters";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { resetPosSale, useSale } from "../../../../store/slices/saleSlice";
@@ -3757,7 +3760,9 @@ const CashierPage = () => {
                     </div>
 
                     <div className="cashier-page__product-stock flex items-center gap-2">
-                      {product.quantity || 0} {product.unit || "шт"}
+                      {isMarketWarehouseServiceProduct(product)
+                        ? SERVICE_STOCK_LABEL
+                        : `${product.quantity || 0} ${product.unit || "шт"}`}
                       {piecePackage && (
                         <button
                           type="button"
