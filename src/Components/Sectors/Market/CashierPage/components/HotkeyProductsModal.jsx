@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { productSearchHaystackLower } from "../../../../../../tools/productBarcode";
 import { getDefaultPackage } from "../../../../../../tools/marketPackPieceSale";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../../tools/marketWarehouseFilters";
 import "./HotkeyProductsModal.scss";
 
 const HOTKEY_GROUPS = Array.from({ length: 12 }, (_, index) => `F${index + 1}`);
@@ -171,7 +175,9 @@ const HotkeyProductsModal = ({
                     </div>
 
                     <div className="hotkey-products-modal__card-stock">
-                      {formatQuantity(product.quantity || 0)} {product.unit || "шт"}
+                      {isMarketWarehouseServiceProduct(product)
+                        ? SERVICE_STOCK_LABEL
+                        : `${formatQuantity(product.quantity || 0)} ${product.unit || "шт"}`}
                     </div>
 
                     {piecePackage ? (

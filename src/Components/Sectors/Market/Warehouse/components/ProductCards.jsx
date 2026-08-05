@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import { GripVertical } from "lucide-react";
 import { formatPrice, formatStock, getPrimaryImage } from "../utils";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../../tools/marketWarehouseFilters";
 import noImage from "./placeholder.png";
 import "./ProductCards.scss";
 
@@ -108,7 +112,9 @@ const ProductCard = React.memo(
             <div
               className={`mt-0.5 font-semibold ${outOfStock ? "text-red-600" : "text-slate-900"}`}
             >
-              {formatStock(product.quantity)}
+              {isMarketWarehouseServiceProduct(product)
+                ? SERVICE_STOCK_LABEL
+                : formatStock(product.quantity)}
             </div>
           </div>
         </div>

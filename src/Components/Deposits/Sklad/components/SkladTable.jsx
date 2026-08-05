@@ -1,4 +1,8 @@
 import { CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../tools/marketWarehouseFilters";
 
 /**
  * Компонент таблицы товаров
@@ -14,6 +18,10 @@ const SkladTable = ({
 }) => {
   // Определяем статус товара
   const getProductStatus = (item) => {
+    // У услуг остатка нет — «Нет в наличии» для них некорректно
+    if (isMarketWarehouseServiceProduct(item)) {
+      return { text: SERVICE_STOCK_LABEL, color: "#00aa88", icon: "success" };
+    }
     if (item.quantity === 0) {
       return { text: "Нет в наличии", color: "#ff5a5a", icon: "error" };
     } else if (item.quantity < 20) {
@@ -69,12 +77,16 @@ const SkladTable = ({
                 </td>
                 <td
                   className={
-                    item.quantity < 20 && item.quantity > 0
+                    !isMarketWarehouseServiceProduct(item) &&
+                    item.quantity < 20 &&
+                    item.quantity > 0
                       ? "sklad-new__quantity--low"
                       : ""
                   }
                 >
-                  {item.quantity}
+                  {isMarketWarehouseServiceProduct(item)
+                    ? SERVICE_STOCK_LABEL
+                    : item.quantity}
                 </td>
                 <td>
                   {item.category !== undefined && item.category

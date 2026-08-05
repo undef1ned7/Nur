@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
 import api from "../../../../api";
+import {
+  SERVICE_STOCK_LABEL,
+  isMarketWarehouseServiceProduct,
+} from "../../../../tools/marketWarehouseFilters";
 import "./Bar.scss";
 
 /* =========================
@@ -522,7 +526,11 @@ function SellModal({
   }, [onClose]);
 
   const available = useMemo(
-    () => (products || []).filter((p) => (Number(p.quantity) || 0) > 0),
+    () =>
+      (products || []).filter(
+        (p) =>
+          isMarketWarehouseServiceProduct(p) || (Number(p.quantity) || 0) > 0
+      ),
     [products]
   );
 
@@ -646,7 +654,11 @@ function SellModal({
                 <button
                   key={p.id}
                   className="bar__item"
-                  title={`Остаток: ${p.quantity || 0}`}
+                  title={
+                    isMarketWarehouseServiceProduct(p)
+                      ? SERVICE_STOCK_LABEL
+                      : `Остаток: ${p.quantity || 0}`
+                  }
                   onClick={() => addByPick(p)}
                   disabled={!sale.id || scanBusy || checkoutBusy}
                 >
@@ -660,7 +672,9 @@ function SellModal({
                       Цена: {fmtMoney(p.price)}
                     </span>
                     <span className="bar__badge">
-                      Остаток: {Number(p.quantity) || 0}
+                      {isMarketWarehouseServiceProduct(p)
+                        ? SERVICE_STOCK_LABEL
+                        : `Остаток: ${Number(p.quantity) || 0}`}
                     </span>
                     <span className="bar__badge">ШК: {p.barcode || "—"}</span>
                   </div>
