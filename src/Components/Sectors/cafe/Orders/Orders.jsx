@@ -73,6 +73,7 @@ import {
 } from "./cafeOrderItemPayload";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
 import { buildCafeReceiptPrintFinancials } from "../utils/cafeOrderFinancials";
+import { mapLimited } from "../utils/mapLimited";
 import { canCafeOrderPay } from "../../../../tools/cafeEmployeePermissions";
 import {
   defaultWeightQty,
@@ -470,6 +471,10 @@ const Orders = () => {
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
+  /** Dedupe detail GET /cafe/orders/:id/ from WS sync storms. */
+  const detailInFlightRef = useRef(new Set());
+  const detailFetchedRef = useRef(new Set());
+  const DETAIL_HYDRATE_CONCURRENCY = 5;
   const [loading, setLoading] = useState(true);
   const [waiterFilter, setWaiterFilter] = useState(null);
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
@@ -750,13 +755,14 @@ const Orders = () => {
       .map((o) => o.id);
     if (!ids.length) return list;
 
-    const details = await Promise.all(
-      ids.map((id) =>
-        api
-          .get(`/cafe/orders/${id}/`)
-          .then((r) => ({ id, data: r.data }))
-          .catch(() => null),
-      ),
+    const details = await mapLimited(ids, DETAIL_HYDRATE_CONCURRENCY, (id) =>
+      api
+        .get(`/cafe/orders/${id}/`)
+        .then((r) => {
+          detailFetchedRef.current.add(String(id));
+          return { id, data: r.data };
+        })
+        .catch(() => null),
     );
 
     return list.map((o) => {
@@ -835,7 +841,10 @@ const Orders = () => {
         alert(errorMessage, true);
       }
     })();
-  }, [socketOrders?.orders]);
+    // Только при монтировании — раньше deps на socketOrders?.orders
+    // дергали /cafe/tables/ на каждый WS-тик.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyOrderDetailToList = (orderSnapshot, detail) => {
     const oid = String(orderSnapshot?.id || "");
@@ -853,21 +862,44 @@ const Orders = () => {
 
   const fetchAndMergeOrderDetail = (orderSnapshot) => {
     const oid = String(orderSnapshot?.id || "");
-    if (!oid || !orderNeedsDetail(orderSnapshot)) return;
+    if (!oid || oid.startsWith("offline-")) return;
+    if (!orderNeedsDetail(orderSnapshot)) return;
+    if (detailInFlightRef.current.has(oid)) return;
+    if (detailFetchedRef.current.has(oid)) return;
+
+    detailInFlightRef.current.add(oid);
     api
       .get(`/cafe/orders/${oid}/`)
-      .then((r) => applyOrderDetailToList(orderSnapshot, r?.data))
-      .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+      .then((r) => {
+        detailFetchedRef.current.add(oid);
+        applyOrderDetailToList(orderSnapshot, r?.data);
+      })
+      .catch((e) => {
+        console.error("DETAIL FETCH ERROR:", e);
+        const status = e?.response?.status;
+        if (status && status >= 400 && status < 500) {
+          detailFetchedRef.current.add(oid);
+        }
+      })
+      .finally(() => {
+        detailInFlightRef.current.delete(oid);
+      });
   };
 
   const refreshOrderDetailInList = (orderId, socketSnapshot) => {
     const oid = String(orderId || "");
-    if (!oid) return;
+    if (!oid || oid.startsWith("offline-")) return;
+    if (socketSnapshot && !orderNeedsDetail(socketSnapshot)) return;
+    if (detailInFlightRef.current.has(oid)) return;
+    if (detailFetchedRef.current.has(oid)) return;
+
+    detailInFlightRef.current.add(oid);
     api
       .get(`/cafe/orders/${oid}/`)
       .then((r) => {
         const detail = r?.data;
         if (!detail) return;
+        detailFetchedRef.current.add(oid);
         setOrders((cur) =>
           cur.map((o) =>
             String(o.id) === oid
@@ -876,7 +908,16 @@ const Orders = () => {
           ),
         );
       })
-      .catch((e) => console.error("DETAIL FETCH ERROR:", e));
+      .catch((e) => {
+        console.error("DETAIL FETCH ERROR:", e);
+        const status = e?.response?.status;
+        if (status && status >= 400 && status < 500) {
+          detailFetchedRef.current.add(oid);
+        }
+      })
+      .finally(() => {
+        detailInFlightRef.current.delete(oid);
+      });
   };
 
   const mergeOrders = (p, so) => {
@@ -905,9 +946,9 @@ const Orders = () => {
 
   const mergeSocketOrder = (p, so) => {
     const merged = mergeOrders(p, so);
-    const sItems = Array.isArray(so?.items) ? so.items : [];
-    if (!sItems.length && so?.id) {
-      refreshOrderDetailInList(so.id, so);
+    // Detail только если после merge всё ещё нет items (не на каждый WS-тик)
+    if (orderNeedsDetail(merged) && so?.id) {
+      refreshOrderDetailInList(so.id, merged);
     }
     return merged;
   };
@@ -1005,7 +1046,11 @@ const Orders = () => {
   }, [fetchOrders]);
 
   useEffect(() => {
-    const handler = () => fetchOrders();
+    const handler = () => {
+      detailFetchedRef.current.clear();
+      detailInFlightRef.current.clear();
+      fetchOrders();
+    };
     window.addEventListener("orders:refresh", handler);
     return () => window.removeEventListener("orders:refresh", handler);
   }, [fetchOrders]);
