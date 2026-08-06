@@ -1,5 +1,9 @@
 import axios from "axios";
 import { createAuthResponseInterceptor } from "./authInterceptors";
+import {
+  createCircuitRequestInterceptor,
+  noteCircuitFailure,
+} from "./circuitBreaker";
 import { getOfflineFallback } from "../services/cafeOfflineFallback";
 import "../i18n.js";
 import "../i18n";
@@ -44,6 +48,8 @@ api.interceptors.request.use(
   },
 );
 
+api.interceptors.request.use(createCircuitRequestInterceptor());
+
 api.interceptors.response.use(
   (res) => res,
   createAuthResponseInterceptor(api, axios),
@@ -52,6 +58,10 @@ api.interceptors.response.use(
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
+    if (error?.response?.status) {
+      noteCircuitFailure(error.config, error.response.status);
+    }
+
     const isNetworkError =
       !error.response &&
       (error.code === "ERR_NETWORK" ||
