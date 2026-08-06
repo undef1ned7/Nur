@@ -49,9 +49,10 @@ export default function CafeLayout() {
   const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
   const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
   const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
-  const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
-  /** Отсечка по created_at для заказов из poll GET /cafe/orders/?page_size=50. */
-  const POLL_CAFE_ORDERS_LIST_MAX_AGE_MS = 5 * 60 * 1000;
+  /** Отсечка по created_at для visibility-fallback GET /cafe/orders/. */
+  const POLL_CAFE_ORDERS_LIST_MAX_AGE_MS = 2 * 60 * 1000;
+  /** Жёсткий лимит detail GET на один visibility-тик (анти-DDoS). */
+  const POLL_MAX_PRINT_ATTEMPTS_PER_TICK = 2;
   /** Skip kitchen "diff" right after create when snapshot not written yet (avoids second slip vs order_created). */
   const KITCHEN_DIFF_INITIAL_SKIP_MS = 25 * 1000;
   const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
@@ -118,15 +119,25 @@ export default function CafeLayout() {
     })();
   }, []);
 
-  const shouldAutoPrintNow = async () => {
-    // If explicitly disabled -> never auto print
+  /**
+   * @param {{ allowAutoDetect?: boolean }} [opts]
+   * allowAutoDetect=false — только явный localStorage (для poll).
+   * Не пишем cafe_auto_kitchen_print=true автоматически: иначе любой ПК с
+   * printer-bridge навсегда включает poll и DDoS-ит /cafe/orders/.
+   */
+  const shouldAutoPrintNow = async (opts = {}) => {
+    const allowAutoDetect = opts.allowAutoDetect !== false;
+
     try {
       const v = localStorage.getItem("cafe_auto_kitchen_print");
       if (v === "false") return false;
       if (v === "true") return true;
     } catch {}
 
-    // Auto-enable if this device looks like a print-station:
+    // Poll и прочий fallback: без явного opt-in — не печатаем и не ходим в API
+    if (!allowAutoDetect) return false;
+
+    // Auto-detect only for WS-triggered print (do NOT persist):
     // - Wi‑Fi printers: local printer-bridge reachable
     // - USB printers: WebUSB printer is connected/authorized
     const now = Date.now();
@@ -157,28 +168,16 @@ export default function CafeLayout() {
       clearTimeout(t);
       const ok = r.ok;
       bridgeHealthRef.current = { checkedAt: Date.now(), ok };
-      if (ok) {
-        try {
-          localStorage.setItem("cafe_auto_kitchen_print", "true");
-        } catch {}
-        return true;
-      }
+      return ok;
     } catch {
       bridgeHealthRef.current = { checkedAt: Date.now(), ok: false };
     }
 
-    // No bridge → try USB (no dialogs; only already-authorized devices)
     try {
-      const okUsb = await checkPrinterConnection().catch(() => false);
-      if (okUsb) {
-        try {
-          localStorage.setItem("cafe_auto_kitchen_print", "true");
-        } catch {}
-        return true;
-      }
-    } catch {}
-
-    return false;
+      return await checkPrinterConnection().catch(() => false);
+    } catch {
+      return false;
+    }
   };
 
   const isCookPage = useMemo(() => {
@@ -625,12 +624,17 @@ export default function CafeLayout() {
     } catch {}
   };
 
-  const printKitchenTicketsForOrder = async (orderId, attempt = 0) => {
+  const printKitchenTicketsForOrder = async (
+    orderId,
+    attempt = 0,
+    options = {},
+  ) => {
     const oid = String(orderId || "");
     if (!oid) return;
     if (isKitchenPrintSkipped(oid)) return;
     if (printingOrdersRef.current.has(oid)) return;
 
+    const stabilize = options.stabilize !== false;
     const lastFailure = permanentlyFailedPrintsRef.current.get(oid);
     if (lastFailure && Date.now() - lastFailure < PRINT_FAILURE_COOLDOWN_MS) {
       return;
@@ -641,14 +645,14 @@ export default function CafeLayout() {
 
     const scheduleRetry = (why) => {
       // retry a few times because order detail may not be available immediately after WS event
-      const maxAttempts = 5;
+      const maxAttempts = stabilize ? 5 : 1;
       if (attempt >= maxAttempts) {
         console.warn("Auto kitchen print: give up", {
           orderId: oid,
           attempt,
           why,
         });
-        // Permanent skip — иначе poll каждые 15с снова бьёт detail GET
+        // Permanent skip — иначе poll каждые N сек снова бьёт detail GET
         markKitchenPrintSkipped(oid, String(why || "max-attempts"));
         return;
       }
@@ -656,7 +660,7 @@ export default function CafeLayout() {
       if (retryTimersRef.current.has(oid)) return;
       const t = setTimeout(() => {
         retryTimersRef.current.delete(oid);
-        printKitchenTicketsForOrder(oid, attempt + 1);
+        printKitchenTicketsForOrder(oid, attempt + 1, options);
       }, delay);
       retryTimersRef.current.set(oid, t);
     };
@@ -678,22 +682,23 @@ export default function CafeLayout() {
         await new Promise((res) => setTimeout(res, 1500));
       }
 
-      // Часто сразу после order_created позиции докатываются по частям.
-      // Коротко ждём "стабилизацию" состава, чтобы печатать одним чеком на кухню.
-      let stableSig = orderItemsSignature(detail?.items);
-      for (let i = 0; i < 2; i += 1) {
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((resolve) => setTimeout(resolve, 450));
-        // eslint-disable-next-line no-await-in-loop
-        const nextDetail = await api
-          .get(`/cafe/orders/${encodeURIComponent(oid)}/`)
-          .then((r) => r?.data || null)
-          .catch(() => null);
-        if (!nextDetail) break;
-        const nextSig = orderItemsSignature(nextDetail?.items);
-        detail = nextDetail;
-        if (nextSig === stableSig) break;
-        stableSig = nextSig;
+      // Стабилизация только для WS create (не для poll — иначе ×3 GET на заказ).
+      if (stabilize) {
+        let stableSig = orderItemsSignature(detail?.items);
+        for (let i = 0; i < 2; i += 1) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((resolve) => setTimeout(resolve, 450));
+          // eslint-disable-next-line no-await-in-loop
+          const nextDetail = await api
+            .get(`/cafe/orders/${encodeURIComponent(oid)}/`)
+            .then((r) => r?.data || null)
+            .catch(() => null);
+          if (!nextDetail) break;
+          const nextSig = orderItemsSignature(nextDetail?.items);
+          detail = nextDetail;
+          if (nextSig === stableSig) break;
+          stableSig = nextSig;
+        }
       }
 
       const items = Array.isArray(detail?.items) ? detail.items : [];
@@ -1138,35 +1143,41 @@ export default function CafeLayout() {
 
   // Fallback: poll recent orders and print kitchen tickets for any unprinted (when order was created from another device, e.g. phone)
   const pollRecentOrdersAndPrint = useCallback(async () => {
-    const enabled = await shouldAutoPrintNow();
+    // Только явный opt-in в настройках. Auto-detect bridge здесь запрещён —
+    // иначе 1 list + N×3 detail ≈ 10 req/s и очередь на gunicorn.
+    const enabled = await shouldAutoPrintNow({ allowAutoDetect: false });
     if (!enabled) return;
     try {
-      // Без ordering: бэк часто отвечает 400 Bad Request на ordering=-created_at,
-      // а прежний fallback делал второй GET на каждый тик → спам 4xx.
       const res = await api.get("/cafe/orders/", {
-        params: { page_size: 50 },
+        params: { page_size: 20 },
       });
       const list = res?.data?.results ?? res?.data ?? [];
       if (!Array.isArray(list)) return;
       const cutoff = Date.now() - POLL_CAFE_ORDERS_LIST_MAX_AGE_MS;
+      let budget = POLL_MAX_PRINT_ATTEMPTS_PER_TICK;
       for (const o of list) {
+        if (budget <= 0) break;
         const oid = String(o?.id ?? "");
         if (!oid) continue;
         const created = o?.created_at ?? o?.date;
         const createdMs = created ? new Date(created).getTime() : 0;
-        // NaN < cutoff === false — без этой проверки «битая» дата вечно попадала в ветку печати
         if (!Number.isFinite(createdMs)) continue;
         if (createdMs < cutoff) continue;
 
-        // Чек по опросу списка: только недавние по created_at из этого ответа API
         if (isPaidStatusRef.current(o)) {
+          if (isReceiptMarkedPrinted(oid)) continue;
+          budget -= 1;
           await printReceiptForOrderRef.current(oid);
           continue;
         }
 
         if (isKitchenPrintSkipped(oid)) continue;
         if (printingOrdersRef.current.has(oid)) continue;
-        await printKitchenTicketsForOrderRef.current(oid);
+        budget -= 1;
+        // Без stabilize — один detail GET, не три
+        await printKitchenTicketsForOrderRef.current(oid, 0, {
+          stabilize: false,
+        });
       }
     } catch (e) {
       console.warn("CafeLayout poll recent orders:", e?.message || e);
@@ -1234,19 +1245,13 @@ export default function CafeLayout() {
     }
   }, [orders?.lastMessage, profile?.id, isCookPage]);
 
-  // Fallback polling: when order is created from another device (e.g. phone), this device (notebook) may not get WebSocket event — poll recent orders and print
-  useEffect(() => {
-    const intervalId = setInterval(
-      pollRecentOrdersAndPrint,
-      POLL_RECENT_ORDERS_MS,
-    );
-    return () => clearInterval(intervalId);
-  }, [pollRecentOrdersAndPrint]);
-
-  // When user returns to this tab (e.g. notebook), immediately check for new orders to print
+  // Интервальный poll ОТКЛЮЧЁН (был DDoS: ~10 req/s на /cafe/orders/).
+  // Печать — по WebSocket. Visibility — только при явном cafe_auto_kitchen_print=true,
+  // с жёстким budget (см. pollRecentOrdersAndPrint).
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === "visible") pollRecentOrdersAndPrint();
+      if (document.visibilityState !== "visible") return;
+      void pollRecentOrdersAndPrint();
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
