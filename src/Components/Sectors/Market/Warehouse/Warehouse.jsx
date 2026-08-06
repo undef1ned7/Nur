@@ -28,7 +28,10 @@ import {
 } from "./hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
-import { lookupMarketWarehouseProductByBarcode } from "../../../../../tools/marketWarehouseBarcodeScan";
+import {
+  isCompanyWarehouseBarcodeProduct,
+  lookupMarketWarehouseProductByBarcode,
+} from "../../../../../tools/marketWarehouseBarcodeScan";
 import { getBarcodeAmbiguity } from "../../../../../tools/barcodeAmbiguity";
 
 const WAREHOUSE_SELECTED_IDS_KEY = "marketWarehouseSelectedProductIds";
@@ -411,8 +414,25 @@ const Warehouse = () => {
         const result = await lookupMarketWarehouseProductByBarcode(scanned);
         const productId = result?.product?.id;
 
-        if (productId) {
+        // Локальный Product компании — открываем карточку.
+        if (productId && isCompanyWarehouseBarcodeProduct(result)) {
           navigate(`/crm/sklad/${productId}`);
+          return;
+        }
+
+        // GlobalProduct: id нельзя слать в GET /main/products/{id}/.
+        // Сначала заводим товар в компанию через create-by-barcode.
+        if (productId && result?.source === "global") {
+          alert(
+            "Товар найден в глобальном каталоге. Добавьте его на склад компании.",
+            false,
+          );
+          navigate("/crm/sklad/add-product", {
+            state: {
+              openScanTab: true,
+              initialScanBarcode: scanned,
+            },
+          });
           return;
         }
 

@@ -26,12 +26,13 @@ import {
 } from "@/store/creators/saleThunk";
 import { fetchShiftsAsync } from "@/store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "@/store/slices/cashSlice";
-import api from "@/api";
+import { lookupWarehouseProductByBarcodeApi } from "@/api/products";
 import { productMatchesBarcode } from "../../../../../tools/productBarcode";
 import {
   SERVICE_STOCK_LABEL,
   isMarketWarehouseServiceProduct,
 } from "@/tools/marketWarehouseFilters";
+import { normalizeWarehouseBarcodeProduct } from "../../../../../tools/marketWarehouseBarcodeScan";
 import { useClient } from "@/store/slices/ClientSlice";
 import { useProducts } from "@/store/slices/productSlice";
 import { resetPosSale, useSale } from "@/store/slices/saleSlice";
@@ -476,15 +477,15 @@ const SellCashierPage = () => {
           }
         }
 
-        // Если товара нет в локальном списке (пагинация), пробуем получить его по barcode.
+        // Если товара нет в локальном списке (пагинация), ищем только среди
+        // товаров компании. GlobalProduct сюда подставлять нельзя — у него
+        // другой id, и POS/детали ждут локальный Product.
         if (!scannedProduct) {
           try {
-            const productByBarcode = await api.get(
-              `/main/products/global-barcode/${barcode}/`,
+            const productByBarcode = await lookupWarehouseProductByBarcodeApi(
+              barcode,
             );
-            if (productByBarcode?.data?.id) {
-              scannedProduct = productByBarcode.data;
-            }
+            scannedProduct = normalizeWarehouseBarcodeProduct(productByBarcode);
           } catch (_e) {
             // Ниже покажем штатную ошибку "не найден"
           }
@@ -494,7 +495,7 @@ const SellCashierPage = () => {
           showAlert(
             "error",
             "Ошибка сканирования",
-            "Товар с таким штрих-кодом не найден",
+            "Товар с таким штрих-кодом не найден. Если он есть в глобальном каталоге — сначала добавьте его на склад.",
           );
           return;
         }

@@ -59,6 +59,7 @@ const AddProductBarcode = ({
   warehouseCategory,
   onWarehouseCategoryChange,
   cashBoxes = [],
+  initialBarcode = "",
 }) => {
   const {
     scannedProduct,
@@ -71,7 +72,9 @@ const AddProductBarcode = ({
   const { company } = useUser();
   const { list: clients = [] } = useClient();
 
-  const [barcodeScan, setBarcodeScan] = useState("");
+  const [barcodeScan, setBarcodeScan] = useState(() =>
+    String(initialBarcode || "").trim(),
+  );
   const [quantity, setQuantity] = useState(1);
   const [state, setState] = useState({
     name: "",

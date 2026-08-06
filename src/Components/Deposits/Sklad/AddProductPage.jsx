@@ -146,9 +146,24 @@ const AddProductPage = ({
   const isEditMode = !!productId;
   const [loadingProduct, setLoadingProduct] = useState(isEditMode);
 
-  const [activeTab, setActiveTab] = useState(0); // 0 - Ввод вручную, 1 - Сканирование
+  // Скан со склада (/crm/sklad): глобальный товар → вкладка «Сканирование»
+  const [initialScanBarcode] = useState(() =>
+    String(location.state?.initialScanBarcode || "").trim(),
+  );
+  const [activeTab, setActiveTab] = useState(() =>
+    location.state?.openScanTab || location.state?.initialScanBarcode ? 1 : 0,
+  ); // 0 - Ввод вручную, 1 - Сканирование
   const [productType, setProductType] = useState("piece"); // "piece" или "weight"
   const [selectCashBox, setSelectCashBox] = useState("");
+
+  // Сбрасываем router state после чтения initialScanBarcode, чтобы back/refresh
+  // не запускал поиск повторно.
+  useEffect(() => {
+    if (!location.state?.openScanTab && !location.state?.initialScanBarcode) {
+      return;
+    }
+    navigate(location.pathname, { replace: true, state: {} });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Для маркета: тип товара (товар/услуга/комплект)
   const [itemType, setItemType] = useState("product"); // "product", "service", "kit"
@@ -1287,6 +1302,7 @@ const AddProductPage = ({
               )}
               <AddProductBarcode
                 onClose={handleReturn}
+                initialBarcode={initialScanBarcode}
                 onShowSuccessAlert={(productName) => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
