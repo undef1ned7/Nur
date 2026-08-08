@@ -26,24 +26,37 @@ export const createPermissionProtectedRoute = (
   permissionKey,
   profile,
   props,
-) => (
-  <Route
-    key={path}
-    path={path}
-    element={
-      <ProtectedRoute>
-        <Suspense fallback={<RouteFallback />}>
-          {profile?.[permissionKey] ? (
-            <Component />
-          ) : (
-            <Navigate to="/crm/cafe/menu" replace />
-          )}
-        </Suspense>
-      </ProtectedRoute>
-    }
-    {...props}
-  />
-);
+) => {
+  const role = String(profile?.role || "")
+    .trim()
+    .toLowerCase();
+  const isOwnerOrAdmin =
+    role === "owner" ||
+    role === "admin" ||
+    role === "владелец" ||
+    role === "админ" ||
+    role === "администратор";
+  const allowed = isOwnerOrAdmin || Boolean(profile?.[permissionKey]);
+
+  return (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <ProtectedRoute>
+          <Suspense fallback={<RouteFallback />}>
+            {allowed ? (
+              <Component />
+            ) : (
+              <Navigate to="/crm/cafe/menu" replace />
+            )}
+          </Suspense>
+        </ProtectedRoute>
+      }
+      {...props}
+    />
+  );
+};
 
 /** Производство: маршруты с агентом недоступны на тарифе «Старт». */
 export const createProductionAgentProtectedRoute = (path, Component, props) => (
