@@ -307,27 +307,44 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
   );
 };
 
-const BARCODE_LAYOUTS = [
-  { value: "plu", label: "По PLU — префикс(2) + PLU(5) + значение(5)" },
-  { value: "code", label: "По коду — префикс(2) + Код(6) + вес(4)" },
+const BARCODE_MODES = [
+  {
+    value: "auto",
+    label: "Авто (по префиксу: 20=вес, 25=сумма)",
+  },
+  { value: "weight", label: "По весу" },
+  { value: "amount", label: "По сумме" },
 ];
 
-const BARCODE_MODES = [
-  { value: "auto", label: "Авто (по префиксу: 20 — вес, 25 — сумма)" },
-  { value: "weight", label: "По весу (граммы)" },
-  { value: "amount", label: "По сумме (сомы)" },
+const BARCODE_LAYOUTS = [
+  {
+    value: "plu",
+    label: "По PLU (префикс + PLU(5) + значение(5))",
+  },
+  {
+    value: "code",
+    label: "По коду (префикс + PLU(6) + значение(4))",
+  },
+];
+
+const BARCODE_AMOUNT_UNITS = [
+  { value: "tiyin", label: "Тыйын (03800 = 38.00 сом)" },
+  { value: "som", label: "Сом (00036 = 36 сом)" },
 ];
 
 /**
  * Таб «Настройки»: как касса разбирает штрихкод весов —
- * scale_barcode_mode и scale_barcode_layout на уровне компании
+ * mode / layout / amount_unit на уровне компании
  * (GET/PATCH /users/settings/company/).
  */
 const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
-  const [layout, setLayout] = useState("plu");
   const [mode, setMode] = useState("auto");
+  const [layout, setLayout] = useState("plu");
+  const [amountUnit, setAmountUnit] = useState("tiyin");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const amountUnitDisabled = mode === "weight";
 
   useEffect(() => {
     let cancelled = false;
@@ -336,8 +353,11 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
       try {
         const { data } = await api.get("users/settings/company/");
         if (cancelled) return;
-        if (data?.scale_barcode_layout) setLayout(data.scale_barcode_layout);
         if (data?.scale_barcode_mode) setMode(data.scale_barcode_mode);
+        if (data?.scale_barcode_layout) setLayout(data.scale_barcode_layout);
+        if (data?.scale_barcode_amount_unit) {
+          setAmountUnit(data.scale_barcode_amount_unit);
+        }
       } catch (err) {
         if (!cancelled) {
           onError(
@@ -360,8 +380,9 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
     try {
       setSaving(true);
       await api.patch("users/settings/company/", {
-        scale_barcode_layout: layout,
         scale_barcode_mode: mode,
+        scale_barcode_layout: layout,
+        scale_barcode_amount_unit: amountUnit,
       });
       onSuccess(
         "Настройки чтения штрихкода сохранены. Изменения действуют сразу на следующем скане.",
@@ -379,27 +400,8 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
         <h2 className="scales-page__card-title">Чтение штрихкода весов</h2>
         <p className="scales-page__card-text">
           Настройки задают, как касса разбирает штрихкод с этикетки весов.
-          Действуют на всю компанию — применяются ко всем кассам. Менять может
-          владелец или администратор.
+          Действуют на всю компанию — применяются ко всем кассам.
         </p>
-
-        <div className="scales-page__field">
-          <div className="scales-page__field-label">
-            Раскладка штрихкода
-          </div>
-          <select
-            className="scales-page__select"
-            value={layout}
-            onChange={(e) => setLayout(e.target.value)}
-            disabled={loading}
-          >
-            {BARCODE_LAYOUTS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
 
         <div className="scales-page__field">
           <div className="scales-page__field-label">Режим значения</div>
@@ -417,6 +419,44 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
           </select>
         </div>
 
+        <div className="scales-page__field">
+          <div className="scales-page__field-label">Раскладка штрихкода</div>
+          <select
+            className="scales-page__select"
+            value={layout}
+            onChange={(e) => setLayout(e.target.value)}
+            disabled={loading}
+          >
+            {BARCODE_LAYOUTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="scales-page__field">
+          <div className="scales-page__field-label">Единица суммы</div>
+          <select
+            className="scales-page__select"
+            value={amountUnit}
+            onChange={(e) => setAmountUnit(e.target.value)}
+            disabled={loading || amountUnitDisabled}
+          >
+            {BARCODE_AMOUNT_UNITS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {amountUnitDisabled && (
+            <div className="scales-page__hint">
+              Влияет только на суммовые штрихкоды. При режиме «По весу» не
+              используется.
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           className="scales-page__send-btn"
@@ -432,8 +472,7 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
 
         <div className="scales-page__warning">
           <strong>Для весов Rongta RLS из нашего экспорта</strong> (отдел 21,
-          тип штрихкода 5) обычно подходит: раскладка «По коду», режим «По
-          весу».
+          тип штрихкода 5) обычно: режим «По весу», раскладка «По коду».
         </div>
       </div>
 
@@ -443,23 +482,32 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
         </h3>
         <ul className="scales-page__info-list">
           <li>
-            1. Свесьте товар с известным PLU и посмотрите штрихкод на этикетке.
+            1. Свесьте товар с известным PLU и посмотрите штрихкод — сколько
+            цифр занимает номер товара (5 или 6).
           </li>
           <li>
-            2. Пример: вызвали PLU 1, весы напечатали{" "}
-            <code>2100100001452</code>.
+            2. Обе раскладки ищут товар по PLU; отличаются только шириной
+            полей. «По коду» = то же PLU, но в 6-значном поле.
           </li>
           <li>
-            3. Как «По PLU»: 21 | 00100 | 00145 | 2 → PLU = 100 — не тот
-            товар.
+            3. Если ошиблись — не страшно: при промахе касса автоматически
+            пробует альтернативную раскладку. Настройка задаёт, какая
+            пробуется первой.
+          </li>
+        </ul>
+        <h3 className="scales-page__info-title" style={{ marginTop: 16 }}>
+          Как понять единицу суммы
+        </h3>
+        <ul className="scales-page__info-list">
+          <li>
+            Свесьте товар и сравните «Сумма(сом)» на этикетке с полем значения
+            в штрихкоде.
           </li>
           <li>
-            4. Как «По коду»: 21 | 001000 | 0145 | 2 → Код 1000 → PLU = 1,
-            вес 0.145 кг — совпало.
+            Если поле совпадает с суммой один-в-один (36 и 00036) — «Сом».
           </li>
           <li>
-            5. Если PLU «не тот», а в штрихкоде виден Код (1000, 1010, …) —
-            ставьте раскладку «По коду».
+            Если в поле два лишних нуля (38.00 и 03800) — «Тыйын».
           </li>
         </ul>
         <h3 className="scales-page__info-title" style={{ marginTop: 16 }}>

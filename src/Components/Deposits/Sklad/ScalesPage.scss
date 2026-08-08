@@ -187,6 +187,12 @@
       outline: none;
       border-color: #f7d74f;
     }
+
+    &:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
   }
 
   &__checkbox {
