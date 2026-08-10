@@ -29,7 +29,7 @@ const ProductCard = React.memo(
         className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
         onClick={() => onProductClick(product)}
       >
-        <div className="flex items-start gap-3">
+        <div className="warehouse-card__top">
           {enableDrag && onProductDragStart && (
             <button
               type="button"
@@ -47,7 +47,7 @@ const ProductCard = React.memo(
               <GripVertical size={18} />
             </button>
           )}
-          <div className="pt-1" onClick={(e) => onRowSelect(product.id, e)}>
+          <div className="pt-1 shrink-0" onClick={(e) => onRowSelect(product.id, e)}>
             <input
               type="checkbox"
               checked={isSelected}
@@ -60,7 +60,7 @@ const ProductCard = React.memo(
           <img
             src={primaryImage?.image_url || noImage}
             alt={product.name || "Товар"}
-            className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
+            className="warehouse-table__product-image h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover"
             loading="lazy"
             decoding="async"
             onError={(e) => {
@@ -68,49 +68,48 @@ const ProductCard = React.memo(
             }}
           />
 
-          <div className="min-w-0 flex-1">
+          <div className="warehouse-card__body">
             <div className="text-xs text-slate-500">#{rowNumber}</div>
             <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
               {product.name || "—"}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-              <span className="whitespace-nowrap">
+            <div className="warehouse-card__meta">
+              <span className="warehouse-card__meta-item">
                 Код:{" "}
                 <span className="font-medium">{product.code || "—"}</span>
               </span>
-              <span className="whitespace-nowrap">
+              <span className="warehouse-card__meta-item">
                 Арт:{" "}
-                <span className="font-medium">
-                  {product.article || "—"}
-                </span>
+                <span className="font-medium">{product.article || "—"}</span>
               </span>
-              <span className="whitespace-nowrap">
+              <span className="warehouse-card__meta-item">
                 Ед:{" "}
                 <span className="font-medium">{product.unit || "—"}</span>
               </span>
             </div>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-xl bg-slate-50 p-2">
-            <div className="text-slate-500">Цена продажи</div>
-            <div className="mt-0.5 font-semibold text-slate-900">
+
+        <div className="warehouse-card__metrics">
+          <div className="warehouse-card__metric">
+            <div className="warehouse-card__metric-label">Цена продажи</div>
+            <div className="warehouse-card__metric-value">
               {formatPrice(product.price)}
             </div>
           </div>
 
-          <div className="rounded-xl bg-slate-50 p-2">
-            <div className="text-slate-500">Скидка</div>
-            <div className="mt-0.5 font-semibold text-slate-900">
+          <div className="warehouse-card__metric">
+            <div className="warehouse-card__metric-label">Скидка</div>
+            <div className="warehouse-card__metric-value">
               {formatPrice(product.discount_percent || 0)}%
             </div>
           </div>
 
-          <div className="col-span-2 rounded-xl bg-slate-50 p-2">
-            <div className="text-slate-500">Остатки</div>
+          <div className="warehouse-card__metric warehouse-card__metric--full">
+            <div className="warehouse-card__metric-label">Остатки</div>
             <div
-              className={`mt-0.5 font-semibold ${outOfStock ? "text-red-600" : "text-slate-900"}`}
+              className={`warehouse-card__metric-value ${outOfStock ? "text-red-600" : ""}`}
             >
               {isMarketWarehouseServiceProduct(product)
                 ? SERVICE_STOCK_LABEL
@@ -122,7 +121,6 @@ const ProductCard = React.memo(
     );
   },
   (prevProps, nextProps) => {
-    // Кастомное сравнение для оптимизации ререндеров
     return (
       prevProps.product.id === nextProps.product.id &&
       prevProps.isSelected === nextProps.isSelected &&
@@ -132,7 +130,7 @@ const ProductCard = React.memo(
       prevProps.onProductDragStart === nextProps.onProductDragStart &&
       prevProps.isOutOfStock === nextProps.isOutOfStock
     );
-  }
+  },
 );
 
 ProductCard.displayName = "ProductCard";
@@ -153,8 +151,6 @@ const ProductCards = ({
   onProductDragStart,
   isOutOfStock,
 }) => {
-  // Мемоизация вычислений для всех товаров
-  // Используем selectedRows.size вместо selectedRows для более стабильного сравнения
   const selectedRowsSize = selectedRows.size;
   const productsData = useMemo(() => {
     return products.map((product, index) => ({
@@ -165,8 +161,6 @@ const ProductCards = ({
     }));
   }, [products, selectedRows, selectedRowsSize, getRowNumber]);
 
-  // Показываем старые данные во время загрузки (оптимистичное обновление)
-  // Только если данных нет вообще - показываем загрузку
   if (loading && products.length === 0) {
     return (
       <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
@@ -184,13 +178,13 @@ const ProductCards = ({
   }
 
   return (
-    <div className="block relative">
+    <div className="warehouse-cards relative">
       {loading && products.length > 0 && (
-        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/50 backdrop-blur-sm">
           <div className="text-sm text-slate-600">Загрузка...</div>
         </div>
       )}
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="warehouse-cards__toolbar">
         <label
           className="flex items-center gap-2 text-sm text-slate-700"
           onClick={(e) => e.stopPropagation()}
@@ -210,7 +204,7 @@ const ProductCards = ({
         </div>
       </div>
 
-      <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="warehouse-cards__grid">
         {productsData.map((productData) => (
           <ProductCard
             key={productData.product.id}
@@ -230,9 +224,7 @@ const ProductCards = ({
   );
 };
 
-// Оптимизированное сравнение для React.memo
 const areEqual = (prevProps, nextProps) => {
-  // Быстрые проверки сначала
   if (
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
@@ -245,28 +237,21 @@ const areEqual = (prevProps, nextProps) => {
     return false;
   }
 
-  // Проверка длины массива (O(1))
   if (prevProps.products.length !== nextProps.products.length) {
     return false;
   }
 
-  // Если массивы одинаковые по ссылке - пропускаем проверку
   if (prevProps.products === nextProps.products) {
     return true;
   }
 
-  // При смене страницы данные всегда должны обновляться
-  // Проверяем только первые элементы - если они разные, значит это новая страница
   if (prevProps.products.length > 0 && nextProps.products.length > 0) {
     if (prevProps.products[0]?.id !== nextProps.products[0]?.id) {
-      return false; // Разные данные - нужно обновить
+      return false;
     }
   }
 
-  // Если первые элементы совпадают и длина совпадает, считаем что данные не изменились
-  // Это оптимизация для случая, когда меняется только selectedRows или другие пропсы
   return true;
 };
 
 export default React.memo(ProductCards, areEqual);
-

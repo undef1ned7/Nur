@@ -169,10 +169,7 @@ const normalizeProductListPayload = (payload) => {
 const enrichCatalogProductsPrices = async (products) => {
   const list = Array.isArray(products) ? products : [];
   const needEnrich = list.filter(
-    (p) =>
-      p?.id &&
-      !(Number(p.price) > 0) &&
-      !(Number(p.wholesale_price) > 0),
+    (p) => p?.id && !(Number(p.price) > 0) && !(Number(p.wholesale_price) > 0),
   );
   if (!needEnrich.length) return list;
 
@@ -208,7 +205,9 @@ const enrichCatalogProductsPrices = async (products) => {
       ...p,
       price: Number(p.price) > 0 ? p.price : extra.price,
       wholesale_price:
-        Number(p.wholesale_price) > 0 ? p.wholesale_price : extra.wholesale_price,
+        Number(p.wholesale_price) > 0
+          ? p.wholesale_price
+          : extra.wholesale_price,
       name: p.name && p.name !== "—" ? p.name : extra.name || p.name,
       article: p.article || extra.article || "",
       unit: p.unit || extra.unit || "шт",
@@ -1347,8 +1346,7 @@ const CreateSaleDocument = () => {
 
           if (warehouse) {
             list = list.filter(
-              (p) =>
-                !p.warehouse || String(p.warehouse) === String(warehouse),
+              (p) => !p.warehouse || String(p.warehouse) === String(warehouse),
             );
           }
         } else {
