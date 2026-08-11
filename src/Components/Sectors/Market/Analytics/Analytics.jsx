@@ -3706,7 +3706,9 @@ const Analytics = () => {
                     <th>%</th>
                     <th>Дней</th>
                     <th>Оклад за период</th>
-                    <th>Продажи сотрудника</th>
+                    <th>Как кассир</th>
+                    <th>Как консультант</th>
+                    <th>Комиссия</th>
                     <th>Бонус %</th>
                     <th>Итого</th>
                   </tr>
@@ -3724,7 +3726,21 @@ const Analytics = () => {
                         <td>{formatNumber(row.period_days || 0)}</td>
                         <td>{formatCurrency(row.base_prorated || 0, 2)}</td>
                         <td>
-                          {formatCurrency(row.employee_sales_period || 0, 2)}
+                          {formatCurrency(
+                            row.cashier_sales_period ??
+                              row.employee_sales_period ??
+                              0,
+                            2,
+                          )}
+                        </td>
+                        <td>
+                          {formatCurrency(row.consultant_sales_period || 0, 2)}
+                        </td>
+                        <td>
+                          {formatCurrency(
+                            row.consultant_commission_period || 0,
+                            2,
+                          )}
                         </td>
                         <td>{formatCurrency(row.percent_bonus || 0, 2)}</td>
                         <td>{formatCurrency(row.total || 0, 2)}</td>
@@ -3733,7 +3749,7 @@ const Analytics = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={11}
                         style={{ textAlign: "center", color: "#6b7280" }}
                       >
                         Нет данных

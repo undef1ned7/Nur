@@ -256,6 +256,18 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
                   <span>{receiptData.cashier.name}</span>
                 </div>
               )}
+              {(receiptData?.consultant?.name ||
+                receiptData?.consultant_name ||
+                receiptData?.consultant_display) && (
+                <div className="receipt-preview-modal__info-row">
+                  <span>Консультант:</span>
+                  <span>
+                    {receiptData?.consultant?.name ||
+                      receiptData?.consultant_name ||
+                      receiptData?.consultant_display}
+                  </span>
+                </div>
+              )}
               {receiptData?.client?.full_name && (
                 <div className="receipt-preview-modal__info-row">
                   <span>Покупатель:</span>

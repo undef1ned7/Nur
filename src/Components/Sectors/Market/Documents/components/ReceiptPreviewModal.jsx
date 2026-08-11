@@ -298,6 +298,12 @@ const ReceiptPreviewModal = ({
   const doc = receiptData?.document || receiptData?.sale || {};
   const company = receiptData?.company || {};
   const cashier = receiptData?.cashier || {};
+  const consultant = receiptData?.consultant || {};
+  const consultantName =
+    consultant?.name ||
+    receiptData?.consultant_name ||
+    receiptData?.consultant_display ||
+    "";
   const client = receiptData?.client || null;
 
   const itemsSubtotal = items.reduce((sum, it) => sum + (it.total || 0), 0);
@@ -428,7 +434,7 @@ const ReceiptPreviewModal = ({
             </div>
 
             {/* Информация о кассире и клиенте */}
-            {(cashier?.name || client?.full_name) && (
+            {(cashier?.name || consultantName || client?.full_name) && (
               <div className="receipt-preview-modal__receipt-info">
                 {cashier?.name && (
                   <div className="receipt-preview-modal__info-row">
@@ -436,6 +442,12 @@ const ReceiptPreviewModal = ({
                     <span>{cashier.name}</span>
                   </div>
                 )}
+                {consultantName ? (
+                  <div className="receipt-preview-modal__info-row">
+                    <span>Консультант:</span>
+                    <span>{consultantName}</span>
+                  </div>
+                ) : null}
                 {client?.full_name && (
                   <div className="receipt-preview-modal__info-row">
                     <span>Покупатель:</span>
