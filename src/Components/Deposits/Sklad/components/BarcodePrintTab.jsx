@@ -8,6 +8,7 @@ import {
 } from "../services/xp365bPrintService";
 import UniversalModal from "../../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
 import BarcodeA4PrintModal from "./BarcodeA4PrintModal";
+import NumberInput from "./NumberInput";
 import Loading from "../../../common/Loading/Loading";
 import JsBarcode from "jsbarcode";
 import {
@@ -827,27 +828,27 @@ const BarcodePrintTab = ({
               <>
                 <label className="barcode-print-tab__size-label">
                   Ширина (мм):
-                  <input
+                  <NumberInput
                     className="barcode-print-tab__custom-size-input"
-                    type="number"
                     min={15}
                     max={110}
                     step={1}
+                    fallback={30}
                     value={customWidthMm}
-                    onChange={(e) => setCustomWidthMm(e.target.value)}
+                    onCommit={setCustomWidthMm}
                     title="Ширина этикетки в миллиметрах (15–110)"
                   />
                 </label>
                 <label className="barcode-print-tab__size-label">
                   Высота (мм):
-                  <input
+                  <NumberInput
                     className="barcode-print-tab__custom-size-input"
-                    type="number"
                     min={10}
                     max={110}
                     step={1}
+                    fallback={20}
                     value={customHeightMm}
-                    onChange={(e) => setCustomHeightMm(e.target.value)}
+                    onCommit={setCustomHeightMm}
                     title="Высота этикетки в миллиметрах (10–110)"
                   />
                 </label>
@@ -856,18 +857,15 @@ const BarcodePrintTab = ({
 
             <label className="barcode-print-tab__size-label">
               Копий (по умолчанию):
-              <input
+              <NumberInput
                 className="barcode-print-tab__copies-input"
-                type="number"
                 min={1}
                 max={100}
                 step={1}
+                fallback={1}
                 value={copiesValue}
-                onChange={(e) =>
-                  setPrintSettings((prev) => ({
-                    ...prev,
-                    copies: e.target.value,
-                  }))
+                onCommit={(next) =>
+                  setPrintSettings((prev) => ({ ...prev, copies: next }))
                 }
                 title="Значение копий для позиций, у которых не задано своё количество"
               />
@@ -933,19 +931,16 @@ const BarcodePrintTab = ({
 
           <label className="barcode-print-tab__size-label">
             Высота штрих-кода:
-            <input
+            <NumberInput
               className="barcode-print-tab__custom-size-input"
-              type="number"
               min={20}
               max={200}
               step={2}
+              fallback={44}
               value={Math.round(barcodeHeight)}
-              onChange={(e) => {
+              onCommit={(next) => {
                 setDidTouchBarcodeSize(true);
-                setPrintSettings((prev) => ({
-                  ...prev,
-                  barcodeHeight: clamp(Number(e.target.value) || 44, 20, 200),
-                }));
+                setPrintSettings((prev) => ({ ...prev, barcodeHeight: next }));
               }}
               title="Высота штрих-кода в точках (203 DPI ≈ 8 точек/мм)"
             />
@@ -1137,14 +1132,14 @@ const BarcodePrintTab = ({
                         title="Сколько копий этикетки печатать для этой позиции"
                       >
                         Копий:
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           max={100}
                           step={1}
+                          fallback={copiesValue}
                           value={getProductCopies(product.id)}
-                          onChange={(e) =>
-                            setProductCopies(product.id, e.target.value)
+                          onCommit={(next) =>
+                            setProductCopies(product.id, next)
                           }
                           disabled={!hasBarcode || isBatchPrinting}
                           className="barcode-print-tab__card-copies-input"
@@ -1278,14 +1273,14 @@ const BarcodePrintTab = ({
 
               <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 Копий:
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={100}
                   step={1}
+                  fallback={copiesValue}
                   value={getProductCopies(previewProduct.id)}
-                  onChange={(e) =>
-                    setProductCopies(previewProduct.id, e.target.value)
+                  onCommit={(next) =>
+                    setProductCopies(previewProduct.id, next)
                   }
                   style={{ width: 80 }}
                   title="Сколько копий этикетки печатать для этой позиции"

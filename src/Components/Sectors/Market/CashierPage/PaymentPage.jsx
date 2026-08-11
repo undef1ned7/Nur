@@ -30,6 +30,8 @@ import {
   checkPrinterConnection,
   ensurePrinterConnectedInteractively,
   enrichMarketReceiptPayload,
+  isOpaquePrintPayload,
+  isPrintFormatError,
 } from "../../../pages/Sell/services/printService";
 import api from "../../../../api";
 import "./PaymentPage.scss";
@@ -336,6 +338,12 @@ const PaymentPage = ({
       });
       return true;
     } catch (err) {
+      // Формат чека не подошёл — принтер тут ни при чём, окно выбора USB
+      // не поможет: пусть вызывающий код возьмёт другой источник чека.
+      if (isPrintFormatError(err)) {
+        console.warn("[PaymentPage] Чек в неподходящем формате:", err);
+        return false;
+      }
       console.warn(
         "[PaymentPage] Печать не удалась, запрашиваем выбор USB-принтера:",
         err
@@ -366,6 +374,9 @@ const PaymentPage = ({
   };
 
   const buildReceiptPrintPayload = (apiPayload, splitParts = null) => {
+    // Серверный чек приходит PDF-блобом — его печатаем как есть, без обогащения.
+    if (isOpaquePrintPayload(apiPayload)) return apiPayload;
+
     const received = readAmountReceived();
     let paidCash = 0;
     let paidCard = 0;
@@ -796,7 +807,7 @@ const PaymentPage = ({
                 showAlert(
                   "warning",
                   "Печать",
-                  "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+                  "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки»."
                 );
               }
             } else {
@@ -809,7 +820,7 @@ const PaymentPage = ({
                   showAlert(
                     "warning",
                     "Печать",
-                    "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+                    "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки»."
                   );
                 }
               }
