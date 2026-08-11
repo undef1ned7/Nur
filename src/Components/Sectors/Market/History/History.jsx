@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
+import {
+  employeeDisplayName,
+  listFrom,
+  mapEmployeeOption,
+} from "../../../../../tools/marketSaleConsultant";
 import "./History.scss";
 
 const fmtMoney = (v) =>
@@ -10,6 +15,24 @@ const asArray = (data) =>
   Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
 
 const pickDate = (row) => row.paid_at || row.created_at || null;
+
+const pickConsultantDisplay = (r) =>
+  r.consultant_display ||
+  r.consultant_name ||
+  (r.consultant && typeof r.consultant === "object"
+    ? employeeDisplayName(r.consultant)
+    : null) ||
+  "—";
+
+const pickCommissionAmount = (r) => {
+  const n = Number(r.consultant_commission_amount);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const pickCommissionPercent = (r) => {
+  const n = Number(r.consultant_commission_percent);
+  return Number.isFinite(n) ? n : null;
+};
 
 export default function MarketHistory() {
   const [rows, setRows] = useState([]);
@@ -22,9 +45,43 @@ export default function MarketHistory() {
   const [status, setStatus] = useState(""); // "" = все
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [consultantFilter, setConsultantFilter] = useState("");
+  const [consultants, setConsultants] = useState([]);
 
   // модалка деталей
   const [openId, setOpenId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const acc = [];
+        let url =
+          "/users/employees/?page_size=200&ordering=last_name,first_name";
+        let guard = 0;
+        while (url && guard < 20) {
+          // eslint-disable-next-line no-await-in-loop
+          const { data } = await api.get(url);
+          acc.push(...listFrom(data));
+          url = data?.next || null;
+          guard += 1;
+        }
+        if (!cancelled) {
+          setConsultants(
+            acc
+              .map(mapEmployeeOption)
+              .filter(Boolean)
+              .sort((a, b) => a.name.localeCompare(b.name, "ru")),
+          );
+        }
+      } catch {
+        if (!cancelled) setConsultants([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = async (url = null) => {
     try {
@@ -39,8 +96,9 @@ export default function MarketHistory() {
         if (status) q.set("status", status);
         if (start) q.set("start", start);
         if (end) q.set("end", end);
+        if (consultantFilter) q.set("consultant", consultantFilter);
         resp = await api.get(
-          `/main/pos/sales/${q.toString() ? `?${q.toString()}` : ""}`
+          `/main/pos/sales/${q.toString() ? `?${q.toString()}` : ""}`,
         );
       }
 
@@ -56,6 +114,9 @@ export default function MarketHistory() {
         total: Number(r.total) || 0,
         createdAt: pickDate(r),
         user: r.user_display || "—",
+        consultant: pickConsultantDisplay(r),
+        commissionPercent: pickCommissionPercent(r),
+        commissionAmount: pickCommissionAmount(r),
       }));
 
       if (url) {
@@ -74,20 +135,21 @@ export default function MarketHistory() {
   };
 
   useEffect(() => {
-    load(); // первичная загрузка
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    load(); // перезагрузка при смене фильтров
-  }, [status, start, end]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, start, end, consultantFilter]);
 
   const onOpen = (id) => setOpenId(id);
   const onClose = () => setOpenId(null);
 
   const totalSum = useMemo(
     () => rows.reduce((s, r) => s + (Number(r.total) || 0), 0),
-    [rows]
+    [rows],
   );
 
   return (
@@ -110,6 +172,22 @@ export default function MarketHistory() {
               <option value="new">Новые</option>
               <option value="paid">Оплачено</option>
               <option value="canceled">Отменено</option>
+            </select>
+          </label>
+
+          <label className="history__filter">
+            <span className="history__filterLabel">Консультант</span>
+            <select
+              className="history__input"
+              value={consultantFilter}
+              onChange={(e) => setConsultantFilter(e.target.value)}
+            >
+              <option value="">Все</option>
+              {consultants.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -152,7 +230,9 @@ export default function MarketHistory() {
           <thead>
             <tr>
               <th>Дата</th>
-              <th>Пользователь</th>
+              <th>Кассир</th>
+              <th>Консультант</th>
+              <th>Комиссия</th>
               <th>Статус</th>
               <th>Итого</th>
               <th></th>
@@ -161,7 +241,7 @@ export default function MarketHistory() {
           <tbody>
             {loading && rows.length === 0 ? (
               <tr>
-                <td className="history__empty" colSpan={6}>
+                <td className="history__empty" colSpan={7}>
                   Загрузка…
                 </td>
               </tr>
@@ -172,9 +252,20 @@ export default function MarketHistory() {
                     {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
                   </td>
                   <td>{r.user}</td>
+                  <td>{r.consultant}</td>
+                  <td>
+                    {r.commissionAmount > 0
+                      ? `${fmtMoney(r.commissionAmount)}${
+                          r.commissionPercent != null
+                            ? ` (${r.commissionPercent}%)`
+                            : ""
+                        }`
+                      : r.consultant && r.consultant !== "—"
+                        ? "0"
+                        : "—"}
+                  </td>
                   <td>{r.status}</td>
                   <td>{fmtMoney(r.total)}</td>
-                  <td className="ellipsis" title={r.id}></td>
                   <td>
                     <button
                       className="history__btn history__btn--primary"
@@ -187,7 +278,7 @@ export default function MarketHistory() {
               ))
             ) : (
               <tr>
-                <td className="history__empty" colSpan={6}>
+                <td className="history__empty" colSpan={7}>
                   Нет данных
                 </td>
               </tr>
@@ -195,7 +286,7 @@ export default function MarketHistory() {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={3}>
+              <td colSpan={4}>
                 <strong>Всего чеков:</strong> {count}
               </td>
               <td colSpan={3}>
@@ -229,7 +320,7 @@ function SaleModal({ id, onClose }) {
   const [err, setErr] = useState("");
   const [sale, setSale] = useState(null);
 
-  const fmtMoney = (v) =>
+  const fmtMoneyLocal = (v) =>
     (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
     " с";
 
@@ -257,6 +348,10 @@ function SaleModal({ id, onClose }) {
         id: data.id,
         createdAt: data.created_at || null,
         user: data.user_display || "—",
+        consultant: pickConsultantDisplay(data),
+        commissionPercent: pickCommissionPercent(data),
+        commissionAmount: pickCommissionAmount(data),
+        commissionEnabled: Boolean(data.consultant_commission_enabled),
         total: Number(data.total) || 0,
         items,
       });
@@ -299,7 +394,6 @@ function SaleModal({ id, onClose }) {
           <div className="history__error">{err}</div>
         ) : sale ? (
           <>
-            {/* Только создано, пользователь и итог */}
             <div className="history__meta">
               <div>
                 <strong>Создано:</strong>{" "}
@@ -308,10 +402,25 @@ function SaleModal({ id, onClose }) {
                   : "—"}
               </div>
               <div>
-                <strong>Пользователь:</strong> {sale.user}
+                <strong>Кассир:</strong> {sale.user}
               </div>
               <div>
-                <strong>Итого:</strong> {fmtMoney(sale.total)}
+                <strong>Консультант:</strong> {sale.consultant}
+              </div>
+              {sale.consultant && sale.consultant !== "—" ? (
+                <div>
+                  <strong>Комиссия:</strong>{" "}
+                  {sale.commissionAmount > 0
+                    ? `${fmtMoneyLocal(sale.commissionAmount)}${
+                        sale.commissionPercent != null
+                          ? ` (${sale.commissionPercent}%)`
+                          : ""
+                      }`
+                    : "не начислялась"}
+                </div>
+              ) : null}
+              <div>
+                <strong>Итого:</strong> {fmtMoneyLocal(sale.total)}
               </div>
             </div>
 
@@ -320,7 +429,7 @@ function SaleModal({ id, onClose }) {
                 <thead>
                   <tr>
                     <th>Товар</th>
-                    <th>Штрих-код</th>
+                    <th>Штрихкод</th>
                     <th>Кол-во</th>
                     <th>Цена</th>
                     <th>Сумма</th>
@@ -330,50 +439,24 @@ function SaleModal({ id, onClose }) {
                   {sale.items.length ? (
                     sale.items.map((it) => (
                       <tr key={it.id}>
-                        <td className="ellipsis" title={it.name}>
-                          {it.name}
-                        </td>
-                        <td className="ellipsis" title={it.barcode || "—"}>
+                        <td>{it.name}</td>
+                        <td className="ellipsis" title={it.barcode}>
                           {it.barcode || "—"}
                         </td>
                         <td>{it.qty}</td>
-                        <td>{fmtMoney(it.unit_price)}</td>
-                        <td>{fmtMoney(it.line_total)}</td>
+                        <td>{fmtMoneyLocal(it.unit_price)}</td>
+                        <td>{fmtMoneyLocal(it.line_total)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td className="history__empty" colSpan={5}>
-                        Позиции отсутствуют
+                        Нет позиций
                       </td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3}></td>
-                    <td>
-                      <strong>Итого</strong>
-                    </td>
-                    <td>{fmtMoney(sale.total)}</td>
-                  </tr>
-                </tfoot>
               </table>
-            </div>
-
-            <div className="history__modalFooter">
-              <button
-                className="history__btn history__btn--secondary"
-                onClick={load}
-              >
-                Обновить
-              </button>
-              <button
-                className="history__btn history__btn--primary"
-                onClick={onClose}
-              >
-                Закрыть
-              </button>
             </div>
           </>
         ) : null}

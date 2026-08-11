@@ -13,12 +13,18 @@ import {
 } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import CustomerModal from "./components/CustomerModal";
+import ConsultantCommissionBlock from "./components/ConsultantCommissionBlock";
 import SuccessPaymentModal from "./components/SuccessPaymentModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
   validateSplitAmounts,
 } from "../../../../../tools/marketCashierSplitPayment";
+import {
+  buildConsultantCheckoutFields,
+  isValidCommissionPercent,
+  parseCommissionPercent,
+} from "../../../../../tools/marketSaleConsultant";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
@@ -104,6 +110,15 @@ const PaymentPage = ({
     title: "",
     message: "",
   });
+
+  // Консультант на продаже (опционально)
+  const [consultantEnabled, setConsultantEnabled] = useState(false);
+  const [consultantId, setConsultantId] = useState("");
+  const [consultantCommissionEnabled, setConsultantCommissionEnabled] =
+    useState(false);
+  const [consultantCommissionPercent, setConsultantCommissionPercent] =
+    useState("");
+  const [consultantName, setConsultantName] = useState("");
 
   // Функция для показа AlertModal
   const showAlert = (type, title, message) => {
@@ -375,7 +390,28 @@ const PaymentPage = ({
         paidCard,
         change: paymentMethod === "cash" ? Math.max(0, received - total) : 0,
       });
-      if (enriched && Array.isArray(enriched.items)) return enriched;
+      if (enriched && typeof enriched === "object") {
+        const nameFromApi =
+          enriched.consultant?.name ||
+          enriched.consultant_display ||
+          enriched.consultant_name ||
+          "";
+        const name =
+          nameFromApi ||
+          (consultantEnabled && consultantName ? consultantName : "");
+        if (name) {
+          enriched.consultant_name = name;
+          enriched.consultant = {
+            ...(enriched.consultant && typeof enriched.consultant === "object"
+              ? enriched.consultant
+              : {}),
+            id: enriched.consultant?.id || consultantId || null,
+            name,
+          };
+        }
+        if (Array.isArray(enriched.items)) return enriched;
+        return enriched;
+      }
     } catch (err) {
       console.warn("[PaymentPage] enrich receipt payload failed:", err);
     }
@@ -390,6 +426,28 @@ const PaymentPage = ({
     if (!saleId) {
       showAlert("error", "Ошибка", "Продажа не найдена");
       return;
+    }
+
+    if (consultantEnabled) {
+      if (!consultantId) {
+        showAlert(
+          "warning",
+          "Консультант",
+          "Выберите консультанта или снимите галочку «Указать консультанта»",
+        );
+        return;
+      }
+      if (consultantCommissionEnabled) {
+        const pct = parseCommissionPercent(consultantCommissionPercent);
+        if (pct == null || !isValidCommissionPercent(pct)) {
+          showAlert(
+            "warning",
+            "Процент консультанта",
+            "Укажите процент от 0 до 100",
+          );
+          return;
+        }
+      }
     }
 
     // Валидация для отсрочки - требуется клиент
@@ -530,6 +588,12 @@ const PaymentPage = ({
 
       // Выполняем checkout
       // Передаем bool: true только если принтер подключен
+      const consultantFields = buildConsultantCheckoutFields({
+        enabled: consultantEnabled,
+        consultantId,
+        commissionEnabled: consultantCommissionEnabled,
+        commissionPercent: consultantCommissionPercent,
+      });
       const result = await dispatch(
         productCheckout({
           id: saleId,
@@ -543,6 +607,7 @@ const PaymentPage = ({
               : paymentMethod === "cash"
               ? readAmountReceived() || total
               : null,
+          ...(consultantFields || {}),
         })
       );
 
@@ -769,6 +834,13 @@ const PaymentPage = ({
             splitParts,
           ),
         });
+
+        // Сброс блока консультанта для следующей продажи
+        setConsultantEnabled(false);
+        setConsultantId("");
+        setConsultantName("");
+        setConsultantCommissionEnabled(false);
+        setConsultantCommissionPercent("");
       } else {
         const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
         showAlert(
@@ -1060,6 +1132,21 @@ const PaymentPage = ({
               </button>
             )}
           </div>
+
+          <ConsultantCommissionBlock
+            saleTotal={total}
+            enabled={consultantEnabled}
+            onEnabledChange={setConsultantEnabled}
+            consultantId={consultantId}
+            onConsultantChange={({ id, name }) => {
+              setConsultantId(id || "");
+              setConsultantName(name || "");
+            }}
+            commissionEnabled={consultantCommissionEnabled}
+            onCommissionEnabledChange={setConsultantCommissionEnabled}
+            commissionPercent={consultantCommissionPercent}
+            onCommissionPercentChange={setConsultantCommissionPercent}
+          />
         </div>
 
         <div className="payment-page__right">

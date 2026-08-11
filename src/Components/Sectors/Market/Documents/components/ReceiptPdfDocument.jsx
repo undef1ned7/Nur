@@ -171,6 +171,9 @@ export default function ReceiptPdfDocument({ data }) {
   const doc = data?.document || data?.sale || {};
   const company = data?.company || {};
   const cashier = data?.cashier || {};
+  const consultant = data?.consultant || {};
+  const consultantName =
+    consultant?.name || data?.consultant_name || data?.consultant_display || "";
   const client = data?.client || null;
 
   const items = Array.isArray(data?.items)
@@ -251,7 +254,7 @@ export default function ReceiptPdfDocument({ data }) {
         </View>
 
         {/* Информация о кассире и клиенте */}
-        {(cashier?.name || client?.full_name) && (
+        {(cashier?.name || consultantName || client?.full_name) && (
           <View style={s.receiptInfo}>
             {cashier?.name && (
               <View style={s.infoRow}>
@@ -259,6 +262,12 @@ export default function ReceiptPdfDocument({ data }) {
                 <Text>{cashier.name}</Text>
               </View>
             )}
+            {consultantName ? (
+              <View style={s.infoRow}>
+                <Text>Консультант:</Text>
+                <Text>{consultantName}</Text>
+              </View>
+            ) : null}
             {client?.full_name && (
               <View style={s.infoRow}>
                 <Text>Покупатель:</Text>
