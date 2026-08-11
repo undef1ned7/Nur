@@ -7,6 +7,7 @@ import {
   getAdditionalServicesForMenu,
   ADDITIONAL_SERVICES_CONFIG,
 } from "../Sidebar/config/additionalServicesConfig";
+import { isStartPlan } from "../../utils/subscriptionPlan";
 
 // Базовые permissions (общие для всех секторов)
 const BASIC_ACCESS_TYPES = [
@@ -367,7 +368,7 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
       : sectorName;
 
   // Для тарифа "Старт" — только базовые; кафе дополняем сектором без кухни
-  if (tariff === "Старт") {
+  if (isStartPlan(tariff)) {
     if (normalizedSectorName === "Кафе") {
       const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
         (a) => a.backendKey !== "can_view_cafe_cook",
@@ -463,13 +464,28 @@ const AccessList = ({
       HIDE_RULES.forEach((rule) => {
         const { when = {}, hide = {} } = rule;
         const sectorOk = !when.sector || when.sector === sectorName;
+        const sectorInOk =
+          !when.sectorIn ||
+          !sectorName ||
+          when.sectorIn.includes(sectorName);
+        const sectorNotInOk =
+          !when.sectorNotIn ||
+          !sectorName ||
+          !when.sectorNotIn.includes(sectorName);
         const tariffOk = !when.tariff || when.tariff === tariff;
         const tariffInOk =
           !when.tariffIn || (tariff && when.tariffIn.includes(tariff));
         const tariffNotInOk =
           !when.tariffNotIn || (tariff && !when.tariffNotIn.includes(tariff));
 
-        if (sectorOk && tariffOk && tariffInOk && tariffNotInOk) {
+        if (
+          sectorOk &&
+          sectorInOk &&
+          sectorNotInOk &&
+          tariffOk &&
+          tariffInOk &&
+          tariffNotInOk
+        ) {
           (hide.labels || []).forEach((l) => result.labels.add(l));
           (hide.toIncludes || []).forEach((p) => result.toIncludes.push(p));
         }
@@ -478,9 +494,8 @@ const AccessList = ({
       return result;
     })();
 
-    // Получаем базовые пункты меню
-    const basicItems = MENU_CONFIG.basic.filter((item) => {
-      if (!item.implemented) return false;
+    const passesHideRules = (item) => {
+      if (!item?.implemented) return false;
       if (hiddenByRules.labels.has(item.label)) return false;
       if (
         hiddenByRules.toIncludes.length > 0 &&
@@ -490,11 +505,14 @@ const AccessList = ({
         return false;
       }
       return true;
-    });
+    };
 
-    // Получаем секторные пункты меню
+    // Получаем базовые пункты меню
+    const basicItems = MENU_CONFIG.basic.filter(passesHideRules);
+
+    // Получаем секторные пункты меню (логика как в useMenuItems)
     let sectorItems = [];
-    if (sectorName && company?.sector?.name && tariff !== "Старт") {
+    if (sectorName && company?.sector?.name) {
       const sectorNameLower = company.sector.name.toLowerCase();
       const sectorKey = sectorNameLower.replace(/\s+/g, "_");
 
@@ -518,19 +536,20 @@ const AccessList = ({
 
       const configKey = sectorMapping[sectorKey] || sectorKey;
       const sectorConfig = MENU_CONFIG.sector[configKey] || [];
+      const startPlan = isStartPlan(tariff);
 
-      sectorItems = sectorConfig.filter((item) => {
-        if (!item.implemented) return false;
-        if (hiddenByRules.labels.has(item.label)) return false;
-        if (
-          hiddenByRules.toIncludes.length > 0 &&
-          typeof item.to === "string" &&
-          hiddenByRules.toIncludes.some((p) => item.to.includes(p))
-        ) {
-          return false;
+      if (startPlan) {
+        // Кафе на «Старт»: секторные права есть в сайдбаре (без кухни) —
+        // их нужно уметь выдавать в модалке доступов.
+        if (configKey === "cafe") {
+          sectorItems = sectorConfig.filter(
+            (item) => item.to !== "/crm/cafe/cook" && passesHideRules(item),
+          );
         }
-        return true;
-      });
+        // Остальные секторы на «Старт» — без секторных чекбоксов (как раньше)
+      } else {
+        sectorItems = sectorConfig.filter(passesHideRules);
+      }
     }
 
     // Собираем все permissions из меню

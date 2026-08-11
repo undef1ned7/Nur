@@ -5,6 +5,13 @@ import {
 } from "../src/api/products";
 import { productMatchesBarcode } from "./productBarcode";
 
+/** Источник найденного товара: локальный склад / глобальный каталог / список компании. */
+export const WAREHOUSE_BARCODE_SOURCE = {
+  warehouse: "warehouse",
+  global: "global",
+  alternate: "alternate",
+};
+
 /** Нормализует ответ lookup / global-barcode / обёртку product. */
 export const normalizeWarehouseBarcodeProduct = (data) => {
   if (!data || typeof data !== "object") return null;
@@ -31,7 +38,12 @@ const isBarcodeNotFound = (err) => {
 
 /**
  * Поиск товара по штрихкоду для /crm/sklad (без POS start/scan/delete).
- * @returns {Promise<{ product: object } | null>}
+ *
+ * Важно: `source: "global"` — это GlobalProduct. Его id нельзя передавать в
+ * GET /main/products/{id}/ и нельзя открывать как карточку склада — сначала
+ * нужно завести товар в компанию через create-by-barcode.
+ *
+ * @returns {Promise<{ product: object, source: string } | null>}
  */
 export async function lookupMarketWarehouseProductByBarcode(barcode, params = {}) {
   const code = String(barcode || "").trim();
@@ -40,23 +52,43 @@ export async function lookupMarketWarehouseProductByBarcode(barcode, params = {}
   try {
     const data = await lookupWarehouseProductByBarcodeApi(code, params);
     const product = normalizeWarehouseBarcodeProduct(data);
-    if (product) return { product };
+    if (product) {
+      return { product, source: WAREHOUSE_BARCODE_SOURCE.warehouse };
+    }
   } catch (err) {
     if (!isBarcodeNotFound(err)) throw err;
+  }
+
+  // Фолбэк по дополнительным штрихкодам среди товаров компании
+  // (`alternate_barcodes`): barcode-эндпоинты ищут только по основному коду.
+  const alternateProduct = await findProductByAlternateBarcode(code);
+  if (alternateProduct) {
+    return {
+      product: alternateProduct,
+      source: WAREHOUSE_BARCODE_SOURCE.alternate,
+    };
   }
 
   try {
     const data = await getProductByBarcodeApi(code);
     const product = normalizeWarehouseBarcodeProduct(data);
-    if (product) return { product };
+    if (product) {
+      return { product, source: WAREHOUSE_BARCODE_SOURCE.global };
+    }
   } catch (err) {
     if (!isBarcodeNotFound(err)) throw err;
   }
 
-  // Фолбэк по дополнительным штрихкодам (`alternate_barcodes`):
-  // barcode-эндпоинты ищут только по основному коду.
-  const product = await findProductByAlternateBarcode(code);
-  return product ? { product } : null;
+  return null;
+}
+
+/** Товар компании (локальный Product), найденный по любому штрихкоду. */
+export function isCompanyWarehouseBarcodeProduct(result) {
+  const source = result?.source;
+  return (
+    source === WAREHOUSE_BARCODE_SOURCE.warehouse ||
+    source === WAREHOUSE_BARCODE_SOURCE.alternate
+  );
 }
 
 /** Поиск товара по доп. штрихкоду через обычный список товаров. */

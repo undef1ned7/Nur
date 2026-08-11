@@ -317,16 +317,41 @@ export const historySellObjectDetail = createAsyncThunk(
 export const productCheckout = createAsyncThunk(
   "products/productCheckout",
   async (
-    { id, bool, clientId, payment_method, cash_received, payments },
+    {
+      id,
+      bool,
+      clientId,
+      payment_method,
+      cash_received,
+      payments,
+      consultant_id,
+      consultant_commission_enabled,
+      consultant_commission_percent,
+    },
     { rejectWithValue },
   ) => {
     try {
       const hasPayments = Array.isArray(payments) && payments.length > 0;
+      const hasConsultant =
+        consultant_id != null && String(consultant_id).trim() !== "";
       const payload = {
         print_receipt: bool,
         ...(clientId && { client_id: clientId }),
         ...(hasPayments ? { payments } : payment_method ? { payment_method } : {}),
         ...(cash_received != null && cash_received !== "" ? { cash_received } : {}),
+        ...(hasConsultant
+          ? {
+              consultant_id: String(consultant_id),
+              consultant_commission_enabled: Boolean(
+                consultant_commission_enabled,
+              ),
+              consultant_commission_percent:
+                consultant_commission_percent != null &&
+                consultant_commission_percent !== ""
+                  ? String(consultant_commission_percent)
+                  : "0.00",
+            }
+          : {}),
       };
       const { data } = await api.post(
         `main/pos/sales/${id}/checkout/`,

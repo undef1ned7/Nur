@@ -1,12 +1,14 @@
 .stocksLayout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .stocksLayout--noGroups {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .stocksToolbar {
@@ -182,8 +184,7 @@
   &.is-children-selected {
     background-color: #f2d03626;
   }
-
-} 
+}
 .stocksGroups__tree {
   margin-top: 8px;
   overflow-y: auto;

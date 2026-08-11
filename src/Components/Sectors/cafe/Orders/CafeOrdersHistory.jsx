@@ -28,6 +28,7 @@ import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { suppressOfflineError } from "../../../../utils/cafeOfflineError";
 import { resolveTableLabel, TAKEAWAY_LABEL } from "../utils/resolveTableLabel";
+import { mapLimited } from "../utils/mapLimited";
 import { buildCafeReceiptPrintFinancials } from "../utils/cafeOrderFinancials";
 import { CafeOrderFinancialTotals } from "./components/CafeOrderFinancialTotals";
 import { canCafeOrderReturn } from "../../../../tools/cafeEmployeePermissions";
@@ -252,13 +253,11 @@ const CafeOrderHistory = () => {
 
     if (!ids.length) return list;
 
-    const details = await Promise.all(
-      ids.map((id) =>
-        api
-          .get(`/cafe/orders/${id}/`)
-          .then((r) => ({ id, data: r.data }))
-          .catch(() => null),
-      ),
+    const details = await mapLimited(ids, 5, (id) =>
+      api
+        .get(`/cafe/orders/${id}/`)
+        .then((r) => ({ id, data: r.data }))
+        .catch(() => null),
     );
 
     return list.map((o) => {

@@ -132,6 +132,93 @@ const isOwnerMultiWarehouseMode = (docType, agentId, startPlan) => {
   );
 };
 
+/** Нормализация строки остатка агента → формат товара каталога продажи */
+const mapAgentStockToCatalogProduct = (row) => {
+  const productId =
+    typeof row?.product === "string"
+      ? row.product
+      : row?.product?.id || row?.product_id || row?.id;
+  if (!productId) return null;
+  const qtyRaw = row?.qty_available ?? row?.qty ?? row?.quantity ?? 0;
+  const qty = Number(qtyRaw);
+  return {
+    id: productId,
+    name: row?.product_name || row?.name || "—",
+    article: row?.product_article || row?.article || "",
+    unit: row?.product_unit || row?.unit || "шт",
+    quantity: Number.isFinite(qty) ? qty : 0,
+    warehouse: row?.warehouse_id || row?.warehouse,
+    warehouse_name: row?.warehouse_name || "",
+    price: Number(row?.price ?? row?.product_price ?? 0),
+    wholesale_price: Number(
+      row?.wholesale_price ?? row?.product_wholesale_price ?? 0,
+    ),
+    product_group: row?.product_group ?? row?.product_group_id ?? null,
+    images: Array.isArray(row?.images) ? row.images : [],
+    characteristics: row?.characteristics || null,
+  };
+};
+
+const normalizeProductListPayload = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+/** Подтянуть цены/метаданные товара, если в остатках агента их нет */
+const enrichCatalogProductsPrices = async (products) => {
+  const list = Array.isArray(products) ? products : [];
+  const needEnrich = list.filter(
+    (p) => p?.id && !(Number(p.price) > 0) && !(Number(p.wholesale_price) > 0),
+  );
+  if (!needEnrich.length) return list;
+
+  const uniqueIds = [
+    ...new Set(needEnrich.map((p) => String(p.id)).filter(Boolean)),
+  ];
+  const extraById = new Map();
+  await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        const data = await warehouseAPI.getProductByUuid(id);
+        extraById.set(id, {
+          price: Number(data?.price ?? 0),
+          wholesale_price: Number(data?.wholesale_price ?? 0),
+          name: data?.name,
+          article: data?.article,
+          unit: data?.unit,
+          product_group: data?.product_group ?? null,
+          images: Array.isArray(data?.images) ? data.images : [],
+          characteristics: data?.characteristics || null,
+        });
+      } catch {
+        /* ignore */
+      }
+    }),
+  );
+  if (!extraById.size) return list;
+
+  return list.map((p) => {
+    const extra = extraById.get(String(p.id));
+    if (!extra) return p;
+    return {
+      ...p,
+      price: Number(p.price) > 0 ? p.price : extra.price,
+      wholesale_price:
+        Number(p.wholesale_price) > 0
+          ? p.wholesale_price
+          : extra.wholesale_price,
+      name: p.name && p.name !== "—" ? p.name : extra.name || p.name,
+      article: p.article || extra.article || "",
+      unit: p.unit || extra.unit || "шт",
+      product_group: p.product_group ?? extra.product_group,
+      images:
+        Array.isArray(p.images) && p.images.length ? p.images : extra.images,
+      characteristics: p.characteristics || extra.characteristics,
+    };
+  });
+};
+
 const getProductImages = (product) => {
   if (!product) return [];
   const images = Array.isArray(product.images) ? product.images : [];
@@ -400,6 +487,10 @@ const CreateSaleDocument = () => {
   const params = useParams();
   const { company, profile: userProfile, tariff } = useUser();
   const startPlan = isStartPlan(tariff || company?.subscription_plan?.name);
+  const isOwnerOrAdmin =
+    userProfile?.role === "owner" || userProfile?.role === "admin";
+  /** Агент продаёт со своих остатков, а не из каталога склада */
+  const useAgentStockCatalog = !isOwnerOrAdmin;
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
   const { employees } = useDepartments();
@@ -1239,7 +1330,25 @@ const CreateSaleDocument = () => {
             search: searchQuery,
             page_size: 1000,
           });
-          list = Array.isArray(data) ? data : data?.results || [];
+          list = normalizeProductListPayload(data);
+        } else if (useAgentStockCatalog) {
+          const params = { page_size: 1000 };
+          if (warehouse) params.warehouse = warehouse;
+          if (searchQuery) params.search = searchQuery;
+          if (groupIdOrNull) params.product_group = groupIdOrNull;
+
+          const data = await warehouseAPI.listMyAgentProducts(params);
+          if (warehouseRef.current !== requestWarehouse) return;
+
+          list = normalizeProductListPayload(data)
+            .map(mapAgentStockToCatalogProduct)
+            .filter(Boolean);
+
+          if (warehouse) {
+            list = list.filter(
+              (p) => !p.warehouse || String(p.warehouse) === String(warehouse),
+            );
+          }
         } else {
           const params = {
             warehouse,
@@ -1256,9 +1365,7 @@ const CreateSaleDocument = () => {
           if (warehouseRef.current !== requestWarehouse) return;
 
           if (fetchProductsAsync.fulfilled.match(result)) {
-            list =
-              result.payload?.results ||
-              (Array.isArray(result.payload) ? result.payload : []);
+            list = normalizeProductListPayload(result.payload);
           } else {
             setGroupProducts((prev) => ({
               ...(prev || {}),
@@ -1285,6 +1392,24 @@ const CreateSaleDocument = () => {
             search: debouncedProductSearch || "",
           },
         }));
+
+        if (useAgentStockCatalog && list.length) {
+          const enriched = await enrichCatalogProductsPrices(list);
+          if (warehouseRef.current !== requestWarehouse) return;
+          setGroupProducts((prev) => {
+            const current = prev?.[key];
+            if (!current || current.search !== (debouncedProductSearch || "")) {
+              return prev;
+            }
+            return {
+              ...(prev || {}),
+              [key]: {
+                ...current,
+                items: enriched,
+              },
+            };
+          });
+        }
       } catch (e) {
         console.error("Ошибка загрузки товаров группы:", e);
         setGroupProducts((prev) => ({
@@ -1298,7 +1423,13 @@ const CreateSaleDocument = () => {
         }));
       }
     },
-    [warehouse, debouncedProductSearch, dispatch, isMultiWarehouseOwnerDoc],
+    [
+      warehouse,
+      debouncedProductSearch,
+      dispatch,
+      isMultiWarehouseOwnerDoc,
+      useAgentStockCatalog,
+    ],
   );
 
   // Поиск: по складу или по всем складам компании (multi-warehouse SALE).
@@ -1956,19 +2087,31 @@ const CreateSaleDocument = () => {
 
         if (!warehouse) return;
 
-        const result = await dispatch(
-          fetchProductsAsync({ warehouse, page_size: 1000 }),
-        );
-        if (cancelled) return;
-        if (fetchProductsAsync.fulfilled.match(result)) {
-          const list =
-            result.payload?.results ||
-            (Array.isArray(result.payload) ? result.payload : []);
-          const productById = new Map(
-            list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }]),
+        let list = [];
+        if (useAgentStockCatalog) {
+          const data = await warehouseAPI.listMyAgentProducts({
+            warehouse,
+            page_size: 1000,
+          });
+          if (cancelled) return;
+          list = normalizeProductListPayload(data)
+            .map(mapAgentStockToCatalogProduct)
+            .filter(Boolean);
+        } else {
+          const result = await dispatch(
+            fetchProductsAsync({ warehouse, page_size: 1000 }),
           );
-          applyStockMap(productById, { filterToWarehouse: true });
+          if (cancelled) return;
+          if (fetchProductsAsync.fulfilled.match(result)) {
+            list = normalizeProductListPayload(result.payload);
+          }
         }
+
+        if (!list.length) return;
+        const productById = new Map(
+          list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }]),
+        );
+        applyStockMap(productById, { filterToWarehouse: true });
       } catch {
         // игнорируем ошибку загрузки
       }
@@ -1983,6 +2126,7 @@ const CreateSaleDocument = () => {
     editDocumentId,
     cartStockSyncKey,
     isMultiWarehouseOwnerDoc,
+    useAgentStockCatalog,
     dispatch,
   ]);
 
@@ -2044,8 +2188,6 @@ const CreateSaleDocument = () => {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, isAgentFilterRelevant, startPlan]);
-  const isOwnerOrAdmin =
-    userProfile?.role === "owner" || userProfile?.role === "admin";
   const currentUserAgentId = userProfile?.id ? String(userProfile.id) : "";
 
   useEffect(() => {
@@ -3652,7 +3794,9 @@ const CreateSaleDocument = () => {
                 <p className="create-sale-document__search-results-hint">
                   {isMultiWarehouseOwnerDoc
                     ? "Поиск по всем складам компании"
-                    : "Поиск по всем товарам склада"}
+                    : useAgentStockCatalog
+                      ? "Поиск по вашим остаткам"
+                      : "Поиск по всем товарам склада"}
                 </p>
                 <div className="create-sale-document__group-products">
                   {renderGroupProductsList(

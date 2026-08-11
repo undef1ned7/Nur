@@ -603,6 +603,15 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(enc(`${dt}\n`));
   }
   if (hasText(cashier)) chunks.push(enc(lr("Кассир", cashier, width) + "\n"));
+  const consultant = String(
+    payload.consultant_name ??
+      payload.consultant?.name ??
+      payload.consultant_display ??
+      "",
+  ).trim();
+  if (hasText(consultant)) {
+    chunks.push(enc(lr("Консультант", consultant, width) + "\n"));
+  }
   if (hasText(shift)) chunks.push(enc(lr("Смена", shift, width) + "\n"));
   chunks.push(enc(divider + "\n"));
   if (ekassaFields) {

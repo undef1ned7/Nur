@@ -1247,9 +1247,28 @@ const safeOrigin = () =>
   typeof window !== "undefined" ? window.location.origin : "";
 
 const SCALE_BARCODE_MODE_OPTIONS = [
-  { value: "auto", label: "Авто (по префиксу)" },
+  {
+    value: "auto",
+    label: "Авто (по префиксу: 20=вес, 25=сумма)",
+  },
   { value: "weight", label: "По весу" },
   { value: "amount", label: "По сумме" },
+];
+
+const SCALE_BARCODE_LAYOUT_OPTIONS = [
+  {
+    value: "plu",
+    label: "По PLU (префикс + PLU(5) + значение(5))",
+  },
+  {
+    value: "code",
+    label: "По коду (префикс + PLU(6) + значение(4))",
+  },
+];
+
+const SCALE_BARCODE_AMOUNT_UNIT_OPTIONS = [
+  { value: "tiyin", label: "Тыйын (03800 = 38.00 сом)" },
+  { value: "som", label: "Сом (00036 = 36 сом)" },
 ];
 
 const Settings = () => {
@@ -1511,6 +1530,8 @@ const Settings = () => {
     phones_howcase: company?.phones_howcase || "",
     cashier_password: company?.cashier_password || "",
     scale_barcode_mode: company?.scale_barcode_mode || "auto",
+    scale_barcode_layout: company?.scale_barcode_layout || "plu",
+    scale_barcode_amount_unit: company?.scale_barcode_amount_unit || "tiyin",
   });
 
   useEffect(() => {
@@ -1525,6 +1546,8 @@ const Settings = () => {
       phones_howcase: company?.phones_howcase || "",
       cashier_password: company?.cashier_password || "",
       scale_barcode_mode: company?.scale_barcode_mode || "auto",
+      scale_barcode_layout: company?.scale_barcode_layout || "plu",
+      scale_barcode_amount_unit: company?.scale_barcode_amount_unit || "tiyin",
     });
   }, [company]);
 
@@ -1619,6 +1642,8 @@ const Settings = () => {
       phones_howcase: company?.phones_howcase || "",
       cashier_password: company?.cashier_password || "",
       scale_barcode_mode: company?.scale_barcode_mode || "auto",
+      scale_barcode_layout: company?.scale_barcode_layout || "plu",
+      scale_barcode_amount_unit: company?.scale_barcode_amount_unit || "tiyin",
     });
   };
 
@@ -2014,7 +2039,7 @@ const Settings = () => {
                     className="settings__label"
                     htmlFor="scale_barcode_mode"
                   >
-                    Режим штрихкода весов
+                    Режим значения штрихкода весов
                   </label>
                   <select
                     id="scale_barcode_mode"
@@ -2030,9 +2055,69 @@ const Settings = () => {
                     ))}
                   </select>
                   <p className="settings__mutedText" style={{ marginTop: 8 }}>
-                    Если весы печатают вес в штрихкоде — выберите «По весу».
-                    Если печатают стоимость — «По сумме». «Авто» определяет тип
-                    по префиксу штрихкода (20 — вес, 25 — сумма).
+                    Если весы печатают вес — «По весу». Если сумму — «По сумме».
+                    «Авто» определяет тип по префиксу (20 — вес, 25 — сумма).
+                  </p>
+                </div>
+
+                <div
+                  className="settings__form-group"
+                  style={{ marginTop: "15px" }}
+                >
+                  <label
+                    className="settings__label"
+                    htmlFor="scale_barcode_layout"
+                  >
+                    Раскладка штрихкода весов
+                  </label>
+                  <select
+                    id="scale_barcode_layout"
+                    name="scale_barcode_layout"
+                    className="settings__select"
+                    value={companyState.scale_barcode_layout || "plu"}
+                    onChange={handleCompanyChange}
+                  >
+                    {SCALE_BARCODE_LAYOUT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="settings__mutedText" style={{ marginTop: 8 }}>
+                    Обе раскладки ищут товар по PLU; отличаются шириной полей.
+                    Свесьте товар с известным PLU и посмотрите, 5 или 6 цифр
+                    занимает номер товара.
+                  </p>
+                </div>
+
+                <div
+                  className="settings__form-group"
+                  style={{ marginTop: "15px" }}
+                >
+                  <label
+                    className="settings__label"
+                    htmlFor="scale_barcode_amount_unit"
+                  >
+                    Единица суммы в штрихкоде весов
+                  </label>
+                  <select
+                    id="scale_barcode_amount_unit"
+                    name="scale_barcode_amount_unit"
+                    className="settings__select"
+                    value={companyState.scale_barcode_amount_unit || "tiyin"}
+                    onChange={handleCompanyChange}
+                    disabled={companyState.scale_barcode_mode === "weight"}
+                  >
+                    {SCALE_BARCODE_AMOUNT_UNIT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="settings__mutedText" style={{ marginTop: 8 }}>
+                    {companyState.scale_barcode_mode === "weight"
+                      ? "Влияет только на суммовые штрихкоды. При режиме «По весу» не используется."
+                      : "Тыйын: 03800 = 38.00 сом. Сом: 00036 = 36 сом. Сравните сумму на этикетке с полем значения в штрихкоде."}
                   </p>
                 </div>
 

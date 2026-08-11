@@ -70,6 +70,8 @@ const getSectorPermissions = (sectorName) => {
       "can_view_cafe_tables",
       "can_view_cafe_cook",
       "can_view_cafe_inventory",
+      "can_view_cafe_order_pay",
+      "can_view_cafe_order_return",
     ],
     "Строительная компания": [
       "can_view_building_work_process",

@@ -693,12 +693,37 @@ const MarketEmployEmployeeDetail = () => {
                           </span>
                         </div>
                         <div className="marketEmployDetail__breakdownItem">
-                          <span className="marketEmployDetail__breakdownLabel">Продажи сотрудника</span>
+                          <span className="marketEmployDetail__breakdownLabel">Продажи как кассир</span>
                           <span className="marketEmployDetail__breakdownValue">
-                            {fmtMoney(salarySummary.employee_sales_period)}
+                            {fmtMoney(
+                              salarySummary.cashier_sales_period ??
+                                salarySummary.employee_sales_period,
+                            )}
                           </span>
                           <span className="marketEmployDetail__breakdownHint">
-                            оплаченные чеки за период
+                            чеки, где сотрудник пробил оплату
+                          </span>
+                        </div>
+                        <div className="marketEmployDetail__breakdownItem">
+                          <span className="marketEmployDetail__breakdownLabel">
+                            Продажи как консультант
+                          </span>
+                          <span className="marketEmployDetail__breakdownValue">
+                            {fmtMoney(salarySummary.consultant_sales_period)}
+                          </span>
+                          <span className="marketEmployDetail__breakdownHint">
+                            чеки с привязкой консультанта
+                          </span>
+                        </div>
+                        <div className="marketEmployDetail__breakdownItem">
+                          <span className="marketEmployDetail__breakdownLabel">
+                            Комиссия консультанта
+                          </span>
+                          <span className="marketEmployDetail__breakdownValue">
+                            {fmtMoney(salarySummary.consultant_commission_period)}
+                          </span>
+                          <span className="marketEmployDetail__breakdownHint">
+                            сумма % с продаж за период
                           </span>
                         </div>
                         <div className="marketEmployDetail__breakdownItem marketEmployDetail__breakdownItem--accent">
@@ -709,7 +734,7 @@ const MarketEmployEmployeeDetail = () => {
                             {fmtMoney(salarySummary.percent_bonus)}
                           </span>
                           <span className="marketEmployDetail__breakdownHint">
-                            % от суммы продаж
+                            % профиля + комиссия консультанта
                           </span>
                         </div>
                       </div>
@@ -725,7 +750,9 @@ const MarketEmployEmployeeDetail = () => {
                                 <th>%</th>
                                 <th>Дней</th>
                                 <th>Оклад за период</th>
-                                <th>Продажи</th>
+                                <th>Как кассир</th>
+                                <th>Как консультант</th>
+                                <th>Комиссия</th>
                                 <th>Бонус</th>
                                 <th>Итого</th>
                               </tr>
@@ -738,7 +765,13 @@ const MarketEmployEmployeeDetail = () => {
                                   <td>{fmtMoney(r.sales_percent)}</td>
                                   <td>{r.period_days || 0}</td>
                                   <td>{fmtMoney(r.base_prorated)}</td>
-                                  <td>{fmtMoney(r.employee_sales_period)}</td>
+                                  <td>
+                                    {fmtMoney(
+                                      r.cashier_sales_period ?? r.employee_sales_period,
+                                    )}
+                                  </td>
+                                  <td>{fmtMoney(r.consultant_sales_period)}</td>
+                                  <td>{fmtMoney(r.consultant_commission_period)}</td>
                                   <td>{fmtMoney(r.percent_bonus)}</td>
                                   <td>{fmtMoney(r.total)}</td>
                                 </tr>
@@ -783,8 +816,8 @@ const MarketEmployEmployeeDetail = () => {
                   aria-label="Продажи и смены"
                 >
                   <p className="marketEmployDetail__panelIntro">
-                    Сводка по кассе за тот же период. Для начисления % используются продажи, где
-                    сотрудник — автор чека (см. вкладку «Расчёт зарплаты»).
+                    Сводка по кассе за тот же период. Процент с чека может идти
+                    консультанту, если его указали при оплате (см. «Расчёт зарплаты»).
                   </p>
                   {empAnalyticsError ? (
                     <div className="barbermasters__alert">{empAnalyticsError}</div>

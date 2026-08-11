@@ -14,9 +14,11 @@ import { useUser } from "../../../store/slices/userSlice";
 import useResize from "../../../hooks/useResize";
 import { useAlert } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../tools/validateResErrors";
+import { mapLimited } from "../../Sectors/cafe/utils/mapLimited";
 
 /* Base path */
 const BASE = "/crm/kassa";
+const HYDRATE_CONCURRENCY = 5;
 
 /* helpers */
 const asArray = (d) =>
@@ -395,13 +397,11 @@ const CashboxPayment = () => {
       .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
       .map((o) => o.id);
     if (!needIds.length) return list;
-    const details = await Promise.all(
-      needIds.map((id) =>
-        api
-          .get(`/cafe/orders/${id}/`)
-          .then((r) => ({ id, data: r.data }))
-          .catch(() => null)
-      )
+    const details = await mapLimited(needIds, HYDRATE_CONCURRENCY, (id) =>
+      api
+        .get(`/cafe/orders/${id}/`)
+        .then((r) => ({ id, data: r.data }))
+        .catch(() => null),
     );
     return list.map((o) => {
       const d = details.find((x) => x && x.id === o.id)?.data;
