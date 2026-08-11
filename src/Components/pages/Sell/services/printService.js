@@ -1114,10 +1114,25 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
 }
 
 /* ---------- Главная функция обработки ответа для печати ---------- */
+const PRINT_FORMAT_ERROR = "Неизвестный формат ответа для печати";
+
+/** Ответ, который нельзя «обогащать» копированием полей: PDF/бинарь/поток. */
+export function isOpaquePrintPayload(payload) {
+  return (
+    (typeof Blob !== "undefined" && payload instanceof Blob) ||
+    (typeof ArrayBuffer !== "undefined" && payload instanceof ArrayBuffer) ||
+    ArrayBuffer.isView(payload) ||
+    (typeof ReadableStream !== "undefined" && payload instanceof ReadableStream)
+  );
+}
+
 export function enrichMarketReceiptPayload(payload, meta = {}) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return payload;
   }
+  // Серверный чек приходит PDF-блобом: спред превратил бы его в пустой {}
+  // и печать падала бы с «Неизвестный формат ответа для печати».
+  if (isOpaquePrintPayload(payload)) return payload;
   const next = { ...payload };
   const orderTotal = toNum(
     meta.total ?? next.total_amount ?? next.paid_cash ?? next.paid_card,
@@ -1218,5 +1233,17 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     await printReceiptJSONViaUSB(printable, printOptions);
     return;
   }
-  throw new Error("Неизвестный формат ответа для печати");
+  throw new Error(PRINT_FORMAT_ERROR);
+}
+
+/**
+ * Ошибка формата ответа (а не принтера): переподключение USB тут не поможет,
+ * нужно брать другой источник чека.
+ */
+export function isPrintFormatError(err) {
+  const message = String(err?.message ?? err ?? "");
+  return (
+    message.includes(PRINT_FORMAT_ERROR) ||
+    message.includes("Получен невалидный PDF и не JSON")
+  );
 }
