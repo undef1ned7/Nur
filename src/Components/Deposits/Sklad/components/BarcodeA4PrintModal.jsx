@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import JsBarcode from "jsbarcode";
 import { getBarcodePrintEncoding } from "../../../../../tools/productBarcode";
+import NumberInput from "./NumberInput";
 import "./BarcodeA4PrintModal.scss";
 
 /** Один штрих-код на canvas (динамический предпросмотр + печать). */
@@ -78,13 +79,13 @@ const FieldStyleRow = ({ label, enabled, onToggle, style, onStyle, noFont }) => 
     </label>
     {enabled && !noFont && (
       <div className="barcode-a4-fs__ctrls">
-        <input
+        <NumberInput
           className="barcode-a4-fs__size"
-          type="number"
           min={6}
           max={60}
+          fallback={12}
           value={style.size}
-          onChange={(e) => onStyle({ size: Number(e.target.value) })}
+          onCommit={(size) => onStyle({ size })}
           title="Размер шрифта, px"
         />
         <button
@@ -328,33 +329,33 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
           <div className="barcode-a4-modal__row">
             <label className="barcode-a4-modal__field">
               <span>Товаров в ряд</span>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={6}
-                value={cols}
-                onChange={(e) => setCols(e.target.value)}
+                fallback={3}
+                value={colsValue}
+                onCommit={setCols}
               />
             </label>
             <label className="barcode-a4-modal__field">
               <span>Строк на лист</span>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={20}
-                value={rows}
-                onChange={(e) => setRows(e.target.value)}
+                fallback={8}
+                value={rowsValue}
+                onCommit={setRows}
                 title="Меньше строк — крупнее этикетки (напр. 2 строки на весь лист)"
               />
             </label>
             <label className="barcode-a4-modal__field">
               <span>Копий каждого</span>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={50}
-                value={copies}
-                onChange={(e) => setCopies(e.target.value)}
+                fallback={1}
+                value={copiesValue}
+                onCommit={setCopies}
                 title="Значение по умолчанию для всех позиций"
               />
             </label>
@@ -389,18 +390,15 @@ const BarcodeA4PrintModal = ({ products = [], onClose }) => {
                       >
                         {p.name || "Товар"}
                       </span>
-                      <input
+                      <NumberInput
                         className="barcode-a4-copies__input"
-                        type="number"
                         min={1}
                         max={50}
                         step={1}
+                        fallback={copiesValue}
                         value={getCopies(p)}
-                        onChange={(e) =>
-                          setCopiesById((prev) => ({
-                            ...prev,
-                            [p.id]: clampCopies(e.target.value, copiesValue),
-                          }))
+                        onCommit={(next) =>
+                          setCopiesById((prev) => ({ ...prev, [p.id]: next }))
                         }
                         title="Сколько копий этой позиции печатать"
                       />
