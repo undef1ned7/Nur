@@ -196,7 +196,8 @@
     max-width: 220px;
     min-width: 180px;
     box-sizing: border-box;
-    height: 140px;
+    min-height: 140px;
+    height: auto;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -311,48 +312,47 @@
     flex-shrink: 0;
   }
 
-  &__product-price-row {
+  &__product-meta {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-top: auto;
     min-width: 0;
-    flex-shrink: 0;
+    width: 100%;
+    padding-right: 42px;
   }
 
   &__product-price {
     font-size: 20px;
     font-weight: 700;
     color: #111827;
-    min-width: 0;
     line-height: 1.2;
   }
 
   &__product-stock {
     font-size: 13px;
-    font-weight: 500;
-    color: #6b7280;
-    white-space: nowrap;
-    flex-shrink: 0;
-    line-height: 1.2;
+    font-weight: 600;
+    color: #4b5563;
+    line-height: 1.25;
+    word-break: break-word;
   }
 
   &__product-piece-btn {
-    align-self: flex-start;
-    max-width: calc(100% - 42px);
-    margin-top: auto;
-    padding: 4px 8px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
+    margin-top: 2px;
+    padding: 3px 7px;
     border: 1px solid #e2e8f0;
     background: #fff;
     border-radius: 8px;
     cursor: pointer;
-    color: #475569;
+    color: #334155;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 100%;
     transition:
       border-color 0.15s,
       background 0.15s,
@@ -361,8 +361,14 @@
     &:hover {
       background: #f8fafc;
       border-color: #cbd5e1;
-      color: #1e293b;
+      color: #0f172a;
     }
+  }
+
+  &__product-piece-btn-pack {
+    font-weight: 500;
+    color: #64748b;
+    font-size: 10px;
   }
 
   &__pagination {
@@ -1104,7 +1110,8 @@
 
     &__product-card {
       padding: 12px;
-      height: 130px;
+      min-height: 130px;
+      height: auto;
       min-width: 140px;
       max-width: 180px;
     }
@@ -1165,7 +1172,8 @@
 
     &__product-card {
       max-width: 100%;
-      height: 120px;
+      min-height: 120px;
+      height: auto;
       min-width: auto;
       padding: 10px;
     }

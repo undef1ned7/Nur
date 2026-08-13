@@ -3755,7 +3755,7 @@ const CashierPage = () => {
                     <div className="cashier-page__product-name">
                       {product.name || "—"}
                     </div>
-                    <div className="cashier-page__product-price-row">
+                    <div className="cashier-page__product-meta">
                       <div className="cashier-page__product-price">
                         {formatPrice(product.price || 0)} сом
                       </div>
@@ -3764,22 +3764,25 @@ const CashierPage = () => {
                           ? SERVICE_STOCK_LABEL
                           : `${product.quantity || 0} ${product.unit || "шт"}`}
                       </span>
+                      {piecePackage && (
+                        <button
+                          type="button"
+                          className="cashier-page__product-piece-btn"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!piecePackage?.id) return;
+                            addToCartWithPackage(product, piecePackage.id);
+                          }}
+                          title={`Добавить 1 шт из упаковки (${Number(piecePackage.quantity_in_package).toFixed(0)} в упаковке)`}
+                        >
+                          +1 шт
+                          <span className="cashier-page__product-piece-btn-pack">
+                            / {Number(piecePackage.quantity_in_package).toFixed(0)}
+                          </span>
+                        </button>
+                      )}
                     </div>
-                    {piecePackage && (
-                      <button
-                        type="button"
-                        className="cashier-page__product-piece-btn"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!piecePackage?.id) return;
-                          addToCartWithPackage(product, piecePackage.id);
-                        }}
-                        title={`Добавить 1 шт из упаковки (${piecePackage.quantity_in_package} в упаковке)`}
-                      >
-                        +1 шт (из {piecePackage.quantity_in_package})
-                      </button>
-                    )}
                   </div>
                 );
               })
