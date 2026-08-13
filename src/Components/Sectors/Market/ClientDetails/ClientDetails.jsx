@@ -27,7 +27,12 @@ import {
 } from "lucide-react";
 
 import api from "../../../../api";
+import { fetchClientKpis } from "../../../../api/clients";
 import { productSearchHaystackLower } from "../../../../../tools/productBarcode";
+import {
+  aggregateClientKpisFromDeals,
+  EMPTY_CLIENT_KPIS,
+} from "../../../../tools/clientKpis";
 import "./ClientDetails.scss";
 import "./ClientDetails.redesign.scss";
 
@@ -37,10 +42,7 @@ import AlertModal from "../../../common/AlertModal/AlertModal";
 
 import {
   listFrom,
-  toDecimalString,
   kindLabel,
-  ruStatusToKind,
-  kindToRu,
   typeLabel,
   normalizeDealFromApi,
   msgFromError,
@@ -79,6 +81,8 @@ export default function MarketClientDetails() {
   const [deals, setDeals] = useState([]);
   const [dealsLoading, setDealsLoading] = useState(false);
   const [dealsErr, setDealsErr] = useState("");
+  const [clientKpis, setClientKpis] = useState(EMPTY_CLIENT_KPIS);
+  const [kpisFromApi, setKpisFromApi] = useState(false);
   const [clientErr, setClientErr] = useState("");
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [supplierProductsLoading, setSupplierProductsLoading] = useState(false);
@@ -138,7 +142,20 @@ export default function MarketClientDetails() {
     fetchClient();
   }, [client, id, setClients]);
 
-  const loadDeals = async (clientId) => {
+  const loadKpis = useCallback(async (clientId) => {
+    if (!clientId) return;
+    try {
+      const next = await fetchClientKpis(clientId);
+      setClientKpis(next);
+      setKpisFromApi(true);
+    } catch (e) {
+      console.warn("Не удалось загрузить KPI клиента, считаем по сделкам", e);
+      setKpisFromApi(false);
+    }
+  }, []);
+
+  const loadDeals = useCallback(async (clientId) => {
+    if (!clientId) return;
     setDealsLoading(true);
     setDealsErr("");
     try {
@@ -151,7 +168,16 @@ export default function MarketClientDetails() {
     } finally {
       setDealsLoading(false);
     }
-  };
+  }, []);
+
+  const refreshDealsAndKpis = useCallback(
+    (clientId) => {
+      if (!clientId) return;
+      void loadDeals(clientId);
+      void loadKpis(clientId);
+    },
+    [loadDeals, loadKpis],
+  );
 
   const loadSupplierProducts = useCallback(async (supplierId) => {
     const normalizedSupplierId = String(supplierId || "").trim();
@@ -260,8 +286,12 @@ export default function MarketClientDetails() {
   }, []);
 
   useEffect(() => {
-    if (client?.id) loadDeals(client.id);
-  }, [client?.id]);
+    setDeals([]);
+    setDealsErr("");
+    setClientKpis(EMPTY_CLIENT_KPIS);
+    setKpisFromApi(false);
+    if (client?.id) refreshDealsAndKpis(client.id);
+  }, [client?.id, refreshDealsAndKpis]);
 
   useEffect(() => {
     if (client?.id) void loadClientSales(client.id);
@@ -412,21 +442,29 @@ export default function MarketClientDetails() {
   const kindTranslate = { new: "Новый" };
   const clientName = client?.fio || client?.full_name || "—";
 
-  const totals = useMemo(() => {
-    const agg = { debt: 0, prepayment: 0, sale: 0 };
-    for (const d of deals) {
-      const kind = d.kind || "sale";
-      if (kind === "debt") {
-        agg.debt += Number(d.remaining_debt || 0);
-        agg.prepayment += Number(d.prepayment || 0);
-      } else if (kind === "prepayment") {
-        agg.prepayment += Number(d.amount || 0);
-      } else {
-        agg.sale += Number(d.amount || 0);
-      }
-    }
-    return { ...agg, amount: agg.sale };
-  }, [deals]);
+  const kpiTotals = useMemo(
+    () => (kpisFromApi ? clientKpis : aggregateClientKpisFromDeals(deals)),
+    [clientKpis, deals, kpisFromApi],
+  );
+
+  const totals = useMemo(
+    () => ({
+      debt: kpiTotals.debt.amount,
+      prepayment: kpiTotals.prepayment.amount,
+      sale: kpiTotals.sale.amount,
+      amount: kpiTotals.sale.amount,
+    }),
+    [kpiTotals],
+  );
+
+  const dealKindCounts = useMemo(
+    () => ({
+      debt: kpiTotals.debt.count,
+      prepayment: kpiTotals.prepayment.count,
+      sale: kpiTotals.sale.count,
+    }),
+    [kpiTotals],
+  );
 
   const detailRows = useMemo(() => {
     if (!detailsView) return [];
@@ -436,7 +474,7 @@ export default function MarketClientDetails() {
       if (detailsView === "prepayment") {
         return deal.kind === "prepayment" || Number(deal.prepayment || 0) > 0;
       }
-      return deal.kind === "sale";
+      return deal.kind !== "debt" && deal.kind !== "prepayment";
     };
 
     return deals
@@ -544,10 +582,12 @@ export default function MarketClientDetails() {
         ? prev.map((d) => (d.id === deal.id ? deal : d))
         : [deal, ...prev];
     });
+    if (client?.id) void loadKpis(client.id);
   };
 
   const handleDealDeleted = (dealId) => {
     setDeals((prev) => prev.filter((d) => d.id !== dealId));
+    if (client?.id) void loadKpis(client.id);
   };
 
   const handleDealError = (message) => {
@@ -592,18 +632,6 @@ export default function MarketClientDetails() {
   const showSupplierSections =
     String(client?.type || "").toLowerCase() === "suppliers" &&
     ["Магазин", "Производство"].includes(company?.sector?.name);
-
-  // ---- UI-only derived values (no API / no data-model changes) ----
-  const dealKindCounts = useMemo(() => {
-    const acc = { debt: 0, prepayment: 0, sale: 0 };
-    for (const d of deals) {
-      const kind = d.kind || "sale";
-      if (kind === "debt") acc.debt += 1;
-      else if (kind === "prepayment") acc.prepayment += 1;
-      else acc.sale += 1;
-    }
-    return acc;
-  }, [deals]);
 
   const clientInitials = useMemo(() => {
     const parts = String(clientName || "")
@@ -1344,7 +1372,7 @@ export default function MarketClientDetails() {
           id={selectedRowId}
           clientType={client?.type}
           onClose={() => setShowDebtModal(false)}
-          onChanged={() => client?.id && loadDeals(client.id)}
+          onChanged={() => refreshDealsAndKpis(client?.id)}
         />
       )}
 

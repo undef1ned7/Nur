@@ -130,6 +130,52 @@ describe("saleThunk", () => {
       expect(result.type).toBe("deals/create/fulfilled");
     });
 
+    it("builds v2 debt payload with months and installments", async () => {
+      api.post.mockResolvedValue({ data: { id: 101 } });
+
+      const store = createTestStore();
+      const result = await store.dispatch(
+        createDeal({
+          clientId: 5,
+          title: "Долг Иван",
+          statusRu: "Долги",
+          amount: "10000",
+          prepayment: "2000",
+          debtMonths: 4,
+          intervalMonths: 1,
+          first_due_date: "2026-09-12",
+          installments: [
+            { number: 1, amount: "2000.00", due_date: "2026-09-12" },
+            { number: 2, amount: "2000.00", due_date: "2026-10-12" },
+            { number: 3, amount: "2000.00", due_date: "2026-11-12" },
+            { number: 4, amount: "2000.00", due_date: "2026-12-12" },
+          ],
+          scheduleVersion: "v2",
+        }),
+      );
+
+      expect(api.post).toHaveBeenCalledWith("/main/clients/5/deals/", {
+        title: "Долг Иван",
+        kind: "debt",
+        amount: "10000.00",
+        note: "",
+        client: 5,
+        debt_months: 4,
+        prepayment: "2000.00",
+        first_due_date: "2026-09-12",
+        interval_months: 1,
+        installments: [
+          { number: 1, amount: "2000.00", due_date: "2026-09-12" },
+          { number: 2, amount: "2000.00", due_date: "2026-10-12" },
+          { number: 3, amount: "2000.00", due_date: "2026-11-12" },
+          { number: 4, amount: "2000.00", due_date: "2026-12-12" },
+        ],
+        schedule_version: "v2",
+        auto_schedule: true,
+      });
+      expect(result.type).toBe("deals/create/fulfilled");
+    });
+
     it("maps plain sale status to kind sale", async () => {
       api.post.mockResolvedValue({ data: { id: 1 } });
 

@@ -2,6 +2,12 @@
 // Контракт описан в docs/market/cashier-settings.md.
 // Настройки задаёт владелец/админ компании, кассир получает их только на чтение.
 import api from "./index";
+import {
+  hasMigratedDebtScheduleToV2,
+  markMigratedDebtScheduleToV2,
+  parseDebtScheduleVersion,
+  shouldUpgradeDebtScheduleToV2,
+} from "../tools/debtScheduleVersion";
 
 export const MARKET_CASHIER_SETTINGS_URL = "/main/pos/cashier-settings/";
 export const MARKET_CASHIER_VERIFY_DELETE_CODE_URL = `${MARKET_CASHIER_SETTINGS_URL}verify-delete-code/`;
@@ -27,14 +33,18 @@ export const normalizeMarketCashierSettings = (data) => {
     deleteCodeRequired: Boolean(required),
     deleteCode: code || "",
     maxDiscountPercent: parsePercent(data?.max_discount_percent),
+    debtScheduleVersion: parseDebtScheduleVersion(
+      data?.debt_schedule_version ?? data?.deferred_schedule_version,
+    ),
   };
 };
 
-/** Значения по умолчанию: код не нужен, ограничения скидки нет. */
+/** Значения по умолчанию: код не нужен, ограничения скидки нет, отсрочка v2. */
 export const DEFAULT_MARKET_CASHIER_SETTINGS = {
   deleteCodeRequired: false,
   deleteCode: "",
   maxDiscountPercent: null,
+  debtScheduleVersion: "v2",
 };
 
 /** GET — текущие настройки кассы компании. */
@@ -60,3 +70,60 @@ export const verifyMarketCashierDeleteCode = async (code) => {
   });
   return Boolean(data?.valid ?? data?.is_valid ?? false);
 };
+
+export function rawDebtScheduleVersion(data) {
+  return data?.debt_schedule_version ?? data?.deferred_schedule_version;
+}
+
+const overlayDebtScheduleV2 = (data) => ({
+  ...(data || {}),
+  debt_schedule_version: "v2",
+});
+
+const ensureInflight = new Map();
+
+/**
+ * Первый заход маркета: бэкенд default — v1 / нет поля.
+ * Если явно v2 — не трогаем. Иначе один раз PATCH на v2 (owner/admin).
+ * После успешного апдейта больше не форсим v2 — пользователь может вернуть v1.
+ */
+export async function ensureMarketDebtScheduleV2(
+  data,
+  companyId,
+  { canWrite = true } = {},
+) {
+  const key = String(companyId || "_");
+  if (ensureInflight.has(key)) {
+    return ensureInflight.get(key);
+  }
+
+  const run = (async () => {
+    const raw = rawDebtScheduleVersion(data);
+    if (!shouldUpgradeDebtScheduleToV2(raw)) {
+      markMigratedDebtScheduleToV2(companyId);
+      return data;
+    }
+    if (hasMigratedDebtScheduleToV2(companyId)) {
+      return data;
+    }
+    if (!canWrite) {
+      return overlayDebtScheduleV2(data);
+    }
+    try {
+      const updated = await updateMarketCashierSettings({
+        debt_schedule_version: "v2",
+      });
+      markMigratedDebtScheduleToV2(companyId);
+      return updated ?? overlayDebtScheduleV2(data);
+    } catch {
+      return overlayDebtScheduleV2(data);
+    }
+  })();
+
+  ensureInflight.set(key, run);
+  try {
+    return await run;
+  } finally {
+    ensureInflight.delete(key);
+  }
+}

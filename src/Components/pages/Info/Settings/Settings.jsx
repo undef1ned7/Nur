@@ -1237,6 +1237,7 @@ import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
 import {
   fetchMarketCashierSettings,
+  ensureMarketDebtScheduleV2,
   normalizeMarketCashierSettings,
   updateMarketCashierSettings,
 } from "../../../../api/marketCashierSettings";
@@ -1390,6 +1391,7 @@ const Settings = () => {
   const [cashierSettings, setCashierSettings] = useState({
     deleteCode: "",
     maxDiscountPercent: "",
+    debtScheduleVersion: "v2",
   });
   const [cashierSettingsLoading, setCashierSettingsLoading] = useState(false);
   const [cashierSettingsSaving, setCashierSettingsSaving] = useState(false);
@@ -1406,13 +1408,18 @@ const Settings = () => {
       try {
         const data = await fetchMarketCashierSettings();
         if (cancelled) return;
-        const normalized = normalizeMarketCashierSettings(data);
+        const ensured = await ensureMarketDebtScheduleV2(data, company?.id, {
+          canWrite: true,
+        });
+        if (cancelled) return;
+        const normalized = normalizeMarketCashierSettings(ensured);
         setCashierSettings({
           deleteCode: normalized.deleteCode,
           maxDiscountPercent:
             normalized.maxDiscountPercent == null
               ? ""
               : String(normalized.maxDiscountPercent),
+          debtScheduleVersion: normalized.debtScheduleVersion || "v2",
         });
       } catch (err) {
         if (cancelled) return;
@@ -1428,7 +1435,7 @@ const Settings = () => {
     return () => {
       cancelled = true;
     };
-  }, [canViewMarketCashierSettings]);
+  }, [canViewMarketCashierSettings, company?.id]);
 
   const handleSaveCashierSettings = async (e) => {
     e.preventDefault();
@@ -1457,6 +1464,7 @@ const Settings = () => {
       const data = await updateMarketCashierSettings({
         delete_item_code: code || null,
         max_discount_percent: percent === null ? null : String(percent),
+        debt_schedule_version: cashierSettings.debtScheduleVersion || "v2",
       });
       const normalized = normalizeMarketCashierSettings(data);
       setCashierSettings({
@@ -1467,6 +1475,7 @@ const Settings = () => {
               ? ""
               : String(percent)
             : String(normalized.maxDiscountPercent),
+        debtScheduleVersion: normalized.debtScheduleVersion || cashierSettings.debtScheduleVersion || "v2",
       });
       setCashierSettingsError("");
       showAlert("success", "Настройки кассы сохранены");
@@ -2473,6 +2482,63 @@ const Settings = () => {
                     подтверждения.
                   </p>
                 )}
+              </div>
+            </div>
+
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <span className="settings__emoji">📅</span> Продажа в долг
+              </h2>
+              <p className="settings__mutedText">
+                v2 — предоплата и график платежей по дням или месяцам. v1 — как
+                раньше: срок одной датой. Пока бэк не отдал поле, касса рисует
+                v2.
+              </p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="settings__btn settings__btn--secondary"
+                  disabled={cashierSettingsLoading}
+                  style={{
+                    width: "auto",
+                    opacity:
+                      cashierSettings.debtScheduleVersion === "v2" ? 1 : 0.65,
+                    outline:
+                      cashierSettings.debtScheduleVersion === "v2"
+                        ? "2px solid var(--primary, #f7d74f)"
+                        : undefined,
+                  }}
+                  onClick={() =>
+                    setCashierSettings((prev) => ({
+                      ...prev,
+                      debtScheduleVersion: "v2",
+                    }))
+                  }
+                >
+                  v2 — график платежей
+                </button>
+                <button
+                  type="button"
+                  className="settings__btn settings__btn--secondary"
+                  disabled={cashierSettingsLoading}
+                  style={{
+                    width: "auto",
+                    opacity:
+                      cashierSettings.debtScheduleVersion === "v1" ? 1 : 0.65,
+                    outline:
+                      cashierSettings.debtScheduleVersion === "v1"
+                        ? "2px solid var(--primary, #f7d74f)"
+                        : undefined,
+                  }}
+                  onClick={() =>
+                    setCashierSettings((prev) => ({
+                      ...prev,
+                      debtScheduleVersion: "v1",
+                    }))
+                  }
+                >
+                  v1 — классическая
+                </button>
               </div>
             </div>
 
