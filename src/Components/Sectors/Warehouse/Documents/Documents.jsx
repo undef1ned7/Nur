@@ -78,6 +78,7 @@ const DOC_TYPE_FROM_PARAM = {
 const ALL_TABS = ["receipts", "invoices", "esf_xml", "agent_sales", "ko1", "summary"];
 const SALE_ONLY_TABS = ["agent_sales", "summary"];
 const DEFAULT_TAB = "invoices";
+const PAGE_SIZE = 100;
 
 const resolveTabFromParam = (tab, docType) => {
   if (!ALL_TABS.includes(tab)) return DEFAULT_TAB;
@@ -289,9 +290,6 @@ const Documents = () => {
     };
   }, [activeTab, agentSalesCarts]);
 
-  // Функция для генерации порядкового номера чека/накладной
-  // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
-  const PAGE_SIZE = 50;
   const getDocumentNumber = (index, prefix = "ЧЕК") => {
     const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
@@ -552,7 +550,7 @@ const Documents = () => {
       // Используем новый warehouse API
       const params = {
         page: currentPage,
-        page_size: 100, // По умолчанию 100 согласно документации
+        page_size: PAGE_SIZE,
         ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(docType === "RECEIPT" &&
@@ -656,7 +654,7 @@ const Documents = () => {
         activeTab === "agent_sales" ? "SALE" : docType;
       const params = {
         page: currentPage,
-        page_size: 100,
+        page_size: PAGE_SIZE,
         ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
       };

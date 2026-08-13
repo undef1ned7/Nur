@@ -12,6 +12,7 @@ import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { FaArrowUp } from "react-icons/fa";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useEnsureMarketDebtScheduleV2 } from "../../hooks/useMarketCashierSettings";
 const useAnnouncement = (company, setHideAnnouncement) => {
   const [daysLeft, setDaysLeft] = useState(null);
 
@@ -42,6 +43,7 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 
 const Layout = () => {
   const { company } = useUser();
+  useEnsureMarketDebtScheduleV2();
   const rootBlock = useMemo(() => {
     return document.getElementById('root')
   }, [])

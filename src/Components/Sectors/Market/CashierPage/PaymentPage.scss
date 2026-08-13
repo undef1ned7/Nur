@@ -737,6 +737,116 @@
     }
   }
 
+  &__debt-step {
+    margin-bottom: 16px;
+  }
+
+  &__debt-step-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #111827;
+  }
+
+  &__debt-step-hint {
+    margin: 4px 0 12px;
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  &__schedule-unit-row {
+    margin-bottom: 12px;
+  }
+
+  &__schedule-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 16px;
+  }
+
+  &__day-interval-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  &__day-interval-prefix,
+  &__day-interval-suffix {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4b5563;
+    white-space: nowrap;
+  }
+
+  &__day-interval-input {
+    width: 88px;
+    flex: 0 0 88px;
+    text-align: center;
+  }
+
+  &__schedule-preset {
+    min-width: 48px;
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &--active {
+      background: #fff7cc;
+      border-color: #f7d617;
+      color: #111827;
+    }
+  }
+
+  &__schedule-table {
+    margin-top: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  &__schedule-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #111827;
+    border-top: 1px solid #e5e7eb;
+
+    &:first-child {
+      border-top: none;
+    }
+
+    &--head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #6b7280;
+      background: #f9fafb;
+    }
+
+    span:last-child {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
   &__debt-days {
     margin: 20px 0;
     padding: 16px;
