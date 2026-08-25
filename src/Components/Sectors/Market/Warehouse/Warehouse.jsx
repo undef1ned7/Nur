@@ -1,38 +1,45 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import {
+  lazy,
+  Suspense,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./Warehouse.scss";
-import api from "../../../../api";
-import FilterModal from "./components/FilterModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import BarcodeAmbiguityModal from "../../../common/BarcodeAmbiguityModal/BarcodeAmbiguityModal";
 import WarehouseHeader from "./components/WarehouseHeader";
 import SearchSection from "./components/SearchSection";
 import BulkActionsBar from "./components/BulkActionsBar";
-import BulkEditModal from "./components/BulkEditModal";
 import ProductTable from "./components/ProductTable";
 import ProductCards from "./components/ProductCards";
 import Pagination from "./components/Pagination";
+import ReactPortal from "../../../common/Portal/ReactPortal";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 import {
   bulkDeleteProductsAsync,
   bulkUpdateProductsAsync,
   fetchProductsAsync,
 } from "../../../../store/creators/productCreators";
-import useScanDetection from "use-scan-detection";
 import { useSearch } from "./hooks/useSearch";
 import { usePagination } from "./hooks/usePagination";
 import { useProductSelection } from "./hooks/useProductSelection";
-import {
-  useWarehouseData,
-  useWarehouseReferences,
-} from "./hooks/useWarehouseData";
+import { useWarehouseData } from "./hooks/useWarehouseData";
+import { useWarehouseFilterData } from "./hooks/useWarehouseFilterData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
-import {
-  isCompanyWarehouseBarcodeProduct,
-  lookupMarketWarehouseProductByBarcode,
-} from "../../../../../tools/marketWarehouseBarcodeScan";
-import { getBarcodeAmbiguity } from "../../../../../tools/barcodeAmbiguity";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
+import { useAlert } from "@/hooks/useDialog";
+
+const FilterModal = lazy(() => import("./components/FilterModal"));
+const BulkEditModal = lazy(() => import("./components/BulkEditModal"));
+const WarehouseBarcodeScanner = lazy(
+  () => import("./components/WarehouseBarcodeScanner"),
+);
 
 const WAREHOUSE_SELECTED_IDS_KEY = "marketWarehouseSelectedProductIds";
 const WAREHOUSE_SELECTED_SNAPSHOTS_KEY = "marketWarehouseSelectedProductSnapshots";
@@ -65,10 +72,21 @@ const pickProductSnapshot = (product) => ({
   barcode: product.barcode,
   alternate_barcodes: product.alternate_barcodes,
 });
-import ReactPortal from "../../../common/Portal/ReactPortal";
-import DataContainer from "../../../common/DataContainer/DataContainer";
-import { validateResErrors } from "../../../../../tools/validateResErrors";
-import { useAlert } from "@/hooks/useDialog";
+
+const scheduleIdleTask = (callback) => {
+  if (typeof requestIdleCallback === "function") {
+    return requestIdleCallback(callback, { timeout: 2500 });
+  }
+  return setTimeout(callback, 800);
+};
+
+const cancelIdleTask = (id) => {
+  if (typeof cancelIdleCallback === "function") {
+    cancelIdleCallback(id);
+    return;
+  }
+  clearTimeout(id);
+};
 
 const Warehouse = () => {
   const dispatch = useDispatch();
@@ -82,9 +100,8 @@ const Warehouse = () => {
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
-  const [suppliers, setSuppliers] = useState([]);
-  const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [scanLookupLoading, setScanLookupLoading] = useState(false);
+  const [enableBarcodeScanner, setEnableBarcodeScanner] = useState(false);
   const [barcodeAmbiguity, setBarcodeAmbiguity] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
@@ -103,35 +120,12 @@ const Warehouse = () => {
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
   const [searchParams] = useSearchParams();
 
-  // Загрузка справочников
-  const { brands, categories } = useWarehouseReferences();
+  const { brands, categories, suppliers, suppliersLoading } =
+    useWarehouseFilterData(showFilterModal);
 
   useEffect(() => {
-    let mounted = true;
-
-    const loadSuppliers = async () => {
-      try {
-        setSuppliersLoading(true);
-        const res = await api.get("/main/clients/", {
-          params: { type: "suppliers", page_size: 500 },
-        });
-        const nextSuppliers = res?.data?.results || res?.data || [];
-        if (!mounted) return;
-        setSuppliers(Array.isArray(nextSuppliers) ? nextSuppliers : []);
-      } catch (error) {
-        if (!mounted) return;
-        console.error("Ошибка при загрузке поставщиков склада:", error);
-        setSuppliers([]);
-      } finally {
-        if (mounted) setSuppliersLoading(false);
-      }
-    };
-
-    void loadSuppliers();
-
-    return () => {
-      mounted = false;
-    };
+    const taskId = scheduleIdleTask(() => setEnableBarcodeScanner(true));
+    return () => cancelIdleTask(taskId);
   }, []);
 
   // Получаем текущую страницу из URL
@@ -217,10 +211,19 @@ const Warehouse = () => {
   const [selectedSnapshots, setSelectedSnapshots] = useState(
     loadSnapshotsFromStorage,
   );
-  const barcodeProcessingRef = useRef(false);
-  const lastScanTimeRef = useRef(0);
-  const lastScannedBarcodeRef = useRef("");
-  const isScanningRef = useRef(false);
+
+  const scannerBlocked =
+    showFilterModal ||
+    showDeleteConfirmModal ||
+    showBulkEditModal ||
+    Boolean(barcodeAmbiguity);
+
+  const handleScanStart = useCallback(() => setScanLookupLoading(true), []);
+  const handleScanEnd = useCallback(() => setScanLookupLoading(false), []);
+  const handleScanAmbiguity = useCallback(
+    (ambiguity) => setBarcodeAmbiguity(ambiguity),
+    [],
+  );
 
   useEffect(() => {
     setSelectedSnapshots((prev) => {
@@ -376,92 +379,9 @@ const Warehouse = () => {
     setViewMode(mode);
   }, []);
 
-  useScanDetection({
-    minLength: 3,
-    onComplete: async (barcode) => {
-      const scanned = String(barcode || "").trim();
-      if (!scanned || barcodeProcessingRef.current) return;
-
-      const activeEl = document.activeElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === "INPUT" ||
-          activeEl.tagName === "TEXTAREA" ||
-          activeEl.isContentEditable)
-      ) {
-        return;
-      }
-      if (
-        showFilterModal ||
-        showDeleteConfirmModal ||
-        showBulkEditModal ||
-        barcodeAmbiguity
-      )
-        return;
-
-      const now = Date.now();
-      const isDuplicateScan =
-        lastScannedBarcodeRef.current === scanned &&
-        now - lastScanTimeRef.current < 1500;
-      if (isDuplicateScan || isScanningRef.current) return;
-
-      barcodeProcessingRef.current = true;
-      isScanningRef.current = true;
-      lastScannedBarcodeRef.current = scanned;
-      lastScanTimeRef.current = now;
-      setScanLookupLoading(true);
-      try {
-        const result = await lookupMarketWarehouseProductByBarcode(scanned);
-        const productId = result?.product?.id;
-
-        // Локальный Product компании — открываем карточку.
-        if (productId && isCompanyWarehouseBarcodeProduct(result)) {
-          navigate(`/crm/sklad/${productId}`);
-          return;
-        }
-
-        // GlobalProduct: id нельзя слать в GET /main/products/{id}/.
-        // Сначала заводим товар в компанию через create-by-barcode.
-        if (productId && result?.source === "global") {
-          alert(
-            "Товар найден в глобальном каталоге. Добавьте его на склад компании.",
-            false,
-          );
-          navigate("/crm/sklad/add-product", {
-            state: {
-              openScanTab: true,
-              initialScanBarcode: scanned,
-            },
-          });
-          return;
-        }
-
-        alert("Товар с таким штрихкодом не найден.", true);
-      } catch (error) {
-        const ambiguity = getBarcodeAmbiguity(error);
-        if (ambiguity) {
-          setBarcodeAmbiguity(ambiguity);
-          return;
-        }
-        const errorMessage = validateResErrors(
-          error,
-          "Ошибка поиска товара по штрихкоду",
-        );
-        alert(errorMessage, true);
-      } finally {
-        barcodeProcessingRef.current = false;
-        setScanLookupLoading(false);
-        setTimeout(() => {
-          isScanningRef.current = false;
-        }, 300);
-      }
-    },
-  });
-
-  // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
     () => formatDeleteMessage(selectedCount),
-    [selectedCount]
+    [selectedCount],
   );
 
   return (
@@ -531,28 +451,31 @@ const Warehouse = () => {
 
       {showFilterModal && (
         <ReactPortal modalId="warehouse-filter-modal">
-          <FilterModal
-            onClose={() => setShowFilterModal(false)}
-            currentFilters={filters}
-            onApplyFilters={handleApplyFilters}
-            onResetFilters={handleResetFilters}
-            brands={brands}
-            categories={categories}
-            suppliers={suppliers}
-            suppliersLoading={suppliersLoading}
-          />
+          <Suspense fallback={null}>
+            <FilterModal
+              onClose={() => setShowFilterModal(false)}
+              currentFilters={filters}
+              onApplyFilters={handleApplyFilters}
+              onResetFilters={handleResetFilters}
+              brands={brands}
+              categories={categories}
+              suppliers={suppliers}
+              suppliersLoading={suppliersLoading}
+            />
+          </Suspense>
         </ReactPortal>
       )}
 
       {showBulkEditModal && (
         <ReactPortal modalId="warehouse-bulk-edit-modal">
-          {/* Справочники модалка грузит сама — с поиском и постраничной догрузкой */}
-          <BulkEditModal
-            selectedCount={selectedCount}
-            onClose={() => setShowBulkEditModal(false)}
-            onApply={confirmBulkEdit}
-            saving={bulkUpdating}
-          />
+          <Suspense fallback={null}>
+            <BulkEditModal
+              selectedCount={selectedCount}
+              onClose={() => setShowBulkEditModal(false)}
+              onApply={confirmBulkEdit}
+              saving={bulkUpdating}
+            />
+          </Suspense>
         </ReactPortal>
       )}
 
@@ -576,6 +499,17 @@ const Warehouse = () => {
         }}
         onClose={() => setBarcodeAmbiguity(null)}
       />
+
+      {enableBarcodeScanner && (
+        <Suspense fallback={null}>
+          <WarehouseBarcodeScanner
+            isBlocked={scannerBlocked}
+            onScanStart={handleScanStart}
+            onScanEnd={handleScanEnd}
+            onAmbiguity={handleScanAmbiguity}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

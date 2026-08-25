@@ -266,6 +266,11 @@ const AddProductPage = ({
     addImages,
     removeImage,
     setPrimaryImage,
+    cropperOpen,
+    cropperImageSrc,
+    cropperSourceFile,
+    handleCropComplete,
+    handleCropCancel,
   } = useProductImages();
 
   // Состояние для AlertModal
@@ -853,6 +858,7 @@ const AddProductPage = ({
       totalAmount = Number(purchasePrice) * qty;
 
       // Загрузка изображений (после создания товара или при редактировании)
+      let imageUploadFailureCount = 0;
       try {
         const targetProductId = isEditMode
           ? productId
@@ -865,13 +871,16 @@ const AddProductPage = ({
               (id) => !currentIds.includes(id),
             );
             if (removedIds.length > 0) {
-              await Promise.allSettled(
+              const deleteResults = await Promise.allSettled(
                 removedIds.map((imageId) =>
                   api.delete(
                     `/main/products/${targetProductId}/images/${imageId}/`,
                   ),
                 ),
               );
+              imageUploadFailureCount += deleteResults.filter(
+                (r) => r.status === "rejected",
+              ).length;
             }
           }
           // Загружаем только новые изображения (с файлами)
@@ -891,13 +900,21 @@ const AddProductPage = ({
                   },
                 );
               });
-              if (uploads.length) await Promise.allSettled(uploads);
+              const uploadResults = await Promise.allSettled(uploads);
+              imageUploadFailureCount += uploadResults.filter(
+                (r) => r.status === "rejected",
+              ).length;
+              uploadResults
+                .filter((r) => r.status === "rejected")
+                .forEach((r) => {
+                  console.warn("Загрузка изображения не удалась:", r.reason);
+                });
             }
           }
         }
       } catch (e) {
         console.warn("Загрузка изображений не удалась:", e);
-        // не блокируем основной флоу
+        imageUploadFailureCount += 1;
       }
 
       // Создание долга, если выбран
@@ -1001,10 +1018,18 @@ const AddProductPage = ({
         dueDate: "",
       });
 
+      const successMessage = isEditMode
+        ? "Товар успешно обновлен!"
+        : "Товар успешно добавлен!";
+      const imageWarningMessage =
+        imageUploadFailureCount > 0
+          ? `${successMessage} Но ${imageUploadFailureCount} фото не удалось загрузить на сервер — попробуйте добавить их повторно в карточке товара.`
+          : successMessage;
+
       showAlert(
-        isEditMode ? "Товар успешно обновлен!" : "Товар успешно добавлен!",
-        "success",
-        "Успех",
+        imageWarningMessage,
+        imageUploadFailureCount > 0 ? "warning" : "success",
+        imageUploadFailureCount > 0 ? "Внимание" : "Успех",
       );
       setTimeout(() => {
         if (embedded && typeof onEmbeddedSaved === "function") {
@@ -1364,6 +1389,11 @@ const AddProductPage = ({
               addImages={addImages}
               removeImage={removeImage}
               setPrimaryImage={setPrimaryImage}
+              cropperOpen={cropperOpen}
+              cropperImageSrc={cropperImageSrc}
+              cropperSourceFile={cropperSourceFile}
+              onCropComplete={handleCropComplete}
+              onCropCancel={handleCropCancel}
               isEditMode={isEditMode}
               fieldErrors={fieldErrors}
               showBrandInputs={showBrandInputs}
@@ -2060,6 +2090,11 @@ const MarketProductForm = ({
   addImages,
   removeImage,
   setPrimaryImage,
+  cropperOpen = false,
+  cropperImageSrc = null,
+  cropperSourceFile = null,
+  onCropComplete,
+  onCropCancel,
   isEditMode = false,
   fieldErrors = {},
   showBrandInputs,
@@ -2470,6 +2505,11 @@ const MarketProductForm = ({
         onImageAdd={addImages}
         onImageRemove={removeImage}
         onSetPrimary={setPrimaryImage}
+        cropperOpen={cropperOpen}
+        cropperImageSrc={cropperImageSrc}
+        cropperSourceFile={cropperSourceFile}
+        onCropComplete={onCropComplete}
+        onCropCancel={onCropCancel}
       />
 
       {/* Категория и Бренд */}

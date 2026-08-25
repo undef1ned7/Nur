@@ -78,11 +78,16 @@ export const BRANCH_TABS_RULES = [
     when: { sector: "Магазин" },
     hide: {
       tabIds: [],
-      sectorTabRoutes: [
-        "/crm/market/analytics",
-        "/crm/market/bar",
-        "/crm/market/history",
-      ],
+      // Все пункты marketMenu доступны на карточке филиала.
+      // Скрываем только устаревший /crm/market/bar (нет в меню маркета).
+      sectorTabRoutes: ["/crm/market/bar"],
+    },
+  },
+  {
+    when: { sector: "Цветочный магазин" },
+    hide: {
+      tabIds: [],
+      sectorTabRoutes: ["/crm/market/bar"],
     },
   },
   {
@@ -123,13 +128,57 @@ export const BRANCH_TABS_RULES = [
 ];
 
 /**
- * Дополнительные табы для конкретных сфер (если нужно добавить специфичные табы)
+ * Дополнительные табы для конкретных сфер (поверх MENU_CONFIG.sector).
+ * Используются на /crm/branch/:id, чтобы покрыть market-маршруты вне sector-меню
+ * (кассир, категории).
+ *
+ * Формат: { id, label, icon, route }
+ * icon — ключ для getSectorTabIcon в BranchDetails.
  */
 export const SECTOR_EXTRA_TABS = {
-  // Пример: если нужно добавить дополнительные табы для конкретной сферы
-  // Кафе: [
-  //   { id: "cafe-special", label: "Специальный таб", icon: "special" },
-  // ],
+  Магазин: [
+    {
+      id: "market-cashier",
+      label: "Кассир",
+      icon: "cashRegister",
+      route: "/crm/market/cashier",
+    },
+    {
+      id: "market-categories",
+      label: "Категории",
+      icon: "tags",
+      route: "/crm/market/categories",
+    },
+  ],
+  "Цветочный магазин": [
+    {
+      id: "market-cashier",
+      label: "Кассир",
+      icon: "cashRegister",
+      route: "/crm/market/cashier",
+    },
+    {
+      id: "market-categories",
+      label: "Категории",
+      icon: "tags",
+      route: "/crm/market/categories",
+    },
+  ],
+};
+
+/**
+ * Переименование секторных табов на карточке филиала,
+ * чтобы не дублировать подписи с BASE_TABS (например, «Аналитика»).
+ */
+export const SECTOR_TAB_LABEL_OVERRIDES = {
+  Магазин: {
+    "/crm/market/analytics": "Аналитика маркета",
+    "/crm/market/history": "История продаж",
+  },
+  "Цветочный магазин": {
+    "/crm/market/analytics": "Аналитика маркета",
+    "/crm/market/history": "История продаж",
+  },
 };
 
 /**

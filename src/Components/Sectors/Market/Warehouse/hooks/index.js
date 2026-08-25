@@ -6,4 +6,5 @@ export {
   useWarehouseData,
   useWarehouseReferences,
 } from "./useWarehouseData";
+export { useWarehouseFilterData } from "./useWarehouseFilterData";
 

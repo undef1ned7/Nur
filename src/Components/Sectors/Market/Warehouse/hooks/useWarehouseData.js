@@ -7,43 +7,43 @@ import {
 } from "../../../../../store/creators/productCreators";
 import { loadProductsFromCache } from "../../../../../store/slices/productSlice";
 
+const SESSION_PRODUCTS_CACHE_KEY = "nur_market_warehouse_products_cache_v1";
+const MAX_SESSION_CACHE_ENTRIES = 12;
+
 /**
- * Хук для загрузки справочников (бренды и категории)
- * @returns {Object} Объект с брендами и категориями
+ * Хук для загрузки справочников (бренды и категории).
+ * @param {boolean} enabled — загружать только когда нужны (например, FilterModal открыта)
  */
-export const useWarehouseReferences = () => {
+export const useWarehouseReferences = (enabled = true) => {
   const dispatch = useDispatch();
 
-  // Оптимизация селекторов с мемоизацией
   const brands = useSelector(
     (state) => state.product.brands || [],
     (prev, next) =>
       prev.length === next.length &&
-      prev.every((item, idx) => item.id === next[idx]?.id)
+      prev.every((item, idx) => item.id === next[idx]?.id),
   );
 
   const categories = useSelector(
     (state) => state.product.categories || [],
     (prev, next) =>
       prev.length === next.length &&
-      prev.every((item, idx) => item.id === next[idx]?.id)
+      prev.every((item, idx) => item.id === next[idx]?.id),
   );
 
-  // Загрузка справочников только если данных нет (кэширование)
   useEffect(() => {
+    if (!enabled) return;
     if (brands.length === 0) {
       dispatch(fetchBrandsAsync());
     }
     if (categories.length === 0) {
       dispatch(fetchCategoriesAsync());
     }
-  }, [dispatch, brands.length, categories.length]);
-
+  }, [dispatch, brands.length, categories.length, enabled]);
 
   return { brands, categories };
 };
 
-// Функция для создания ключа кэша из параметров
 const createCacheKey = (params) => {
   if (!params || Object.keys(params).length === 0) return "";
   const sortedParams = Object.keys(params)
@@ -55,82 +55,103 @@ const createCacheKey = (params) => {
   return JSON.stringify(sortedParams);
 };
 
-// Время жизни кэша (5 минут)
 const CACHE_TTL = 5 * 60 * 1000;
 
+const readSessionProductsCache = (cacheKey) => {
+  if (typeof sessionStorage === "undefined" || !cacheKey) return null;
+  try {
+    const raw = sessionStorage.getItem(SESSION_PRODUCTS_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const entry = parsed?.[cacheKey];
+    if (!entry?.timestamp) return null;
+    if (Date.now() - entry.timestamp >= CACHE_TTL) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionProductsCache = (cacheKey, cachedData) => {
+  if (typeof sessionStorage === "undefined" || !cacheKey || !cachedData) return;
+  try {
+    const raw = sessionStorage.getItem(SESSION_PRODUCTS_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const next = { ...parsed, [cacheKey]: { ...cachedData, timestamp: Date.now() } };
+    const keys = Object.keys(next);
+    if (keys.length > MAX_SESSION_CACHE_ENTRIES) {
+      keys
+        .sort((a, b) => (next[a]?.timestamp || 0) - (next[b]?.timestamp || 0))
+        .slice(0, keys.length - MAX_SESSION_CACHE_ENTRIES)
+        .forEach((key) => delete next[key]);
+    }
+    sessionStorage.setItem(SESSION_PRODUCTS_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / private mode */
+  }
+};
+
 /**
- * Хук для управления данными склада с кэшированием
- * @param {Object} params - Параметры запроса товаров
- * @returns {Object} Объект с данными и состоянием загрузки
+ * Хук для управления данными склада с кэшированием (Redux + sessionStorage).
  */
 export const useWarehouseData = (params) => {
   const dispatch = useDispatch();
   const lastParamsRef = useRef("");
-  const cacheLoadedRef = useRef(false);
 
-  // Сериализация params для стабильного сравнения и ключа кэша
-  const paramsString = useMemo(() => {
-    return createCacheKey(params);
-  }, [params]);
+  const paramsString = useMemo(() => createCacheKey(params), [params]);
 
-  // Селектор для кэша
   const productsCache = useSelector(
-    (state) => state.product.productsCache || {}
+    (state) => state.product.productsCache || {},
   );
 
-  // Проверяем кэш синхронно и загружаем данные сразу, если они есть
   const cachedData = useMemo(() => {
     if (!paramsString) return null;
     const data = productsCache[paramsString];
-    if (data && data.timestamp) {
-      const cacheAge = Date.now() - data.timestamp;
-      if (cacheAge < CACHE_TTL) {
-        return data;
-      }
+    if (data?.timestamp && Date.now() - data.timestamp < CACHE_TTL) {
+      return data;
     }
-    return null;
+    return readSessionProductsCache(paramsString);
   }, [paramsString, productsCache]);
 
-  // Оптимизированные селекторы - выбираем только нужные поля
   const products = useSelector((state) => state.product.list);
   const loading = useSelector((state) => state.product.loading);
   const count = useSelector((state) => state.product.count);
   const next = useSelector((state) => state.product.next);
   const previous = useSelector((state) => state.product.previous);
 
-  // Загрузка товаров при изменении параметров с приоритетом кэша
   useEffect(() => {
     if (!params || Object.keys(params).length === 0) return;
 
     const cacheKey = paramsString;
-
-    // Пропускаем, если это те же параметры
     if (cacheKey === lastParamsRef.current) return;
 
-    // Если есть валидный кэш, загружаем его СИНХРОННО перед запросом
-    // Это предотвращает белый экран при быстрой смене страниц
     if (cachedData) {
       dispatch(loadProductsFromCache({ cacheKey, cachedData }));
-      cacheLoadedRef.current = true;
     }
 
-    // Делаем запрос для обновления данных (stale-while-revalidate)
-    // Если есть кэш, loading не будет true благодаря _skipLoadingIfCached
     dispatch(
       fetchProductsAsync({
         ...params,
         _cacheKey: cacheKey,
-        _skipLoadingIfCached: !!cachedData, // Флаг для пропуска loading если есть кэш
-      })
+        _skipLoadingIfCached: !!cachedData,
+      }),
     );
 
     lastParamsRef.current = cacheKey;
-    cacheLoadedRef.current = false;
   }, [dispatch, paramsString, cachedData, params]);
 
-  // Если есть валидный кэш и данные уже загружены, не показываем loading
-  // Это предотвращает белый экран при быстрой смене страниц
-  const effectiveLoading = cachedData && products.length > 0 ? false : loading;
+  useEffect(() => {
+    if (!paramsString || loading || products.length === 0) return;
+    writeSessionProductsCache(paramsString, {
+      list: products,
+      count,
+      next,
+      previous,
+      weightProductsCount: 0,
+    });
+  }, [paramsString, loading, products, count, next, previous]);
+
+  const effectiveLoading =
+    cachedData && products.length > 0 ? false : loading;
 
   return {
     products,

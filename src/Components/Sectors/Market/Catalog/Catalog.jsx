@@ -80,7 +80,7 @@ const SORT_OPTIONS = [
   { value: "discount_asc", label: "Скидка: меньше сначала" },
 ];
 
-// Значения для бэкенда (?ordering=...). Фронт также сортирует локально как fallback.
+// Значения query-параметра ordering для бэкенда (?ordering=...)
 const SORT_TO_ORDERING = {
   name_asc: "name",
   name_desc: "-name",
@@ -88,23 +88,6 @@ const SORT_TO_ORDERING = {
   price_desc: "-final_price",
   discount_asc: "discount_percent",
   discount_desc: "-discount_percent",
-};
-
-const sortShowcaseItems = (arr, sort) => {
-  if (!sort || !Array.isArray(arr)) return arr;
-  const name = (x) => String(x?.name || x?.title || "");
-  const price = (x) => toNum(x?.final_price ?? x?.price);
-  const disc = (x) => toNum(x?.discount_percent);
-  const comparators = {
-    name_asc: (a, b) => name(a).localeCompare(name(b), "ru"),
-    name_desc: (a, b) => name(b).localeCompare(name(a), "ru"),
-    price_asc: (a, b) => price(a) - price(b),
-    price_desc: (a, b) => price(b) - price(a),
-    discount_asc: (a, b) => disc(a) - disc(b),
-    discount_desc: (a, b) => disc(b) - disc(a),
-  };
-  const cmp = comparators[sort];
-  return cmp ? [...arr].sort(cmp) : arr;
 };
 
 const setQuery = (locationSearch, patch) => {
@@ -736,12 +719,6 @@ const Catalog = () => {
   const categories =
     allCategories.length > 0 ? allCategories : categoriesFromItems;
 
-  // Локальная сортировка как fallback (если бэкенд ещё не учитывает ?ordering)
-  const visibleItems = useMemo(
-    () => sortShowcaseItems(items, qState.sort),
-    [items, qState.sort],
-  );
-
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const currentPage = Math.max(
     1,
@@ -1083,7 +1060,7 @@ const Catalog = () => {
           ) : null}
 
           {!loading &&
-            visibleItems.map((p) => (
+            items.map((p) => (
               <ShowcaseCard
                 key={p.id}
                 item={p}

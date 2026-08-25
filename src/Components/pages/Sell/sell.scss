@@ -3041,14 +3041,15 @@
 .sellFiltersModal__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px 18px;
+  gap: 14px 14px;
+  align-items: end;
 }
 
 .sellFiltersModal__field {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 2px;
+  min-width: 0;
 
   span {
     font-size: 12px;
@@ -3057,16 +3058,44 @@
   }
 }
 
+.sellFiltersModal__quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sellFiltersModal__quickBtn {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid #00000033;
+  background: #f7d617;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+
+  &:hover {
+    background: #f5cf00;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
 .sellFiltersModal__actions {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 
   .sell__reset,
   .sell__header-btn {
-    min-width: 120px;
+    min-width: 132px;
     margin: 0;
     padding: 10px 14px;
     width: auto;
@@ -3086,6 +3115,14 @@
   .sellFiltersModal__grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .sellFiltersModal__quick {
+    grid-template-columns: 1fr;
+  }
+
+  .sellFiltersModal__actions {
+    justify-content: flex-end;
   }
 }
 

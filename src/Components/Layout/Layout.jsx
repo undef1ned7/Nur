@@ -13,6 +13,8 @@ import { useTranslation } from "react-i18next";
 import { FaArrowUp } from "react-icons/fa";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useEnsureMarketDebtScheduleV2 } from "../../hooks/useMarketCashierSettings";
+import { prefetchSkladRoute } from "../../utils/prefetchSkladRoute";
+import { isMarketSectorName } from "../../utils/subscriptionPlan";
 const useAnnouncement = (company, setHideAnnouncement) => {
   const [daysLeft, setDaysLeft] = useState(null);
 
@@ -42,12 +44,32 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 };
 
 const Layout = () => {
-  const { company } = useUser();
+  const { company, sector } = useUser();
+  const location = useLocation();
   useEnsureMarketDebtScheduleV2();
   const rootBlock = useMemo(() => {
     return document.getElementById('root')
   }, [])
   const [isArrowView, setIsArrowView] = useState(false);
+
+  useEffect(() => {
+    const sectorName = sector || company?.sector?.name || "";
+    if (!isMarketSectorName(sectorName)) return undefined;
+    if (location.pathname.startsWith("/crm/sklad")) return undefined;
+
+    const taskId =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => prefetchSkladRoute(), { timeout: 3000 })
+        : setTimeout(() => prefetchSkladRoute(), 1200);
+
+    return () => {
+      if (typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(taskId);
+      } else {
+        clearTimeout(taskId);
+      }
+    };
+  }, [sector, company, location.pathname]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
@@ -61,7 +83,6 @@ const Layout = () => {
   });
 
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
-  const location = useLocation();
 
   const isHidden = useMemo(() => {
     return (

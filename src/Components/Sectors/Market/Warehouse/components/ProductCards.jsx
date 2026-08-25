@@ -6,6 +6,8 @@ import {
   isMarketWarehouseServiceProduct,
 } from "../../../../../tools/marketWarehouseFilters";
 import noImage from "./placeholder.png";
+import WarehouseListSkeleton from "./WarehouseListSkeleton";
+import { VIEW_MODES } from "../constants";
 import "./ProductCards.scss";
 
 /**
@@ -162,11 +164,7 @@ const ProductCards = ({
   }, [products, selectedRows, selectedRowsSize, getRowNumber]);
 
   if (loading && products.length === 0) {
-    return (
-      <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-        Загрузка...
-      </div>
-    );
+    return <WarehouseListSkeleton viewMode={VIEW_MODES.CARDS} />;
   }
 
   if (products.length === 0 && !loading) {

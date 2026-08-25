@@ -1698,6 +1698,8 @@ const PaymentPage = ({
           onClose={() => setShowCustomerModal(false)}
           onSelect={handleCustomerSelect}
           customers={customers}
+          title="Покупатели"
+          defaultTab="client"
         />
       )}
 

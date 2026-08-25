@@ -4,6 +4,7 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
+import { isSkladRoute, prefetchSkladRoute } from "../../../utils/prefetchSkladRoute";
 
 // Маппинг path (из URL сайдбара) в doc_type для подсветки при создании документа
 const DOC_TYPE_PATH_TO_API = {
@@ -87,6 +88,12 @@ const MenuItem = ({
         location.pathname === path || location.pathname.startsWith(path + "/"),
     );
 
+  const handlePrefetch = () => {
+    if (isSkladRoute(to)) {
+      prefetchSkladRoute();
+    }
+  };
+
   return (
     <li
       className={`sidebar__menu-item-wrapper ${children ? "has-children" : ""}`}
@@ -98,6 +105,8 @@ const MenuItem = ({
           return `sidebar__menu-item ${active ? "sidebar__menu-item--active" : ""}`;
         }}
         onClick={handleClick}
+        onMouseEnter={handlePrefetch}
+        onFocus={handlePrefetch}
       >
         {IconComponent}
         <span>{label}</span>
@@ -127,6 +136,12 @@ const MenuItem = ({
                         : ""
                     }`
                   }
+                  onMouseEnter={() => {
+                    if (isSkladRoute(child.to)) prefetchSkladRoute();
+                  }}
+                  onFocus={() => {
+                    if (isSkladRoute(child.to)) prefetchSkladRoute();
+                  }}
                   onClick={() => {
                     if (shouldCloseOnClick()) {
                       toggleSidebar();
