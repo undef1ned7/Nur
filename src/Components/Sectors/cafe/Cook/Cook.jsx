@@ -24,7 +24,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
-import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import { choosePrinterByDialog, formatPrinterBinding, getActivePrinterKey, getPrinterPaperMm, getSavedPrinters, listAuthorizedPrinters, normalizePaperMm, parsePrinterBinding, setActivePrinterByKey, setPrinterPaperMm, CAFE_PAPER_MM_OPTIONS } from "../Orders/OrdersPrintService";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { getKitchenDeleteErrorMessage } from "../../../../utils/kitchenDeleteError";
@@ -394,6 +394,7 @@ const Cook = () => {
   const [saving, setSaving] = useState(false);
   const [printerDevice, setPrinterDevice] = useState('usb');
   const [ipPrinter, setIpPrinter] = useState('')
+  const [paperMm, setPaperMm] = useState(80);
 
   const confirm = useConfirm();
   const { socketOrders: { orders } } = useOutletContext()
@@ -498,13 +499,16 @@ const Cook = () => {
         setSelectedKey(parsed.usbKey || "");
         setIpPrinter("");
         setPrinterDevice("usb");
+        setPaperMm(getPrinterPaperMm(raw));
       } else if (parsed.kind === "ip") {
         setSelectedKey("");
         setIpPrinter(parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`);
         setPrinterDevice("wifi");
+        setPaperMm(getPrinterPaperMm(raw));
       } else {
         setSelectedKey("");
         setIpPrinter("");
+        setPaperMm(80);
       }
     } else {
       setEditKitchenTitle("");
@@ -525,6 +529,9 @@ const Cook = () => {
     }
     try {
       await api.patch(`/cafe/kitchens/${id}/`, data);
+      if (data.printer) {
+        setPrinterPaperMm(data.printer, normalizePaperMm(paperMm));
+      }
       setEditingKitchen(null);
       refetchKitchens();
       showNotice("ok", "Кухня сохранена");
@@ -535,7 +542,7 @@ const Cook = () => {
     } finally {
       setKitchenSaving(false);
     }
-  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice, printerDevice, selectedKey, ipPrinter]);
+  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice, printerDevice, selectedKey, ipPrinter, paperMm]);
 
   const handleDeleteKitchen = useCallback(
     (k) => {
@@ -1161,6 +1168,22 @@ const Cook = () => {
                   </div>
                 )
               }
+
+              <div className="cafeCookKitchenModal__label" style={{ marginTop: 12 }}>Ширина ленты</div>
+              <div className="flex gap-2 flex-wrap mb-2">
+                {CAFE_PAPER_MM_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.mm}
+                    type="button"
+                    className={`cafeCookKitchenModal__iconBtn ${paperMm === opt.mm ? "bg-green-300!" : ""}`}
+                    onClick={() => setPaperMm(opt.mm)}
+                    disabled={kitchenSaving}
+                    title={opt.label}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
 
             </div>
             <div className="cafeCook__editKitchenFooter">

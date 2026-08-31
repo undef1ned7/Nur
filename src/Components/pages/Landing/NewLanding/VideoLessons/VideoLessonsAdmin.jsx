@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import Header from "../sections/Header/Header";
+import LessonThumbnailField from "./components/LessonThumbnailField";
 import { useKnowledgeBase } from "./hooks/useKnowledgeBase";
+import { revokeLessonThumbnailPreview } from "./utils";
 import {
   createKnowledgeBaseCourse,
   fetchKnowledgeBaseCourse,
@@ -11,7 +13,37 @@ import {
 import "./VideoLessons.scss";
 import "./VideoLessonsAdmin.scss";
 
-const EMPTY_LESSON = { title: "", description: "", url: "" };
+const EMPTY_LESSON = {
+  id: "",
+  title: "",
+  description: "",
+  url: "",
+  thumbnail: "",
+  thumbnailFile: null,
+  thumbnailPreview: "",
+  thumbnailCleared: false,
+  thumbnailTouched: false,
+};
+
+const createEmptyLesson = () => ({ ...EMPTY_LESSON });
+
+const mapCourseLessons = (courseLessons) => {
+  const sorted = [...(courseLessons || [])].sort((a, b) => a.order - b.order);
+
+  return sorted.length
+    ? sorted.map(({ id, title, description, url, thumbnail }) => ({
+        id: id || "",
+        title: title || "",
+        description: description || "",
+        url: url || "",
+        thumbnail: thumbnail || "",
+        thumbnailFile: null,
+        thumbnailPreview: "",
+        thumbnailCleared: false,
+        thumbnailTouched: false,
+      }))
+    : [createEmptyLesson()];
+};
 
 const VideoLessonsAdmin = () => {
   const navigate = useNavigate();
@@ -19,26 +51,39 @@ const VideoLessonsAdmin = () => {
 
   const [courseId, setCourseId] = useState("");
   const [title, setTitle] = useState("");
-  const [lessons, setLessons] = useState([{ ...EMPTY_LESSON }]);
+  const [lessons, setLessons] = useState([createEmptyLesson()]);
   const [loadingCourse, setLoadingCourse] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const lessonsRef = useRef(lessons);
+
+  lessonsRef.current = lessons;
 
   const isEdit = Boolean(courseId);
 
+  const revokeAllPreviews = useCallback((items) => {
+    items.forEach(revokeLessonThumbnailPreview);
+  }, []);
+
   const resetForm = useCallback(() => {
+    setLessons((prev) => {
+      revokeAllPreviews(prev);
+      return [createEmptyLesson()];
+    });
     setCourseId("");
     setTitle("");
-    setLessons([{ ...EMPTY_LESSON }]);
     setFormError(null);
     setSuccess(null);
-  }, []);
+  }, [revokeAllPreviews]);
 
   useEffect(() => {
     if (!courseId) {
       setTitle("");
-      setLessons([{ ...EMPTY_LESSON }]);
+      setLessons((prev) => {
+        revokeAllPreviews(prev);
+        return [createEmptyLesson()];
+      });
       return;
     }
 
@@ -48,18 +93,10 @@ const VideoLessonsAdmin = () => {
       try {
         const course = await fetchKnowledgeBaseCourse(courseId);
         setTitle(course.title || "");
-        const sorted = [...(course.lessons || [])].sort(
-          (a, b) => a.order - b.order
-        );
-        setLessons(
-          sorted.length
-            ? sorted.map(({ title: t, description, url }) => ({
-                title: t || "",
-                description: description || "",
-                url: url || "",
-              }))
-            : [{ ...EMPTY_LESSON }]
-        );
+        setLessons((prev) => {
+          revokeAllPreviews(prev);
+          return mapCourseLessons(course.lessons);
+        });
       } catch (err) {
         setFormError(err.message || "Не удалось загрузить курс");
       } finally {
@@ -68,24 +105,84 @@ const VideoLessonsAdmin = () => {
     };
 
     loadCourse();
-  }, [courseId]);
+  }, [courseId, revokeAllPreviews]);
+
+  useEffect(
+    () => () => {
+      revokeAllPreviews(lessonsRef.current);
+    },
+    [revokeAllPreviews],
+  );
 
   const updateLesson = (index, field, value) => {
     setLessons((prev) =>
-      prev.map((lesson, i) =>
-        i === index ? { ...lesson, [field]: value } : lesson
-      )
+      prev.map((lesson, i) => {
+        if (i !== index) return lesson;
+
+        if (field === "thumbnail") {
+          revokeLessonThumbnailPreview(lesson);
+          return {
+            ...lesson,
+            thumbnail: value,
+            thumbnailFile: null,
+            thumbnailPreview: "",
+            thumbnailCleared: false,
+            thumbnailTouched: true,
+          };
+        }
+
+        return { ...lesson, [field]: value };
+      }),
+    );
+  };
+
+  const handleSelectThumbnailFile = (index, file) => {
+    setFormError(null);
+    setLessons((prev) =>
+      prev.map((lesson, i) => {
+        if (i !== index) return lesson;
+
+        revokeLessonThumbnailPreview(lesson);
+        return {
+          ...lesson,
+          thumbnail: "",
+          thumbnailFile: file,
+          thumbnailPreview: URL.createObjectURL(file),
+          thumbnailCleared: false,
+          thumbnailTouched: true,
+        };
+      }),
+    );
+  };
+
+  const handleClearThumbnail = (index) => {
+    setLessons((prev) =>
+      prev.map((lesson, i) => {
+        if (i !== index) return lesson;
+
+        revokeLessonThumbnailPreview(lesson);
+        return {
+          ...lesson,
+          thumbnail: "",
+          thumbnailFile: null,
+          thumbnailPreview: "",
+          thumbnailCleared: true,
+          thumbnailTouched: true,
+        };
+      }),
     );
   };
 
   const addLesson = () => {
-    setLessons((prev) => [...prev, { ...EMPTY_LESSON }]);
+    setLessons((prev) => [...prev, createEmptyLesson()]);
   };
 
   const removeLesson = (index) => {
-    setLessons((prev) =>
-      prev.length > 1 ? prev.filter((_, i) => i !== index) : prev
-    );
+    setLessons((prev) => {
+      if (prev.length <= 1) return prev;
+      revokeLessonThumbnailPreview(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const validate = () => {
@@ -105,6 +202,15 @@ const VideoLessonsAdmin = () => {
       } catch {
         return `Некорректная ссылка: ${lesson.url}`;
       }
+
+      const thumb = lesson.thumbnail?.trim();
+      if (thumb) {
+        try {
+          new URL(thumb);
+        } catch {
+          return `Некорректная ссылка на превью: ${lesson.thumbnail}`;
+        }
+      }
     }
 
     return null;
@@ -115,11 +221,23 @@ const VideoLessonsAdmin = () => {
     lessons: lessons
       .filter((l) => l.title.trim() || l.url.trim())
       .map((l) => ({
+        id: l.id || undefined,
         title: l.title.trim(),
         description: l.description.trim(),
         url: l.url.trim(),
+        thumbnail: l.thumbnail,
+        thumbnailFile: l.thumbnailFile,
+        thumbnailCleared: l.thumbnailCleared,
+        thumbnailTouched: l.thumbnailTouched,
       })),
   });
+
+  const syncLessonsFromCourse = (course) => {
+    setLessons((prev) => {
+      revokeAllPreviews(prev);
+      return mapCourseLessons(course.lessons);
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -135,6 +253,7 @@ const VideoLessonsAdmin = () => {
     setSubmitting(true);
     try {
       const payload = buildPayload();
+      let savedCourseId = courseId;
 
       if (isEdit) {
         await updateKnowledgeBaseCourse(courseId, payload);
@@ -143,8 +262,15 @@ const VideoLessonsAdmin = () => {
         const created = await createKnowledgeBaseCourse(payload);
         setSuccess("Курс создан");
         if (created?.id) {
+          savedCourseId = created.id;
           setCourseId(created.id);
         }
+      }
+
+      if (savedCourseId) {
+        const course = await fetchKnowledgeBaseCourse(savedCourseId);
+        setTitle(course.title || "");
+        syncLessonsFromCourse(course);
       }
 
       reload();
@@ -241,7 +367,10 @@ const VideoLessonsAdmin = () => {
                 </div>
 
                 {lessons.map((lesson, index) => (
-                  <div key={index} className="vl-admin__lesson-card">
+                  <div
+                    key={lesson.id || `new-${index}`}
+                    className="vl-admin__lesson-card"
+                  >
                     <div className="vl-admin__lesson-card-head">
                       <span>Урок {index + 1}</span>
                       {lessons.length > 1 && (
@@ -299,6 +428,16 @@ const VideoLessonsAdmin = () => {
                         disabled={loadingCourse}
                       />
                     </div>
+
+                    <LessonThumbnailField
+                      lesson={lesson}
+                      index={index}
+                      disabled={loadingCourse}
+                      onChange={updateLesson}
+                      onSelectFile={handleSelectThumbnailFile}
+                      onClear={handleClearThumbnail}
+                      onFileError={setFormError}
+                    />
                   </div>
                 ))}
               </div>
@@ -310,7 +449,11 @@ const VideoLessonsAdmin = () => {
                 </p>
               )}
 
-              {error && <p className="vl-admin__message vl-admin__message--error">{error}</p>}
+              {error && (
+                <p className="vl-admin__message vl-admin__message--error">
+                  {error}
+                </p>
+              )}
               {formError && (
                 <pre className="vl-admin__message vl-admin__message--error">
                   {formError}

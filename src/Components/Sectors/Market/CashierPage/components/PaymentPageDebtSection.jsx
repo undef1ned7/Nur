@@ -22,6 +22,29 @@ import {
   getTodayIsoDate,
 } from "../../../../../tools/deferredPaymentDates";
 
+const DEBT_SECTION_LABELS = {
+  client: {
+    totalDebt: "ОБЩИЙ ДОЛГ КЛИЕНТА",
+    debtAmount: "СУММА ДОЛГА",
+    debtRemaining: "ОСТАТОК В ДОЛГ",
+    totalSum: "Сумма заказа",
+    prepayToggleV1: "Предоплата при отсрочке",
+    prepayToggleV2: "Принять предоплату сейчас",
+    prepayStepTitle: "1. Предоплата",
+    scheduleHint: "Разделите остаток на платежи по дням или месяцам",
+  },
+  supplier: {
+    totalDebt: "ДОЛГ ПОСТАВЩИКУ",
+    debtAmount: "ДОЛГ ПОСТАВЩИКУ",
+    debtRemaining: "ОСТАТОК ПОСТАВЩИКУ",
+    totalSum: "Сумма закупки",
+    prepayToggleV1: "Предоплата поставщику",
+    prepayToggleV2: "Оплатить поставщику сейчас",
+    prepayStepTitle: "1. Оплата поставщику",
+    scheduleHint: "График выплат поставщику по дням или месяцам",
+  },
+};
+
 export default function PaymentPageDebtSection({
   total,
   totalDebt,
@@ -56,7 +79,11 @@ export default function PaymentPageDebtSection({
   deferredDueDateInputRef,
   onOpenDeferredDueDatePicker,
   onFirstDueDateChange,
+  counterpartyKind = "client",
+  totalDebtLabel,
 }) {
+  const labels = DEBT_SECTION_LABELS[counterpartyKind] || DEBT_SECTION_LABELS.client;
+  const resolvedTotalDebtLabel = totalDebtLabel || labels.totalDebt;
   const presets =
     scheduleUnit === "month" ? MONTH_SCHEDULE_PRESETS : DAY_SCHEDULE_PRESETS;
   const intervalPresets =
@@ -69,14 +96,16 @@ export default function PaymentPageDebtSection({
     <div className="payment-page__debt-section">
       <div className="payment-page__debt-amount">
         <div className="payment-page__debt-label">
-          {deferredPrepaymentValue > 0 ? "ОСТАТОК В ДОЛГ" : "СУММА ДОЛГА"}
+          {deferredPrepaymentValue > 0
+            ? labels.debtRemaining
+            : labels.debtAmount}
         </div>
         <div className="payment-page__debt-value">
           {deferredSaleDebtRemaining.toFixed(2)}
         </div>
         {deferredPrepaymentValue > 0 && (
           <p className="payment-page__debt-hint">
-            Сумма заказа {total.toFixed(2)} сом · предоплата{" "}
+            {labels.totalSum} {total.toFixed(2)} сом · предоплата{" "}
             {deferredPrepaymentValue.toFixed(2)} сом
           </p>
         )}
@@ -92,7 +121,7 @@ export default function PaymentPageDebtSection({
                 onDeferredPrepaymentEnabledChange(e.target.checked);
               }}
             />
-            <span>Предоплата при отсрочке</span>
+            <span>{labels.prepayToggleV1}</span>
           </label>
 
           {deferredPrepaymentEnabled && (
@@ -248,8 +277,12 @@ export default function PaymentPageDebtSection({
       ) : (
         <>
       <div className="payment-page__debt-step">
-        <div className="payment-page__debt-step-title">1. Предоплата</div>
-        <p className="payment-page__debt-step-hint">Необязательно</p>
+        <div className="payment-page__debt-step-title">{labels.prepayStepTitle}</div>
+        <p className="payment-page__debt-step-hint">
+          {counterpartyKind === "supplier"
+            ? "Необязательно · расход из кассы"
+            : "Необязательно"}
+        </p>
         <label className="payment-page__deferred-prepay-toggle">
           <input
             type="checkbox"
@@ -258,7 +291,7 @@ export default function PaymentPageDebtSection({
               onDeferredPrepaymentEnabledChange(e.target.checked);
             }}
           />
-          <span>Принять предоплату сейчас</span>
+          <span>{labels.prepayToggleV2}</span>
         </label>
 
         {deferredPrepaymentEnabled && (
@@ -355,9 +388,7 @@ export default function PaymentPageDebtSection({
 
       <div className="payment-page__debt-step">
         <div className="payment-page__debt-step-title">2. График погашения</div>
-        <p className="payment-page__debt-step-hint">
-          Разделите остаток на платежи по дням или месяцам
-        </p>
+        <p className="payment-page__debt-step-hint">{labels.scheduleHint}</p>
 
         <div className="payment-page__deferred-prepay-method-row payment-page__schedule-unit-row">
           <button
@@ -555,7 +586,7 @@ export default function PaymentPageDebtSection({
       )}
 
       <div className="payment-page__total-debt">
-        <span>ОБЩИЙ ДОЛГ КЛИЕНТА</span>
+        <span>{resolvedTotalDebtLabel}</span>
         <span className="payment-page__total-debt-amount">
           {totalDebt.toLocaleString("ru-RU", {
             minimumFractionDigits: 2,

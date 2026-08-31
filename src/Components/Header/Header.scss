@@ -11,7 +11,9 @@
   &__left {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
   }
 
   &__title {
@@ -19,12 +21,17 @@
     font-weight: 700;
     margin: 0;
     line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__right {
     display: flex;
     align-items: center;
     gap: 20px;
+    flex-shrink: 0;
   }
 
   &__project {
@@ -284,58 +291,50 @@
   }
 
   &__burger {
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    // color: #1c2526;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: transparent;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f7d617 0%, #eab308 100%);
     border: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      background: rgba(255, 193, 7, 0.1);
-      transform: translate(-50%, -50%);
-      transition: width 0.3s ease, height 0.3s ease;
-    }
+    color: #1a1a1a;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 
     svg {
       width: 24px;
       height: 24px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
-      z-index: 1;
     }
 
     &:hover {
-      background: rgba(255, 193, 7, 0.1);
-      color: #ffc107;
-      transform: scale(1.05);
-
-      &::before {
-        width: 100%;
-        height: 100%;
-      }
-
-      svg {
-        transform: rotate(90deg);
-      }
+      transform: scale(1.04);
+      box-shadow: 0 4px 12px rgba(234, 179, 8, 0.45);
     }
 
     &:active {
-      transform: scale(0.95);
+      transform: scale(0.96);
+    }
+
+    @media (max-width: 768px) {
+      display: flex;
+    }
+
+    &--desktop-visible {
+      @media (min-width: 769px) {
+        display: flex;
+        background: transparent;
+        box-shadow: none;
+        border: 1px solid rgba(247, 215, 79, 0.35);
+
+        &:hover {
+          background: rgba(247, 215, 79, 0.12);
+          box-shadow: none;
+        }
+      }
     }
   }
 }
@@ -373,19 +372,26 @@
         right: -4px;
       }
     }
-
-    &__burger {
-      svg {
-        width: 20px;
-        height: 20px;
-      }
-    }
   }
 }
 
-/* На планшетах тоже скрываем селект и показываем иконку */
 @media screen and (max-width: 768px) {
   .header {
+    padding: 14px 16px;
+    gap: 8px;
+
+    &__title {
+      font-size: 22px;
+    }
+
+    &__left {
+      gap: 10px;
+    }
+
+    &__right {
+      gap: 12px;
+    }
+
     &__project {
       display: none;
     }
@@ -428,13 +434,6 @@
         padding: 1px 4px;
         top: -3px;
         right: -3px;
-      }
-    }
-
-    &__burger {
-      svg {
-        width: 18px;
-        height: 18px;
       }
     }
   }

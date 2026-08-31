@@ -12,7 +12,7 @@ import NotificationModal from "../NotificationModal/NotificationModal";
 import { fetchNotificationsAsync } from "../../store/creators/notificationCreators";
 import { useNotificationsSocket } from "../../hooks/useNotificationsSocket";
 import ConsultingWazzupNotifyBridge from "../Sectors/Consulting/common/ConsultingWazzupNotifyBridge";
-import { mapSectorNameToSlug } from "../../utils/sectorMapping";
+import { resolveCashierPath } from "../../utils/cashierRoutes";
 import "./Header.scss";
 
 const pageTitles = {
@@ -280,25 +280,10 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     );
   }, [company?.sector?.name]);
 
-  const isWarehouseSector = useMemo(() => {
-    if (!company?.sector?.name) return false;
-    return company.sector.name.toLowerCase().trim() === "склад";
-  }, [company?.sector?.name]);
-
-  // Барбершоп / Услуги / Стоматология: интерфейс кассира — общая касса продаж
-  const isBarberFamilySector = useMemo(
-    () =>
-      ["barber", "services", "dentistry"].includes(
-        mapSectorNameToSlug(company?.sector?.name),
-      ),
+  const cashierPath = useMemo(
+    () => resolveCashierPath(company?.sector?.name),
     [company?.sector?.name],
   );
-
-  const cashierPath = useMemo(() => {
-    if (isWarehouseSector) return "/crm/warehouse/kassa";
-    if (isBarberFamilySector) return "/crm/sell/start";
-    return "/crm/market/cashier";
-  }, [isWarehouseSector, isBarberFamilySector]);
 
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
@@ -407,9 +392,15 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     <div className="header">
       <ConsultingWazzupNotifyBridge />
       <div className="header__left">
-        <div className="header__burger" onClick={toggleSidebar}>
+        <button
+          type="button"
+          className={`header__burger${!isSidebarOpen ? " header__burger--desktop-visible" : ""}`}
+          onClick={toggleSidebar}
+          aria-label={isSidebarOpen ? "Закрыть меню" : "Открыть меню"}
+          aria-expanded={isSidebarOpen}
+        >
           <Menu size={24} />
-        </div>
+        </button>
         <h2 className="header__title">{title}</h2>
       </div>
       <div className="header__right">

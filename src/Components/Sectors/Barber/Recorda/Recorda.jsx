@@ -70,6 +70,7 @@ const Recorda = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
   const [modalMode, setModalMode] = useState("booking");
+  const [slotDraft, setSlotDraft] = useState(null);
 
   /* Проверка, сегодня ли выбранная дата */
   const isToday = fltDate === todayStr();
@@ -133,6 +134,7 @@ const Recorda = () => {
         time: s.time || "",
         minutes: parseDurationMin(s.time || ""),
         active: s.is_active !== false,
+        category_id: s.category || "",
         category_name: s.category_name || "",
         barbers: Array.isArray(s.barbers)
           ? s.barbers.map(String)
@@ -266,25 +268,39 @@ const Recorda = () => {
     "";
 
   const handleOpenNew = () => {
+    setSlotDraft(null);
     setCurrentRecord(null);
     setModalMode("booking");
     setModalOpen(true);
   };
 
   const handleOpenWalkIn = () => {
+    setSlotDraft(null);
     setCurrentRecord(null);
     setModalMode("walkin");
     setModalOpen(true);
   };
 
   const handleOpenExisting = (rec) => {
+    setSlotDraft(null);
     setCurrentRecord(rec);
+    setModalMode("booking");
+    setModalOpen(true);
+  };
+
+  const handleOpenSlot = ({ barberId, startTime }) => {
+    setSlotDraft({
+      barberId: String(barberId),
+      startTime: String(startTime),
+    });
+    setCurrentRecord(null);
     setModalMode("booking");
     setModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setModalOpen(false);
+    setSlotDraft(null);
   };
 
   /* ===== авто-завершение записей после конца времени ===== */
@@ -360,7 +376,9 @@ const Recorda = () => {
         clientPhone={clientPhone}
         COL_HEADER_H={COL_HEADER_H}
         SLOT_PX={SLOT_PX}
+        SLOT_MIN={SLOT_MIN}
         onRecordClick={handleOpenExisting}
+        onSlotClick={handleOpenSlot}
         isToday={isToday}
       />
 
@@ -370,6 +388,7 @@ const Recorda = () => {
           onClose={handleCloseModal}
           currentRecord={currentRecord}
           initialMode={modalMode}
+          slotDraft={slotDraft}
           clients={clients}
           barbers={barbers}
           services={services}

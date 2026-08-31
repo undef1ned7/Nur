@@ -8,6 +8,9 @@ import {
   getActivePrinterKey,
   setActivePrinterByKey,
   formatPrinterBinding,
+  normalizePaperMm,
+  setPrinterPaperMm,
+  CAFE_PAPER_MM_OPTIONS,
 } from "../../Orders/OrdersPrintService";
 import "./KitchenCreateModal.scss";
 import { useAlert } from "../../../../../hooks/useDialog";
@@ -40,6 +43,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
   const [saving, setSaving] = useState(false);
   const [printerDevice, setPrinterDevice] = useState('usb');
   const [ipPrinter, setIpPrinter] = useState('')
+  const [paperMm, setPaperMm] = useState(80);
 
   const [title, setTitle] = useState("");
   const [authorized, setAuthorized] = useState([]);
@@ -164,6 +168,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
         const map = readKitchenPrinterMap();
         map[String(created.id)] = data.printer;
         writeKitchenPrinterMap(map);
+        setPrinterPaperMm(data.printer, normalizePaperMm(paperMm));
       }
 
       onCreated?.(created);
@@ -302,6 +307,22 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
                 </div>
               )
             }
+
+            <div className="cafeCookKitchenModal__label" style={{ marginTop: 12 }}>Ширина ленты</div>
+            <div className="flex gap-2 flex-wrap">
+              {CAFE_PAPER_MM_OPTIONS.map((opt) => (
+                <button
+                  key={opt.mm}
+                  type="button"
+                  className={`cafeCookKitchenModal__iconBtn ${paperMm === opt.mm ? "bg-green-300!" : ""}`}
+                  onClick={() => setPaperMm(opt.mm)}
+                  disabled={saving}
+                  title={opt.label}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
 
           </div>
         </div>

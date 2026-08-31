@@ -530,6 +530,9 @@ export const createDeal = createAsyncThunk(
           debtMonths !== undefined &&
           debtMonths !== null &&
           debtMonths !== "";
+        const isV2Schedule =
+          scheduleVersion === "v2" ||
+          (Array.isArray(installments) && installments.length > 0);
 
         if (hasDays) {
           const debtDaysNum = Number(debtDays);
@@ -538,9 +541,16 @@ export const createDeal = createAsyncThunk(
             : 1;
         } else if (hasMonths) {
           const monthsNum = Number(debtMonths);
-          payload.debt_months = Number.isFinite(monthsNum)
+          const safeMonths = Number.isFinite(monthsNum)
             ? Math.max(1, Math.round(monthsNum))
             : 1;
+          // Простой долг (склад, закупки): бэк ждёт debt_days.
+          // v2-график с installments — debt_months.
+          if (isV2Schedule) {
+            payload.debt_months = safeMonths;
+          } else {
+            payload.debt_days = safeMonths * 30;
+          }
         }
 
         if (

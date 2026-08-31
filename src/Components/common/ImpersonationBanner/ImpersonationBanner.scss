@@ -1,0 +1,36 @@
+.impersonation-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #1a2332;
+  color: #f5f7fa;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.impersonation-banner strong {
+  font-weight: 600;
+}
+
+.impersonation-banner__btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.impersonation-banner__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}

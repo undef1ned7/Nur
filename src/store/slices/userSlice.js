@@ -59,6 +59,8 @@ const userSlice = createSlice({
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("userId");
+      localStorage.removeItem("platformAdminSession");
+      localStorage.removeItem("platformAdminImpersonating");
     },
   },
   extraReducers: (builder) => {

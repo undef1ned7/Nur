@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { ArrowLeft, User, X, CheckCircle } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -17,9 +23,7 @@ import ConsultantCommissionBlock from "./components/ConsultantCommissionBlock";
 import SuccessPaymentModal from "./components/SuccessPaymentModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
-import {
-  validateSplitAmounts,
-} from "../../../../../tools/marketCashierSplitPayment";
+import { validateSplitAmounts } from "../../../../../tools/marketCashierSplitPayment";
 import {
   buildConsultantCheckoutFields,
   isValidCommissionPercent,
@@ -76,7 +80,7 @@ const PaymentPage = ({
   const debtIsV2 = isDebtScheduleV2(debtScheduleVersion);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [amountReceived, setAmountReceived] = useState(
-    total ? total.toFixed(2) : "0.00"
+    total ? total.toFixed(2) : "0.00",
   );
   const [withoutCheck, setWithoutCheck] = useState(() => {
     try {
@@ -86,15 +90,19 @@ const PaymentPage = ({
     }
   });
   const [scheduleUnit, setScheduleUnit] = useState("month");
-  const [scheduleCount, setScheduleCount] = useState(defaultScheduleCount("month"));
+  const [scheduleCount, setScheduleCount] = useState(
+    defaultScheduleCount("month"),
+  );
   const [dayInterval, setDayInterval] = useState(DEFAULT_MONTH_INTERVAL);
   const [debtDays, setDebtDays] = useState(30);
   const [deferredDueDate, setDeferredDueDate] = useState(() =>
     defaultFirstDueDate("month"),
   );
-  const [deferredPrepaymentEnabled, setDeferredPrepaymentEnabled] = useState(false);
+  const [deferredPrepaymentEnabled, setDeferredPrepaymentEnabled] =
+    useState(false);
   const [deferredPrepaymentAmount, setDeferredPrepaymentAmount] = useState("");
-  const [deferredPrepaymentMethod, setDeferredPrepaymentMethod] = useState("cash");
+  const [deferredPrepaymentMethod, setDeferredPrepaymentMethod] =
+    useState("cash");
   const [deferredPrepaymentBank, setDeferredPrepaymentBank] = useState("");
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
@@ -246,7 +254,9 @@ const PaymentPage = ({
 
   const deferredPrepaymentValue = useMemo(() => {
     if (!deferredPrepaymentEnabled) return 0;
-    const n = parseFloat(String(deferredPrepaymentAmount || "").replace(",", "."));
+    const n = parseFloat(
+      String(deferredPrepaymentAmount || "").replace(",", "."),
+    );
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [deferredPrepaymentEnabled, deferredPrepaymentAmount]);
 
@@ -422,10 +432,11 @@ const PaymentPage = ({
     setSplitOnlineAmount(formatSplitAmount(maxTotal - amount));
   };
 
-  const printReceiptSmart = async (payload) => {
+  const printReceiptSmart = async (payload, opts = {}) => {
+    const interactiveFirst = opts.interactive === true;
     try {
       await handleCheckoutResponseForPrinting(payload, {
-        interactive: false,
+        interactive: interactiveFirst,
         receiptStyle: "market",
       });
       return true;
@@ -438,7 +449,7 @@ const PaymentPage = ({
       }
       console.warn(
         "[PaymentPage] Печать не удалась, запрашиваем выбор USB-принтера:",
-        err
+        err,
       );
       const connected = await ensurePrinterConnectedInteractively();
       if (!connected) return false;
@@ -526,204 +537,211 @@ const PaymentPage = ({
     payingInFlightRef.current = true;
 
     try {
-    if (!saleId) {
-      showAlert("error", "Ошибка", "Продажа не найдена");
-      return;
-    }
-
-    if (consultantEnabled) {
-      if (!consultantId) {
-        showAlert(
-          "warning",
-          "Консультант",
-          "Выберите консультанта или снимите галочку «Указать консультанта»",
-        );
+      if (!saleId) {
+        showAlert("error", "Ошибка", "Продажа не найдена");
         return;
       }
-      if (consultantCommissionEnabled) {
-        const pct = parseCommissionPercent(consultantCommissionPercent);
-        if (pct == null || !isValidCommissionPercent(pct)) {
+
+      if (consultantEnabled) {
+        if (!consultantId) {
           showAlert(
             "warning",
-            "Процент консультанта",
-            "Укажите процент от 0 до 100",
+            "Консультант",
+            "Выберите консультанта или снимите галочку «Указать консультанта»",
           );
           return;
         }
-      }
-    }
-
-    // Валидация для отсрочки - требуется клиент
-    if (paymentMethod === "deferred") {
-      if (!selectedCustomer?.id) {
-        showAlert(
-          "warning",
-          "Требуется клиент",
-          "Для оформления отсрочки необходимо выбрать клиента"
-        );
-        return;
-      }
-      if (deferredPrepaymentEnabled) {
-        if (deferredPrepaymentValue <= 0) {
-          showAlert("warning", "Предоплата", "Укажите сумму предоплаты");
-          return;
+        if (consultantCommissionEnabled) {
+          const pct = parseCommissionPercent(consultantCommissionPercent);
+          if (pct == null || !isValidCommissionPercent(pct)) {
+            showAlert(
+              "warning",
+              "Процент консультанта",
+              "Укажите процент от 0 до 100",
+            );
+            return;
+          }
         }
-        if (debtIsV2 ? deferredPrepaymentValue >= total : deferredPrepaymentValue > total) {
+      }
+
+      // Валидация для отсрочки - требуется клиент
+      if (paymentMethod === "deferred") {
+        if (!selectedCustomer?.id) {
           showAlert(
             "warning",
-            "Предоплата",
+            "Требуется клиент",
+            "Для оформления отсрочки необходимо выбрать клиента",
+          );
+          return;
+        }
+        if (deferredPrepaymentEnabled) {
+          if (deferredPrepaymentValue <= 0) {
+            showAlert("warning", "Предоплата", "Укажите сумму предоплаты");
+            return;
+          }
+          if (
             debtIsV2
-              ? "Предоплата должна быть меньше суммы заказа — остаток уходит в долг"
-              : "Сумма предоплаты не может быть больше суммы заказа",
-          );
-          return;
+              ? deferredPrepaymentValue >= total
+              : deferredPrepaymentValue > total
+          ) {
+            showAlert(
+              "warning",
+              "Предоплата",
+              debtIsV2
+                ? "Предоплата должна быть меньше суммы заказа — остаток уходит в долг"
+                : "Сумма предоплаты не может быть больше суммы заказа",
+            );
+            return;
+          }
+          if (
+            deferredPrepaymentMethod === "cashless" &&
+            !deferredPrepaymentBank
+          ) {
+            showAlert(
+              "warning",
+              "Требуется банк",
+              "Выберите банк для безналичной предоплаты",
+            );
+            return;
+          }
         }
-        if (deferredPrepaymentMethod === "cashless" && !deferredPrepaymentBank) {
+        if (debtIsV2) {
+          if (deferredSaleDebtRemaining <= 0) {
+            showAlert(
+              "warning",
+              "Сумма долга",
+              "После предоплаты должен остаться долг больше нуля",
+            );
+            return;
+          }
+          const countNum =
+            typeof scheduleCount === "number"
+              ? scheduleCount
+              : parseInt(String(scheduleCount), 10);
+          if (!Number.isFinite(countNum) || countNum < 1) {
+            showAlert(
+              "warning",
+              "График погашения",
+              scheduleUnit === "month"
+                ? "Укажите число месяцев не менее 1"
+                : "Укажите число платежей не менее 1",
+            );
+            return;
+          }
+          if (countNum > maxInstallmentsForUnit(scheduleUnit)) {
+            showAlert(
+              "warning",
+              "График погашения",
+              scheduleUnit === "month"
+                ? `Максимум ${maxInstallmentsForUnit("month")} месяцев`
+                : `Максимум ${maxInstallmentsForUnit("day")} платежей`,
+            );
+            return;
+          }
+          const intervalNum =
+            typeof dayInterval === "number"
+              ? dayInterval
+              : parseInt(String(dayInterval), 10);
+          if (!Number.isFinite(intervalNum) || intervalNum < 1) {
+            showAlert(
+              "warning",
+              "Интервал",
+              scheduleUnit === "month"
+                ? "Укажите интервал не менее 1 месяца"
+                : "Укажите интервал не менее 1 дня",
+            );
+            return;
+          }
+          if (intervalNum > maxIntervalForUnit(scheduleUnit)) {
+            showAlert(
+              "warning",
+              "Интервал",
+              scheduleUnit === "month"
+                ? `Максимум ${MAX_MONTH_INTERVAL} месяцев между платежами`
+                : `Максимум ${MAX_DAY_INTERVAL} дней между платежами`,
+            );
+            return;
+          }
+          if (!deferredDueDate || deferredDueDate < todayIsoDate()) {
+            showAlert(
+              "warning",
+              "Дата первого платежа",
+              "Дата первого платежа не может быть раньше сегодня",
+            );
+            return;
+          }
+          if (!debtSchedule) {
+            showAlert(
+              "warning",
+              "График погашения",
+              "Не удалось построить график. Проверьте срок и дату первого платежа",
+            );
+            return;
+          }
+        } else {
+          const daysNum =
+            typeof debtDays === "number"
+              ? debtDays
+              : parseInt(String(debtDays), 10);
+          if (!Number.isFinite(daysNum) || daysNum < 1) {
+            showAlert(
+              "warning",
+              "Срок рассрочки",
+              "Укажите срок рассрочки не менее 1 дня",
+            );
+            return;
+          }
+        }
+      }
+
+      // Валидация для безналичных - требуется выбор банка
+      if (paymentMethod === "cashless") {
+        if (!selectedBank) {
           showAlert(
             "warning",
             "Требуется банк",
-            "Выберите банк для безналичной предоплаты",
+            "Для безналичной оплаты необходимо выбрать банк",
           );
           return;
         }
       }
-      if (debtIsV2) {
-      if (deferredSaleDebtRemaining <= 0) {
-        showAlert(
-          "warning",
-          "Сумма долга",
-          "После предоплаты должен остаться долг больше нуля",
-        );
-        return;
-      }
-      const countNum =
-        typeof scheduleCount === "number"
-          ? scheduleCount
-          : parseInt(String(scheduleCount), 10);
-      if (!Number.isFinite(countNum) || countNum < 1) {
-        showAlert(
-          "warning",
-          "График погашения",
-          scheduleUnit === "month"
-            ? "Укажите число месяцев не менее 1"
-            : "Укажите число платежей не менее 1",
-        );
-        return;
-      }
-      if (countNum > maxInstallmentsForUnit(scheduleUnit)) {
-        showAlert(
-          "warning",
-          "График погашения",
-          scheduleUnit === "month"
-            ? `Максимум ${maxInstallmentsForUnit("month")} месяцев`
-            : `Максимум ${maxInstallmentsForUnit("day")} платежей`,
-        );
-        return;
-      }
-      const intervalNum =
-        typeof dayInterval === "number"
-          ? dayInterval
-          : parseInt(String(dayInterval), 10);
-      if (!Number.isFinite(intervalNum) || intervalNum < 1) {
-        showAlert(
-          "warning",
-          "Интервал",
-          scheduleUnit === "month"
-            ? "Укажите интервал не менее 1 месяца"
-            : "Укажите интервал не менее 1 дня",
-        );
-        return;
-      }
-      if (intervalNum > maxIntervalForUnit(scheduleUnit)) {
-        showAlert(
-          "warning",
-          "Интервал",
-          scheduleUnit === "month"
-            ? `Максимум ${MAX_MONTH_INTERVAL} месяцев между платежами`
-            : `Максимум ${MAX_DAY_INTERVAL} дней между платежами`,
-        );
-        return;
-      }
-      if (!deferredDueDate || deferredDueDate < todayIsoDate()) {
-        showAlert(
-          "warning",
-          "Дата первого платежа",
-          "Дата первого платежа не может быть раньше сегодня",
-        );
-        return;
-      }
-      if (!debtSchedule) {
-        showAlert(
-          "warning",
-          "График погашения",
-          "Не удалось построить график. Проверьте срок и дату первого платежа",
-        );
-        return;
-      }
-      } else {
-        const daysNum =
-          typeof debtDays === "number"
-            ? debtDays
-            : parseInt(String(debtDays), 10);
-        if (!Number.isFinite(daysNum) || daysNum < 1) {
+
+      let splitParts = null;
+      if (paymentMethod === "split") {
+        if (!splitOnlineBank) {
           showAlert(
             "warning",
-            "Срок рассрочки",
-            "Укажите срок рассрочки не менее 1 дня",
+            "Требуется банк",
+            "Выберите банк для онлайн-оплаты",
+          );
+          return;
+        }
+        const check = validateSplitAmounts(
+          total,
+          splitOnlineAmount,
+          splitTransferAmount,
+        );
+        if (!check.ok) {
+          showAlert("warning", "Смешанная оплата", check.message);
+          return;
+        }
+        splitParts = check;
+      }
+
+      // Валидация для наличных
+      if (paymentMethod === "cash") {
+        const received = readAmountReceived();
+        if (received < total) {
+          showAlert(
+            "warning",
+            "Недостаточно средств",
+            "Полученная сумма меньше суммы заказа!",
           );
           return;
         }
       }
-    }
 
-    // Валидация для безналичных - требуется выбор банка
-    if (paymentMethod === "cashless") {
-      if (!selectedBank) {
-        showAlert(
-          "warning",
-          "Требуется банк",
-          "Для безналичной оплаты необходимо выбрать банк"
-        );
-        return;
-      }
-    }
-
-    let splitParts = null;
-    if (paymentMethod === "split") {
-      if (!splitOnlineBank) {
-        showAlert(
-          "warning",
-          "Требуется банк",
-          "Выберите банк для онлайн-оплаты",
-        );
-        return;
-      }
-      const check = validateSplitAmounts(
-        total,
-        splitOnlineAmount,
-        splitTransferAmount,
-      );
-      if (!check.ok) {
-        showAlert("warning", "Смешанная оплата", check.message);
-        return;
-      }
-      splitParts = check;
-    }
-
-    // Валидация для наличных
-    if (paymentMethod === "cash") {
-      const received = readAmountReceived();
-      if (received < total) {
-        showAlert(
-          "warning",
-          "Недостаточно средств",
-          "Полученная сумма меньше суммы заказа!"
-        );
-        return;
-      }
-    }
-
-    // Маппинг способов оплаты
+      // Маппинг способов оплаты
       // payment_method может быть: cash, transfer, debt, mbank, optima, obank, bakai
       let paymentMethodApi = "cash";
       let checkoutPayments = null;
@@ -791,12 +809,10 @@ const PaymentPage = ({
             paymentMethod === "split" || paymentMethod === "deferred"
               ? checkoutCashReceived
               : paymentMethod === "cash"
-              ? readAmountReceived() || total
-              : null,
+                ? readAmountReceived() || total
+                : null,
           ...(consultantFields || {}),
-          ...(debtIsV2 &&
-          paymentMethod === "deferred" &&
-          debtSchedule
+          ...(debtIsV2 && paymentMethod === "deferred" && debtSchedule
             ? {
                 schedule_version: "v2",
                 debt_schedule: {
@@ -815,7 +831,7 @@ const PaymentPage = ({
                 },
               }
             : {}),
-        })
+        }),
       );
 
       if (result.type === "products/productCheckout/fulfilled") {
@@ -853,15 +869,14 @@ const PaymentPage = ({
               } catch (startDebtError) {
                 console.warn(
                   "Ошибка при создании долга для тарифа Старт:",
-                  startDebtError
+                  startDebtError,
                 );
-                const errorMessage = validateResErrors(startDebtError, "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ")
+                const errorMessage = validateResErrors(
+                  startDebtError,
+                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ",
+                );
                 // Не блокируем успешную оплату, если ошибка с долгом
-                showAlert(
-                  "warning",
-                  "Предупреждение",
-                  errorMessage
-                );
+                showAlert("warning", "Предупреждение", errorMessage);
                 return;
               }
             }
@@ -923,13 +938,12 @@ const PaymentPage = ({
             ).unwrap();
           } catch (debtError) {
             console.warn("Ошибка при создании долга:", debtError);
-            const errorMessage = validateResErrors(debtError, "Оплата оформлена, но не удалось создать запись о долге. ")
-            // Не блокируем успешную оплату, если ошибка с долгом
-            showAlert(
-              "warning",
-              "Предупреждение",
-              errorMessage
+            const errorMessage = validateResErrors(
+              debtError,
+              "Оплата оформлена, но не удалось создать запись о долге. ",
             );
+            // Не блокируем успешную оплату, если ошибка с долгом
+            showAlert("warning", "Предупреждение", errorMessage);
           }
         }
 
@@ -960,7 +974,10 @@ const PaymentPage = ({
               }),
             ).unwrap();
           } catch (cashError) {
-            console.warn("Ошибка при создании денежного потока предоплаты:", cashError);
+            console.warn(
+              "Ошибка при создании денежного потока предоплаты:",
+              cashError,
+            );
           }
         }
 
@@ -1030,9 +1047,11 @@ const PaymentPage = ({
               let ok = await printReceiptSmart(printPayload);
               if (!ok) {
                 const receiptResult = await dispatch(
-                  getProductCheckout(saleIdForReceipt)
+                  getProductCheckout(saleIdForReceipt),
                 );
-                if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+                if (
+                  receiptResult.type === "products/getProductCheckout/fulfilled"
+                ) {
                   ok = await printReceiptSmart(
                     buildReceiptPrintPayload(receiptResult.payload, splitParts),
                   );
@@ -1042,20 +1061,22 @@ const PaymentPage = ({
                 showAlert(
                   "warning",
                   "Печать",
-                  "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки»."
+                  "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки».",
                 );
               }
             } else {
               const receiptResult = await dispatch(
-                getProductCheckout(saleIdForReceipt)
+                getProductCheckout(saleIdForReceipt),
               );
-              if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+              if (
+                receiptResult.type === "products/getProductCheckout/fulfilled"
+              ) {
                 const ok = await printReceiptSmart(receiptResult.payload);
                 if (!ok) {
                   showAlert(
                     "warning",
                     "Печать",
-                    "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки»."
+                    "Не удалось распечатать чек. Оплата проведена — чек можно распечатать повторно из раздела «Чеки».",
                   );
                 }
               }
@@ -1088,21 +1109,19 @@ const PaymentPage = ({
         setConsultantCommissionEnabled(false);
         setConsultantCommissionPercent("");
       } else {
-        const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
-        showAlert(
-          "error",
-          "Ошибка",
-          errorMessage
+        const errorMessage = validateResErrors(
+          result.payload,
+          "Ошибка при оформлении оплаты. ",
         );
+        showAlert("error", "Ошибка", errorMessage);
       }
     } catch (error) {
       console.error("Ошибка при оформлении оплаты:", error);
-      const errorMessage = validateResErrors(error, "Ошибка при оформлении оплаты. ")
-      showAlert(
-        "error",
-        "Ошибка",
-        errorMessage
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при оформлении оплаты. ",
       );
+      showAlert("error", "Ошибка", errorMessage);
     } finally {
       payingInFlightRef.current = false;
     }
@@ -1122,47 +1141,38 @@ const PaymentPage = ({
 
     setPrinting(true);
     try {
-      // Для повторной печати в приоритете checkoutResponse (JSON с ekassa),
-      // а не серверный PDF, чтобы формат был новым.
+      // Как в SellDetail: сначала checkout JSON (eKassa), иначе blob с /receipt/
+      let ok = false;
       if (receiptData.checkoutResponse) {
-        const ok = await printReceiptSmart(receiptData.checkoutResponse);
-        if (!ok) {
-          showAlert(
-            "error",
-            "Ошибка печати",
-            "Не удалось распечатать чек. Проверьте принтер и повторите."
-          );
-        }
-      } else {
-        // Фолбэк: пытаемся получить чек с сервера
+        ok = await printReceiptSmart(receiptData.checkoutResponse, {
+          interactive: true,
+        });
+      }
+      if (!ok) {
         const receiptResult = await dispatch(
-          getProductCheckout(receiptData.saleId)
+          getProductCheckout(receiptData.saleId),
         );
         if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-          const ok = await printReceiptSmart(receiptResult.payload);
-          if (!ok) {
-            showAlert(
-              "error",
-              "Ошибка печати",
-              "Не удалось распечатать чек. Проверьте принтер и повторите."
-            );
-          }
-        } else {
-          showAlert(
-            "error",
-            "Ошибка печати",
-            "Не удалось получить данные чека для печати"
+          ok = await printReceiptSmart(
+            buildReceiptPrintPayload(receiptResult.payload),
+            { interactive: true },
           );
         }
       }
+      if (!ok) {
+        showAlert(
+          "error",
+          "Ошибка печати",
+          "Не удалось распечатать чек. Проверьте принтер и повторите.",
+        );
+      }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);
-      const errorMessage = validateResErrors(error, "Ошибка при печати чека. ")
-      showAlert(
-        "error",
-        "Ошибка печати",
-        errorMessage
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при печати чека. ",
       );
+      showAlert("error", "Ошибка печати", errorMessage);
     } finally {
       setPrinting(false);
     }
@@ -1313,10 +1323,11 @@ const PaymentPage = ({
               {paymentMethods.map((method) => (
                 <button
                   key={method.id}
-                  className={`payment-page__method ${paymentMethod === method.id
-                    ? "payment-page__method--active"
-                    : ""
-                    }`}
+                  className={`payment-page__method ${
+                    paymentMethod === method.id
+                      ? "payment-page__method--active"
+                      : ""
+                  }`}
                   onClick={() => setPaymentMethod(method.id)}
                 >
                   <div className="payment-page__method-content">
@@ -1408,7 +1419,7 @@ const PaymentPage = ({
                     {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    }
+                    },
                   )}{" "}
                   сом
                 </span>
@@ -1445,10 +1456,11 @@ const PaymentPage = ({
                 {banks.map((bank) => (
                   <button
                     key={bank.id}
-                    className={`payment-page__bank ${selectedBank === bank.id
-                      ? "payment-page__bank--active"
-                      : ""
-                      }`}
+                    className={`payment-page__bank ${
+                      selectedBank === bank.id
+                        ? "payment-page__bank--active"
+                        : ""
+                    }`}
                     onClick={() => setSelectedBank(bank.id)}
                     title={bank.name}
                   >
@@ -1504,7 +1516,9 @@ const PaymentPage = ({
                           className="payment-page__bank-logo"
                         />
                       ) : (
-                        <div className="payment-page__bank-name">{bank.name}</div>
+                        <div className="payment-page__bank-name">
+                          {bank.name}
+                        </div>
                       )}
                     </div>
                     {splitOnlineBank === bank.id && (
@@ -1521,7 +1535,9 @@ const PaymentPage = ({
                   step="0.01"
                   className="payment-page__amount-input"
                   value={splitOnlineAmount}
-                  onChange={(e) => handleSplitOnlineAmountChange(e.target.value)}
+                  onChange={(e) =>
+                    handleSplitOnlineAmountChange(e.target.value)
+                  }
                 />
               </label>
               <h3 className="payment-page__section-title">НАЛИЧНЫЕ</h3>
@@ -1533,7 +1549,9 @@ const PaymentPage = ({
                   step="0.01"
                   className="payment-page__amount-input"
                   value={splitTransferAmount}
-                  onChange={(e) => handleSplitTransferAmountChange(e.target.value)}
+                  onChange={(e) =>
+                    handleSplitTransferAmountChange(e.target.value)
+                  }
                 />
               </label>
               <p className="payment-page__split-total">
@@ -1600,7 +1618,9 @@ const PaymentPage = ({
               onDayIntervalChange={handleDayIntervalChange}
               onDayIntervalBlur={handleDayIntervalBlur}
               onDayIntervalPreset={(interval) =>
-                setDayInterval(normalizeScheduleInterval(scheduleUnit, interval))
+                setDayInterval(
+                  normalizeScheduleInterval(scheduleUnit, interval),
+                )
               }
               debtSchedule={debtSchedule}
               deferredDueDate={deferredDueDate}
@@ -1630,24 +1650,24 @@ const PaymentPage = ({
                 <div className="payment-page__quick-select-buttons">
                   {quickSelectAmounts.length > 0
                     ? quickSelectAmounts.map((amount) => (
-                      <button
-                        key={amount}
-                        className="payment-page__quick-select-btn"
-                        onClick={() => handleQuickSelect(amount)}
-                      >
-                        {amount.toFixed(0)}
-                      </button>
-                    ))
+                        <button
+                          key={amount}
+                          className="payment-page__quick-select-btn"
+                          onClick={() => handleQuickSelect(amount)}
+                        >
+                          {amount.toFixed(0)}
+                        </button>
+                      ))
                     : // Если сумма очень большая, показываем ближайшие купюры
-                    kyrgyzstanBills.slice(-3).map((amount) => (
-                      <button
-                        key={amount}
-                        className="payment-page__quick-select-btn"
-                        onClick={() => handleQuickSelect(amount)}
-                      >
-                        {amount.toFixed(0)}
-                      </button>
-                    ))}
+                      kyrgyzstanBills.slice(-3).map((amount) => (
+                        <button
+                          key={amount}
+                          className="payment-page__quick-select-btn"
+                          onClick={() => handleQuickSelect(amount)}
+                        >
+                          {amount.toFixed(0)}
+                        </button>
+                      ))}
                 </div>
               </div>
 
@@ -1674,7 +1694,7 @@ const PaymentPage = ({
                   setWithoutCheck(e.target.checked);
                   localStorage.setItem(
                     "market_withoutCheck",
-                    String(e.target.checked)
+                    String(e.target.checked),
                   );
                 }}
               />

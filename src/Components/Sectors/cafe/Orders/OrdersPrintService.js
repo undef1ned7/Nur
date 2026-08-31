@@ -15,15 +15,34 @@ function lookupWaiterIdInMap(idToLabel, id) {
   return "";
 }
 
-const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
-const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
-const CHAR_DOT_WIDTH = FONT === "B" ? 9 : 12;
+/** localStorage map: binding → paper mm */
+const LS_PRINTER_PAPER_MM = "cafe_printer_paper_mm";
 
-const CHARS_PER_LINE = Number(
-  localStorage.getItem("escpos_cpl") || Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH)
-);
+/**
+ * Распространённые ширины термоленты (ESC/POS text).
+ * charsPerLine — ориентир для Font A / узкой печати.
+ */
+export const CAFE_PAPER_MM_OPTIONS = [
+  { mm: 38, label: "38 мм", charsPerLine: 24 },
+  { mm: 44, label: "44 мм", charsPerLine: 28 },
+  { mm: 58, label: "58 мм", charsPerLine: 32 },
+  { mm: 76, label: "76 мм", charsPerLine: 42 },
+  { mm: 80, label: "80 мм", charsPerLine: 48 },
+  { mm: 112, label: "112 мм", charsPerLine: 64 },
+];
 
-const PRINT_WIDTH = Math.min(CHARS_PER_LINE, 42);
+const CAFE_PAPER_MM_SET = new Set(CAFE_PAPER_MM_OPTIONS.map((o) => o.mm));
+
+export function normalizePaperMm(raw) {
+  const n = Number(raw);
+  return CAFE_PAPER_MM_SET.has(n) ? n : 80;
+}
+
+export function charsPerLineForPaperMm(paperMm) {
+  const mm = normalizePaperMm(paperMm);
+  const preset = CAFE_PAPER_MM_OPTIONS.find((o) => o.mm === mm);
+  return preset?.charsPerLine ?? 48;
+}
 
 const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
 const CP866_CODES = new Set([66, 18]);
@@ -424,8 +443,11 @@ export function pickCafeOrderWaiterName(order, waiterIdToLabel = null) {
   return "";
 }
 
-function buildPrettyReceiptFromJSON(payload) {
-  const width = PRINT_WIDTH;
+function buildPrettyReceiptFromJSON(payload, opts = {}) {
+  const paperMm = normalizePaperMm(
+    opts.paperMm ?? payload?.paper_mm ?? payload?.paperMm
+  );
+  const width = charsPerLineForPaperMm(paperMm);
   const line = "-".repeat(width);
   const enc = getEncoder(CODEPAGE);
 
@@ -560,8 +582,9 @@ function buildFinanceCashReportChunks({
   incomeBreakdown = [],
   incomeItems = [],
   company = "КАФЕ",
+  paperMm = 80,
 } = {}) {
-  const width = PRINT_WIDTH;
+  const width = charsPerLineForPaperMm(paperMm);
   const line = "-".repeat(width);
   const enc = getEncoder(CODEPAGE);
 
@@ -748,22 +771,33 @@ export async function printFinanceCashReportToReceiptPrinter({
     }
   }
   if (!org) org = "КАФЕ";
+  const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+  const paperMm = getPrinterPaperMm(receiptBinding);
   const parts = buildFinanceCashReportChunks({
     dateFrom,
     dateTo,
     incomeBreakdown,
     incomeItems,
     company: org,
+    paperMm,
   });
   await sendEscPosToCafeReceiptPrinter(parts);
 }
 
-export async function printOrderReceiptJSONViaUSB(payload) {
-  const parts = buildPrettyReceiptFromJSON(payload);
+export async function printOrderReceiptJSONViaUSB(payload, opts = {}) {
+  const usbKey = String(opts.usbKey || opts.binding || getActivePrinterKey() || "").replace(
+    /^usb\//,
+    ""
+  );
+  const binding = opts.binding || (usbKey ? `usb/${usbKey}` : "");
+  const paperMm = normalizePaperMm(
+    opts.paperMm ?? getPrinterPaperMm(binding)
+  );
+  const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
   await transferUsbEscPosParts(parts);
 }
 
-export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
+export async function printOrderReceiptJSONViaUSBWithDialog(payload, opts = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
 
   const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
@@ -779,14 +813,18 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
 
   const { outEP } = await openUsbDevice(dev);
 
-  const parts = buildPrettyReceiptFromJSON(payload);
+  const key = keyOf(dev.vendorId, dev.productId, dev.serialNumber);
+  const paperMm = normalizePaperMm(
+    opts.paperMm ?? getPrinterPaperMm(`usb/${key}`)
+  );
+  const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await dev.transferOut(outEP, chunk);
     }
   }
   return {
-    key: keyOf(dev.vendorId, dev.productId, dev.serialNumber),
+    key,
     vendorId: dev.vendorId,
     productId: dev.productId,
     serial: safeSerial(dev.serialNumber),
@@ -820,6 +858,33 @@ export function parsePrinterBinding(raw) {
   return { kind: "ip", ip, port };
 }
 
+/** Нормализованный ключ binding для карты ширины ленты. */
+export function printerPaperMapKey(binding) {
+  const parsed = parsePrinterBinding(binding);
+  if (parsed.kind === "usb") return `usb/${parsed.usbKey}`;
+  if (parsed.kind === "ip") {
+    return parsed.port === 9100
+      ? `ip/${parsed.ip}`
+      : `ip/${parsed.ip}:${parsed.port}`;
+  }
+  return String(binding || "").trim();
+}
+
+export function getPrinterPaperMm(binding) {
+  const key = printerPaperMapKey(binding);
+  if (!key) return 80;
+  const map = readJson(LS_PRINTER_PAPER_MM, {});
+  return normalizePaperMm(map?.[key]);
+}
+
+export function setPrinterPaperMm(binding, paperMm) {
+  const key = printerPaperMapKey(binding);
+  if (!key) return;
+  const map = readJson(LS_PRINTER_PAPER_MM, {});
+  map[key] = normalizePaperMm(paperMm);
+  writeJson(LS_PRINTER_PAPER_MM, map);
+}
+
 export function formatPrinterBinding(input) {
   const kind = input?.kind;
   if (kind === "usb") {
@@ -845,9 +910,15 @@ export function formatPrinterBinding(input) {
   return "";
 }
 
-export async function printViaWiFiSimple(payload, ip, port = 9100) {
+export async function printViaWiFiSimple(payload, ip, port = 9100, opts = {}) {
   try {
-    const parts = buildPrettyReceiptFromJSON(payload);
+    const binding =
+      opts.binding ||
+      formatPrinterBinding({ kind: "ip", ip, port });
+    const paperMm = normalizePaperMm(
+      opts.paperMm ?? getPrinterPaperMm(binding)
+    );
+    const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
     const combinedData = combineDataParts(parts);
 
     // Preferred: local RAW-TCP bridge (prints without HTTP headers)

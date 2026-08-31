@@ -24,6 +24,9 @@ import {
   useCash,
 } from "../../../store/slices/cashSlice";
 import { createDeal } from "../../../store/creators/saleThunk";
+import { useMarketCashierSettings } from "../../../hooks/useMarketCashierSettings";
+import { useDebtScheduleForm } from "../../../hooks/useDebtScheduleForm";
+import SkladDebtForm from "./AddProductPage/components/SkladDebtForm";
 import AddProductBarcode from "./AddProductBarcode";
 import {
   createProductAsync,
@@ -435,15 +438,10 @@ const AddProductPage = ({
   // Id изображений при загрузке товара (для удаления с сервера при редактировании)
   const [initialProductImageIds, setInitialProductImageIds] = useState([]);
 
-  // Состояния для долга
-  const [debt, setDebt] = useState("");
-  const [amount, setAmount] = useState("");
-  const [debtMonths, setDebtMonths] = useState("");
+  // Состояния для долга (график как в кассе — PaymentPage)
   const [showDebtForm, setShowDebtForm] = useState(false);
-  const [debtState, setDebtState] = useState({
-    phone: "",
-    dueDate: "",
-  });
+  const [startPlanPhone, setStartPlanPhone] = useState("");
+  const { debtScheduleVersion } = useMarketCashierSettings();
 
   useEffect(() => {
     dispatch(fetchClientsAsync());
@@ -704,6 +702,18 @@ const AddProductPage = ({
     setState((prev) => ({ ...prev, [name]: value }));
   };
 
+  const purchaseDebtTotal = useMemo(() => {
+    if (itemType !== "product") return 0;
+    const purchasePrice = Number(newItemData.purchase_price || 0);
+    const qty = Number(newItemData.quantity || 0);
+    return purchasePrice * qty;
+  }, [itemType, newItemData.purchase_price, newItemData.quantity]);
+
+  const debtForm = useDebtScheduleForm({
+    total: purchaseDebtTotal,
+    debtScheduleVersion,
+  });
+
   // Ограничение цены: максимум 3 знака после запятой
   const sanitizePriceTo3Decimals = (val) => {
     const s = String(val ?? "").replace(",", ".");
@@ -730,11 +740,6 @@ const AddProductPage = ({
             ? "piece"
             : "weight",
     }));
-  };
-
-  const onChangeDebt = (e) => {
-    const { name, value } = e.target;
-    setDebtState((prev) => ({ ...prev, [name]: value }));
   };
 
   // Поставщик, выбранный через серверный поиск: его может не быть в общем
@@ -769,12 +774,15 @@ const AddProductPage = ({
     [categories],
   );
 
-  // Автоматическое заполнение телефона при выборе поставщика в тарифе "Старт"
+  // Автозаполнение телефона поставщика для тарифа «Старт»
   useEffect(() => {
     if (company?.subscription_plan?.name === "Старт" && pickSupplier?.phone) {
-      setDebtState((prev) => ({ ...prev, phone: pickSupplier.phone }));
+      setStartPlanPhone(pickSupplier.phone);
     }
   }, [newItemData.client, pickSupplier, company?.subscription_plan?.name]);
+
+  const supplierDebt =
+    pickSupplier?.debt || pickSupplier?.total_debt || 0;
 
   const handleSubmit = async () => {
     const {
@@ -804,28 +812,28 @@ const AddProductPage = ({
       return;
     }
 
-    // Валидация для долговых операций
-    if (debt && !client) {
-      showAlert("Выберите поставщика для долговой операции");
-      return;
-    }
-
-    const debtErrors = utils.validateDebtData(
-      {
-        debt,
-        debtMonths,
-        amount,
-        purchasePrice: purchase_price,
-        quantity,
-        debtState,
-      },
-      company,
-    );
-
-    if (Object.keys(debtErrors).length > 0) {
-      const firstError = Object.values(debtErrors)[0];
-      showAlert(firstError);
-      return;
+    // Валидация долга поставщику
+    if (showDebtForm) {
+      if (!client) {
+        showAlert("Выберите поставщика для долговой операции");
+        return;
+      }
+      if (purchaseDebtTotal <= 0) {
+        showAlert("Укажите закупочную цену и количество для оформления долга");
+        return;
+      }
+      if (
+        company?.subscription_plan?.name === "Старт" &&
+        !String(startPlanPhone || "").trim()
+      ) {
+        showAlert("Введите номер телефона поставщика");
+        return;
+      }
+      const debtCheck = debtForm.validate();
+      if (!debtCheck.ok) {
+        showAlert(debtCheck.message);
+        return;
+      }
     }
 
     // Формируем payload используя утилиту (убрано ~150 строк дублирующего кода)
@@ -917,63 +925,56 @@ const AddProductPage = ({
         imageUploadFailureCount += 1;
       }
 
-      // Создание долга, если выбран
-      if (debt === "Долги" && client) {
+      // Создание долга поставщику (график как в кассе)
+      if (showDebtForm && client && purchaseDebtTotal > 0) {
+        const supplierName =
+          pickSupplier?.full_name || pickSupplier?.name || "Поставщик";
+        const dealParams = debtForm.buildCreateDealParams({
+          clientId: client,
+          counterpartyName: supplierName,
+          amount: purchaseDebtTotal,
+        });
+
         if (company?.subscription_plan?.name === "Старт") {
           await utils.createDebt({
-            name: pickSupplier?.full_name,
-            phone: debtState.phone,
-            due_date: debtState.dueDate,
-            amount: totalAmount,
+            name: supplierName,
+            phone: startPlanPhone,
+            due_date: dealParams.dueDateString,
+            amount: dealParams.debtRecordAmount,
           });
         }
 
-        // Создание сделки
-        await dispatch(
-          createDeal({
-            clientId: client,
-            title: `Долг ${pickSupplier?.full_name}`,
-            statusRu: debt,
-            amount: totalAmount,
-            debtMonths: Number(debtMonths),
-          }),
-        ).unwrap();
-      }
-
-      if (debt === "Предоплата" && client) {
-        await dispatch(
-          createDeal({
-            clientId: client,
-            title: `Предоплата ${pickSupplier?.full_name}`,
-            statusRu: debt,
-            amount: totalAmount,
-            prepayment: Number(amount),
-            debtMonths: Number(debtMonths),
-          }),
-        ).unwrap();
+        const { dueDateString, debtRecordAmount, ...createDealArgs } =
+          dealParams;
+        await dispatch(createDeal(createDealArgs)).unwrap();
       }
 
       // Добавление денежного потока при создании товара
-      // Создаем запрос на кассу только если не долг и не режим редактирования
-      if (!isEditMode && debt !== "Долги") {
-        // Сумма в кассу: количество × закупочная цена за единицу (для Предоплаты — переданная сумма)
+      if (!isEditMode) {
         const purchaseUnitPrice =
           purchase_price || newItemData.purchase_price || "0";
-        const amountForCash =
-          debt === "Предоплата"
-            ? Number(amount || "0")
-            : qty * Number(purchaseUnitPrice);
+        const amountForCash = showDebtForm
+          ? debtForm.deferredPrepaymentValue
+          : qty * Number(purchaseUnitPrice);
         // Используем selectCashBox если cashData.cashbox пустой
         const cashboxId = cashData.cashbox || selectCashBox;
 
         // Создаем денежный поток если есть касса и сумма больше 0
         if (cashboxId && Number(amountForCash) > 0) {
+          const supplierName =
+            pickSupplier?.full_name || pickSupplier?.name || "Поставщик";
+          const cashFlowName = showDebtForm
+            ? debtForm.deferredPrepaymentValue > 0
+              ? `Предоплата поставщику: ${supplierName}`
+              : `Закупка: ${name || product?.name || "Новый товар"}`
+            : name || product?.name || "Новый товар";
+
           try {
             await dispatch(
               addCashFlows({
                 cashbox: cashboxId,
                 type: "expense",
-                name: name || product?.name || "Новый товар",
+                name: cashFlowName,
                 amount: amountForCash,
                 source_cashbox_flow_id: product.id,
                 source_business_operation_id: "Склад",
@@ -997,7 +998,7 @@ const AddProductPage = ({
         }
       }
 
-      if (client !== "" && !debt) {
+      if (client !== "" && !showDebtForm) {
         await dispatch(
           createDeal({
             clientId: newItemData?.client,
@@ -1008,15 +1009,10 @@ const AddProductPage = ({
         ).unwrap();
       }
 
-      // Очищаем данные долга
-      setDebt("");
-      setAmount("");
-      setDebtMonths("");
+      // Очищаем форму долга
       setShowDebtForm(false);
-      setDebtState({
-        phone: "",
-        dueDate: "",
-      });
+      setStartPlanPhone("");
+      debtForm.reset();
 
       const successMessage = isEditMode
         ? "Товар успешно обновлен!"
@@ -1413,17 +1409,13 @@ const AddProductPage = ({
               state={state}
               setState={setState}
               onSubmit={onSubmit}
-              debt={debt}
-              setDebt={setDebt}
-              amount={amount}
-              setAmount={setAmount}
-              debtMonths={debtMonths}
-              setDebtMonths={setDebtMonths}
               showDebtForm={showDebtForm}
               setShowDebtForm={setShowDebtForm}
-              debtState={debtState}
-              setDebtState={setDebtState}
-              onChangeDebt={onChangeDebt}
+              debtForm={debtForm}
+              purchaseDebtTotal={purchaseDebtTotal}
+              supplierDebt={supplierDebt}
+              startPlanPhone={startPlanPhone}
+              setStartPlanPhone={setStartPlanPhone}
               pickSupplier={pickSupplier}
               company={company}
             />
@@ -1821,106 +1813,20 @@ const AddProductPage = ({
                       </form>
                     )}
 
-                    <label className="add-product-page__checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={showDebtForm}
-                        onChange={(e) => setShowDebtForm(e.target.checked)}
-                      />
-                      Добавить долг по этому товару
-                    </label>
-
-                    {showDebtForm && (
-                      <div className="add-product-page__debt-form">
-                        {!newItemData.client && (
-                          <p className="add-product-page__error">
-                            Выберите поставщика в форме выше!
-                          </p>
-                        )}
-                        {company?.subscription_plan?.name === "Старт" &&
-                          newItemData.client && (
-                            <>
-                              <div className="add-product-page__form-group">
-                                <label className="add-product-page__label">
-                                  Телефон поставщика
-                                </label>
-                                <input
-                                  type="text"
-                                  onChange={onChangeDebt}
-                                  name="phone"
-                                  value={debtState.phone}
-                                  className="add-product-page__input"
-                                />
-                              </div>
-                              <div className="add-product-page__form-group">
-                                <label className="add-product-page__label">
-                                  Дата оплаты
-                                </label>
-                                <input
-                                  type="date"
-                                  onChange={onChangeDebt}
-                                  name="dueDate"
-                                  value={debtState.dueDate}
-                                  className="add-product-page__input"
-                                />
-                              </div>
-                            </>
-                          )}
-                        <div className="add-product-page__form-group">
-                          <label className="add-product-page__label">
-                            Тип оплаты
-                          </label>
-                          <select
-                            value={debt}
-                            onChange={(e) => setDebt(e.target.value)}
-                            className="add-product-page__input"
-                          >
-                            <option value="">Тип оплаты</option>
-                            <option value="Предоплата">Предоплата</option>
-                            <option value="Долги">Долг</option>
-                          </select>
-                        </div>
-                        {debt === "Предоплата" && (
-                          <>
-                            <div className="add-product-page__form-group">
-                              <label className="add-product-page__label">
-                                Сумма предоплаты
-                              </label>
-                              <input
-                                type="text"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="add-product-page__input"
-                              />
-                            </div>
-                            <div className="add-product-page__form-group">
-                              <label className="add-product-page__label">
-                                Срок долга (мес.)
-                              </label>
-                              <input
-                                type="text"
-                                value={debtMonths}
-                                onChange={(e) => setDebtMonths(e.target.value)}
-                                className="add-product-page__input"
-                              />
-                            </div>
-                          </>
-                        )}
-                        {debt === "Долги" && (
-                          <div className="add-product-page__form-group">
-                            <label className="add-product-page__label">
-                              Срок долга (мес.)
-                            </label>
-                            <input
-                              type="text"
-                              value={debtMonths}
-                              onChange={(e) => setDebtMonths(e.target.value)}
-                              className="add-product-page__input"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <SkladDebtForm
+                      showDebtForm={showDebtForm}
+                      onShowDebtFormChange={setShowDebtForm}
+                      hasSupplier={Boolean(newItemData.client)}
+                      supplierName={
+                        pickSupplier?.full_name || pickSupplier?.name || ""
+                      }
+                      counterpartyDebt={supplierDebt}
+                      purchaseTotal={purchaseDebtTotal}
+                      company={company}
+                      startPlanPhone={startPlanPhone}
+                      onStartPlanPhoneChange={setStartPlanPhone}
+                      debtForm={debtForm}
+                    />
                   </div>
                 </div>
 
@@ -2114,17 +2020,13 @@ const MarketProductForm = ({
   state,
   setState,
   onSubmit,
-  debt,
-  setDebt,
-  amount,
-  setAmount,
-  debtMonths,
-  setDebtMonths,
   showDebtForm,
   setShowDebtForm,
-  debtState,
-  setDebtState,
-  onChangeDebt,
+  debtForm,
+  purchaseDebtTotal,
+  supplierDebt,
+  startPlanPhone,
+  setStartPlanPhone,
   pickSupplier,
   company,
 }) => {
@@ -3295,108 +3197,21 @@ const MarketProductForm = ({
               )}
             </div>
 
-            {/* Чекбокс для добавления долга */}
-            <label className="add-product-page__checkbox-label">
-              <input
-                type="checkbox"
-                checked={showDebtForm}
-                onChange={(e) => setShowDebtForm(e.target.checked)}
-              />
-              Добавить долг по этому товару
-            </label>
-
-            {/* Форма долга */}
-            {showDebtForm && (
-              <div className="add-product-page__debt-form">
-                {!newItemData.client && (
-                  <p className="add-product-page__error">
-                    Выберите поставщика в форме выше!
-                  </p>
-                )}
-                {company?.subscription_plan?.name === "Старт" &&
-                  newItemData.client && (
-                    <>
-                      <div className="market-product-form__form-group">
-                        <label className="market-product-form__label">
-                          Телефон поставщика
-                        </label>
-                        <input
-                          type="text"
-                          onChange={onChangeDebt}
-                          name="phone"
-                          value={debtState.phone}
-                          className="market-product-form__input"
-                        />
-                      </div>
-                      <div className="market-product-form__form-group">
-                        <label className="market-product-form__label">
-                          Дата оплаты
-                        </label>
-                        <input
-                          type="date"
-                          onChange={onChangeDebt}
-                          name="dueDate"
-                          value={debtState.dueDate}
-                          className="market-product-form__input"
-                        />
-                      </div>
-                    </>
-                  )}
-                <div className="market-product-form__form-group">
-                  <label className="market-product-form__label">
-                    Тип оплаты
-                  </label>
-                  <select
-                    value={debt}
-                    onChange={(e) => setDebt(e.target.value)}
-                    className="market-product-form__input"
-                  >
-                    <option value="">Тип оплаты</option>
-                    <option value="Предоплата">Предоплата</option>
-                    <option value="Долги">Долг</option>
-                  </select>
-                </div>
-                {debt === "Предоплата" && (
-                  <>
-                    <div className="market-product-form__form-group">
-                      <label className="market-product-form__label">
-                        Сумма предоплаты
-                      </label>
-                      <input
-                        type="text"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="market-product-form__input"
-                      />
-                    </div>
-                    <div className="market-product-form__form-group">
-                      <label className="market-product-form__label">
-                        Срок долга (мес.)
-                      </label>
-                      <input
-                        type="text"
-                        value={debtMonths}
-                        onChange={(e) => setDebtMonths(e.target.value)}
-                        className="market-product-form__input"
-                      />
-                    </div>
-                  </>
-                )}
-                {debt === "Долги" && (
-                  <div className="market-product-form__form-group">
-                    <label className="market-product-form__label">
-                      Срок долга (мес.)
-                    </label>
-                    <input
-                      type="text"
-                      value={debtMonths}
-                      onChange={(e) => setDebtMonths(e.target.value)}
-                      className="market-product-form__input"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+            <SkladDebtForm
+              showDebtForm={showDebtForm}
+              onShowDebtFormChange={setShowDebtForm}
+              hasSupplier={Boolean(newItemData.client)}
+              supplierName={
+                pickSupplier?.full_name || pickSupplier?.name || ""
+              }
+              counterpartyDebt={supplierDebt}
+              purchaseTotal={purchaseDebtTotal}
+              company={company}
+              startPlanPhone={startPlanPhone}
+              onStartPlanPhoneChange={setStartPlanPhone}
+              debtForm={debtForm}
+              classNamePrefix="market-product-form"
+            />
 
             <div className="market-product-form__form-group">
               <label className="market-product-form__label">

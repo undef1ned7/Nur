@@ -549,6 +549,36 @@
     margin-bottom: 8px;
   }
 
+  &__checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 0;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  &__debt-form {
+    margin-top: 16px;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+  }
+
+  &__error {
+    color: #ff0000;
+    font-size: 13px;
+    margin: 8px 0;
+  }
+
+  &__hint {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+  }
+
   &__input {
     width: 100%;
     padding: 10px 12px;

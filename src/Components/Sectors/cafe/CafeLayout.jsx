@@ -411,7 +411,9 @@ export default function CafeLayout() {
         } else {
           await enqueuePrintJob(async () => {
             await setActivePrinterByKey(parsed.usbKey);
-            await printOrderReceiptJSONViaUSB(payload);
+            await printOrderReceiptJSONViaUSB(payload, {
+              usbKey: parsed.usbKey,
+            });
           });
         }
 
@@ -783,7 +785,9 @@ export default function CafeLayout() {
           // eslint-disable-next-line no-await-in-loop
           await enqueuePrintJob(async () => {
             await setActivePrinterByKey(parsed.usbKey);
-            await printOrderReceiptJSONViaUSB(payload);
+            await printOrderReceiptJSONViaUSB(payload, {
+              usbKey: parsed.usbKey,
+            });
           });
         }
       }
@@ -1055,7 +1059,9 @@ export default function CafeLayout() {
           } else if (parsed.kind === "usb") {
             await enqueuePrintJob(async () => {
               await setActivePrinterByKey(parsed.usbKey);
-              await printOrderReceiptJSONViaUSB(payload);
+              await printOrderReceiptJSONViaUSB(payload, {
+                usbKey: parsed.usbKey,
+              });
             });
           }
         };

@@ -1270,7 +1270,7 @@ const Orders = () => {
           await printViaWiFiSimple(payload, parsed.ip, parsed.port);
         } else if (parsed.kind === "usb") {
           await setActivePrinterByKey(parsed.usbKey);
-          await printOrderReceiptJSONViaUSB(payload);
+          await printOrderReceiptJSONViaUSB(payload, { usbKey: parsed.usbKey });
         } else {
           throw new Error("Некорректная настройка принтера кассы");
         }
@@ -1427,7 +1427,7 @@ const Orders = () => {
             await printViaWiFiSimple(payload, parsed.ip, parsed.port);
           } else if (parsed.kind === "usb") {
             await setActivePrinterByKey(parsed.usbKey);
-            await printOrderReceiptJSONViaUSB(payload);
+            await printOrderReceiptJSONViaUSB(payload, { usbKey: parsed.usbKey });
           } else {
             console.warn(
               "Kitchen print skipped: invalid printer binding for kitchen",

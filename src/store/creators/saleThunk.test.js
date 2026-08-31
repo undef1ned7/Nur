@@ -176,6 +176,34 @@ describe("saleThunk", () => {
       expect(result.type).toBe("deals/create/fulfilled");
     });
 
+    it("maps debtMonths to debt_days for simple debt without v2 schedule", async () => {
+      api.post.mockResolvedValue({ data: { id: 102 } });
+
+      const store = createTestStore();
+      const result = await store.dispatch(
+        createDeal({
+          clientId: 5,
+          title: "Долг поставщику",
+          statusRu: "Долги",
+          amount: "1500",
+          debtMonths: 2,
+          first_due_date: "2026-10-01",
+        }),
+      );
+
+      expect(api.post).toHaveBeenCalledWith("/main/clients/5/deals/", {
+        title: "Долг поставщику",
+        kind: "debt",
+        amount: "1500.00",
+        note: "",
+        client: 5,
+        debt_days: 60,
+        first_due_date: "2026-10-01",
+        auto_schedule: true,
+      });
+      expect(result.type).toBe("deals/create/fulfilled");
+    });
+
     it("maps plain sale status to kind sale", async () => {
       api.post.mockResolvedValue({ data: { id: 1 } });
 

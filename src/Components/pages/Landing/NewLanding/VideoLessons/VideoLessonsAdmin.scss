@@ -95,6 +95,81 @@
     }
   }
 
+  &__field-hint {
+    font-size: 12px;
+    color: #9a9a9a;
+    line-height: 1.4;
+
+    &--file {
+      color: #6b6b6b;
+    }
+  }
+
+  &__thumb-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  &__thumb-file-input {
+    display: none;
+  }
+
+  &__thumb-file-btn,
+  &__thumb-clear-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__thumb-file-btn {
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    color: #232025;
+
+    &:hover:not(:disabled) {
+      border-color: #f2b705;
+      background: #fffbeb;
+    }
+  }
+
+  &__thumb-clear-btn {
+    border: 1px solid #f0d4d0;
+    background: #fff;
+    color: #c0392b;
+
+    &:hover:not(:disabled) {
+      background: #fdecea;
+    }
+  }
+
+  &__thumb-preview {
+    width: 160px;
+    aspect-ratio: 16 / 10;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #e8e8e8;
+    margin-top: 4px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
   &__lessons-head {
     display: flex;
     align-items: center;

@@ -5,10 +5,14 @@ import {
   getSavedPrinters,
   listAuthorizedPrinters,
   formatPrinterBinding,
+  getPrinterPaperMm,
+  normalizePaperMm,
   parsePrinterBinding,
   printOrderReceiptJSONViaUSB,
   printViaWiFiSimple,
   setActivePrinterByKey,
+  setPrinterPaperMm,
+  CAFE_PAPER_MM_OPTIONS,
 } from "../../../Sectors/cafe/Orders/OrdersPrintService";
 
 const safeName = (p) => p?.name || "USB Printer";
@@ -18,6 +22,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
   const [ipPort, setIpPort] = useState("");
   const [usbKey, setUsbKey] = useState("");
   const [bridgeUrl, setBridgeUrl] = useState("");
+  const [paperMm, setPaperMm] = useState(80);
 
   const [loadingUsb, setLoadingUsb] = useState(false);
   const [authorized, setAuthorized] = useState([]);
@@ -53,6 +58,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
       setDevice("wifi");
       setIpPort(parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`);
     }
+    if (raw) setPaperMm(getPrinterPaperMm(raw));
 
     const url = localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
     setBridgeUrl(url);
@@ -81,6 +87,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
           setIpPort("");
           setUsbKey("");
         }
+        if (printer) setPaperMm(getPrinterPaperMm(printer));
         setBridgeUrl(bridge_url || "http://127.0.0.1:5179/print");
       } catch (e) {
         // если ошибка, оставляем дефолтные значения
@@ -105,6 +112,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
   }, [bridgeUrl]);
 
   const save = useCallback(async () => {
+    const mm = normalizePaperMm(paperMm);
     if (device === "wifi") {
       const binding = formatPrinterBinding({ kind: "ip", ipPort });
       const parsed = parsePrinterBinding(`ip/${ipPort}`);
@@ -114,6 +122,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
       }
       localStorage.setItem("cafe_receipt_printer", binding);
       localStorage.setItem("cafe_printer_bridge_url", bridgeUrl || "http://127.0.0.1:5179/print");
+      setPrinterPaperMm(binding, mm);
       const ok = await saveToBackend(binding);
       if (ok) {
         showAlert?.("success", "Принтер кассы сохранён");
@@ -134,13 +143,14 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
     }
     localStorage.setItem("cafe_receipt_printer", binding);
     localStorage.setItem("cafe_printer_bridge_url", bridgeUrl || "http://127.0.0.1:5179/print");
+    setPrinterPaperMm(binding, mm);
     const ok = await saveToBackend(binding);
     if (ok) {
       showAlert?.("success", "Принтер кассы сохранён");
     } else {
       showAlert?.("warning", "Сохранено локально, но сервер не принял принтер");
     }
-  }, [device, ipPort, usbKey, bridgeUrl, showAlert, saveToBackend]);
+  }, [device, ipPort, usbKey, bridgeUrl, paperMm, showAlert, saveToBackend]);
 
   const chooseUsb = useCallback(async () => {
     setLoadingUsb(true);
@@ -180,17 +190,22 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
 
     try {
       if (parsed.kind === "ip") {
-        await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+        await printViaWiFiSimple(payload, parsed.ip, parsed.port, {
+          paperMm: normalizePaperMm(paperMm),
+        });
       } else if (parsed.kind === "usb") {
         await setActivePrinterByKey(parsed.usbKey);
-        await printOrderReceiptJSONViaUSB(payload);
+        await printOrderReceiptJSONViaUSB(payload, {
+          usbKey: parsed.usbKey,
+          paperMm: normalizePaperMm(paperMm),
+        });
       }
       showAlert?.("success", "Тест отправлен на печать");
     } catch (e) {
       console.error("CafeReceiptPrinterSettings testPrint error:", e);
       showAlert?.("error", "Не удалось отправить тест на печать");
     }
-  }, [showAlert]);
+  }, [showAlert, paperMm]);
 
   return (
     <div className="settings__section">
@@ -313,6 +328,26 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
           </div>
         </>
       )}
+
+      <div className="settings__form-group">
+        <div className="settings__label">Ширина ленты</div>
+        <div className="settings__segmented" style={{ flexWrap: "wrap" }}>
+          {CAFE_PAPER_MM_OPTIONS.map((opt) => (
+            <button
+              key={opt.mm}
+              type="button"
+              className={`settings__segBtn ${paperMm === opt.mm ? "settings__segBtn--active" : ""}`}
+              onClick={() => setPaperMm(opt.mm)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="settings__mutedText" style={{ marginTop: 8 }}>
+          Настройка только для этого принтера. Чем меньше мм — тем меньше символов в строке
+          (например 58 мм ≈32, 80 мм ≈48).
+        </p>
+      </div>
 
       <div className="settings__actions">
         <button type="button" className="settings__btn settings__btn--primary" onClick={save}>

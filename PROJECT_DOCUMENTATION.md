@@ -27,6 +27,7 @@
 17. [PWA и Service Worker](#17-pwa-и-service-worker)
 18. [Утилиты и доменная логика](#18-утилиты-и-доменная-логика)
 19. [Печать чеков (Cafe)](#19-печать-чеков-cafe)
+19a. [Печать чеков (Market)](#19a-печать-чеков-market)
 20. [Подпроект ubl-invoice](#20-подпроект-ubl-invoice)
 21. [Переменные окружения](#21-переменные-окружения)
 22. [Сборка и деплой](#22-сборка-и-деплой)
@@ -934,6 +935,8 @@ Vite автоподключает SCSS partials через `additionalData` в `
 
 ## 19. Печать чеков (Cafe)
 
+**Полная документация для агентов/разработчиков:** [docs/cafe/receipt-printing.md](./docs/cafe/receipt-printing.md) (оглавление — [docs/cafe/README.md](./docs/cafe/README.md)).
+
 Сетевые принтеры (XPrinter XP-N160II, порт **9100**) принимают **RAW TCP** (JetDirect). Браузер не умеет открывать сырой TCP.
 
 ### Решение
@@ -946,7 +949,9 @@ Vite автоподключает SCSS partials через `additionalData` в `
 |---|---|
 | **USB** | WebUSB — bridge не нужен |
 | **Wi-Fi** | `tools/printer-bridge.mjs` или `tools/printer-agent/` (Python/Flet) |
-| **Бэкенд** | Endpoint `{ ip, port, data }` — см. `docs/PRINT_BACKEND_API.md` |
+| **Контракт bridge** | `POST /print` `{ ip, port, data(base64) }`, `GET /health` |
+
+Два контура: **чек кассы** (`cafe_receipt_printer`) и **тикеты кухонь** (`kitchen.printer` / `kitchen_printer_map`). Автопечать кухни — в `CafeLayout` по WebSocket; ручной чек — в `Orders` после оплаты. Фискальный ККМ — отдельный поток (`fiscalDriverService`), не путать с термопринтером.
 
 ### Настройка
 
@@ -959,6 +964,24 @@ npm run printer-bridge   # http://127.0.0.1:5179/print
 ```
 
 > Bridge запускается **в офисе** (LAN с принтером), не на VPS. Подробнее — в [README.md](./README.md).
+
+---
+
+## 19a. Печать чеков (Market)
+
+**Полная документация для агентов/разработчиков:** [docs/market/receipt-printing.md](./docs/market/receipt-printing.md) (оглавление — [docs/market/README.md](./docs/market/README.md)).
+
+Маркет **не** использует `printer-bridge` и **не** вызывает `fiscalDriverService`. Печать = **WebUSB → ESC/POS** через `src/Components/pages/Sell/services/printService.js` с `receiptStyle: "market"` (graphic layout на canvas + native QR).
+
+| Аспект | Маркет |
+|---|---|
+| Транспорт | Только USB (Chrome/Edge WebUSB) |
+| Настройки | `/crm/pos-print-settings` → `escpos_*` в localStorage |
+| Автопечать | После `POST main/pos/sales/{id}/checkout/` (если не «Без чека») |
+| eKassa | Поля в checkout JSON мержатся в термочек; фискализация на бэкенде |
+| «Без чека» | `localStorage.market_withoutCheck` |
+
+Не смешивать с §19 (кафе).
 
 ---
 
@@ -1062,11 +1085,12 @@ npx vitest run src/ProtectedRoute.test.jsx
 
 | Папка | Темы |
 |---|---|
-| `docs/market/` | Касса, склад, витрина, штрихкоды, аналитика, долги, скидки |
-| `docs/cafe/` | *(часть в корне: cafe-receipt-print-analysis.md)* |
+| `docs/market/` | Касса, склад, витрина, штрихкоды, аналитика, долги, скидки; печать WebUSB ([receipt-printing.md](./docs/market/receipt-printing.md)) |
+| `docs/cafe/` | Печать: чековый аппарат, кухни, ESC/POS, WS/dedupe ([receipt-printing.md](./docs/cafe/receipt-printing.md)) |
 | `docs/production/` | ГП, закупки, зарплата, аналитика, POS |
 | `docs/warehouse/` | Агентская модель, склады, зарплата, чеклист бэкенда |
 | `docs/consulting/` | Воронка, Wazzup, лиды, зарплата, подписки, backend API specs |
+| `docs/platform-admin/` | Платформенная админка NUR: компании, пользователи, impersonate |
 | `docs/kassa/` | Cashflows, фильтры |
 | `docs/services/` | Зарплата услуг |
 

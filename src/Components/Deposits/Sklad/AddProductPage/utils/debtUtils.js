@@ -2,6 +2,10 @@
  * Утилиты для работы с долгами
  */
 import api from "../../../../../api";
+import {
+  addMonthsToIso,
+  todayIsoDate,
+} from "../../../../../tools/buildDebtSchedule";
 
 /**
  * Создает долг через API
@@ -52,4 +56,18 @@ export const validateDebtData = (debtData, company) => {
 
   return errors;
 };
+
+/**
+ * Поля долга для createDeal при добавлении товара на склад.
+ * @param {{ debtMonths: string|number, dueDate?: string }} params
+ */
+export function buildSkladDealDebtParams({ debtMonths, dueDate }) {
+  const months = Math.max(1, Math.round(Number(debtMonths) || 1));
+  const debtDays = months * 30;
+  const first_due_date =
+    (dueDate && String(dueDate).trim()) ||
+    addMonthsToIso(todayIsoDate(), months);
+
+  return { debtDays, first_due_date };
+}
 

@@ -1,12 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  computeEscposCharsPerLine,
+  isEscposGraphicPrintEnabled,
+  persistEscposSettings,
   printRussianRawUsb,
-  setEscposCharsPerLine,
-  setEscposCodepage,
-  setEscposDotsPerLine,
-  setEscposFont,
-  setEscposLineHeight,
+  readEscposCharsPerLine,
 } from "../../Sell/services/printService";
 import "./Settings.scss";
 
@@ -31,35 +30,89 @@ export default function PosPrintSettings() {
   const navigate = useNavigate();
 
   const [dotsPerLine, setDotsPerLine] = useState(576);
-  const [charsPerLine, setCharsPerLine] = useState(64);
+  const [charsPerLine, setCharsPerLine] = useState(48);
   const [font, setFont] = useState("B"); // A | B
   const [lineHeight, setLineHeight] = useState(22);
   const [codepage, setCodepage] = useState(17);
+  const [graphicPrint, setGraphicPrint] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [msg, setMsg] = useState(null); // {type, text}
+  const [loaded, setLoaded] = useState(false);
+  const skipAutoSaveRef = useRef(false);
+
+  const persistCurrent = useCallback(
+    (values, { silent = false } = {}) => {
+      const ok = persistEscposSettings(values);
+      if (!ok) {
+        setMsg({
+          type: "error",
+          text: "Не удалось сохранить настройки (localStorage недоступен)",
+        });
+        return false;
+      }
+      if (!silent) {
+        setMsg({ type: "success", text: "Сохранено" });
+      }
+      return true;
+    },
+    [],
+  );
 
   useEffect(() => {
     const f = String(readString("escpos_font", "B")).toUpperCase() === "A" ? "A" : "B";
     const dpl = readNumber("escpos_dpl", 576);
-    const charDotWidth = f === "B" ? 9 : 12;
-    const cplDefault = Math.floor(dpl / charDotWidth);
-    const cpl = readNumber("escpos_cpl", cplDefault);
+    const cpl = readEscposCharsPerLine(
+      dpl,
+      f,
+      computeEscposCharsPerLine(dpl, f),
+    );
     const lh = readNumber("escpos_line", f === "B" ? 22 : 24);
     const cp = readNumber("escpos_cp", 17);
 
+    skipAutoSaveRef.current = true;
     setFont(f);
     setDotsPerLine(dpl);
     setCharsPerLine(cpl);
     setLineHeight(lh);
     setCodepage(cp);
+    setGraphicPrint(isEscposGraphicPrintEnabled());
+    setLoaded(true);
+    queueMicrotask(() => {
+      skipAutoSaveRef.current = false;
+    });
   }, []);
+
+  const syncCharsPerLine = useCallback((dpl, f) => {
+    setCharsPerLine(computeEscposCharsPerLine(dpl, f));
+  }, []);
+
+  const handleDotsPerLineChange = useCallback(
+    (value) => {
+      const dpl = Number(value);
+      setDotsPerLine(dpl);
+      syncCharsPerLine(dpl, font);
+    },
+    [font, syncCharsPerLine],
+  );
+
+  const handleFontChange = useCallback(
+    (nextFont) => {
+      setFont(nextFont);
+      syncCharsPerLine(dotsPerLine, nextFont);
+    },
+    [dotsPerLine, syncCharsPerLine],
+  );
 
   const presets = useMemo(
     () => [
-      { id: "80", label: "80 мм (обычно 576 точек)", dpl: 576 },
-      { id: "58", label: "58 мм (обычно 384 точки)", dpl: 384 },
+      { id: "80", label: "80 мм бумага (576 точек, 48 символов)", dpl: 576 },
+      {
+        id: "58",
+        label: "58 мм бумага / 48 мм печать (384 точки, 32 символа)",
+        dpl: 384,
+      },
       { id: "44", label: "44 мм (обычно 320 точек)", dpl: 320 },
       { id: "38", label: "38 мм (обычно 288 точек)", dpl: 288 },
       { id: "custom", label: "Вручную", dpl: null },
@@ -80,37 +133,81 @@ export default function PosPrintSettings() {
       if (!preset) return;
       if (preset.dpl) {
         const f = font === "A" ? "A" : "B";
-        const charDotWidth = f === "B" ? 9 : 12;
-        setDotsPerLine(preset.dpl);
-        setCharsPerLine(Math.floor(preset.dpl / charDotWidth));
+        const nextDpl = preset.dpl;
+        const nextCpl = computeEscposCharsPerLine(preset.dpl, f);
+        skipAutoSaveRef.current = true;
+        setDotsPerLine(nextDpl);
+        setCharsPerLine(nextCpl);
+        persistCurrent(
+          {
+            dotsPerLine: nextDpl,
+            charsPerLine: nextCpl,
+            lineHeight,
+            font: f,
+            codepage,
+            graphicPrint,
+          },
+          { silent: false },
+        );
+        queueMicrotask(() => {
+          skipAutoSaveRef.current = false;
+        });
       }
     },
-    [font, presets]
+    [font, presets, lineHeight, codepage, graphicPrint, persistCurrent],
   );
+
+  useEffect(() => {
+    if (!loaded || skipAutoSaveRef.current) return undefined;
+    const timer = setTimeout(() => {
+      persistCurrent(
+        {
+          dotsPerLine,
+          charsPerLine,
+          lineHeight,
+          font,
+          codepage,
+          graphicPrint,
+        },
+        { silent: true },
+      );
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [
+    loaded,
+    dotsPerLine,
+    charsPerLine,
+    lineHeight,
+    font,
+    codepage,
+    graphicPrint,
+    persistCurrent,
+  ]);
 
   const save = useCallback(async () => {
     setMsg(null);
     setSaving(true);
     try {
-      const dpl = Math.max(200, Number(dotsPerLine || 0));
-      const cpl = Math.max(16, Number(charsPerLine || 0));
-      const lh = Math.max(10, Number(lineHeight || 0));
-      const f = font === "A" ? "A" : "B";
-      const cp = Number(codepage || 0);
-
-      setEscposDotsPerLine(dpl);
-      setEscposCharsPerLine(cpl);
-      setEscposLineHeight(lh);
-      setEscposFont(f);
-      if (Number.isFinite(cp) && cp >= 0 && cp <= 255) setEscposCodepage(cp);
-
-      setMsg({ type: "success", text: "Сохранено (escpos_* в localStorage)" });
-    } catch (e) {
-      setMsg({ type: "error", text: "Не удалось сохранить настройки" });
+      persistCurrent({
+        dotsPerLine,
+        charsPerLine,
+        lineHeight,
+        font,
+        codepage,
+        graphicPrint,
+      });
     } finally {
       setSaving(false);
     }
-  }, [dotsPerLine, charsPerLine, lineHeight, font, codepage]);
+  }, [
+    dotsPerLine,
+    charsPerLine,
+    lineHeight,
+    font,
+    codepage,
+    graphicPrint,
+    persistCurrent,
+  ]);
 
   const testUsb = useCallback(async () => {
     setMsg(null);
@@ -164,11 +261,37 @@ export default function PosPrintSettings() {
           </div>
 
           <p className="settings__mutedText">
-            Настройки сохраняются в <code>localStorage</code> и влияют на печать
-            чеков (WebUSB / ESC/POS).
+            Настройки сохраняются в <code>localStorage</code> (<code>escpos_*</code>)
+            автоматически при изменении и применяются к graphic-чекам (canvas → растр)
+            и текстовым ESC/POS (fallback / тест USB).
           </p>
 
           {msg && <div className={msgClassName}>{msg.text}</div>}
+
+          <div className="settings__form-group">
+            <div className="settings__label">Режим печати чека</div>
+            <div className="settings__segmented">
+              <button
+                type="button"
+                className={`settings__segBtn ${graphicPrint ? "settings__segBtn--active" : ""}`}
+                onClick={() => setGraphicPrint(true)}
+              >
+                Graphic (canvas)
+              </button>
+              <button
+                type="button"
+                className={`settings__segBtn ${!graphicPrint ? "settings__segBtn--active" : ""}`}
+                onClick={() => setGraphicPrint(false)}
+              >
+                Текстовый ESC/POS
+              </button>
+            </div>
+            <div className="settings__fieldHint">
+              <b>Graphic</b> — по умолчанию; кириллица через canvas и растр (GS v
+              0), без codepage. <b>Текстовый</b> — байты ESC/POS + codepage
+              (как <code>/crm/sell</code>).
+            </div>
+          </div>
 
           <div className="settings__form-group">
             <div className="settings__label">Ширина бумаги</div>
@@ -187,7 +310,7 @@ export default function PosPrintSettings() {
 
           <div className="settings__form-group">
             <div className="settings__label">
-              DOTS_PER_LINE (точек по ширине, для PDF/картинок)
+              DOTS_PER_LINE (ширина растра в точках, ~8 точек/мм зоны печати)
             </div>
             <input
               className="settings__input settings__input--plain"
@@ -195,13 +318,14 @@ export default function PosPrintSettings() {
               min={200}
               step={1}
               value={dotsPerLine}
-              onChange={(e) => setDotsPerLine(Number(e.target.value))}
+              onChange={(e) => handleDotsPerLineChange(e.target.value)}
             />
           </div>
 
           <div className="settings__form-group">
             <div className="settings__label">
-              CHARS_PER_LINE (символов в строке, для текстовых чеков)
+              CHARS_PER_LINE (логическая ширина строки: layout graphic-чека и
+              текстовый ESC/POS)
             </div>
             <input
               className="settings__input settings__input--plain"
@@ -214,27 +338,34 @@ export default function PosPrintSettings() {
           </div>
 
           <div className="settings__form-group">
-            <div className="settings__label">Шрифт</div>
+            <div className="settings__label">Шрифт ESC/POS (Font A / B)</div>
             <div className="settings__segmented">
               <button
                 type="button"
                 className={`settings__segBtn ${font === "B" ? "settings__segBtn--active" : ""}`}
-                onClick={() => setFont("B")}
+                onClick={() => handleFontChange("B")}
               >
                 Font B (узкий)
               </button>
               <button
                 type="button"
                 className={`settings__segBtn ${font === "A" ? "settings__segBtn--active" : ""}`}
-                onClick={() => setFont("A")}
+                onClick={() => handleFontChange("A")}
               >
                 Font A (широкий)
               </button>
             </div>
+            <div className="settings__fieldHint">
+              Влияет на текстовую печать (ESC M) и подсказку CHARS_PER_LINE.
+              Graphic-чек рисуется моноширинным canvas-шрифтом, но ширина строки
+              берётся из CHARS_PER_LINE.
+            </div>
           </div>
 
           <div className="settings__form-group">
-            <div className="settings__label">Межстрочный интервал (escpos_line)</div>
+            <div className="settings__label">
+              Межстрочный интервал (escpos_line, точки; ESC 3)
+            </div>
             <input
               className="settings__input settings__input--plain"
               type="number"
@@ -243,6 +374,10 @@ export default function PosPrintSettings() {
               value={lineHeight}
               onChange={(e) => setLineHeight(Number(e.target.value))}
             />
+            <div className="settings__fieldHint">
+              Используется в graphic-чеке (высота строк canvas) и в текстовом
+              ESC/POS (ESC 3).
+            </div>
           </div>
 
           <div className="settings__form-group">
@@ -276,7 +411,8 @@ export default function PosPrintSettings() {
             />
             <div className="settings__fieldHint">
               Если печатает “кракозябрами” — попробуйте переключить <b>17 ↔ 66</b>{" "}
-              или <b>PC866 ↔ CP1251</b>.
+              или <b>PC866 ↔ CP1251</b>. Только для текстового режима (
+              <code>graphic: false</code>); graphic-чек кириллицу рисует через canvas.
             </div>
           </div>
 

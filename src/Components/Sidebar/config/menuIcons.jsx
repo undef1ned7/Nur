@@ -50,6 +50,7 @@ import {
   FaTags,
   FaTrashAlt,
   FaTruckLoading,
+  FaShieldAlt,
   FaUsers,
   FaWarehouse,
 } from "react-icons/fa";
@@ -77,6 +78,7 @@ export const menuIcons = {
   users: () => createIcon(Users),
   instagram: () => createIcon(Instagram),
   cog: () => createIcon(FaCog),
+  shield: () => createIcon(FaShieldAlt),
   store: () => createIcon(Store),
   clipboardList: () => createIcon(ClipboardList),
   // Для Building (используются в menuConfig.js)

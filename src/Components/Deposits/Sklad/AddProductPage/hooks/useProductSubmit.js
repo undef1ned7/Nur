@@ -162,18 +162,29 @@ export const useProductSubmit = ({
           });
         }
 
+        const dealDebt = utils.buildSkladDealDebtParams({
+          debtMonths,
+          dueDate: debtState.dueDate,
+        });
+
         await dispatch(
           createDeal({
             clientId: newItemData.client,
             title: `Долг ${pickSupplier?.full_name}`,
             statusRu: debt,
             amount: totalAmount,
-            debtMonths: Number(debtMonths),
+            debtDays: dealDebt.debtDays,
+            first_due_date: dealDebt.first_due_date,
           })
         ).unwrap();
       }
 
       if (debt === "Предоплата" && newItemData.client) {
+        const dealDebt = utils.buildSkladDealDebtParams({
+          debtMonths,
+          dueDate: debtState.dueDate,
+        });
+
         await dispatch(
           createDeal({
             clientId: newItemData.client,
@@ -181,7 +192,8 @@ export const useProductSubmit = ({
             statusRu: debt,
             amount: totalAmount,
             prepayment: Number(amount),
-            debtMonths: Number(debtMonths),
+            debtDays: dealDebt.debtDays,
+            first_due_date: dealDebt.first_due_date,
           })
         ).unwrap();
       }

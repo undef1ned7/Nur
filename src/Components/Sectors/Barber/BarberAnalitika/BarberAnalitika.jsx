@@ -1,7 +1,5 @@
 // BarberAnalitika.jsx
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../../../../api";
 import {
   FiRefreshCcw,
   FiUsers,
@@ -53,7 +51,6 @@ ChartJS.register(
 );
 
 const BarberAnalitika = () => {
-  const navigate = useNavigate();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
@@ -64,6 +61,8 @@ const BarberAnalitika = () => {
   const {
     loading,
     errorMsg,
+    accessDenied,
+    refetch,
     totalApps,
     totalServices,
     totalClientsBarber,
@@ -84,6 +83,8 @@ const BarberAnalitika = () => {
     clientsSalesRows,
     unifiedIncome,
     unifiedExpense,
+    goodsSummary,
+    salesClientsSummary,
     weekChart,
     dayLineChart,
     bookingsStatusesData,
@@ -101,36 +102,6 @@ const BarberAnalitika = () => {
 
   const openModal = (payload) => setModal({ open: true, ...payload });
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
-
-  // Обработчик клика на карточки приход/расход
-  const handleCardClick = async (tabType) => {
-    try {
-      const { data } = await api.get("/construction/cashboxes/");
-      const boxes = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-          ? data
-          : [];
-
-      if (boxes.length === 0) {
-        alert("Нет доступных касс");
-        return;
-      }
-
-      const firstBox = boxes[0];
-      const firstBoxId = firstBox?.id || firstBox?.uuid || "";
-
-      if (!firstBoxId) {
-        alert("Не удалось определить ID кассы");
-        return;
-      }
-
-      navigate(`/crm/kassa/${firstBoxId}?tab=${tabType}`);
-    } catch (error) {
-      console.error("Ошибка при загрузке касс:", error);
-      alert("Не удалось загрузить список касс");
-    }
-  };
 
   const years = useMemo(() => [2025, 2026, 2027], []);
 
@@ -281,7 +252,7 @@ const BarberAnalitika = () => {
     },
     {
       key: "busiestDay",
-      title: "Загруженный день",
+      title: "Пик дня",
       value: busiestDay ? `${busiestDay.name} (${busiestDay.count})` : "—",
       icon: <FiStar size={20} />,
       iconMod: "pink",
@@ -466,6 +437,7 @@ const BarberAnalitika = () => {
               options={yearOptions}
               placeholder="Год"
               hideClear
+              hideSearch
             />
           </div>
 
@@ -476,13 +448,35 @@ const BarberAnalitika = () => {
               options={monthOptions}
               placeholder="Месяц"
               hideClear
+              hideSearch
             />
           </div>
+
+          <button
+            type="button"
+            className="barber-analitika__refresh"
+            onClick={refetch}
+            disabled={loading}
+            aria-label="Обновить данные"
+            title="Обновить данные"
+          >
+            <FiRefreshCcw size={18} />
+          </button>
         </div>
       </header>
 
-      {errorMsg && <div className="barber-analitika__alert">{errorMsg}</div>}
+      {errorMsg && (
+        <div
+          className={`barber-analitika__alert ${
+            accessDenied ? "barber-analitika__alert--denied" : ""
+          }`}
+        >
+          {errorMsg}
+        </div>
+      )}
 
+      {!accessDenied && (
+        <>
       {/* Индикатор загрузки */}
       {loading && (
         <div className="barber-analitika__loading">
@@ -808,10 +802,16 @@ const BarberAnalitika = () => {
             <>
               <h3 className="barber-analitika__panel-title">
                 Клиенты (продажи)
+                {salesClientsSummary.activeClients > 0 && (
+                  <span className="barber-analitika__panel-subtitle">
+                    {" "}
+                    · активных за месяц: {fmtInt(salesClientsSummary.activeClients)}
+                  </span>
+                )}
               </h3>
               <ul className="barber-analitika__top-list">
-                {clientsSalesRows.slice(0, 5).map((r, idx) => (
-                  <li key={idx} className="barber-analitika__top-item">
+                {clientsSalesRows.slice(0, 5).map((r) => (
+                  <li key={r.id} className="barber-analitika__top-item">
                     <div className="barber-analitika__top-item-left">
                       <div className="barber-analitika__top-icon barber-analitika__top-icon--client">
                         <FiShoppingCart size={18} />
@@ -867,6 +867,7 @@ const BarberAnalitika = () => {
           </div>
 
           {businessTab === "products" && (
+            <>
             <BarberAnalitikaCard
               icon={<FiPackage size={16} />}
               title="Товары (продажи)"
@@ -887,6 +888,21 @@ const BarberAnalitika = () => {
               rows={loadingProducts ? [] : productsRowsAgg}
               onOpenModal={openModal}
             />
+            <div className="barber-analitika__products-summary">
+              <span>
+                Итого за период: {fmt(goodsSummary.totalQty)} шт. ·{" "}
+                {fmtMoney(goodsSummary.totalRevenue)}
+              </span>
+              {(stockKpis.positions > 0 || stockKpis.totalQty > 0) && (
+                <span>
+                  Склад сейчас: {fmtInt(stockKpis.positions)} поз. ·{" "}
+                  {fmt(stockKpis.totalQty)} шт.
+                  {stockKpis.stockValueRetail > 0 &&
+                    ` · ${fmtMoney(stockKpis.stockValueRetail)}`}
+                </span>
+              )}
+            </div>
+            </>
           )}
 
           {businessTab === "cashboxes" && (
@@ -952,6 +968,8 @@ const BarberAnalitika = () => {
           onClose={closeModal}
           pageSize={12}
         />
+      )}
+        </>
       )}
     </div>
   );

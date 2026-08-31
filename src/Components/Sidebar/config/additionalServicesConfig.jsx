@@ -14,11 +14,11 @@ import {
 } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 import { SERVICE_IDS } from "../../../config/additionalServiceIds";
-import { mapSectorNameToSlug } from "../../../utils/sectorMapping";
+import {
+  isMarketSector,
+  resolveCashierPath,
+} from "../../../utils/cashierRoutes";
 import { menuIcons } from "./menuIcons";
-
-/** Сферы, где интерфейс кассира — общая касса продаж (/crm/sell/start). */
-const SELL_CASHIER_SECTORS = ["barber", "services", "dentistry"];
 
 const normalizeString = (value) =>
   String(value || "")
@@ -195,30 +195,19 @@ export const ADDITIONAL_SERVICES_CONFIG = [
     type: "navigational",
     label: "Интерфейс кассира",
     to: "/crm/market/cashier",
-    // В барбершопе/услугах/стоматологии касса живёт по другому пути
-    resolveTo: ({ sector }) =>
-      SELL_CASHIER_SECTORS.includes(mapSectorNameToSlug(sector))
-        ? "/crm/sell/start"
-        : "/crm/market/cashier",
+    resolveTo: ({ sector }) => resolveCashierPath(sector),
     icon: menuIcons.cashRegister,
     permission: "can_view_cashier",
     permissionModel: "user",
     implemented: true,
     conditions: {
-      customCheck: ({ tariff, sector }) => {
-        const isStart = normalizeString(tariff) === "старт";
-        const normalizedSector = normalizeString(sector);
-        const isMarket =
-          normalizedSector === "магазин" ||
-          normalizedSector === "цветочный магазин";
-        // На тарифе "Старт" в "Маркете" эта услуга не должна отображаться.
-        return !(isStart && isMarket);
-      },
+      // В маркете касса встроена в сферу — не предлагаем через «Доп. услуги».
+      customCheck: ({ sector }) => !isMarketSector(sector),
     },
     displayMeta: {
       title: "Интерфейс кассира",
       description:
-        "Подключение интерфейса кассира для быстрой продажи, оформления оплат и работы с чеками.",
+        "Подключите интерфейс кассира для быстрой продажи, оформления оплат и работы с чеками.",
       icon: FaCashRegister,
     },
   },

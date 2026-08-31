@@ -79,7 +79,7 @@ const SuccessPaymentModal = ({
 
         // Генерируем PDF из JSON используя InvoicePdfDocument
         const blob = await pdf(
-          <InvoicePdfDocument data={invoiceData} />
+          <InvoicePdfDocument data={invoiceData} />,
         ).toBlob();
 
         const fileName = `invoice_${
@@ -94,7 +94,7 @@ const SuccessPaymentModal = ({
       alert(
         err?.message ||
           err?.detail ||
-          "Не удалось скачать накладную. Попробуйте позже."
+          "Не удалось скачать накладную. Попробуйте позже.",
       );
     } finally {
       setDownloadingInvoice(false);
@@ -215,8 +215,9 @@ const SuccessPaymentModal = ({
         )}
 
         <div className="success-payment-modal__actions">
-          {/* {onPrint && (
+          {onPrint && (
             <button
+              type="button"
               className="success-payment-modal__print-btn"
               onClick={onPrint}
               disabled={printing}
@@ -224,9 +225,10 @@ const SuccessPaymentModal = ({
               <Printer size={18} />
               {printing ? "Печать..." : "ПЕЧАТЬ ЧЕКА"}
             </button>
-          )} */}
+          )}
           {saleId && (
             <button
+              type="button"
               className="success-payment-modal__download-btn"
               onClick={handleDownloadInvoice}
               disabled={downloadingInvoice}

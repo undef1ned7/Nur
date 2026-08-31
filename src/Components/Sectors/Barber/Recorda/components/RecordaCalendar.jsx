@@ -23,6 +23,7 @@ const MIN_EVENT_H = 72;
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
+const SLOT_MIN = 30;
 
 const estimateContentMin = (svc, client, phone) => {
   const wrapLen = 30;
@@ -155,7 +156,9 @@ const RecordaCalendar = ({
   clientPhone,
   COL_HEADER_H,
   SLOT_PX,
+  SLOT_MIN: slotMinProp = SLOT_MIN,
   onRecordClick,
+  onSlotClick,
   isToday,
 }) => {
   const visibleBarbers = useMemo(
@@ -194,13 +197,53 @@ const RecordaCalendar = ({
     return () => clearInterval(timer);
   }, [isToday]);
 
+  const slotTimes = useMemo(
+    () => timesAll.slice(0, -1),
+    [timesAll],
+  );
+
+  const isBarberBusyAtSlot = (barberId, slotIndex) => {
+    const list = recordsByBarber.get(String(barberId)) || [];
+    const slotStart = OPEN_HOUR * 60 + slotIndex * slotMinProp;
+    const slotEnd = slotStart + slotMinProp;
+    return list.some((r) => {
+      const s = new Date(r.start_at);
+      const e = new Date(r.end_at);
+      const rs = s.getHours() * 60 + s.getMinutes();
+      const re = e.getHours() * 60 + e.getMinutes();
+      return rs < slotEnd && slotStart < re;
+    });
+  };
+
   return (
-    <div className="barberrecorda__calendar barberrecorda__calendar--noGutter">
+    <div className="barberrecorda__calendar">
       <div className="barberrecorda__colsWrap">
         <div
           className="barberrecorda__cols"
           style={{ height: calendarHeight }}
         >
+          <aside
+            className="barberrecorda__timeGutter"
+            style={{ height: calendarHeight }}
+            aria-label="Время"
+          >
+            <div
+              className="barberrecorda__timeHeader"
+              style={{ height: COL_HEADER_H }}
+            />
+            {slotTimes.map((t, i) => (
+              <div
+                key={t}
+                className={`barberrecorda__timeCell ${
+                  busySlots.has(i) ? "is-busy" : ""
+                }`}
+                style={{ height: SLOT_PX }}
+              >
+                <span>{t}</span>
+              </div>
+            ))}
+          </aside>
+
           {visibleBarbers.map((b) => {
             const list = recordsByBarber.get(String(b.id)) || [];
             const layout = layoutForBarber(
@@ -249,6 +292,34 @@ const RecordaCalendar = ({
                   className="barberrecorda__eventsArea"
                   style={{ height: calendarHeight - COL_HEADER_H }}
                 >
+                  <div className="barberrecorda__slotLayer" aria-hidden="true">
+                    {slotTimes.map((t, i) => {
+                      const busy = isBarberBusyAtSlot(b.id, i);
+                      return (
+                        <button
+                          key={`${b.id}-${t}`}
+                          type="button"
+                          className={`barberrecorda__slotHit ${
+                            busy ? "is-busy" : ""
+                          }`}
+                          style={{
+                            top: i * SLOT_PX,
+                            height: SLOT_PX,
+                          }}
+                          disabled={busy}
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          onClick={() =>
+                            onSlotClick?.({
+                              barberId: String(b.id),
+                              startTime: t,
+                            })
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+
                   {/* Линия текущего времени */}
                   {nowLineTop !== null && (
                     <div 

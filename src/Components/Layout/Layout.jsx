@@ -11,6 +11,7 @@ import { useUser } from "../../store/slices/userSlice";
 import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { FaArrowUp } from "react-icons/fa";
+import { Menu } from "lucide-react";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useEnsureMarketDebtScheduleV2 } from "../../hooks/useMarketCashierSettings";
 import { prefetchSkladRoute } from "../../utils/prefetchSkladRoute";
@@ -134,6 +135,19 @@ const Layout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!isMobile || !isSidebarOpen || isHidden) {
+      document.body.classList.remove("sidebar-open-mobile");
+      return undefined;
+    }
+
+    document.body.classList.add("sidebar-open-mobile");
+    return () => {
+      document.body.classList.remove("sidebar-open-mobile");
+    };
+  }, [isSidebarOpen, isHidden]);
+
+  useEffect(() => {
     const isMobile = window.innerWidth < 769;
 
     if (isMobile && isSidebarOpen && isHidden) {
@@ -242,6 +256,17 @@ const Layout = () => {
                 toggleSidebar={toggleSidebar}
                 isSidebarOpen={isSidebarOpen}
               />
+              {!isSidebarOpen && (
+                <button
+                  type="button"
+                  className={`mobile-menu-fab${isArrowView ? " mobile-menu-fab--raised" : ""}`}
+                  onClick={toggleSidebar}
+                  aria-label="Открыть меню"
+                  title="Меню"
+                >
+                  <Menu size={22} strokeWidth={2.25} />
+                </button>
+              )}
             </>
           )}
           <div className="content_content">
