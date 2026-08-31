@@ -19,8 +19,12 @@ const BarberSelect = ({
   className = "",
 }) => {
   const rootRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const opts = Array.isArray(options) ? options : [];
+  const dropdownId = useRef(
+    `barber-select-${Math.random().toString(36).slice(2, 9)}`,
+  ).current;
 
   // Автоматически скрываем поиск если опций мало
   const hideSearch = hideSearchProp ?? opts.length < SEARCH_THRESHOLD;
@@ -36,40 +40,58 @@ const BarberSelect = ({
   const [dropdownStyle, setDropdownStyle] = useState({});
   const [dropdownPosition, setDropdownPosition] = useState("bottom");
 
+  const minDropdownWidth = useMemo(() => {
+    const longestLabel = opts.reduce(
+      (max, opt) => Math.max(max, safeStr(opt?.label).length),
+      0,
+    );
+    return Math.max(180, Math.min(320, longestLabel * 9 + 48));
+  }, [opts]);
+
   // Вычисляем позицию dropdown (Portal)
   const calculatePosition = useCallback(() => {
     if (!rootRef.current) return;
 
     const rect = rootRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
     const dropdownHeight = 280;
+    const gap = 4;
+    const edgeGap = 8;
 
     const isTop = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+    const width = Math.max(rect.width, minDropdownWidth);
+    let left = rect.left;
+
+    if (left + width > viewportWidth - edgeGap) {
+      left = Math.max(edgeGap, viewportWidth - width - edgeGap);
+    }
+    if (left < edgeGap) {
+      left = edgeGap;
+    }
 
     setDropdownPosition(isTop ? "top" : "bottom");
     setDropdownStyle({
       position: "fixed",
-      left: rect.left,
-      width: rect.width,
+      left,
+      width,
+      boxSizing: "border-box",
       ...(isTop
-        ? { bottom: viewportHeight - rect.top + 4 }
-        : { top: rect.bottom + 4 }),
+        ? { bottom: viewportHeight - rect.top + gap }
+        : { top: rect.bottom + gap }),
     });
-  }, []);
+  }, [minDropdownWidth]);
 
   // Закрыть при клике вне компонента
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        // Проверяем, не кликнули ли на dropdown в portal
-        const dropdown = document.querySelector(".barber-select__dropdown--portal");
-        if (dropdown && dropdown.contains(e.target)) return;
-        setIsOpen(false);
-      }
+      if (rootRef.current?.contains(e.target)) return;
+      if (dropdownRef.current?.contains(e.target)) return;
+      setIsOpen(false);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -182,6 +204,8 @@ const BarberSelect = ({
   // Dropdown через Portal
   const dropdownElement = isOpen && !disabled && (
     <div
+      ref={dropdownRef}
+      id={dropdownId}
       className={`barber-select__dropdown barber-select__dropdown--portal barber-select__dropdown--${dropdownPosition}`}
       style={dropdownStyle}
       role="listbox"

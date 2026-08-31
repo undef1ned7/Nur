@@ -2,12 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 import {
   choosePrinterByDialog,
+  getPrinterPaperMm,
   getSavedPrinters,
   listAuthorizedPrinters,
+  normalizePaperMm,
   parsePrinterBinding,
   printOrderReceiptJSONViaUSB,
   printViaWiFiSimple,
   setActivePrinterByKey,
+  setPrinterPaperMm,
+  CAFE_PAPER_MM_OPTIONS,
 } from "../../../Sectors/cafe/Orders/OrdersPrintService";
 
 const safeName = (p) => p?.name || "USB Printer";
@@ -93,11 +97,21 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
             ).trim() || String(map?.[kid] || "").trim();
           const parsed = parsePrinterBinding(raw);
           if (parsed.kind === "usb") {
-            next[kid] = { device: "usb", usbKey: parsed.usbKey || "", ipPort: "" };
+            next[kid] = {
+              device: "usb",
+              usbKey: parsed.usbKey || "",
+              ipPort: "",
+              paperMm: getPrinterPaperMm(raw),
+            };
           } else if (parsed.kind === "ip") {
-            next[kid] = { device: "wifi", ipPort: parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`, usbKey: "" };
+            next[kid] = {
+              device: "wifi",
+              ipPort: parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`,
+              usbKey: "",
+              paperMm: getPrinterPaperMm(raw),
+            };
           } else {
-            next[kid] = { device: "wifi", ipPort: "", usbKey: "" };
+            next[kid] = { device: "wifi", ipPort: "", usbKey: "", paperMm: 80 };
           }
         }
         return next;
@@ -147,7 +161,7 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
     async (kitchen) => {
       const kid = String(kitchen?.id ?? "");
       if (!kid) return;
-      const d = drafts?.[kid] || { device: "wifi", ipPort: "", usbKey: "" };
+      const d = drafts?.[kid] || { device: "wifi", ipPort: "", usbKey: "", paperMm: 80 };
 
       let printer = "";
       if (d.device === "wifi") {
@@ -172,6 +186,7 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
         const map = readKitchenPrinterMap();
         map[kid] = printer;
         writeKitchenPrinterMap(map);
+        setPrinterPaperMm(printer, normalizePaperMm(d.paperMm));
 
         showAlert?.("success", `Сохранено: ${kitchenLabel(kitchen)}`);
         await refreshKitchens();
@@ -223,11 +238,17 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
       };
 
       try {
+        const mm = normalizePaperMm(drafts?.[kid]?.paperMm);
         if (parsed.kind === "ip") {
-          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+          await printViaWiFiSimple(payload, parsed.ip, parsed.port, {
+            paperMm: mm,
+          });
         } else if (parsed.kind === "usb") {
           await setActivePrinterByKey(parsed.usbKey);
-          await printOrderReceiptJSONViaUSB(payload);
+          await printOrderReceiptJSONViaUSB(payload, {
+            usbKey: parsed.usbKey,
+            paperMm: mm,
+          });
         }
         showAlert?.("success", `Тест отправлен: ${kitchenLabel(k)}`);
       } catch (e) {
@@ -235,7 +256,7 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
         showAlert?.("error", `Не удалось отправить тест: ${kitchenLabel(k)}`);
       }
     },
-    [getCurrentBinding, kitchenLabel, showAlert]
+    [drafts, getCurrentBinding, kitchenLabel, showAlert]
   );
 
   const chooseUsb = useCallback(
@@ -308,7 +329,8 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
       <div className="settings__cardsGrid">
         {kitchens.map((k) => {
           const kid = String(k?.id ?? "");
-          const d = drafts?.[kid] || { device: "wifi", ipPort: "", usbKey: "" };
+          const d = drafts?.[kid] || { device: "wifi", ipPort: "", usbKey: "", paperMm: 80 };
+          const paperMm = normalizePaperMm(d.paperMm);
           const current = getCurrentBinding(k);
           const parsed = parsePrinterBinding(current);
           const currentText =
@@ -401,6 +423,22 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
                   </div>
                 </div>
               )}
+
+              <div className="settings__form-group" style={{ marginBottom: 12 }}>
+                <div className="settings__label">Ширина ленты</div>
+                <div className="settings__segmented" style={{ flexWrap: "wrap" }}>
+                  {CAFE_PAPER_MM_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.mm}
+                      type="button"
+                      className={`settings__segBtn ${paperMm === opt.mm ? "settings__segBtn--active" : ""}`}
+                      onClick={() => setDraft(kid, { paperMm: opt.mm })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="settings__cardActions">
                 <button type="button" className="settings__btnSmall settings__btnSmall--primary" onClick={() => saveOne(k)}>

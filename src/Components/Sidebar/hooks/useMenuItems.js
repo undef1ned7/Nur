@@ -5,6 +5,7 @@ import { HIDE_RULES } from "../config/hideRules";
 import { useMenuPermissions } from "./useMenuPermissions";
 import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig";
 import { isStartPlan } from "../../../utils/subscriptionPlan";
+import { isPlatformAdmin } from "../../pages/PlatformAdmin/platformAdminAccess";
 
 /**
  * Хук для сборки финального списка пунктов меню
@@ -13,6 +14,9 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
   const { hasPermission, isAllowed, companyAllows } = useMenuPermissions();
   const hasMenuAccess = useCallback(
     (item) => {
+      if (item?.requirePlatformAdmin) {
+        return isPlatformAdmin(profile);
+      }
       if (!item?.permission) return true;
       switch (item.permissionModel) {
         case "user":
@@ -25,7 +29,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
           return hasPermission(item.permission) === true;
       }
     },
-    [company, hasPermission, isAllowed, companyAllows],
+    [company, hasPermission, isAllowed, companyAllows, profile],
   );
   /**
    * Вычисляет скрытые элементы на основе правил

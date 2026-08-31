@@ -1165,3 +1165,13 @@
     }
   }
 }
+
+.payment-page--embedded {
+  position: static;
+  height: auto;
+  width: 100%;
+  min-height: 0;
+  overflow: visible;
+  z-index: auto;
+  background: transparent;
+}

@@ -1,12 +1,14 @@
 import { Suspense, useState, useCallback, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./App.scss";
 import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard.jsx";
 import Layout from "./Components/Layout/Layout.jsx";
 import { ScrollToTop } from "./hooks/ScrollToTop.jsx";
 import { publicRoutes } from "./config/routes.jsx";
+import { platformAdminRoutes } from "./config/routes/platformAdminRoutes.jsx";
 import Logout from "./Components/Auth/Logout/Logout.jsx";
 import RouteFallback from "./Components/common/RouteFallback/RouteFallback.jsx";
+import ImpersonationBanner from "./Components/common/ImpersonationBanner/ImpersonationBanner.jsx";
 import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
 import "./i18n.js";
@@ -14,13 +16,12 @@ import { ModalProvider } from "./context/modal";
 import { useUser } from "./store/slices/userSlice";
 
 function AppRoutes({ profile }) {
-  const { pathname } = useLocation();
   const { sector, company } = useUser();
   const sectorName = sector || company?.sector?.name || "";
   const [crmRoutesElements, setCrmRoutesElements] = useState(null);
 
   useEffect(() => {
-    if (!pathname.startsWith("/crm")) {
+    if (!profile) {
       return undefined;
     }
 
@@ -47,12 +48,14 @@ function AppRoutes({ profile }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, profile, sectorName]);
+  }, [profile, sectorName]);
 
   return (
     <Suspense fallback={<RouteFallback />}>
+      <ImpersonationBanner />
       <Routes>
         {publicRoutes}
+        {platformAdminRoutes}
         <Route key="/crm" path="/crm" element={<Layout />}>
           <Route path="logout" element={<Logout />} />
           {crmRoutesElements ?? (

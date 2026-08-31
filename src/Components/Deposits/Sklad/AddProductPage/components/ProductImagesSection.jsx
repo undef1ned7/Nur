@@ -1,7 +1,8 @@
 import React from "react";
+import { ImageCropperModal } from "../../../../common/ImageCropperModal";
 
 /**
- * Компонент загрузки изображений товара
+ * Компонент загрузки изображений товара (с шагом кроппинга для новых файлов).
  */
 const ProductImagesSection = ({
   images,
@@ -9,6 +10,12 @@ const ProductImagesSection = ({
   onImageAdd,
   onImageRemove,
   onSetPrimary,
+  cropperOpen = false,
+  cropperImageSrc = null,
+  cropperSourceFile = null,
+  onCropComplete,
+  onCropCancel,
+  cropperAspectRatio = 1,
 }) => {
   return (
     <div className="market-product-form__section">
@@ -38,7 +45,7 @@ const ProductImagesSection = ({
             e.preventDefault();
             e.stopPropagation();
             const files = Array.from(e.dataTransfer.files || []).filter((f) =>
-              f.type.startsWith("image/")
+              f.type.startsWith("image/"),
             );
             onImageAdd(files);
           }}
@@ -90,9 +97,17 @@ const ProductImagesSection = ({
           </div>
         )}
       </div>
+
+      <ImageCropperModal
+        open={cropperOpen}
+        imageSrc={cropperImageSrc}
+        sourceFile={cropperSourceFile}
+        aspectRatio={cropperAspectRatio}
+        onCropComplete={onCropComplete}
+        onClose={onCropCancel}
+      />
     </div>
   );
 };
 
 export default React.memo(ProductImagesSection);
-

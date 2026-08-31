@@ -1,43 +1,46 @@
-# NUR CRM — Полная документация проекта
+# NUR CRM — документация проекта
 
-> Дата анализа: 8 июня 2026  
-> Версия проекта: `0.1.0`  
-> Репозиторий: `/Users/undefined/projects/Nur`
+> **Дата обновления:** 24 августа 2026  
+> **Версия:** `0.1.0`  
+> **Репозиторий:** `NurFront` (frontend SPA для [app.nurcrm.kg](https://app.nurcrm.kg))
 
 ---
 
 ## Содержание
 
-1. [Обзор](#1-обзор)
-2. [Технологический стек](#2-технологический-стек)
-3. [Структура репозитория](#3-структура-репозитория)
-4. [Точки входа и bootstrap](#4-точки-входа-и-bootstrap)
+1. [Обзор продукта](#1-обзор-продукта)
+2. [Быстрый старт](#2-быстрый-старт)
+3. [Технологический стек](#3-технологический-стек)
+4. [Структура репозитория](#4-структура-репозитория)
 5. [Архитектура приложения](#5-архитектура-приложения)
-6. [Роутинг](#6-роутинг)
-7. [Аутентификация и авторизация](#7-аутентификация-и-авторизация)
-8. [API-слой](#8-api-слой)
-9. [Redux Store](#9-redux-store)
-10. [Секторы бизнеса](#10-секторы-бизнеса)
-11. [Общие модули (Deposits, Pages)](#11-общие-модули-deposits-pages)
-12. [UI и Layout](#12-ui-и-layout)
-13. [Стилизация](#13-стилизация)
-14. [Интернационализация (i18n)](#14-интернационализация-i18n)
-15. [PWA и Service Worker](#15-pwa-и-service-worker)
-16. [Утилиты (tools/)](#16-утилиты-tools)
-17. [Подпроект ubl-invoice](#17-подпроект-ubl-invoice)
-18. [Переменные окружения](#18-переменные-окружения)
-19. [Сборка и деплой](#19-сборка-и-деплой)
-20. [Тестирование](#20-тестирование)
-21. [Печать чеков (Cafe)](#21-печать-чеков-cafe)
-22. [Существующая документация](#22-существующая-документация)
-23. [Статистика кодовой базы](#23-статистика-кодовой-базы)
-24. [Технический долг и наблюдения](#24-технический-долг-и-наблюдения)
+6. [Точки входа и bootstrap](#6-точки-входа-и-bootstrap)
+7. [Роутинг](#7-роутинг)
+8. [Аутентификация и авторизация](#8-аутентификация-и-авторизация)
+9. [API-слой](#9-api-слой)
+10. [Redux Store](#10-redux-store)
+11. [Секторы бизнеса](#11-секторы-бизнеса)
+12. [Общие модули (Deposits, Pages)](#12-общие-модули-deposits-pages)
+13. [UI, Layout и меню](#13-ui-layout-и-меню)
+14. [Real-time и офлайн](#14-real-time-и-офлайн)
+15. [Стилизация](#15-стилизация)
+16. [Интернационализация](#16-интернационализация)
+17. [PWA и Service Worker](#17-pwa-и-service-worker)
+18. [Утилиты и доменная логика](#18-утилиты-и-доменная-логика)
+19. [Печать чеков (Cafe)](#19-печать-чеков-cafe)
+19a. [Печать чеков (Market)](#19a-печать-чеков-market)
+20. [Подпроект ubl-invoice](#20-подпроект-ubl-invoice)
+21. [Переменные окружения](#21-переменные-окружения)
+22. [Сборка и деплой](#22-сборка-и-деплой)
+23. [Тестирование](#23-тестирование)
+24. [Доменная документация (docs/)](#24-доменная-документация-docs)
+25. [Статистика кодовой базы](#25-статистика-кодовой-базы)
+26. [Технический долг и рекомендации](#26-технический-долг-и-рекомендации)
 
 ---
 
-## 1. Обзор
+## 1. Обзор продукта
 
-**NUR CRM** — многопрофильная CRM-система (frontend) для управления бизнесом в различных отраслях. Продукт ориентирован на рынок Кыргызстана.
+**NUR CRM** — многопрофильная CRM-система (frontend) для управления бизнесом в различных отраслях. Продукт ориентирован на рынок Кыргызстана; интерфейс, комментарии и коммиты — преимущественно на русском языке.
 
 ### Ключевые характеристики
 
@@ -47,24 +50,83 @@
 | Сборщик | Vite 7 |
 | UI-фреймворк | React 18 |
 | Состояние | Redux Toolkit |
-| Бэкенд API | `https://app.nurcrm.kg/api` |
+| Бэкенд API | `https://app.nurcrm.kg/api` (настраивается) |
 | Dev-порт | `3000` |
 | Production output | `build/` |
 
 ### Основные возможности
 
-- Управление **12+ отраслевыми секторами** (кафе, маркет, барбершоп, школа, гостиница, строительство, производство, склад, логистика и др.)
+- **12+ отраслевых секторов:** кафе, маркет, барбершоп/услуги/стоматология, школа, гостиница, строительство, производство, склад (агентская модель), консалтинг, логистика, пилорама
 - **Многопользовательская** система с ролевым доступом (permissions с бэкенда)
-- Управление **филиалами** и **отделами**
-- **Аналитика** и отчётность
-- **Складской учёт** и кассовые операции
-- **PWA** — установка как приложение
+- Управление **филиалами**, **отделами** и **сменами**
+- **Аналитика** и отчётность по секторам
+- **Складской учёт**, кассовые операции, документооборот
+- **PWA** — установка как приложение, кэширование статики
+- **Офлайн-режим кафе** — IndexedDB (Dexie) + очередь синхронизации
+- **Real-time:** WebSocket для заказов кафе, воронки консалтинга, Wazzup-чатов, уведомлений
+- **Онлайн-витрины:** каталог маркета, меню кафе, витрина производства, онлайн-запись барбершопа
 - **Многоязычность** (русский, кыргызский) — в основном для лендинга
-- **Онлайн-витрины**: каталог маркета, меню кафе, онлайн-запись барбершопа
+
+### Связанные приложения
+
+| Приложение | URL | Назначение |
+|---|---|---|
+| Основной CRM | app.nurcrm.kg | Этот репозиторий |
+| Staging | stage.nurcrm.kg | Тестовая сборка (`npm run build:staging`) |
+| Строительство | stroy.nurcrm.kg | Отдельное SPA; редирект после логина через `crossAppAuth` |
 
 ---
 
-## 2. Технологический стек
+## 2. Быстрый старт
+
+### Требования
+
+- Node.js **18+** (рекомендуется LTS)
+- npm **9+**
+
+### Установка и запуск
+
+```bash
+git clone <repository-url>
+cd NurFront
+npm install
+
+cp .env.example .env
+# При необходимости создайте .env.local для локального бэкенда
+
+npm run dev        # http://localhost:3000
+```
+
+### Разработка против локального бэкенда
+
+Создайте `.env.local` (в `.gitignore`):
+
+```env
+DEV_BACKEND=http://192.168.1.175:8000
+VITE_API_URL=/api
+VITE_WS_API_URL=
+```
+
+Vite проксирует:
+- `/api` → `DEV_BACKEND` (REST)
+- `/ws` → `DEV_BACKEND` (WebSocket)
+- `/media` → `https://app.nurcrm.kg` (медиафайлы с прода)
+
+### Основные команды
+
+| Команда | Назначение |
+|---|---|
+| `npm run dev` | Dev-сервер Vite (порт 3000, hot reload) |
+| `npm run build` | Production-сборка → `build/` |
+| `npm run build:staging` | Staging-сборка (читает `.env.staging`) |
+| `npm run preview` | Локальный просмотр production-сборки |
+| `npm test` | Vitest — все unit-тесты |
+| `npm run lint` | ESLint (flat config в `eslint.config.js`) |
+| `npm run printer-bridge` | Node-мост для Wi‑Fi принтеров кафе |
+
+---
+
+## 3. Технологический стек
 
 ### Основные зависимости
 
@@ -72,13 +134,14 @@
 |---|---|
 | **Core** | React 18, React DOM, React Router DOM 6 |
 | **State** | Redux Toolkit 2, React Redux 9 |
-| **HTTP** | Axios 1.6 |
+| **HTTP** | Axios 1.18 |
 | **UI** | MUI 5, Radix UI, Emotion |
 | **Стили** | SASS, Tailwind CSS 4 |
 | **Графики** | Chart.js, react-chartjs-2, Recharts |
 | **Календарь** | FullCalendar 6 |
 | **PDF/Excel** | @react-pdf/renderer, jspdf, xlsx |
 | **i18n** | i18next, react-i18next |
+| **Офлайн** | Dexie 4 (IndexedDB для кафе) |
 | **Анимации** | framer-motion, Swiper |
 | **Утилиты** | date-fns, clsx, tailwind-merge, class-variance-authority |
 | **Прочее** | jsbarcode, use-scan-detection, sonner, lucide-react, react-icons |
@@ -90,106 +153,72 @@
 | Vite 7 | Сборка и dev-сервер |
 | @vitejs/plugin-react | JSX/TSX трансформация |
 | @tailwindcss/vite | Tailwind CSS v4 |
-| vite-plugin-pwa | PWA + Workbox |
+| vite-plugin-pwa | PWA + Workbox (injectManifest) |
 | sass | SCSS компиляция |
-| vitest | Unit-тесты |
-| eslint-config-react-app | ESLint (наследие CRA) |
-
-### NPM-скрипты
-
-```bash
-npm run dev          # Vite dev-сервер (порт 3000)
-npm run build        # Production-сборка → build/
-npm run preview      # Превью production-сборки
-npm test             # vitest run
-npm run printer-bridge  # Node bridge для Wi-Fi принтеров (файл может отсутствовать)
-```
+| vitest + jsdom + Testing Library | Unit-тесты |
+| eslint + eslint-plugin-react | Линтинг |
+| electron + electron-builder | Зависимости для десктоп-упаковки (в `package.json`) |
 
 ---
 
-## 3. Структура репозитория
+## 4. Структура репозитория
 
 ```
-Nur/
-├── public/                    # Статика: иконки, PWA-манифест, локали, звуки
-│   ├── locales/ru/            # Русские переводы
-│   ├── locales/ky/            # Кыргызские переводы
-│   └── site.webmanifest       # PWA манифест
-├── src/                       # Исходный код (~856 JS/JSX/TS файлов)
-│   ├── api/                   # API-модули (18 файлов)
-│   ├── assets/scss/           # Глобальные SCSS переменные и миксины
-│   ├── Components/            # React-компоненты
-│   │   ├── Auth/              # Авторизация
-│   │   ├── common/            # Общие UI-компоненты
-│   │   ├── Deposits/          # Legacy общие модули CRM
-│   │   ├── Layout/            # Основной layout CRM
-│   │   ├── pages/             # Страницы (лендинг, building, sell, info...)
-│   │   ├── Sectors/           # Отраслевые модули (12 секторов)
-│   │   └── Sidebar/           # Боковое меню
-│   ├── config/                # routes.jsx, crmRoutes.jsx
-│   ├── constants/             # Константы (публичные пути и др.)
-│   ├── context/               # React Context (модалки)
-│   ├── data/                  # Статические данные (countries.js)
-│   ├── hooks/                 # Custom hooks (8 файлов)
-│   ├── services/              # Сервисы (registerAccessService)
-│   ├── store/                 # Redux: slices + creators
-│   ├── theme/                 # MUI ThemeModeProvider
-│   ├── tools/                 # Утилиты фронтенда
-│   ├── utils/                 # Общие утилиты
-│   ├── App.jsx                # Корневой компонент
-│   ├── main.jsx               # Точка входа
-│   ├── i18n.js                # Конфигурация i18next
-│   ├── sw.js                  # Service Worker (Workbox)
-│   └── ProtectedRoute.jsx     # HOC защиты маршрутов
-├── docs/                      # Техническая документация (~42 файла)
-├── tools/                     # Доменные утилиты (касса, штрихкоды, аналитика)
-├── ubl-invoice/               # Отдельный TS-пакет UBL 2.1 счетов
-├── build/                     # Production-сборка
-├── index.html                 # HTML-шаблон Vite
-├── vite.config.js             # Конфигурация Vite
-├── vitest.config.ts           # Конфигурация тестов
+NurFront/
+├── public/                         # Статика: иконки, PWA-манифест, локали, звуки
+│   ├── locales/ru/                 # Русские переводы (i18next)
+│   ├── locales/ky/                 # Кыргызские переводы
+│   └── site.webmanifest
+├── src/                            # Исходный код (~1060 JS/JSX/TS файлов)
+│   ├── api/                        # API-модули по доменам (~35 файлов)
+│   ├── assets/scss/                # Глобальные SCSS переменные и миксины
+│   ├── Components/
+│   │   ├── Auth/                   # Логин, регистрация, AuthGuard
+│   │   ├── common/                 # Общие UI-компоненты
+│   │   ├── Deposits/               # Legacy общие модули CRM
+│   │   ├── Layout/                 # Основной layout CRM
+│   │   ├── pages/                  # Страницы (лендинг, building, sell, info…)
+│   │   ├── Sectors/                # Отраслевые модули (12 секторов)
+│   │   └── Sidebar/                # Боковое меню и конфигурация
+│   ├── config/
+│   │   ├── routes.jsx              # Публичные маршруты
+│   │   └── routes/                 # Модульные CRM-маршруты по секторам
+│   ├── constants/                  # Константы (пути, auth)
+│   ├── context/                    # React Context (модалки)
+│   ├── db/                         # Dexie-схема офлайн-БД кафе
+│   ├── hooks/                      # Custom hooks (~19 файлов)
+│   ├── services/                   # Сервисы (офлайн, Wazzup, fiscal, registerAccess)
+│   ├── store/                      # Redux: slices + creators
+│   ├── test/                       # Vitest setup
+│   ├── theme/                      # MUI ThemeModeProvider
+│   ├── tools/                      # Утилиты фронтенда (доменная логика)
+│   ├── utils/                      # Общие утилиты
+│   ├── App.jsx                     # Корневой компонент
+│   ├── main.jsx                    # Точка входа
+│   ├── i18n.js                     # Конфигурация i18next
+│   ├── sw.js                       # Service Worker (Workbox)
+│   └── ProtectedRoute.jsx          # Guard подписки компании
+├── docs/                           # Доменная техническая документация (~56 файлов)
+├── tools/                          # Доменные утилиты + printer-bridge + тесты
+│   └── printer-agent/              # Python/Flet агент печати (альтернатива bridge)
+├── ubl-invoice/                    # Отдельный TS-пакет UBL 2.1 счетов
+├── build/                          # Production-сборка (gitignore)
+├── index.html                      # HTML-шаблон Vite
+├── vite.config.js                  # Конфигурация Vite + PWA + proxy
+├── vitest.config.ts                # Конфигурация тестов
+├── eslint.config.js                # ESLint flat config
 ├── package.json
 ├── .env.example
-└── README.md
+├── README.md                       # Краткий старт + printer-bridge
+├── CLAUDE.md                       # Контекст для AI-ассистентов
+└── PROJECT_DOCUMENTATION.md        # Этот файл
 ```
-
----
-
-## 4. Точки входа и bootstrap
-
-### `index.html` → `src/main.jsx`
-
-```javascript
-// main.jsx — порядок инициализации:
-import './index.css'           // Tailwind
-import store from './store'    // Redux
-import { Provider } from 'react-redux'
-import { registerSW } from 'virtual:pwa-register'  // PWA
-registerSW({ immediate: true })
-ReactDOM.createRoot(...).render(<Provider><App /></Provider>)
-```
-
-> `React.StrictMode` закомментирован.
-
-### `src/App.jsx`
-
-Цепочка провайдеров и роутинга:
-
-```
-AuthGuard
-  └── ThemeModeProvider (MUI light/dark)
-        └── ModalProvider (глобальные alert/confirm)
-              └── BrowserRouter
-                    └── AppRoutes
-                          ├── publicRoutes (routes.jsx)
-                          └── /crm/* → Layout + crmRoutes (lazy-load)
-```
-
-**Lazy-load CRM:** маршруты из `crmRoutes.jsx` (~765 строк) подгружаются динамически только при первом заходе на `/crm/*`, что уменьшает начальный бандл.
 
 ---
 
 ## 5. Архитектура приложения
+
+### Общая схема
 
 ```mermaid
 flowchart TB
@@ -206,20 +235,32 @@ flowchart TB
 
     subgraph routing [Routing]
         public[routes.jsx — публичные]
-        crm[crmRoutes.jsx — lazy]
+        crm[config/routes/* — lazy CRM]
         protected[ProtectedRoute]
     end
 
     subgraph state [Redux Store]
-        slices[29 общих slices]
+        slices[31 общих slices]
         building[18 building slices]
-        creators[creators/thunks]
+        creators[45 creators/thunks]
+    end
+
+    subgraph realtime [Real-time]
+        wsCafe[useCafeWebSocket]
+        wsFunnel[useFunnelBoardWebSocket]
+        wsWazzup[wazzupSocketManager]
+        wsNotify[useNotificationsSocket]
+    end
+
+    subgraph offline [Offline Cafe]
+        dexie[cafeOfflineDB — Dexie]
+        fallback[cafeOfflineFallback]
     end
 
     subgraph ui [UI]
         layout[Layout + Sidebar]
         sectors[Sectors modules]
-        pages[pages + Deposits]
+        deposits[Deposits + pages]
     end
 
     main --> app
@@ -227,27 +268,73 @@ flowchart TB
     guard --> routing
     routing --> layout
     layout --> sectors
-    layout --> pages
+    layout --> deposits
     sectors --> axios
-    pages --> axios
+    deposits --> axios
     creators --> axios
     axios --> ls
+    axios --> fallback
+    fallback --> dexie
     app --> state
+    sectors --> wsCafe
+    sectors --> wsFunnel
+    sectors --> wsWazzup
 ```
 
 ### Принципы архитектуры
 
-1. **Монорепо-секторы** — один фронтенд, маршруты и меню конфигурируются по `company.sector` и permissions с бэкенда.
-2. **Lazy CRM routes** — тяжёлый бандл CRM подгружается только при `/crm/*`.
-3. **Permission-based UI** — sidebar фильтрует пункты меню по permissions пользователя.
-4. **Секторные алиасы** — barber / services / dentistry используют одни React-компоненты с разными URL-префиксами.
-5. **Два слоя «склада»** — legacy `Deposits/Sklad` + `Market/Warehouse` vs отдельный сектор `Warehouse/` (агентская модель).
+1. **Монорепо-секторы** — один фронтенд; маршруты и меню конфигурируются по `company.sector` и permissions с бэкенда.
+2. **Lazy CRM routes** — тяжёлый бандл CRM подгружается только при первом заходе на `/crm/*`.
+3. **Модульный роутинг** — CRM-маршруты разбиты по секторам в `src/config/routes/` (~940 строк суммарно).
+4. **Permission-based UI** — sidebar фильтрует пункты меню по permissions пользователя.
+5. **Секторные алиасы** — barber / services / dentistry используют одни React-компоненты с разными URL-префиксами.
+6. **Два слоя «склада»:**
+   - Legacy: `Deposits/Sklad` + `Market/Warehouse` (розничный магазин)
+   - Отдельный сектор: `Warehouse/` (агентская модель с партнёрами)
+7. **Building — cross-app** — после логина пользователи строительного сектора могут перенаправляться на отдельное SPA (`stroy.nurcrm.kg`).
 
 ---
 
-## 6. Роутинг
+## 6. Точки входа и bootstrap
 
-### Публичные маршруты (`src/config/routes.jsx`, ~112 строк)
+### `index.html` → `src/main.jsx`
+
+```javascript
+import './index.css'           // Tailwind
+import store from './store'    // Redux
+import { Provider } from 'react-redux'
+
+// PWA: registerSW только в production
+// В dev — unregister старых SW (конфликт с Vite HMR)
+
+ReactDOM.createRoot(...).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </React.StrictMode>
+)
+```
+
+### `src/App.jsx` — цепочка провайдеров
+
+```
+AuthGuard
+  └── ThemeModeProvider (MUI light/dark)
+        └── ModalProvider (глобальные alert/confirm)
+              └── BrowserRouter
+                    └── AppRoutes
+                          ├── publicRoutes (routes.jsx)
+                          └── /crm/* → Layout + crmRoutes (dynamic import)
+```
+
+**Lazy-load CRM:** при первом переходе на `/crm/*` выполняется `import("./config/routes/index.js")`. До загрузки показывается `RouteFallback`. При ошибке — автоматический retry через 1.5 с.
+
+---
+
+## 7. Роутинг
+
+### Публичные маршруты (`src/config/routes.jsx`)
 
 | Путь | Компонент | Описание |
 |---|---|---|
@@ -260,56 +347,49 @@ flowchart TB
 | `/catalog/:slug` | `OnlineCatalog` | Публичный каталог маркета |
 | `/production/:slug` | `ProductionShowcase` | Витрина производства |
 | `/cafe/:company_slug/menu` | `CafeMenuOnline` | Онлайн-меню кафе |
-| `/barber\|services\|dentistry/:company_slug/booking` | `OnlineBooking` | Онлайн-запись |
+| `/service\|services\|dentistry/:company_slug/booking` | `OnlineBooking` | Онлайн-запись |
 | `/submit-application` | `SubmitApplication` | Заявка на подключение |
 | `/get-application-list` | `ApplicationList` | Список заявок (ProtectedRoute) |
 
-### CRM-маршруты (`src/config/crmRoutes.jsx`, ~765 строк)
+### CRM-маршруты (`src/config/routes/`)
 
-Все под префиксом `/crm`, обёрнуты в `<Layout />`.
+Агрегатор: `src/config/routes/index.js` — объединяет модули:
 
-#### Паттерны защиты маршрутов
+| Файл | Сектор / модуль |
+|---|---|
+| `commonRoutes.jsx` | Общие: obzor, sklad, kassa, sell, settings, analytics… |
+| `barberRoutes.jsx` | Барбершоп / услуги / стоматология |
+| `marketRoutes.jsx` | Магазин (market) |
+| `cafeRoutes.jsx` | Кафе |
+| `buildingRoutes.jsx` | Строительство |
+| `warehouseRoutes.jsx` | Склад (агентская модель) |
+| `productionRoutes.jsx` | Производство |
+| `schoolRoutes.jsx` | Школа |
+| `hostelRoutes.jsx` | Гостиница |
+| `consultingRoutes.jsx` | Консалтинг |
+| `logisticsRoutes.jsx` | Логистика |
+| `piloramaRoutes.jsx` | Пилорама |
+
+Все CRM-маршруты под префиксом `/crm`, обёрнуты в `<Layout />`.
+
+### Паттерны защиты маршрутов (`helpers.jsx`)
 
 | Функция | Назначение |
 |---|---|
-| `createProtectedRoute(path, Component)` | Проверка подписки компании |
+| `createProtectedRoute(path, Component)` | Проверка подписки компании через `ProtectedRoute` |
 | `createPermissionProtectedRoute` | Проверка permission из профиля |
 | `createProductionAgentProtectedRoute` | Gate для тарифа «Старт» (производство) |
 | `createWarehouseAgentProtectedRoute` | Gate для тарифа «Старт» (склад) |
 
-#### Группы CRM-маршрутов
-
-| Префикс | Сектор / модуль |
-|---|---|
-| `/crm/obzor`, `/crm/sklad`, `/crm/kassa`, `/crm/sell`… | Общие (Deposits) |
-| `/crm/barber/*`, `/crm/services/*`, `/crm/dentistry/*` | Барбершоп / услуги / стоматология |
-| `/crm/hostel/*` | Гостиница |
-| `/crm/school/*` | Школа |
-| `/crm/market/*`, `/crm/clients/*` | Магазин |
-| `/crm/cafe/*` | Кафе |
-| `/crm/building/*` | Строительство |
-| `/crm/consulting/*` | Консалтинг |
-| `/crm/warehouse/*` | Склад (агентская модель) |
-| `/crm/production/*` | Производство |
-| `/crm/pilorama/*` | Пилорама |
-| `/crm/logistics`, `/crm/logistics-analytics` | Логистика |
-
-#### Вложенные Layout-ы
-
-- `BuildingLayout` — строительный модуль
-- `CafeLayout` — кафе
-- `CafeOrdersLayout` — заказы кафе
-- `SellLayout` — универсальная касса
-
 ### ProtectedRoute (`src/ProtectedRoute.jsx`)
 
-- Проверяет `company.end_date` (срок подписки)
+- Проверяет статус подписки компании (`getCompanySubscriptionStatus`)
 - При истечении — редирект на `/` с alert
-- Permission-based редирект в sidebar закомментирован
+- Пока `companyLoading` — показывает «Загрузка…»
 
 ---
 
-## 7. Аутентификация и авторизация
+## 8. Аутентификация и авторизация
 
 ### Поток логина
 
@@ -319,18 +399,19 @@ Login.jsx
     → userCreators.js → POST /users/auth/login/
       → localStorage: accessToken, refreshToken, userId, userData
       → migrateUserPermissions() — автоустановка sector-permissions для владельца
-        → navigate('/crm/')
+        → navigate('/crm/') или редирект на stroy.nurcrm.kg (building)
 ```
 
-### AuthGuard (`src/Components/Auth/AuthGuard/AuthGuard.jsx`)
+### AuthGuard (`Components/Auth/AuthGuard/AuthGuard.jsx`)
 
 | Событие | Действие |
 |---|---|
 | Старт приложения | Проверка токена → `getProfile()` |
 | Валидный токен на публичной странице | Редирект на `/crm` |
 | Нет токена на защищённом пути | Редирект на `/login` |
-| `/crm/logout` | Очистка токенов |
+| `/crm/logout` или `?logout=1` | Очистка токенов (в т.ч. cross-app logout) |
 | Есть токен | `getCompany()` |
+| Building sector | `tryRedirectToBuildingApp()` → stroy.nurcrm.kg |
 
 ### Хранение в localStorage
 
@@ -341,7 +422,7 @@ Login.jsx
 | `userId` | ID пользователя |
 | `userData` | Данные пользователя (JSON) |
 
-### Refresh token (axios interceptor)
+### Refresh token (`authInterceptors.js`)
 
 При 401:
 1. Очередь failed requests (`failedQueue`)
@@ -349,21 +430,18 @@ Login.jsx
 3. Обновление accessToken → повтор оригинального запроса
 4. При неудаче — очистка токенов, редирект на `/login`
 
-### Регистрация
-
-- `RegisterGate` — защита паролем (`VITE_REGISTER_ACCESS_PASSWORD` или бэкенд)
-- `registerUser` в `auth.js` — автоустановка permissions по сектору для роли «Владелец»
-
 ### Permissions и меню
 
-Конфигурация в `src/Components/Sidebar/config/menuConfig.js`:
-- Каждый пункт меню привязан к `permission` с бэкенда
-- Фильтрация через `useMenuItems`, `useMenuPermissions`
-- Тариф «Старт» ограничивает видимость пунктов
+Конфигурация в `Components/Sidebar/config/`:
+- `menuConfig.js` — агрегатор секторных меню
+- `sectors/*.js` — меню по секторам (buildingMenu, marketMenu, cafeMenu…)
+- `commonMenu.js` — общие пункты
+- Фильтрация через `useMenuItems`, `useMenuPermissions`, `hideRules.js`
+- Тариф «Старт» ограничивает видимость пунктов (production, warehouse)
 
 ---
 
-## 8. API-слой
+## 9. API-слой
 
 ### Axios instance (`src/api/index.js`)
 
@@ -371,19 +449,37 @@ Login.jsx
 baseURL: import.meta.env.VITE_API_URL || "https://app.nurcrm.kg/api"
 timeout: 20000
 // Request: Authorization: Bearer {accessToken}
-// Response: auto-refresh при 401
+// Request: FormData — автоматическое удаление Content-Type
+// Response: auto-refresh при 401 (authInterceptors)
+// Response: circuit breaker при серии 5xx
+// Response: offline fallback для кафе при network error
 ```
+
+### Interceptors
+
+| Interceptor | Файл | Назначение |
+|---|---|---|
+| Bearer token | `index.js` | Authorization header |
+| FormData fix | `index.js` | Корректная отправка multipart |
+| Circuit breaker | `circuitBreaker.js` | Временная блокировка запросов при серии ошибок |
+| Auth refresh | `authInterceptors.js` | Refresh token + retry queue |
+| Offline fallback | `cafeOfflineFallback.js` | Dexie-ответ при offline (кафе) |
 
 ### API-модули (`src/api/`)
 
 | Файл | Домен |
 |---|---|
 | `index.js` | Axios instance + interceptors |
-| `auth.js` | Регистрация, логин, industries, subscription plans, permissions |
+| `auth.js` | Регистрация, логин, industries, subscription plans |
+| `authInterceptors.js` | Refresh token logic |
+| `circuitBreaker.js` | Circuit breaker |
 | `employees.js` | Сотрудники |
 | `products.js` | Товары |
 | `orders.js` | Заказы |
-| `warehouse.js` | Склад |
+| `clients.js` | Клиенты |
+| `warehouse.js` | Склад (legacy/market) |
+| `warehouseSummaries.js` | Агрегаты склада |
+| `warehouseSalary.js` | Зарплата склада |
 | `building.js` | Строительство |
 | `catalog.js` | Каталог |
 | `analytics.js` | Аналитика |
@@ -396,22 +492,36 @@ timeout: 20000
 | `additionalServices.js` | Доп. услуги |
 | `registerAccess.js` | Доступ к регистрации |
 | `knowledgeBase.js` | База знаний |
-
-> Модули `clients.js`, `user.js` могут быть в других путях или интегрированы в creators.
+| `marketCashierSettings.js` | Настройки кассы маркета |
+| `productionSalary.js` | Зарплата производства |
+| `servicesSalary.js` | Зарплата услуг |
+| **Consulting cluster** | |
+| `consultingHttp.js` | Базовый HTTP для консалтинга |
+| `consultingLeads.js` | Лиды |
+| `consultingSales.js` | Продажи |
+| `consultingSalary.js` | Зарплата |
+| `consultingCashbox.js` | Касса |
+| `consultingAnalytics.js` | Аналитика |
+| `consultingCatalog.js` | Каталог услуг |
+| `consultingEmployees.js` | Сотрудники консалтинга |
+| `consultingSubscriptions.js` | Подписки |
+| `consultingWazzup.js` | Wazzup / WhatsApp интеграция |
 
 ---
 
-## 9. Redux Store
+## 10. Redux Store
 
 ### Конфигурация (`src/store/index.js`)
 
-**47 reducers** зарегистрировано в store.
+**49 reducers** зарегистрировано в store.
 
-### Общие slices (29)
+### Общие slices (31)
 
 | Ключ store | Файл | Назначение |
 |---|---|---|
 | `user` | `userSlice.js` | Аутентификация, профиль, компания, тариф |
+| `sector` | `sectorSlice.js` | Активный сектор |
+| `funnel` | `funnelSlice.js` | Воронка консалтинга |
 | `order` | `orderSlice.js` | Заказы |
 | `employee` | `employeeSlice.js` | Сотрудники |
 | `product` | `productSlice.js` | Товары |
@@ -463,76 +573,52 @@ timeout: 20000
 | `buildingSalary` | Зарплата |
 | `buildingTreatyInstallments` | Рассрочки по договорам |
 
-### Creators / Thunks (`src/store/creators/`, 38 файлов)
+### Creators / Thunks (`src/store/creators/`, 45 файлов)
 
-| Файл | Область |
-|---|---|
-| `userCreators.js` | login, register, profile, company |
-| `employeeCreators.js` | Сотрудники |
-| `productCreators.js` | Товары |
-| `orderCreators.js` | Заказы |
-| `saleThunk.js` | Продажи |
-| `analyticsCreators.js` | Аналитика |
-| `notificationCreators.js` | Уведомления |
-| `eventsCreators.js` | События |
-| `clientCreators.js` | Клиенты |
-| `departmentCreators.js` | Отделы |
-| `branchCreators.js` | Филиалы |
-| `shiftThunk.js` | Смены |
-| `warehouseCreators.js`, `warehouseThunk.js` | Склад |
-| `transferCreators.js` | Перемещения |
-| `agentCreators.js`, `agentCartCreators.js` | Агенты |
-| `cafeOrdersCreators.js` | Заказы кафе |
-| `consultingThunk.js` | Консалтинг |
-| `logisticsCreators.js` | Логистика |
-| `building/*Creators.js` (15 файлов) | Строительный модуль |
-
-> **Примечание:** `sectorSlice.js` существует, но **не подключён** к store.
+Async thunks вынесены из slices. Основные группы:
+- **Общие:** user, employee, product, order, sale, analytics, notification, events, client, department, branch, shift, warehouse, transfer, agent, cafeOrders, consulting, logistics, funnel
+- **Building:** 15 файлов в `creators/building/`
+- **Утилиты:** `utils/handleThunkError.js`
 
 ---
 
-## 10. Секторы бизнеса
+## 11. Секторы бизнеса
 
 Все секторы находятся в `src/Components/Sectors/`.
 
-### Barber (`Barber/`)
+### Barber / Services / Dentistry (`Barber/`)
 
-**Барбершоп, салоны услуг, стоматология** — общая кодовая база, разные URL-префиксы (`/crm/barber`, `/crm/services`, `/crm/dentistry`).
+Общая кодовая база, разные URL-префиксы.
 
 | Модуль | Назначение |
 |---|---|
-| `Recorda` | Запись клиентов на услуги (календарь/расписание) |
+| `Recorda` | Запись клиентов (календарь) |
 | `Services` | Справочник услуг и цен |
-| `Masters` | Мастера, роли, ставки, выплаты, история |
-| `Clients` | Клиентская база |
-| `ClientDocuments` | Документы клиентов |
-| `History` | История визитов/операций |
-| `Documents` | Документооборот |
-| `BarberAnalitika` | Кассовые отчёты и аналитика |
-| `Requests` | Заявки/запросы |
+| `Masters` | Мастера, роли, ставки, выплаты |
+| `Clients`, `ClientDocuments` | Клиентская база и документы |
+| `History`, `Documents` | История и документооборот |
+| `BarberAnalitika` | Кассовые отчёты |
 | `OnlineBooking` | Публичная онлайн-запись |
-| `common/` | Общие UI-компоненты сектора |
+| `Requests` | Заявки |
 
 ### Market (`Market/`)
 
-**Розничный магазин.**
+Розничный магазин.
 
 | Модуль | Назначение |
 |---|---|
-| `Warehouse` | Склад, товары, штрихкоды, приёмка от поставщиков |
-| `CashierPage` | POS-касса, смены, split-payment |
-| `Categories` | Категории товаров |
-| `Clients`, `ClientDetails` | Клиенты и поставщики |
-| `Counterparties` | Контрагенты |
-| `History` | История продаж |
-| `Documents` | Счета, накладные, акты сверки |
-| `Analytics` | Аналитика продаж |
-| `Bar` | Бар (доп. точка) |
+| `Warehouse` | Склад, товары, штрихкоды, приёмка |
+| `CashierPage` | POS-касса, смены, split-payment, мульти-корзины |
+| `Categories` | Категории |
+| `Clients`, `ClientDetails`, `Counterparties` | Клиенты, поставщики, контрагенты |
+| `History`, `Documents` | История продаж, счета, накладные |
+| `Analytics` | Аналитика |
 | `Catalog` | Публичный онлайн-каталог |
+| `Bar` | Бар (доп. точка) |
 
 ### Cafe (`cafe/`)
 
-**Ресторан / кафе.**
+Ресторан / кафе.
 
 | Модуль | Назначение |
 |---|---|
@@ -541,123 +627,81 @@ timeout: 20000
 | `Tables` | Столы и зал |
 | `Cook` | Экран кухни (KDS) |
 | `Reservations` | Бронирования |
-| `Clients` | Клиенты |
-| `Stock` | Склад кафе |
-| `Purchasing` | Закупки |
-| `Inventory` | Инвентаризация |
-| `Costing` | Калькуляция/себестоимость |
-| `Payroll` | Зарплата |
-| `Reports` | Отчёты |
-| `CafeAnalytics` | Аналитика |
-| `Documents` | Документы |
+| `Stock`, `Purchasing`, `Inventory` | Склад, закупки, инвентаризация |
+| `Costing` | Калькуляция |
+| `Payroll`, `Reports`, `CafeAnalytics` | Зарплата, отчёты, аналитика |
 | `kassaCafe` | Касса |
 | `CafeMenuOnline` | Публичное онлайн-меню |
 | `CafeLayout` | Layout сектора |
 
 ### Building (`Building/` + `pages/Building/`)
 
-**Строительная сфера.** Legacy-компоненты в `Sectors/Building/`, основной UI в `pages/Building/`.
-
-| Модуль (pages/Building) | Назначение |
-|---|---|
-| `Analytics` | Аналитика |
-| `CashRegister` | Касса, рассрочки |
-| `Clients` | Клиенты, подрядчики |
-| `Employees` | Сотрудники |
-| `Notification` | Напоминания |
-| `Procurement` | Закупки |
-| `Projects` | Проекты |
-| `Drawings` | Чертежи |
-| `Salary` | Зарплата |
-| `Sell` | Продажи |
-| `Stock` | Остатки |
-| `Treaty` | Договоры |
-| `Work` | Рабочие процессы |
+Строительная сфера. UI в `pages/Building/`, Redux в `slices/building/`, API в `api/building.js`. Основной UX может редиректить на отдельное SPA.
 
 ### Production (`Production/`)
 
-**Производственный ERP.**
+Производственный ERP.
 
 | Модуль | Назначение |
 |---|---|
-| `Warehouse` | Склад готовой продукции и сырья |
-| `RawMaterialsWarehouse` | Обработка сырья |
+| `Warehouse`, `RawMaterialsWarehouse` | Склад сырья и ГП |
 | `FinishedGoods` | Готовая продукция, рецепты |
 | `Catalog` | Каталог для агентов, публичная витрина |
-| `Request` | Заявки агентов на товар |
+| `Request` | Заявки агентов |
 | `ProductionAgents` | Агенты, клиенты, долги |
-| `Sell` | Продажи производства |
-| `Analytics` | Аналитика владельца и агента |
-| `TransferStatus` | Статусы перемещений |
+| `Sell`, `Analytics` | Продажи и аналитика |
 | `ProductionStartAgentGate` | Gate тарифа «Старт» |
 
 ### Warehouse (`Warehouse/`)
 
-**Агентский склад** (отдельный сектор от Market).
+Агентский склад (отдельный сектор от Market).
 
 | Модуль | Назначение |
 |---|---|
 | `Warehouses` | Склады, партнёрские каталоги |
-| `Stocks`, `AgentStocks` | Остатки (владелец/агент) |
-| `Products` | Номенклатура |
-| `Movements` | Движения товара |
-| `Supply` | Поставки |
-| `WriteOffs` | Списания |
-| `Documents` | Счета, накладные, коммерческие предложения |
-| `Money` | Денежные документы |
-| `Analytics` | Аналитика владельца, агентов, партнёров |
-| `Agents` | Агенты |
-| `Clients` | Клиенты |
-| `BrandCategory`, `Brands`, `Categories` | Бренды и категории |
-| `Kassa` | Касса |
-| `Directories` | Справочники |
+| `Stocks`, `AgentStocks` | Остатки |
+| `Products`, `Movements`, `Supply`, `WriteOffs` | Номенклатура и движения |
+| `Documents`, `Money` | Счета, накладные, КП, деньги |
+| `Analytics` | Аналитика владельца/агентов/партнёров |
+| `Agents`, `Clients` | Агенты и клиенты |
+| `BrandCategory`, `Brands`, `Categories` | Справочники |
+| `Kassa`, `Directories` | Касса и справочники |
 | `WarehouseStartAgentGate` | Gate тарифа «Старт» |
 
 ### Hostel (`Hostel/`)
 
-**Гостиница / хостел.**
-
 | Модуль | Назначение |
 |---|---|
-| `RoomsHalls` | Номера и залы |
-| `Bookings` | Бронирования и заезды |
-| `Clients` | Гости |
-| `Bar` | Бар/доп. услуги |
-| `Warehouse` | Склад гостиницы |
-| `Documents` | Документы |
-| `Analytics` | Аналитика |
-| `Reports` | Отчёты |
-| `kassa` | Касса |
+| `RoomsHalls`, `Bookings` | Номера и бронирования |
+| `Clients`, `Bar`, `Warehouse` | Гости, бар, склад |
+| `Documents`, `Analytics`, `Reports`, `kassa` | Документы и отчёты |
 
 ### School (`School/`)
 
-**Образовательное учреждение.**
-
 | Модуль | Назначение |
 |---|---|
-| `Students` | Ученики |
-| `CoursesGroups` | Курсы и группы |
-| `LessonsRooms` | Уроки и аудитории |
-| `Teachers` | Преподаватели |
-| `Leads` | Лиды/заявки |
-| `Invoices` | Счета и рассрочки |
-| `Documents` | Документы |
+| `Students`, `CoursesGroups` | Ученики, курсы, группы |
+| `LessonsRooms`, `Teachers` | Уроки, преподаватели |
+| `Leads`, `Invoices`, `Documents` | Лиды, счета, документы |
 
 ### Consulting (`Consulting/`)
 
-**Консалтинговые услуги.**
+Консалтинг с CRM-воронкой и WhatsApp (Wazzup).
 
 | Модуль | Назначение |
 |---|---|
-| `client` | Клиенты |
-| `client-requests` | Заявки клиентов |
-| `services` | Услуги |
+| `Funnel` | Kanban-воронка лидов, чат, оплаты |
+| `leads` | Входящие лиды, распределение, аналитика |
+| `Chats` | Inbox Wazzup-чатов |
+| `client`, `client-requests` | Клиенты и заявки |
+| `services` | Каталог услуг |
 | `Bookings` | Бронирования |
-| `Teachers` | Преподаватели/консультанты |
-| `sale` | Продажи |
-| `salary` | Зарплата |
-| `Kassa` | Касса и отчёты |
+| `Teachers` | Сотрудники, KPI, рейтинг |
+| `sale` | Продажи, отмена |
+| `salary` | Схемы, начисления, payslip |
+| `Kassa` | Касса, cash requests, отчёты |
 | `Analytics` | Аналитика |
+| `common/` | Shell, realtime hooks, Wazzup bridge |
 
 ### Logistics (`logistics/`)
 
@@ -673,80 +717,88 @@ timeout: 20000
 
 ---
 
-## 11. Общие модули (Deposits, Pages)
+## 12. Общие модули (Deposits, Pages)
 
-### Deposits (`src/Components/Deposits/`) — legacy общие модули
+### Deposits (`Components/Deposits/`) — legacy общие модули
 
-Используются несколькими секторами как базовый функционал:
+Используются несколькими секторами:
 
 | Модуль | CRM-путь | Назначение |
 |---|---|---|
-| `Obzor` | `/crm/obzor` | Дашборд/обзор |
+| `Obzor` | `/crm/obzor` | Дашборд |
 | `Zakaz` | `/crm/zakaz` | Закупки |
 | `Sklad` | `/crm/sklad` | Склад (market) |
 | `Kassa` | `/crm/kassa` | Касса (владелец) |
 | `KassaWorker` | `/crm/kassa-worker` | Касса (сотрудник) |
-| `KassaWorkerDet` | `/crm/kassa-det` | Детальная касса |
-| `Raspisanie` | `/crm/raspisanie` | Расписание/бронирование |
+| `Raspisanie` | `/crm/raspisanie` | Расписание |
 | `BrandCategoryPage` | `/crm/brand-category` | Бренды и категории |
 | `Warehouse` | `/crm/warehouse-accounting` | Складской учёт |
 | `Employ` | `/crm/employ` | Сотрудники |
 
-### Pages (`src/Components/pages/`)
+> **Важно:** правки в Deposits влияют сразу на несколько секторов.
+
+### Pages (`Components/pages/`)
 
 | Папка | Назначение |
 |---|---|
-| `Landing/` | Старый и новый лендинг (`NewLanding/` — Hero, Pricing, Demo, Team, Footer, VideoLessons) |
-| `Building/` | Полноценный строительный модуль |
+| `Landing/NewLanding/` | Новый лендинг (Hero, Pricing, Demo, Team, VideoLessons) |
+| `Building/` | Строительный модуль |
 | `Sell/` | Универсальная касса/продажи |
 | `Analytics/` | Общая аналитика |
-| `AdditionalServices/` | Дополнительные услуги (Instagram и др.) |
-| `Branch/` | Филиалы |
-| `Shifts/` | Смены |
-| `Info/` | Настройки (Settings, PosPrintSettings, Users, Company, Security) |
-| `Registration/` | Регистрация компании |
-| `SubmitApplication/` | Заявки на подключение |
+| `AdditionalServices/` | Доп. услуги (Instagram и др.) |
+| `Branch/`, `Shifts/` | Филиалы и смены |
+| `Info/` | Настройки (Settings, PosPrintSettings, Users, Company) |
+| `Registration/`, `SubmitApplication/` | Регистрация и заявки |
 | `Pending/` | Ожидающие операции |
-| `LogisticsAnalytics/` | Аналитика логистики |
-| `logistics/` | UI-компоненты логистики (Radix/shadcn-style) |
+| `LogisticsAnalytics/`, `logistics/` | Логистика |
 
 ---
 
-## 12. UI и Layout
+## 13. UI, Layout и меню
 
 ### Layout (`Components/Layout/`)
 
 - Sidebar + Header + `<Outlet />`
 - Скрытие chrome на fullscreen-страницах (касса, sell/start)
 - Баннер об истечении подписки (≤3 дней)
-- Декоративные орнаменты, scroll-to-top
+- Scroll-to-top
 
 ### Sidebar (`Components/Sidebar/`)
 
-| Файл | Назначение |
+| Файл / папка | Назначение |
 |---|---|
-| `config/menuConfig.js` | Конфигурация меню по permissions (~965 строк) |
-| `config/menuIcons.js` | Иконки пунктов меню |
-| `config/hideRules.js` | Правила скрытия пунктов |
+| `config/menuConfig.js` | Агрегатор меню |
+| `config/sectors/*.js` | Меню по секторам |
+| `config/commonMenu.js` | Общие пункты |
+| `config/hideRules.js` | Правила скрытия |
+| `config/menuIcons.js` | Иконки |
 | `hooks/useMenuItems.js` | Фильтрация меню |
 | `hooks/useMenuPermissions.js` | Проверка permissions |
 
-### Common (`Components/common/`)
+### Common UI (`Components/common/`)
 
-`AlertModal`, `DataContainer`, `Loading`, `Modal`, `Notification`, `Portal`, `RouteFallback`, `SearchableCombobox`
+`AlertModal`, `DataContainer`, `Loading`, `Modal`, `Notification`, `Portal`, `RouteFallback`, `SearchableCombobox`, `SearchSelect`
 
 ### Custom Hooks (`src/hooks/`)
 
 | Hook | Назначение |
 |---|---|
 | `useDebounce` | Debounce значений |
-| `useDialog` | Управление диалогами |
-| `useCafeWebSocket` | WebSocket для заказов кафе |
+| `useDialog` | Alert/confirm модалки |
+| `useCafeWebSocket` | WebSocket заказов кафе |
+| `useCafeSync` | Синхронизация офлайн-данных кафе |
+| `useFunnelBoardWebSocket` | WebSocket воронки консалтинга |
+| `useWazzupChatSocket` | WebSocket Wazzup-чатов |
+| `useNotificationsSocket` | WebSocket уведомлений |
 | `useMarketCashierMultiCart` | Мульти-корзины POS маркета |
+| `useMarketCashierSettings` | Настройки кассы |
+| `useCashierQtyScanGuard` | Guard сканирования на кассе |
+| `useFiscalSettings` | Фискальные настройки |
+| `useNetworkStatus` | Статус сети |
 | `useTransfers` | Перемещения товаров |
-| `usePlurize` | Склонение слов |
-| `useResize` | Отслеживание resize |
-| `ScrollToTop` | Скролл наверх при смене маршрута |
+| `useSearchableOptions` | Поисковые select-ы |
+| `usePointerReorder` | Drag-reorder |
+| `ScrollToTop` | Скролл при смене маршрута |
 
 ### Context & Theme
 
@@ -755,214 +807,151 @@ timeout: 20000
 
 ---
 
-## 13. Стилизация
+## 14. Real-time и офлайн
+
+### WebSocket-подключения
+
+| Hook / Service | Назначение | URL |
+|---|---|---|
+| `useCafeWebSocket` | Заказы кафе, KDS | `VITE_WS_API_URL` или proxy `/ws` |
+| `useFunnelBoardWebSocket` | Воронка консалтинга | `/ws/funnel/...` |
+| `wazzupSocketManager` | Wazzup WhatsApp | Consulting API |
+| `useNotificationsSocket` | Push-уведомления | `/ws/notifications/...` |
+
+### Офлайн-режим кафе
+
+```
+Network error → api interceptor → cafeOfflineFallback
+  → cafeOfflineDB (Dexie: menu, tables, orders, queue)
+  → sync при восстановлении сети (useCafeSync)
+```
+
+Таблицы Dexie (`src/db/cafeOfflineDB.js`):
+- `menu_categories`, `menu_items`, `cafe_tables`
+- `open_orders`, `current_shift`
+- `offline_queue` — очередь операций для синхронизации
+- `id_mapping` — маппинг offline_id → server_id
+- `kitchen_tasks` — задачи кухни
+
+---
+
+## 15. Стилизация
 
 ### SCSS (основной подход)
 
 ```
 src/assets/scss/
-├── _variables.scss    # Переменные (цвета, размеры)
-├── _mixin.scss        # Миксины
+├── _variables.scss
+├── _mixin.scss
 ├── core.scss
 └── main.scss
 ```
 
-Vite автоподключает SCSS partials во все `.scss`-файлы через `additionalData` в `vite.config.js`.
+Vite автоподключает SCSS partials через `additionalData` в `vite.config.js`.
 
-**Паттерн:** компонентные стили `Component.scss` / `Component.module.scss`.
+**Паттерн:** `Component.scss` / `Component.module.scss`.
 
 ### Tailwind CSS v4
 
-- Подключён через `@import "tailwindcss"` в `index.css`
+- `@import "tailwindcss"` в `index.css`
 - Плагин `@tailwindcss/vite`
-- Используется **точечно**: logistics UI, production/market компоненты, utility-классы
+- Используется точечно: logistics, production/market компоненты, новые UI
 
 ### UI-библиотеки
 
 | Библиотека | Использование |
 |---|---|
 | MUI v5 | Тема, компоненты, иконки |
-| Radix UI | checkbox, dialog, select, tabs (logistics, landing) |
+| Radix UI | Dialog, select, tabs, checkbox |
 | lucide-react, react-icons | Иконки |
 | framer-motion | Анимации лендинга |
 | sonner | Toast-уведомления |
 
-**Паттерн:** legacy-модули на SCSS + BEM; новые/рефакторенные части — Tailwind utility + MUI.
+**Паттерн:** legacy — SCSS + BEM; новые модули — Tailwind + MUI/Radix.
 
 ---
 
-## 14. Интернационализация (i18n)
+## 16. Интернационализация
 
 ### Конфигурация (`src/i18n.js`)
 
 | Параметр | Значение |
 |---|---|
-| Библиотека | i18next + react-i18next + i18next-http-backend + LanguageDetector |
-| Языки | `ru` (fallback), `ky` (кыргызский) |
+| Библиотека | i18next + react-i18next + http-backend + LanguageDetector |
+| Языки | `ru` (fallback), `ky` |
 | Namespaces | `translation`, `newLanding` |
 | Загрузка | `/locales/{{lng}}/{{ns}}.json` |
-| Детекция | localStorage → navigator |
 
-### Файлы переводов
-
-```
-public/locales/
-├── ru/
-│   ├── translation.json    # ~60 строк (лендинг, header, industries)
-│   └── newLanding.json
-└── ky/
-    ├── translation.json    # ~41 строка
-    └── newLanding.json
-```
-
-> **Важно:** большая часть CRM-интерфейса **не интернационализирована** — строки захардкожены на русском.
+> **Важно:** большая часть CRM-интерфейса **не интернационализирована** — строки на русском.
 
 ---
 
-## 15. PWA и Service Worker
+## 17. PWA и Service Worker
 
 ### Манифест
 
 - Vite PWA генерирует `site.webmanifest`
-- `name`: NurCRM, `display`: standalone, `theme_color`: #000000
+- `name`: NurCRM, `display`: standalone
 
 ### Service Worker (`src/sw.js`)
 
 | Ресурс | Стратегия |
 |---|---|
 | Build-ассеты | Precache |
-| HTML | NetworkFirst (online-first) |
+| `/api`, `/ws` | NetworkOnly (никогда не кэшировать) |
+| HTML (navigate) | NetworkFirst (timeout 30s, только 200 в кэш) |
 | JS/CSS | StaleWhileRevalidate |
 | Images | CacheFirst (30 дней, max 200) |
 | Media `app.nurcrm.kg/media/` | NetworkOnly |
 
 - Стратегия: **injectManifest** (Workbox)
-- Dev: PWA enabled (`devOptions.enabled: true`)
-- Регистрация: `main.jsx` → `registerSW({ immediate: true })`
+- Регистрация: только в **production** (`main.jsx`)
+- В dev: unregister старых SW (конфликт с Vite)
 
 ---
 
-## 16. Утилиты (tools/)
+## 18. Утилиты и доменная логика
 
 ### Корневой `tools/` — доменные утилиты
 
 | Файл | Назначение |
 |---|---|
-| `posSaleCarts.js` | Логика мульти-корзин POS |
-| `marketCashierSplitPayment.js` | Split-payment на кассе |
+| `posSaleCarts.js` | Мульти-корзины POS |
+| `marketCashierSplitPayment.js` | Split-payment |
 | `marketPackPieceSale.js` | Продажа упаковками/штучно |
-| `marketWarehouseBarcodeScan.js` | Сканирование штрихкодов склада |
+| `marketWarehouseBarcodeScan.js` | Сканирование штрихкодов |
+| `marketSaleConsultant.js` | Комиссия консультанта |
 | `productBarcode.js` | Генерация штрихкодов |
+| `barcodeAmbiguity.js` | Разрешение неоднозначных штрихкодов |
 | `cafeAnalyticsDynamics.js` | Динамика аналитики кафе |
-| `cafeCashflowCategory.js` | Категории cashflow |
-| `cafePurchaseExpense.js` | Расходы на закупки |
 | `validateResErrors.js` | Нормализация ошибок API |
-| `sleep.js` | Утилита задержки |
-| `receipt-market-demo.html` | Демо чека маркета |
+| `printer-bridge.mjs` | HTTP → RAW TCP для принтеров |
 
 ### `src/tools/` — утилиты фронтенда
 
-`cafeEmployeePermissions.js`, `deferredPaymentDates.js`, `marketWarehouseFilters.js`, `posSalesListResponse.js`
+`cafeEmployeePermissions.js`, `deferredPaymentDates.js`, `marketWarehouseFilters.js`, `posSalesListResponse.js`, `buildDebtSchedule.js`, `clientKpis.js`
 
 ---
 
-## 17. Подпроект ubl-invoice
+## 19. Печать чеков (Cafe)
 
-**Отдельный TypeScript-пакет** в `ubl-invoice/` — не подключён как dependency основного `package.json`.
+**Полная документация для агентов/разработчиков:** [docs/cafe/receipt-printing.md](./docs/cafe/receipt-printing.md) (оглавление — [docs/cafe/README.md](./docs/cafe/README.md)).
 
-| Аспект | Детали |
-|---|---|
-| Назначение | Генерация счетов в формате **UBL 2.1** (XML) |
-| Зависимости | `decimal.js`, `xmlbuilder2`, `zod` |
-| API | `InvoiceBuilder`, `generateInvoiceXml`, `validateInvoice` |
-| Тесты | Vitest: builder, validator, formatters, xml.builder |
-| Node | >= 20 |
+Сетевые принтеры (XPrinter XP-N160II, порт **9100**) принимают **RAW TCP** (JetDirect). Браузер не умеет открывать сырой TCP.
 
-**Связь с CRM:** основное приложение использует `src/utils/archiveInvoiceXml.ts` (упрощённый XML для архивных счетов склада), **не** пакет `ubl-invoice`.
+### Решение
 
----
-
-## 18. Переменные окружения
-
-| Переменная | Назначение | По умолчанию |
-|---|---|---|
-| `VITE_API_URL` | Base URL API | `https://app.nurcrm.kg/api` |
-| `VITE_WS_API_URL` | WebSocket URL (кафе) | `https://app.nurcrm.kg` |
-| `VITE_REGISTER_ACCESS_PASSWORD` | Пароль страницы регистрации | `nurcrm2026` |
-| `VITE_REGISTER_ACCESS_BACKEND` | Проверка пароля через бэкенд | `false` |
-
-Файл `.env.example`:
-
-```env
-# VITE_API_URL=http://192.168.1.175:8000/api
-# VITE_REGISTER_ACCESS_PASSWORD=nurcrm
-# VITE_REGISTER_ACCESS_BACKEND=true
 ```
-
-> **Устаревшее в README:** `REACT_APP_API_BASE_URL` (CRA) — проект мигрирован на Vite (`VITE_*`).
-
----
-
-## 19. Сборка и деплой
-
-### Vite config highlights
-
-```javascript
-// vite.config.js
-server: { port: 3000, proxy: { '/media': 'https://app.nurcrm.kg' } }
-build: { outDir: 'build', manualChunks: { swiper, charts } }
-resolve: { alias: { '@': '/src' } }
+браузер → HTTP → printer-bridge → RAW TCP → принтер
 ```
-
-### Production build
-
-```bash
-npm run build    # → build/
-npm run preview  # локальный превью
-```
-
-### Manual chunks
-
-- `vendor-swiper` — Swiper
-- `vendor-charts` — chart.js + recharts
-
----
-
-## 20. Тестирование
-
-### Основной проект
-
-| Параметр | Значение |
-|---|---|
-| Runner | Vitest 3 (`npm test`) |
-| Конфиг | `vitest.config.ts` — environment `node` |
-| Include | `src/**/*.test.ts` |
-| Тесты | `src/utils/archiveInvoiceXml.test.ts` (единственный) |
-
-### ubl-invoice
-
-- Отдельный Vitest 2
-- 4 тестовых файла: builder, validator, formatters, xml.builder
-
-**Вывод:** тестовое покрытие минимальное; инфраструктура есть, но почти не используется.
-
----
-
-## 21. Печать чеков (Cafe)
-
-### Проблема
-
-Сетевые чековые принтеры (XPrinter XP-N160II) на порту **9100** принимают **RAW TCP** (JetDirect). Браузер не умеет открывать сырой TCP — только HTTP, WebSocket, WebUSB.
-
-### Решение: printer-bridge
-
-Цепочка: `браузер → HTTP → bridge → RAW TCP → принтер`
 
 | Вариант | Описание |
 |---|---|
 | **USB** | WebUSB — bridge не нужен |
-| **Wi-Fi** | printer-bridge (Node) или printer-agent (Python/Flet) |
-| **Бэкенд** | Endpoint `{ ip, port, data }` — см. `docs/PRINT_BACKEND_API.md` |
+| **Wi-Fi** | `tools/printer-bridge.mjs` или `tools/printer-agent/` (Python/Flet) |
+| **Контракт bridge** | `POST /print` `{ ip, port, data(base64) }`, `GET /health` |
+
+Два контура: **чек кассы** (`cafe_receipt_printer`) и **тикеты кухонь** (`kitchen.printer` / `kitchen_printer_map`). Автопечать кухни — в `CafeLayout` по WebSocket; ручной чек — в `Orders` после оплаты. Фискальный ККМ — отдельный поток (`fiscalDriverService`), не путать с термопринтером.
 
 ### Настройка
 
@@ -971,67 +960,167 @@ localStorage.setItem("cafe_printer_bridge_url", "http://127.0.0.1:5179/print");
 ```
 
 ```bash
-npm run printer-bridge  # → tools/printer-bridge.mjs (может отсутствовать в репо)
+npm run printer-bridge   # http://127.0.0.1:5179/print
+```
+
+> Bridge запускается **в офисе** (LAN с принтером), не на VPS. Подробнее — в [README.md](./README.md).
+
+---
+
+## 19a. Печать чеков (Market)
+
+**Полная документация для агентов/разработчиков:** [docs/market/receipt-printing.md](./docs/market/receipt-printing.md) (оглавление — [docs/market/README.md](./docs/market/README.md)).
+
+Маркет **не** использует `printer-bridge` и **не** вызывает `fiscalDriverService`. Печать = **WebUSB → ESC/POS** через `src/Components/pages/Sell/services/printService.js` с `receiptStyle: "market"` (graphic layout на canvas + native QR).
+
+| Аспект | Маркет |
+|---|---|
+| Транспорт | Только USB (Chrome/Edge WebUSB) |
+| Настройки | `/crm/pos-print-settings` → `escpos_*` в localStorage |
+| Автопечать | После `POST main/pos/sales/{id}/checkout/` (если не «Без чека») |
+| eKassa | Поля в checkout JSON мержатся в термочек; фискализация на бэкенде |
+| «Без чека» | `localStorage.market_withoutCheck` |
+
+Не смешивать с §19 (кафе).
+
+---
+
+## 20. Подпроект ubl-invoice
+
+Отдельный TypeScript-пакет в `ubl-invoice/` — **не подключён** как dependency основного `package.json`.
+
+| Аспект | Детали |
+|---|---|
+| Назначение | Генерация счетов **UBL 2.1** (XML) |
+| Зависимости | decimal.js, xmlbuilder2, zod |
+| API | InvoiceBuilder, generateInvoiceXml, validateInvoice |
+| Тесты | Vitest: builder, validator, formatters, xml.builder |
+
+Основное приложение использует `src/utils/archiveInvoiceXml.ts` для архивных счетов склада.
+
+---
+
+## 21. Переменные окружения
+
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `VITE_API_URL` | Base URL REST API | `https://app.nurcrm.kg/api` |
+| `VITE_WS_API_URL` | WebSocket URL | `https://app.nurcrm.kg` |
+| `DEV_BACKEND` | URL бэкенда для Vite proxy (не в браузере) | `http://localhost:8000` |
+| `VITE_REGISTER_ACCESS_PASSWORD` | Пароль страницы регистрации | `nurcrm2026` |
+| `VITE_REGISTER_ACCESS_BACKEND` | Проверка пароля через бэкенд | `false` |
+| `VITE_BUILDING_APP_URL` | URL строительного SPA | `https://stroy.nurcrm.kg` |
+| `VITE_MAIN_APP_URL` | URL основного SPA (staging) | — |
+| `VITE_FUNNEL_V2` | Расширенная воронка 2.0 | — |
+
+Пример `.env.local` для локальной разработки — см. [раздел 2](#2-быстрый-старт).
+
+---
+
+## 22. Сборка и деплой
+
+### Vite config highlights
+
+```javascript
+server: {
+  port: 3000,
+  proxy: {
+    '/api': DEV_BACKEND,
+    '/ws': DEV_BACKEND (ws: true),
+    '/media': 'https://app.nurcrm.kg',
+  },
+}
+build: {
+  outDir: 'build',
+  manualChunks: { vendor-react, vendor-swiper, vendor-charts },
+}
+resolve: { alias: { '@': '/src' } }
 ```
 
 ### Production
 
-| Компонент | Где |
-|---|---|
-| Фронт | VPS (nurcrm.kg) |
-| Бэкенд API | VPS |
-| Printer-bridge | **В офисе** (LAN с принтером) |
-| Принтер | Офис, Wi-Fi 192.168.x.x:9100 |
+```bash
+npm run build          # → build/
+npm run build:staging  # staging mode (.env.staging)
+npm run preview        # локальный превью
+```
+
+### Manual chunks
+
+- `vendor-react` — React core
+- `vendor-swiper` — Swiper
+- `vendor-charts` — chart.js
 
 ---
 
-## 22. Существующая документация
+## 23. Тестирование
 
-### Корень проекта
-
-| Файл | Описание |
+| Параметр | Значение |
 |---|---|
-| `README.md` | Быстрый старт, printer-bridge |
-| `PROJECT_DOCUMENTATION.md` | Этот файл |
-| `BACKEND-SERVICES-FIX.md` | Исправления бэкенд-сервисов |
-| `cafe-receipt-print-analysis.md` | Анализ печати чеков кафе |
-| `orders-jsx-complete-analysis.md` | Анализ компонента заказов |
+| Runner | Vitest 3 (`npm test`) |
+| Environment | jsdom |
+| Setup | `src/test/setup.js` |
+| Include | `src/**/*.{test,spec}.*`, `tools/**/*.test.js` |
 
-### `docs/` (~42 файла)
+### Покрытие (~40 тестовых файлов)
 
-| Категория | Примеры |
+- API: `authInterceptors`, `circuitBreaker`, `clients`, `marketCashierSettings`, `consultingWazzup.media`
+- Store: `userCreators`, `orderCreators`, `saleThunk`, `sectorSlice`, `productSlice`, `handleThunkError`
+- Components: `ProtectedRoute`, `SearchSelect`, `NumberInput`, `SummaryPdfDocument`
+- Tools: `posSaleCarts`, `productBarcode`, `marketPackPieceSale`, `validateResErrors`
+- Utils: `archiveInvoiceXml`, `crossAppAuth`, `buildDebtSchedule`
+- ubl-invoice: 4 тестовых файла (отдельный пакет)
+
+Запуск одного файла:
+
+```bash
+npx vitest run src/ProtectedRoute.test.jsx
+```
+
+---
+
+## 24. Доменная документация (docs/)
+
+### По секторам
+
+| Папка | Темы |
 |---|---|
-| **Building** | `BUILDING_FRONTEND_API.md`, `building_procurement_frontend_api.md`, `building_payroll_backend.md` |
-| **Cafe** | `CAFE_WEBSOCKETS.md`, `cafe_tech_cards_frontend_api.md`, `CAFE_RECEIPT_PRINTER_SETTINGS_API.md` |
-| **Market** | `MARKET_CASHIER_MULTI_CART_AND_SPLIT_PAYMENT_API.md`, `market_warehouse_barcode_ru.md` |
-| **Production** | `PRODUCTION_FINISHED_GOODS_RECIPE_AND_AUTO_CONSUMPTION_API.md` |
-| **Warehouse** | `warehouse-purchase-vs-receipt.md` |
-| **Print** | `PRINT_BACKEND_API.md` |
-| **AI context** | `sector-segmentation-ai-context.md`, `additional-services-ai-context.md` |
+| `docs/market/` | Касса, склад, витрина, штрихкоды, аналитика, долги, скидки; печать WebUSB ([receipt-printing.md](./docs/market/receipt-printing.md)) |
+| `docs/cafe/` | Печать: чековый аппарат, кухни, ESC/POS, WS/dedupe ([receipt-printing.md](./docs/cafe/receipt-printing.md)) |
+| `docs/production/` | ГП, закупки, зарплата, аналитика, POS |
+| `docs/warehouse/` | Агентская модель, склады, зарплата, чеклист бэкенда |
+| `docs/consulting/` | Воронка, Wazzup, лиды, зарплата, подписки, backend API specs |
+| `docs/platform-admin/` | Платформенная админка NUR: компании, пользователи, impersonate |
+| `docs/kassa/` | Cashflows, фильтры |
+| `docs/services/` | Зарплата услуг |
+
+### Consulting backend specs
+
+`docs/consulting/backend/` — детальные спеки API:
+- `01-leads.md` … `09-cash-confirmation.md`
 
 ### Внутренняя документация компонентов
 
-- `src/Components/Sectors/Market/Warehouse/README.md`
+- `src/Components/Sectors/Market/Warehouse/README.md`, `WAREHOUSE_STRUCTURE.md`
 - `src/Components/Deposits/Sklad/AddProductPage/README.md`
 - `src/Components/Sectors/Production/Catalog/README.md`
-- и др.
 
 ---
 
-## 23. Статистика кодовой базы
+## 25. Статистика кодовой базы
 
 | Метрика | Значение |
 |---|---|
-| JS/JSX/TS файлов в `src/` | ~856 |
-| Redux reducers | 47 |
-| Redux creators/thunks | 38 |
-| API-модулей | 18 |
-| Custom hooks | 8 |
+| JS/JSX/TS файлов в `src/` | ~1061 |
+| Redux reducers | 49 |
+| Redux creators/thunks | 45 |
+| API-модулей | ~35 |
+| Custom hooks | 19 |
 | Секторов в `Sectors/` | 12 |
-| CRM-маршрутов (строк) | ~765 |
-| Публичных маршрутов (строк) | ~112 |
-| Документация в `docs/` | ~42 файла |
-| Unit-тестов (основной проект) | 1 |
+| CRM route files (строк) | ~940 |
+| Публичных маршрутов | 14 |
+| Документация в `docs/` | ~56 файлов |
+| Unit-тестов | ~40 файлов |
 
 ### Секторы (папки)
 
@@ -1042,45 +1131,28 @@ Production, School, Warehouse, cafe, logistics, utils
 
 ---
 
-## 24. Технический долг и наблюдения
+## 26. Технический долг и рекомендации
 
 | # | Наблюдение | Приоритет |
 |---|---|---|
-| 1 | `sectorSlice.js` не подключён к store — сектор хранится в localStorage напрямую | Средний |
-| 2 | i18n покрывает в основном лендинг; CRM — русский hardcode | Низкий |
-| 3 | `printer-bridge.mjs` документирован в README, но может отсутствовать в репо | Средний |
-| 4 | README ссылается на `npm start` (CRA), проект на Vite (`npm run dev`) | Низкий |
-| 5 | `REACT_APP_*` env vars устарели → нужны `VITE_*` | Низкий |
-| 6 | Тестовое покрытие минимальное (1 тест) | Высокий |
-| 7 | Два слоя «склада»: Deposits/Sklad + Market/Warehouse vs Warehouse/ (агентская) | Информационный |
-| 8 | Building: UI в `pages/Building/`, Redux в `slices/building/`, API в `api/building.js` | Информационный |
-| 9 | `React.StrictMode` отключён | Низкий |
-| 10 | ESLint config ссылается на `react-app/jest` (наследие CRA) | Низкий |
-| 11 | Стили: SCSS-доминанта + постепенное внедрение Tailwind в новых модулях | Информационный |
-| 12 | `ubl-invoice` не интегрирован в основной проект | Низкий |
+| 1 | i18n покрывает в основном лендинг; CRM — русский hardcode | Низкий |
+| 2 | Два слоя «склада»: Deposits/Sklad + Market/Warehouse vs Warehouse/ (агентская) | Информационный |
+| 3 | Building: UI в `pages/Building/`, отдельное SPA stroy.nurcrm.kg | Информационный |
+| 4 | Стили: SCSS-доминанта + постепенное внедрение Tailwind | Информационный |
+| 5 | `ubl-invoice` не интегрирован в основной проект | Низкий |
+| 6 | Electron в dependencies, но конфиг упаковки может быть неполным | Средний |
+| 7 | Тестовое покрытие растёт (~40 файлов), но UI/E2E минимально | Средний |
+| 8 | README ссылается на `frontend-actual` — устаревшее имя папки | Низкий |
+
+### Рекомендации для новых разработчиков
+
+1. **Определите сектор** — посмотрите `company.sector` и соответствующий файл в `config/routes/` и `Sidebar/config/sectors/`.
+2. **Deposits — осторожно** — изменения затрагивают несколько секторов.
+3. **Локальный бэкенд** — используйте `.env.local` с `VITE_API_URL=/api`, не меняйте prod URL в `.env`.
+4. **Lazy routes** — новые CRM-страницы добавляйте в соответствующий `*Routes.jsx` с `lazy()`.
+5. **Permissions** — каждый пункт меню привязан к permission; проверяйте `menuConfig` и бэкенд.
+6. **Доменные детали** — ищите в `docs/<sector>/` перед реализацией.
 
 ---
 
-## Быстрый старт (актуальный)
-
-```bash
-# Клонирование и установка
-git clone <repository-url>
-cd Nur
-npm install
-
-# Настройка .env
-cp .env.example .env
-# VITE_API_URL=https://app.nurcrm.kg/api
-
-# Запуск
-npm run dev        # http://localhost:3000
-
-# Production
-npm run build
-npm run preview
-```
-
----
-
-*Документ сгенерирован автоматически на основе анализа кодовой базы NUR CRM.*
+*Документ обновлён на основе анализа кодовой базы NurFront, август 2026.*

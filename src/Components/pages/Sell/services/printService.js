@@ -6,9 +6,9 @@
 // Глобальное состояние USB
 const usbState = { dev: null, opening: null };
 
-const DEFAULT_DOTS_PER_LINE = 576; // 80мм принтер обычно 576 точек
-const MARKET_DEFAULT_DOTS_PER_LINE = 384; // 58мм
-const MARKET_DEFAULT_CHARS_PER_LINE = 42; // font B: 384 / 9
+const DEFAULT_DOTS_PER_LINE = 576; // 80 мм бумага (~203 dpi / 8 dot/mm)
+const MARKET_DEFAULT_DOTS_PER_LINE = 576; // 80 мм бумага
+const MARKET_DEFAULT_CHARS_PER_LINE = 48;
 const DEFAULT_FONT = "B";
 const DEFAULT_CODEPAGE = 17; // PC866 (часто 17 или 66)
 
@@ -22,7 +22,10 @@ const safeLsGet = (k) => {
 const safeLsSet = (k, v) => {
   try {
     localStorage.setItem(k, v);
-  } catch { }
+    return localStorage.getItem(k) === String(v);
+  } catch {
+    return false;
+  }
 };
 const safeNumber = (raw, fallback) => {
   const n = Number(raw);
@@ -44,16 +47,16 @@ function hasEscposWidthSettings() {
 
 // Быстрые тюнеры (пригодятся в консоли):
 export function setEscposDotsPerLine(n) {
-  safeLsSet("escpos_dpl", String(n));
+  return safeLsSet("escpos_dpl", String(n));
 }
 export function setEscposCharsPerLine(n) {
-  safeLsSet("escpos_cpl", String(n));
+  return safeLsSet("escpos_cpl", String(n));
 }
 export function setEscposLineHeight(n) {
-  safeLsSet("escpos_line", String(n));
+  return safeLsSet("escpos_line", String(n));
 }
 export function setEscposFont(ch) {
-  safeLsSet("escpos_font", String(ch).toUpperCase());
+  return safeLsSet("escpos_font", String(ch).toUpperCase());
 }
 
 const ESC = (...b) => new Uint8Array(b);
@@ -62,6 +65,21 @@ const chunkBytes = (u8, size = 12 * 1024) => {
   for (let i = 0; i < u8.length; i += size) out.push(u8.subarray(i, i + size));
   return out;
 };
+
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * «Прогрев» принтера перед растром. После первого USB claim / холодного старта
+ * часть моделей теряет первые байты (ESC @ + заголовок GS v 0) → весь bitmap
+ * печатается как «иероглифы»; вторая печать уже нормальная.
+ */
+async function wakeEscPosPrinter(dev, outEP) {
+  const init = ESC(0x1b, 0x40);
+  await dev.transferOut(outEP, init);
+  await sleepMs(80);
+  await dev.transferOut(outEP, init);
+  await sleepMs(40);
+}
 
 /* ---------- Кодовые страницы и энкодеры ---------- */
 // Поддерживаемые кодовые страницы для кириллицы:
@@ -76,7 +94,28 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 // Если будет "корябяза", поменяйте 17 <-> 66.
 // printRussianRawUsb("Тест: Привет, мир! Ёё №");
 export function setEscposCodepage(n) {
-  safeLsSet("escpos_cp", String(n));
+  return safeLsSet("escpos_cp", String(n));
+}
+
+const GRAPHIC_LS_KEY = "escpos_graphic";
+
+/** Graphic (canvas → GS v 0) включён в настройках POS. По умолчанию — да. */
+export function isEscposGraphicPrintEnabled() {
+  const raw = safeLsGet(GRAPHIC_LS_KEY);
+  if (raw == null || String(raw).trim() === "") return true;
+  const s = String(raw).trim().toLowerCase();
+  if (s === "0" || s === "false" || s === "text") return false;
+  return true;
+}
+
+export function setEscposGraphicPrint(enabled) {
+  return safeLsSet(GRAPHIC_LS_KEY, enabled ? "1" : "0");
+}
+
+function resolveGraphicPrint(options = {}) {
+  if (options.graphic === true) return true;
+  if (options.graphic === false) return false;
+  return isEscposGraphicPrintEnabled();
 }
 
 const PC866_CODES = new Set([66, 17, 18, 59]); // 17 — частый ESC/POS номер PC866, 59 — PC866(Russian)
@@ -130,9 +169,104 @@ function encodePC936(s = "") {
   }
   return new Uint8Array(out);
 }
+/** Рекомендуемое число символов в строке по ширине ленты. */
+export function computeEscposCharsPerLine(dotsPerLine, _font = "B") {
+  const dpl = Math.max(200, Number(dotsPerLine) || DEFAULT_DOTS_PER_LINE);
+  // Эталон 48 мм: 384 × 32 ≈ 12 точек на символ. Пропорция сохраняет физический
+  // кегль на 80 мм (576 → 48), а не floor(576/9)=64 с мелким текстом.
+  const chars = Math.round(
+    (dpl * MARKET_DEFAULT_CHARS_PER_LINE) / MARKET_DEFAULT_DOTS_PER_LINE,
+  );
+  return Math.max(16, chars);
+}
+
+/** Старый расчёт floor(dpl/9) давал 64 символа на 80 мм — мелкий graphic-кегль. */
+export function maybeMigrateLegacyCharsPerLine(dotsPerLine, charsPerLine, font = "B") {
+  const dpl = Math.max(200, Number(dotsPerLine) || DEFAULT_DOTS_PER_LINE);
+  const cpl = Math.max(16, Number(charsPerLine) || 16);
+  const f = String(font).toUpperCase() === "A" ? "A" : "B";
+  const charDotWidth = f === "B" ? 9 : 12;
+  const legacyDense = Math.floor(dpl / charDotWidth);
+  const recommended = computeEscposCharsPerLine(dpl, f);
+  if (cpl === legacyDense && legacyDense !== recommended) return recommended;
+  return cpl;
+}
+
+const LEGACY_CPL_MIGRATION_KEY = "escpos_legacy_cpl_migrated";
+
+/**
+ * Читает escpos_cpl из localStorage.
+ * Одноразовая миграция старых dense-значений (floor(dpl/9)); после неё значение
+ * не перезаписывается — иначе сохранённые вручную настройки «сбрасывались».
+ */
+export function readEscposCharsPerLine(dotsPerLine, font, fallbackChars) {
+  const raw = safeLsGet("escpos_cpl");
+  if (raw == null || String(raw).trim() === "") {
+    return fallbackChars;
+  }
+  let cpl = safeNumber(raw, fallbackChars);
+  if (safeLsGet(LEGACY_CPL_MIGRATION_KEY)) {
+    return cpl;
+  }
+  const migrated = maybeMigrateLegacyCharsPerLine(dotsPerLine, cpl, font);
+  if (migrated !== cpl) {
+    safeLsSet("escpos_cpl", String(migrated));
+    cpl = migrated;
+  }
+  safeLsSet(LEGACY_CPL_MIGRATION_KEY, "1");
+  return cpl;
+}
+
+/** Сохраняет escpos_* в localStorage; возвращает false при ошибке записи. */
+export function persistEscposSettings({
+  dotsPerLine,
+  charsPerLine,
+  lineHeight,
+  font,
+  codepage,
+  graphicPrint,
+}) {
+  const dpl = Math.max(200, Number(dotsPerLine || 0));
+  const cpl = Math.max(16, Number(charsPerLine || 0));
+  const lh = Math.max(10, Number(lineHeight || 0));
+  const f = String(font || DEFAULT_FONT).toUpperCase() === "A" ? "A" : "B";
+  const cp = Number(codepage ?? DEFAULT_CODEPAGE);
+
+  const ok =
+    setEscposDotsPerLine(dpl) &&
+    setEscposCharsPerLine(cpl) &&
+    setEscposLineHeight(lh) &&
+    setEscposFont(f) &&
+    setEscposGraphicPrint(Boolean(graphicPrint)) &&
+    (Number.isFinite(cp) && cp >= 0 && cp <= 255
+      ? setEscposCodepage(cp)
+      : true);
+
+  return Boolean(ok);
+}
+
+/** ESC/POS: шрифт (ESC M) и межстрочный интервал (ESC 3) из настроек escpos_*. */
+export function buildEscPosPrinterSetup(cfg = {}) {
+  const font = String(cfg.font || DEFAULT_FONT).toUpperCase() === "A" ? "A" : "B";
+  const lineDotHeight = Math.min(
+    255,
+    Math.max(
+      1,
+      Math.round(Number(cfg.lineDotHeight) || (font === "B" ? 22 : 24)),
+    ),
+  );
+  return [
+    ESC(0x1b, 0x4d, font === "A" ? 0 : 1),
+    ESC(0x1b, 0x33, lineDotHeight),
+  ];
+}
+
 export function getEscposRuntimeConfig(opts = {}) {
-  const useMarketDefault = Boolean(opts.marketDefault) && !hasEscposWidthSettings();
-  const fontRaw = String(safeLsGet("escpos_font") || DEFAULT_FONT).toUpperCase();
+  const useMarketDefault =
+    Boolean(opts.marketDefault) && !hasEscposWidthSettings();
+  const fontRaw = String(
+    safeLsGet("escpos_font") || DEFAULT_FONT,
+  ).toUpperCase();
   const font = fontRaw === "A" ? "A" : "B";
   const charDotWidth = font === "B" ? 9 : 12;
 
@@ -142,11 +276,11 @@ export function getEscposRuntimeConfig(opts = {}) {
   const dotsPerLine = safeNumber(safeLsGet("escpos_dpl"), fallbackDots);
   const fallbackChars = useMarketDefault
     ? MARKET_DEFAULT_CHARS_PER_LINE
-    : Math.floor(dotsPerLine / charDotWidth);
-  const charsPerLine = safeNumber(safeLsGet("escpos_cpl"), fallbackChars);
+    : computeEscposCharsPerLine(dotsPerLine, font);
+  const charsPerLine = readEscposCharsPerLine(dotsPerLine, font, fallbackChars);
   const lineDotHeight = safeNumber(
     safeLsGet("escpos_line"),
-    font === "B" ? 22 : 24
+    font === "B" ? 22 : 24,
   );
   const codepage = safeByte(safeLsGet("escpos_cp"), DEFAULT_CODEPAGE);
   const encoder = getEncoder(codepage);
@@ -177,7 +311,7 @@ async function ensurePdfJs() {
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   return window.pdfjsLib;
 }
-async function pdfBlobToCanvas(pdfBlob, targetWidth = 384) {
+async function pdfBlobToCanvas(pdfBlob, targetWidth = 576) {
   const pdfjsLib = await ensurePdfJs();
   const ab = await pdfBlob.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
@@ -212,7 +346,20 @@ function canvasToRasterBytes(canvas, threshold = 180) {
   }
   return { raster, w, h, bytesPerLine };
 }
-function buildEscPosForRaster(raster, bytesPerLine, h) {
+function concatUint8Arrays(parts) {
+  const list = (parts || []).filter(Boolean);
+  const totalLen = list.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(totalLen);
+  let o = 0;
+  for (const p of list) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+function buildEscPosForRaster(raster, bytesPerLine, h, opts = {}) {
+  const withCut = opts.withCut !== false;
   const xL = bytesPerLine & 0xff;
   const xH = (bytesPerLine >> 8) & 0xff;
   const yL = h & 0xff;
@@ -223,27 +370,11 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
   const header = ESC(0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH);
 
   // компактная подача + рез
-  const feedAndCut = new Uint8Array([0x1b, 0x64, 0x01, 0x1d, 0x56, 0x00]);
+  const feedAndCut = withCut
+    ? new Uint8Array([0x1b, 0x64, 0x01, 0x1d, 0x56, 0x00])
+    : null;
 
-
-  const total = new Uint8Array(
-    init.length +
-    alignLeft.length +
-    header.length +
-    raster.length +
-    feedAndCut.length
-  );
-  let o = 0;
-  total.set(init, o);
-  o += init.length;
-  total.set(alignLeft, o);
-  o += alignLeft.length;
-  total.set(header, o);
-  o += header.length;
-  total.set(raster, o);
-  o += raster.length;
-  total.set(feedAndCut, o);
-  return total;
+  return concatUint8Arrays([init, alignLeft, header, raster, feedAndCut]);
 }
 
 /* ---------- JSON → ESC/POS ---------- */
@@ -255,12 +386,26 @@ function lr(left, right, width = 32) {
   return L + " ".repeat(spaces) + R;
 }
 
+/** Как lr, но левая часть усекается, чтобы правая (цена) всегда влезла. */
+function lrFit(left, right, width = 32) {
+  const R = String(right ?? "");
+  const maxLeft = Math.max(1, width - R.length - 1);
+  let L = String(left ?? "");
+  if (L.length > maxLeft) {
+    L = maxLeft <= 1 ? "…" : `${L.slice(0, maxLeft - 1)}…`;
+  }
+  return lr(L, R, width);
+}
+
+/** Заголовок колонок товаров: на узкой ленте короче, чтобы влезло «Итого». */
+function marketItemsHeaderLeft(width) {
+  return width < 36 ? "Цена x Кол" : "Цена x Кол-о - Скидка";
+}
+
 /** lr с учётом ESC ! (двойная ширина — в 2 раза меньше символов в строке). */
 function lrSized(left, right, width, escSize = 0) {
   const isDoubleWidth = (escSize & 0x20) !== 0;
-  const lineWidth = isDoubleWidth
-    ? Math.max(12, Math.floor(width / 2))
-    : width;
+  const lineWidth = isDoubleWidth ? Math.max(12, Math.floor(width / 2)) : width;
   return lr(left, right, lineWidth);
 }
 
@@ -356,7 +501,9 @@ function pushReceiptSizeOff(chunks) {
 function pushMarketItemHeaderRow(chunks, enc, width) {
   pushReceiptBoldOn(chunks);
   pushReceiptSlightLargeOn(chunks);
-  chunks.push(enc(lr("Цена x Кол-о - Скидка", "Итого", width) + "\n"));
+  chunks.push(
+    enc(lrFit(marketItemsHeaderLeft(width), "Итого", width) + "\n"),
+  );
   pushReceiptSizeOff(chunks);
   pushReceiptBoldOff(chunks);
 }
@@ -373,7 +520,7 @@ function pushMarketItemLineRow(
   const left = buildMarketItemLineLeft(price, qty, lineDiscountAmt);
   pushReceiptBoldOn(chunks);
   pushReceiptSlightLargeOn(chunks);
-  chunks.push(enc(lr(left, money(lineTotal), width) + "\n"));
+  chunks.push(enc(lrFit(left, money(lineTotal), width) + "\n"));
   pushReceiptSizeOff(chunks);
   pushReceiptBoldOff(chunks);
 }
@@ -430,7 +577,10 @@ function resolveMarketOrderDiscount(payload, ekassaFields) {
 }
 
 const fromTyiyn = (v) => toNum(v) / 100;
-const f = (fields, key) => (fields && Object.prototype.hasOwnProperty.call(fields, key) ? fields[key] : undefined);
+const f = (fields, key) =>
+  fields && Object.prototype.hasOwnProperty.call(fields, key)
+    ? fields[key]
+    : undefined;
 function buildEscPosQr(text) {
   const value = String(text || "").trim();
   if (!value) return [];
@@ -445,13 +595,402 @@ function buildEscPosQr(text) {
     ESC(0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30), // print
   ];
 }
+
+const RECEIPT_CANVAS_FONT =
+  '"Courier New", "Menlo", "Consolas", "Liberation Mono", monospace';
+
+/**
+ * Layout строк чека маркета для графической печати.
+ * @returns {{ lines: Array<{ text: string, align?: string, bold?: boolean, scale?: number }>, qrLink: string }}
+ */
+export function buildMarketReceiptLayout(payload, opts = {}) {
+  const cfg = getEscposRuntimeConfig({ marketDefault: true });
+  const width = Math.max(16, opts.width || cfg.charsPerLine);
+  const divider = "-".repeat(width);
+  const hasText = (v) => {
+    const s = String(v ?? "").trim();
+    return s !== "" && s !== "—";
+  };
+  const line = (text, extra = {}) => ({
+    text: String(text ?? ""),
+    align: "left",
+    bold: false,
+    scale: 1,
+    ...extra,
+  });
+
+  const ekassaFields =
+    payload?.ekassa_fiscal?.fields ||
+    payload?.ekassa?.fields ||
+    payload?.ekassa?.ekassa_payload?.data?.fields ||
+    null;
+  const company = String(payload?.company ?? "").trim();
+  const inn = String(payload?.inn ?? "").trim();
+  const address = String(payload?.address ?? "").trim();
+  const cashier = String(payload?.cashier_name ?? "").trim();
+
+  const docNo = String(
+    ekassaFields
+      ? (f(ekassaFields, "1042") ?? payload?.doc_no ?? "")
+      : (payload?.doc_no ?? ""),
+  ).trim();
+  const dt = String(
+    ekassaFields
+      ? (f(ekassaFields, "1012") ?? payload?.created_at ?? "")
+      : (payload?.created_at ?? ""),
+  ).trim();
+  const shift = String(
+    ekassaFields ? (f(ekassaFields, "1038") ?? "") : "",
+  ).trim();
+
+  const payloadItemsForMerge =
+    (Array.isArray(payload?.items) && payload.items) ||
+    (Array.isArray(payload?.receipt?.items) && payload.receipt.items) ||
+    (Array.isArray(payload?.cart?.items) && payload.cart.items) ||
+    null;
+
+  const items =
+    ekassaFields && Array.isArray(f(ekassaFields, "1059"))
+      ? f(ekassaFields, "1059").map((it, idx) => {
+          const qty = toNum(it?.["1023"]) || 1;
+          const raw1043 = fromTyiyn(it?.["1043"]);
+          const raw1076 = fromTyiyn(it?.["1076"]);
+          const price =
+            raw1076 > 0 ? raw1076 : qty > 0 ? raw1043 / qty : raw1043;
+          const total = raw1043 > 0 ? raw1043 : price * qty;
+          const base = {
+            name: String(it?.["1030"] || "Товар"),
+            qty,
+            price,
+            total,
+          };
+          let src = payloadItemsForMerge?.[idx];
+          if (!src && payloadItemsForMerge?.length) {
+            const nm = base.name.trim();
+            src =
+              payloadItemsForMerge.find(
+                (x) =>
+                  String(x?.name ?? "").trim() === nm &&
+                  (toNum(x?.qty) || 1) === base.qty,
+              ) || null;
+          }
+          if (!src) return base;
+          const mapped = mapMarketReceiptItem({
+            ...src,
+            qty,
+            price,
+            unit_price: price,
+          });
+          return {
+            ...base,
+            line_discount_pct: mapped.line_discount_pct,
+            line_discount_amount: mapped.line_discount_amount,
+            total: mapped.total,
+          };
+        })
+      : (
+          payloadItemsForMerge ||
+          (Array.isArray(payload?.items) ? payload.items : [])
+        ).map(mapMarketReceiptItem);
+
+  const subtotal = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1020"))
+    : items.reduce(
+        (s, it) => s + toNum(it.total) + toNum(it.line_discount_amount),
+        0,
+      );
+  const discount = resolveMarketOrderDiscount(payload, ekassaFields);
+  const vat = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1033"))
+    : toNum(payload?.tax);
+  const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
+  const total = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1031"))
+    : Math.max(0, subtotal - discount + vat);
+  const paidCard = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1081"))
+    : Math.max(0, toNum(payload?.paid_card));
+  const paidCash = ekassaFields
+    ? Math.max(0, total - paidCard)
+    : Math.max(0, toNum(payload?.paid_cash));
+  const cashReceived = Math.max(0, toNum(payload?.cash_received));
+  const change = Math.max(0, toNum(payload?.change));
+  const kkm = String(
+    ekassaFields
+      ? (f(ekassaFields, "1037") ??
+          payload?.ekassa_fiscal?.kkm_reg_number ??
+          "")
+      : (payload?.ekassa_fiscal?.kkm_reg_number ?? ""),
+  ).trim();
+  const fn = String(
+    ekassaFields
+      ? (f(ekassaFields, "1041") ?? payload?.ekassa_fiscal?.fm_number ?? "")
+      : (payload?.ekassa_fiscal?.fm_number ?? ""),
+  ).trim();
+  const fd = String(
+    ekassaFields
+      ? (f(ekassaFields, "1040") ?? payload?.ekassa_fiscal?.fd_number ?? "")
+      : (payload?.ekassa_fiscal?.fd_number ?? ""),
+  ).trim();
+  const fpd = String(
+    ekassaFields
+      ? (f(ekassaFields, "1077") ?? payload?.ekassa_fiscal?.fpd ?? "")
+      : (payload?.ekassa_fiscal?.fpd ?? ""),
+  ).trim();
+  const qrLink = String(
+    payload?.ekassa_fiscal?.link || payload?.ekassa?.link || "",
+  ).trim();
+
+  const lines = [];
+  lines.push(line("СПАСИБО ЗА ПОКУПКУ!", { align: "center", bold: true }));
+  lines.push(line("", { align: "center" }));
+  lines.push(line("Контрольно-кассовый чек - Продажа", { align: "center" }));
+  if (hasText(company)) {
+    lines.push(
+      line(`Магазин: ${company}`, {
+        align: "center",
+        bold: true,
+        scale: 1.15,
+      }),
+    );
+  }
+  if (hasText(inn)) lines.push(line(`ИНН ${inn}`, { align: "center" }));
+  if (hasText(address)) lines.push(line(address, { align: "center" }));
+  lines.push(line(divider));
+  if (hasText(docNo) && hasText(dt)) {
+    lines.push(line(lr(`Чек № ${docNo}`, dt, width)));
+  } else if (hasText(docNo)) {
+    lines.push(line(`Чек № ${docNo}`));
+  } else if (hasText(dt)) {
+    lines.push(line(dt));
+  }
+  if (hasText(cashier)) lines.push(line(lr("Кассир", cashier, width)));
+  const consultant = String(
+    payload?.consultant_name ??
+      payload?.consultant?.name ??
+      payload?.consultant_display ??
+      "",
+  ).trim();
+  if (hasText(consultant)) {
+    lines.push(line(lr("Консультант", consultant, width)));
+  }
+  if (hasText(shift)) lines.push(line(lr("Смена", shift, width)));
+  lines.push(line(divider));
+  if (ekassaFields) {
+    lines.push(line("СНО: Общий налоговый режим"));
+    lines.push(line(divider));
+  }
+
+  // left/right — отдельная правая колонка на canvas (кириллица не моноширинная)
+  lines.push({
+    left: marketItemsHeaderLeft(width),
+    right: "Итого",
+    bold: true,
+  });
+  lines.push(line(""));
+  for (const [index, it] of items.entries()) {
+    const name = String(it.name ?? "Товар");
+    const qty = Number(it.qty || 1);
+    const price = Number(it.price || 0);
+    const lineTotal = Number(it.total ?? qty * price);
+    const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
+    const prefix = `${index + 1}) `;
+    const nameLines = wrapReceiptName(name, Math.max(8, width - prefix.length));
+    lines.push(line(prefix + nameLines[0], { bold: true }));
+    for (let i = 1; i < nameLines.length; i += 1) {
+      lines.push(line(`   ${nameLines[i]}`, { bold: true }));
+    }
+    lines.push(line(""));
+    lines.push({
+      left: buildMarketItemLineLeft(price, qty, lineDiscountAmt),
+      right: money(lineTotal),
+      bold: true,
+    });
+    if (index < items.length - 1) {
+      lines.push(line(divider));
+    }
+  }
+
+  lines.push(line(divider));
+  lines.push(line(lr("Подытог", money(subtotal), width), { bold: true }));
+  if (discount > 0) {
+    lines.push(
+      line(lr("Скидка", `-${money(discount)}`, width), { bold: true }),
+    );
+  }
+  if (!ekassaFields) {
+    if (vat > 0) lines.push(line(lr("НДС", money(vat), width), { bold: true }));
+    if (nsp > 0) lines.push(line(lr("НсП", money(nsp), width), { bold: true }));
+  }
+  lines.push(line(divider));
+  if (ekassaFields) {
+    lines.push(line(lr("Всего", money(total), width), { bold: true }));
+    lines.push(line(lr("Наличные", money(paidCash), width), { bold: true }));
+    lines.push(line(lr("Безналичные", money(paidCard), width), { bold: true }));
+    if (cashReceived > paidCash) {
+      lines.push(
+        line(lr("Получено", money(cashReceived), width), { bold: true }),
+      );
+    }
+    if (change > 0) {
+      lines.push(line(lr("Сдача", money(change), width), { bold: true }));
+    }
+    lines.push(line(lr("Вид расчета", "Полный расчет", width), { bold: true }));
+    lines.push(line(lr("НДС 0%", "0.00", width), { bold: true }));
+    lines.push(line(lr("НсП 0%", "0.00", width), { bold: true }));
+  } else {
+    if (paidCash > 0) {
+      lines.push(line(lr("Наличные", money(paidCash), width), { bold: true }));
+    }
+    if (paidCard > 0) {
+      lines.push(
+        line(lr("Безналичные", money(paidCard), width), { bold: true }),
+      );
+    }
+    if (cashReceived > paidCash) {
+      lines.push(
+        line(lr("Получено", money(cashReceived), width), { bold: true }),
+      );
+    }
+    if (change > 0) {
+      lines.push(line(lr("Сдача", money(change), width), { bold: true }));
+    }
+  }
+
+  lines.push(
+    line(lrSized("Итог", `${money(total)} СОМ`, width, 0x30), {
+      bold: true,
+      scale: 2,
+    }),
+  );
+  lines.push(line(divider));
+  if (hasText(kkm)) {
+    if (ekassaFields) {
+      lines.push(line(lr("ККМ версия", "1.0", width)));
+      lines.push(line(divider));
+    }
+    lines.push(line(lr("РН ККМ", kkm, width)));
+    lines.push(line(divider));
+  }
+  if (hasText(fn)) {
+    lines.push(line(lr("ФМ", fn, width)));
+    lines.push(line(divider));
+  }
+  if (hasText(fd)) {
+    lines.push(line(lr("ФД", fd, width)));
+    lines.push(line(divider));
+  }
+  if (hasText(fpd)) {
+    lines.push(line(lr("ФПД", fpd, width)));
+  }
+  lines.push(line(divider));
+  if (qrLink) {
+    lines.push(line(""));
+    lines.push(line("Проверка чека", { align: "center", bold: true }));
+  }
+
+  return { lines, qrLink, width };
+}
+
+/** Рисует layout чека на canvas шириной dotsPerLine. */
+export function renderReceiptLayoutToCanvas(lines, cfg = {}) {
+  if (typeof document === "undefined") {
+    throw new Error("Canvas недоступен вне браузера");
+  }
+  const dotsPerLine = Math.max(
+    128,
+    Math.round(Number(cfg.dotsPerLine) || MARKET_DEFAULT_DOTS_PER_LINE),
+  );
+  const charsPerLine = Math.max(
+    16,
+    Math.round(Number(cfg.charsPerLine) || MARKET_DEFAULT_CHARS_PER_LINE),
+  );
+  const padX = 2;
+  const padY = 6;
+
+  // Временный canvas, чтобы замерить реальную ширину моноширинного символа
+  // и подобрать кегль так, чтобы charsPerLine заполнили всю зону печати.
+  const canvas = document.createElement("canvas");
+  canvas.width = dotsPerLine;
+  canvas.height = 32;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const usable = Math.max(64, dotsPerLine - padX * 2);
+  const probeSize = 24;
+  ctx.font = `400 ${probeSize}px ${RECEIPT_CANVAS_FONT}`;
+  const measuredChar = Math.max(1, ctx.measureText("0").width || probeSize * 0.6);
+  const baseFontSize = Math.max(
+    16,
+    Math.floor((usable / charsPerLine) * (probeSize / measuredChar)),
+  );
+  const baseLineHeight = Math.max(
+    baseFontSize + 6,
+    Math.round(Number(cfg.lineDotHeight) || baseFontSize + 8),
+  );
+
+  const heights = (lines || []).map((row) => {
+    const scale = Math.max(0.75, Number(row?.scale) || 1);
+    return Math.round(baseLineHeight * scale);
+  });
+  const contentH = heights.reduce((s, h) => s + h, 0);
+  canvas.height = Math.max(padY * 2 + contentH, padY * 2 + baseLineHeight);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#000000";
+  ctx.textBaseline = "top";
+
+  let y = padY;
+  for (let i = 0; i < (lines || []).length; i += 1) {
+    const row = lines[i] || {};
+    const scale = Math.max(0.75, Number(row.scale) || 1);
+    const fontSize = Math.max(14, Math.round(baseFontSize * scale));
+    const rowH = heights[i];
+    const weight = row.bold ? "700" : "400";
+    ctx.font = `${weight} ${fontSize}px ${RECEIPT_CANVAS_FONT}`;
+    const textY = y + Math.max(0, Math.floor((rowH - fontSize) / 2));
+
+    // Двухколоночная строка: правая цена всегда у правого края ленты
+    if (row.left != null || row.right != null) {
+      const left = String(row.left ?? "");
+      const right = String(row.right ?? "");
+      const rightW = right ? ctx.measureText(right).width : 0;
+      const gap = 8;
+      const maxLeftW = Math.max(8, usable - rightW - gap);
+      let leftDraw = left;
+      if (leftDraw && ctx.measureText(leftDraw).width > maxLeftW) {
+        while (
+          leftDraw.length > 1 &&
+          ctx.measureText(`${leftDraw}…`).width > maxLeftW
+        ) {
+          leftDraw = leftDraw.slice(0, -1);
+        }
+        leftDraw = leftDraw.length ? `${leftDraw}…` : "…";
+      }
+      if (leftDraw) ctx.fillText(leftDraw, padX, textY);
+      if (right) {
+        ctx.fillText(right, Math.round(dotsPerLine - padX - rightW), textY);
+      }
+    } else {
+      const text = String(row.text ?? "");
+      if (text) {
+        const metrics = ctx.measureText(text);
+        let x = padX;
+        if (row.align === "center") {
+          x = Math.max(padX, Math.round((dotsPerLine - metrics.width) / 2));
+        } else if (row.align === "right") {
+          x = Math.max(padX, Math.round(dotsPerLine - padX - metrics.width));
+        }
+        ctx.fillText(text, x, textY);
+      }
+    }
+    y += rowH;
+  }
+  return canvas;
+}
+
 function buildReceiptFromJSON(payload, opts = {}) {
   const emphasizeMarketReceipt = opts.receiptStyle === "market";
   const cfg = getEscposRuntimeConfig({ marketDefault: emphasizeMarketReceipt });
-  const width = Math.max(
-    emphasizeMarketReceipt ? 32 : 42,
-    opts.width || cfg.charsPerLine
-  );
+  const width = Math.max(16, opts.width || cfg.charsPerLine);
   const divider = "-".repeat(width);
   const codepage = opts.codepage || cfg.codepage;
   const enc = opts.encoder || getEncoder(codepage);
@@ -471,12 +1010,18 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const cashier = String(payload.cashier_name ?? "").trim();
 
   const docNo = String(
-    ekassaFields ? (f(ekassaFields, "1042") ?? payload.doc_no ?? "") : (payload.doc_no ?? ""),
+    ekassaFields
+      ? (f(ekassaFields, "1042") ?? payload.doc_no ?? "")
+      : (payload.doc_no ?? ""),
   ).trim();
   const dt = String(
-    ekassaFields ? (f(ekassaFields, "1012") ?? payload.created_at ?? "") : (payload.created_at ?? ""),
+    ekassaFields
+      ? (f(ekassaFields, "1012") ?? payload.created_at ?? "")
+      : (payload.created_at ?? ""),
   ).trim();
-  const shift = String(ekassaFields ? (f(ekassaFields, "1038") ?? "") : "").trim();
+  const shift = String(
+    ekassaFields ? (f(ekassaFields, "1038") ?? "") : "",
+  ).trim();
 
   const payloadItemsForMerge =
     (Array.isArray(payload.items) && payload.items) ||
@@ -484,43 +1029,51 @@ function buildReceiptFromJSON(payload, opts = {}) {
     (Array.isArray(payload.cart?.items) && payload.cart.items) ||
     null;
 
-  const items = ekassaFields && Array.isArray(f(ekassaFields, "1059"))
-    ? f(ekassaFields, "1059").map((it, idx) => {
-      const qty = toNum(it?.["1023"]) || 1;
-      // В ответах eKassa для Маркета часто:
-      // 1043 = сумма позиции, 1076 = цена за единицу.
-      const raw1043 = fromTyiyn(it?.["1043"]);
-      const raw1076 = fromTyiyn(it?.["1076"]);
-      const price = raw1076 > 0 ? raw1076 : (qty > 0 ? raw1043 / qty : raw1043);
-      const total = raw1043 > 0 ? raw1043 : price * qty;
-      const base = {
-        name: String(it?.["1030"] || "Товар"),
-        qty,
-        price,
-        total,
-      };
-      let src = payloadItemsForMerge?.[idx];
-      if (!src && payloadItemsForMerge?.length) {
-        const nm = base.name.trim();
-        src =
-          payloadItemsForMerge.find(
-            (x) =>
-              String(x?.name ?? "").trim() === nm &&
-              (toNum(x?.qty) || 1) === base.qty,
-          ) || null;
-      }
-      if (!src) return base;
-      const mapped = mapMarketReceiptItem({ ...src, qty, price, unit_price: price });
-      return {
-        ...base,
-        line_discount_pct: mapped.line_discount_pct,
-        line_discount_amount: mapped.line_discount_amount,
-        total: mapped.total,
-      };
-    })
-    : (payloadItemsForMerge || (Array.isArray(payload.items) ? payload.items : [])).map(
-        mapMarketReceiptItem,
-      );
+  const items =
+    ekassaFields && Array.isArray(f(ekassaFields, "1059"))
+      ? f(ekassaFields, "1059").map((it, idx) => {
+          const qty = toNum(it?.["1023"]) || 1;
+          // В ответах eKassa для Маркета часто:
+          // 1043 = сумма позиции, 1076 = цена за единицу.
+          const raw1043 = fromTyiyn(it?.["1043"]);
+          const raw1076 = fromTyiyn(it?.["1076"]);
+          const price =
+            raw1076 > 0 ? raw1076 : qty > 0 ? raw1043 / qty : raw1043;
+          const total = raw1043 > 0 ? raw1043 : price * qty;
+          const base = {
+            name: String(it?.["1030"] || "Товар"),
+            qty,
+            price,
+            total,
+          };
+          let src = payloadItemsForMerge?.[idx];
+          if (!src && payloadItemsForMerge?.length) {
+            const nm = base.name.trim();
+            src =
+              payloadItemsForMerge.find(
+                (x) =>
+                  String(x?.name ?? "").trim() === nm &&
+                  (toNum(x?.qty) || 1) === base.qty,
+              ) || null;
+          }
+          if (!src) return base;
+          const mapped = mapMarketReceiptItem({
+            ...src,
+            qty,
+            price,
+            unit_price: price,
+          });
+          return {
+            ...base,
+            line_discount_pct: mapped.line_discount_pct,
+            line_discount_amount: mapped.line_discount_amount,
+            total: mapped.total,
+          };
+        })
+      : (
+          payloadItemsForMerge ||
+          (Array.isArray(payload.items) ? payload.items : [])
+        ).map(mapMarketReceiptItem);
 
   // Подытог — это ВАЛОВАЯ сумма до скидок. payload.discount — общая скидка
   // (включая построчные), поэтому подытог считаем как «итог по строке + скидка
@@ -534,7 +1087,9 @@ function buildReceiptFromJSON(payload, opts = {}) {
         0,
       );
   const discount = resolveMarketOrderDiscount(payload, ekassaFields);
-  const vat = ekassaFields ? fromTyiyn(f(ekassaFields, "1033")) : toNum(payload.tax);
+  const vat = ekassaFields
+    ? fromTyiyn(f(ekassaFields, "1033"))
+    : toNum(payload.tax);
   const nsp = ekassaFields ? fromTyiyn(f(ekassaFields, "1215")) : 0;
   const total = ekassaFields
     ? fromTyiyn(f(ekassaFields, "1031"))
@@ -549,7 +1104,9 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const change = Math.max(0, toNum(payload.change));
   const kkm = String(
     ekassaFields
-      ? (f(ekassaFields, "1037") ?? payload?.ekassa_fiscal?.kkm_reg_number ?? "")
+      ? (f(ekassaFields, "1037") ??
+          payload?.ekassa_fiscal?.kkm_reg_number ??
+          "")
       : (payload?.ekassa_fiscal?.kkm_reg_number ?? ""),
   ).trim();
   const fn = String(
@@ -567,10 +1124,15 @@ function buildReceiptFromJSON(payload, opts = {}) {
       ? (f(ekassaFields, "1077") ?? payload?.ekassa_fiscal?.fpd ?? "")
       : (payload?.ekassa_fiscal?.fpd ?? ""),
   ).trim();
-  const qrLink = String(payload?.ekassa_fiscal?.link || payload?.ekassa?.link || "").trim();
+  const qrLink = String(
+    payload?.ekassa_fiscal?.link || payload?.ekassa?.link || "",
+  ).trim();
 
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
+  for (const part of buildEscPosPrinterSetup(cfg)) {
+    chunks.push(part);
+  }
   // ESC R: по Epson n=7 — это Spain I, не Россия; там часто «ломаются» | \ [ ] и т.п.
   // Кириллица идёт через ESC t + CP866/1251 (байты 0x80+). Для стабильного ASCII — USA (0).
   chunks.push(ESC(0x1b, 0x52, 0x00));
@@ -628,7 +1190,10 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const lineTotal = Number(it.total ?? qty * price);
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
       const prefix = `${index + 1}) `;
-      const nameLines = wrapReceiptName(name, Math.max(8, width - prefix.length));
+      const nameLines = wrapReceiptName(
+        name,
+        Math.max(8, width - prefix.length),
+      );
 
       pushReceiptBoldOn(chunks);
       chunks.push(enc(prefix + nameLines[0] + "\n"));
@@ -659,12 +1224,12 @@ function buildReceiptFromJSON(payload, opts = {}) {
       const lineTotal = Number(it.total ?? qty * price);
       chunks.push(enc(`${index + 1}. ${name}\n`));
       const lineDiscountAmt = Math.max(0, toNum(it?.line_discount_amount));
-      chunks.push(enc(lr(`${money(price)} x ${qty} ед.`, money(lineTotal), width) + "\n"));
+      chunks.push(
+        enc(lr(`${money(price)} x ${qty} ед.`, money(lineTotal), width) + "\n"),
+      );
       if (lineDiscountAmt > 0) {
         chunks.push(
-          enc(
-            lr("Скидка (товар)", `-${money(lineDiscountAmt)}`, width) + "\n",
-          ),
+          enc(lr("Скидка (товар)", `-${money(lineDiscountAmt)}`, width) + "\n"),
         );
       }
       if (ekassaFields) {
@@ -708,8 +1273,10 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(enc(lr("НДС 0%", "0.00", width) + "\n"));
     chunks.push(enc(lr("НсП 0%", "0.00", width) + "\n"));
   } else {
-    if (paidCash > 0) chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
-    if (paidCard > 0) chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
+    if (paidCash > 0)
+      chunks.push(enc(lr("Наличные", money(paidCash), width) + "\n"));
+    if (paidCard > 0)
+      chunks.push(enc(lr("Безналичные", money(paidCard), width) + "\n"));
     if (cashReceived > paidCash) {
       chunks.push(enc(lr("Получено", money(cashReceived), width) + "\n"));
     }
@@ -733,21 +1300,17 @@ function buildReceiptFromJSON(payload, opts = {}) {
     if (ekassaFields) {
       chunks.push(enc(lr("ККМ версия", "1.0", width) + "\n"));
       chunks.push(enc(divider + "\n"));
-
     }
     chunks.push(enc(lr("РН ККМ", kkm, width) + "\n"));
     chunks.push(enc(divider + "\n"));
-
   }
   if (hasText(fn)) {
     chunks.push(enc(lr("ФМ", fn, width) + "\n"));
     chunks.push(enc(divider + "\n"));
-
   }
   if (hasText(fd)) {
     chunks.push(enc(lr("ФД", fd, width) + "\n"));
     chunks.push(enc(divider + "\n"));
-
   }
   if (hasText(fpd)) {
     chunks.push(enc(lr("ФПД", fpd, width) + "\n"));
@@ -801,10 +1364,11 @@ function saveVidPidToLS(dev) {
     localStorage.setItem("escpos_pid", dev.productId.toString(16));
     if (dev.serialNumber)
       localStorage.setItem("escpos_serial", String(dev.serialNumber));
-    if (dev.productName) localStorage.setItem("escpos_product", dev.productName);
+    if (dev.productName)
+      localStorage.setItem("escpos_product", dev.productName);
     if (dev.manufacturerName)
       localStorage.setItem("escpos_manufacturer", dev.manufacturerName);
-  } catch { }
+  } catch {}
 }
 async function tryUsbAutoConnect() {
   if (!("usb" in navigator)) throw new Error("Браузер не поддерживает WebUSB");
@@ -819,7 +1383,7 @@ async function tryUsbAutoConnect() {
     devs.find(
       (d) =>
         (!savedVid || d.vendorId === savedVid) &&
-        (!savedPid || d.productId === savedPid)
+        (!savedPid || d.productId === savedPid),
     ) || null
   );
 }
@@ -832,10 +1396,10 @@ async function openUsbDevice(dev) {
   if (!dev.opened) await dev.open();
 
   if (dev.configuration == null) {
-    await dev.selectConfiguration(1).catch(() => { });
+    await dev.selectConfiguration(1).catch(() => {});
     if (dev.configuration == null && dev.configurations?.length) {
       const cfgNum = dev.configurations[0]?.configurationValue ?? 1;
-      await dev.selectConfiguration(cfgNum).catch(() => { });
+      await dev.selectConfiguration(cfgNum).catch(() => {});
     }
   }
   const cfg = dev.configuration;
@@ -844,7 +1408,7 @@ async function openUsbDevice(dev) {
   for (const intf of cfg.interfaces) {
     for (const alt of intf.alternates) {
       const out = (alt.endpoints || []).find(
-        (e) => e.direction === "out" && e.type === "bulk"
+        (e) => e.direction === "out" && e.type === "bulk",
       );
       if (!out) continue;
 
@@ -859,7 +1423,7 @@ async function openUsbDevice(dev) {
       } catch {
         try {
           await dev.releaseInterface(intf.interfaceNumber);
-        } catch { }
+        } catch {}
         continue;
       }
       return {
@@ -870,7 +1434,7 @@ async function openUsbDevice(dev) {
     }
   }
   throw new Error(
-    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера."
+    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера.",
   );
 }
 async function ensureUsbReadyAuto() {
@@ -977,7 +1541,7 @@ export async function checkPrinterConnection() {
   } catch (err) {
     console.error(
       "[PrintService] Ошибка при проверке подключения принтера:",
-      err
+      err,
     );
     return false;
   }
@@ -997,6 +1561,8 @@ async function printReceiptFromPdfUSB(pdfBlob, options = {}) {
   }
   const { outEP } = await openUsbDevice(dev);
   saveVidPidToLS(dev);
+  usbState.dev = dev;
+  await wakeEscPosPrinter(dev, outEP);
 
   // печатаем на ширину принтера
   const isMarket = options?.receiptStyle === "market";
@@ -1010,7 +1576,7 @@ async function printReceiptFromPdfUSB(pdfBlob, options = {}) {
   }
 }
 
-async function printReceiptJSONViaUSB(payload, options = {}) {
+async function printReceiptJSONGraphicViaUSB(payload, options = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
@@ -1023,8 +1589,58 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
   }
   const { outEP } = await openUsbDevice(dev);
   saveVidPidToLS(dev);
+  usbState.dev = dev;
+  await wakeEscPosPrinter(dev, outEP);
+
+  const cfg = getEscposRuntimeConfig({ marketDefault: true });
+  const { lines, qrLink } = buildMarketReceiptLayout(payload, {
+    width: cfg.charsPerLine,
+  });
+  const canvas = renderReceiptLayoutToCanvas(lines, cfg);
+  const { raster, bytesPerLine, h } = canvasToRasterBytes(canvas);
+  const rasterEscpos = buildEscPosForRaster(raster, bytesPerLine, h, {
+    withCut: false,
+  });
+
+  const tailParts = [];
+  if (qrLink) {
+    tailParts.push(ESC(0x1b, 0x61, 0x01)); // center QR
+    for (const part of buildEscPosQr(qrLink)) {
+      tailParts.push(part);
+    }
+    tailParts.push(ESC(0x1b, 0x61, 0x00));
+  }
+  // feed + cut (как у текстового чека — запас бумаги перед отрезом)
+  tailParts.push(ESC(0x1b, 0x64, 0x06));
+  tailParts.push(ESC(0x1d, 0x56, 0x00));
+
+  const payloadBytes = concatUint8Arrays([rasterEscpos, ...tailParts]);
+  for (const part of chunkBytes(payloadBytes)) {
+    await dev.transferOut(outEP, part);
+  }
+}
+
+async function printReceiptJSONViaUSB(payload, options = {}) {
+  if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
 
   const isMarket = options?.receiptStyle === "market";
+  if (isMarket && resolveGraphicPrint(options)) {
+    await printReceiptJSONGraphicViaUSB(payload, options);
+    return;
+  }
+
+  await ensureUsbReadyAuto();
+  let dev = usbState.dev;
+  if (!dev) {
+    if (options?.interactive === false) {
+      throw new Error("Принтер не подключен");
+    }
+    dev = await requestUsbDevice();
+    saveVidPidToLS(dev);
+  }
+  const { outEP } = await openUsbDevice(dev);
+  saveVidPidToLS(dev);
+
   const cfg = getEscposRuntimeConfig({ marketDefault: isMarket });
   const parts = buildReceiptFromJSON(payload, {
     width: cfg.charsPerLine,
@@ -1087,19 +1703,25 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
   saveVidPidToLS(dev);
 
   const cfg = getEscposRuntimeConfig();
-  // ESC/POS: init, international USA (см. ESC R в buildReceiptFromJSON), codepage, text, cut
+  // ESC/POS: init, font/line, international USA, codepage, text, cut
   const init = ESC(0x1b, 0x40);
+  const setup = buildEscPosPrinterSetup(cfg);
   const intl = ESC(0x1b, 0x52, 0x00);
   const cp = ESC(0x1b, 0x74, cfg.codepage);
   const body = cfg.encoder(String(text) + "\n");
   const cut = ESC(0x1d, 0x56, 0x00);
 
+  const setupLen = setup.reduce((n, p) => n + p.length, 0);
   const data = new Uint8Array(
-    init.length + intl.length + cp.length + body.length + cut.length
+    init.length + setupLen + intl.length + cp.length + body.length + cut.length,
   );
   let o = 0;
   data.set(init, o);
   o += init.length;
+  for (const part of setup) {
+    data.set(part, o);
+    o += part.length;
+  }
   data.set(intl, o);
   o += intl.length;
   data.set(cp, o);
@@ -1183,7 +1805,10 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     if (text.startsWith("data:application/pdf;base64,")) {
       const b64 = text.split(",")[1] || "";
       const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-      await printReceiptFromPdfUSB(new Blob([bin], { type: "application/pdf" }), printOptions);
+      await printReceiptFromPdfUSB(
+        new Blob([bin], { type: "application/pdf" }),
+        printOptions,
+      );
       return;
     }
     try {
@@ -1229,7 +1854,11 @@ export async function handleCheckoutResponseForPrinting(res, options = {}) {
     URL.revokeObjectURL(url);
     throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
   }
-  if (printable && typeof printable === "object" && Array.isArray(printable.items)) {
+  if (
+    printable &&
+    typeof printable === "object" &&
+    Array.isArray(printable.items)
+  ) {
     await printReceiptJSONViaUSB(printable, printOptions);
     return;
   }

@@ -11,8 +11,11 @@ import { useUser } from "../../store/slices/userSlice";
 import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { FaArrowUp } from "react-icons/fa";
+import { Menu } from "lucide-react";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useEnsureMarketDebtScheduleV2 } from "../../hooks/useMarketCashierSettings";
+import { prefetchSkladRoute } from "../../utils/prefetchSkladRoute";
+import { isMarketSectorName } from "../../utils/subscriptionPlan";
 const useAnnouncement = (company, setHideAnnouncement) => {
   const [daysLeft, setDaysLeft] = useState(null);
 
@@ -42,12 +45,32 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 };
 
 const Layout = () => {
-  const { company } = useUser();
+  const { company, sector } = useUser();
+  const location = useLocation();
   useEnsureMarketDebtScheduleV2();
   const rootBlock = useMemo(() => {
     return document.getElementById('root')
   }, [])
   const [isArrowView, setIsArrowView] = useState(false);
+
+  useEffect(() => {
+    const sectorName = sector || company?.sector?.name || "";
+    if (!isMarketSectorName(sectorName)) return undefined;
+    if (location.pathname.startsWith("/crm/sklad")) return undefined;
+
+    const taskId =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => prefetchSkladRoute(), { timeout: 3000 })
+        : setTimeout(() => prefetchSkladRoute(), 1200);
+
+    return () => {
+      if (typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(taskId);
+      } else {
+        clearTimeout(taskId);
+      }
+    };
+  }, [sector, company, location.pathname]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
@@ -61,7 +84,6 @@ const Layout = () => {
   });
 
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
-  const location = useLocation();
 
   const isHidden = useMemo(() => {
     return (
@@ -111,6 +133,19 @@ const Layout = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location.pathname]);
+
+  useEffect(() => {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!isMobile || !isSidebarOpen || isHidden) {
+      document.body.classList.remove("sidebar-open-mobile");
+      return undefined;
+    }
+
+    document.body.classList.add("sidebar-open-mobile");
+    return () => {
+      document.body.classList.remove("sidebar-open-mobile");
+    };
+  }, [isSidebarOpen, isHidden]);
 
   useEffect(() => {
     const isMobile = window.innerWidth < 769;
@@ -221,6 +256,17 @@ const Layout = () => {
                 toggleSidebar={toggleSidebar}
                 isSidebarOpen={isSidebarOpen}
               />
+              {!isSidebarOpen && (
+                <button
+                  type="button"
+                  className={`mobile-menu-fab${isArrowView ? " mobile-menu-fab--raised" : ""}`}
+                  onClick={toggleSidebar}
+                  aria-label="Открыть меню"
+                  title="Меню"
+                >
+                  <Menu size={22} strokeWidth={2.25} />
+                </button>
+              )}
             </>
           )}
           <div className="content_content">

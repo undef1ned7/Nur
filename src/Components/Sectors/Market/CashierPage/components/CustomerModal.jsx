@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { X, Search, User, Plus } from "lucide-react";
 import {
@@ -7,25 +7,66 @@ import {
 } from "../../../../../store/creators/clientCreators";
 import "./CustomerModal.scss";
 
-const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
+const CustomerModal = ({
+  onClose,
+  onSelect,
+  customers = [],
+  title,
+  defaultTab = "client",
+}) => {
   const dispatch = useDispatch();
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [activeTab, setActiveTab] = useState(
+    defaultTab === "suppliers" ? "suppliers" : "client",
+  );
   const [newClient, setNewClient] = useState({
     full_name: "",
     phone: "",
     email: "",
     date: new Date().toISOString().split("T")[0],
-    type: "client",
+    type: defaultTab === "suppliers" ? "suppliers" : "client",
   });
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.includes(searchTerm)
-  );
+  const normalizeCustomerType = (c) => {
+    const t = String(c?.type || "client").toLowerCase();
+    return t === "supplier" || t === "suppliers" ? "suppliers" : "client";
+  };
+
+  const searchTermNormalized = searchTerm.trim().toLowerCase();
+
+  const { filteredClients, filteredSuppliers } = useMemo(() => {
+    const applySearchFilter = (list) =>
+      list.filter((customer) => {
+        const fullName = String(customer?.full_name || customer?.name || "");
+        const phone = String(customer?.phone || "");
+
+        if (!searchTermNormalized) return true;
+
+        return (
+          fullName.toLowerCase().includes(searchTermNormalized) ||
+          phone.includes(searchTermNormalized) ||
+          phone.includes(searchTerm)
+        );
+      });
+
+    const clients = customers.filter(
+      (c) => normalizeCustomerType(c) === "client",
+    );
+    const suppliers = customers.filter(
+      (c) => normalizeCustomerType(c) === "suppliers",
+    );
+
+    return {
+      filteredClients: applySearchFilter(clients),
+      filteredSuppliers: applySearchFilter(suppliers),
+    };
+  }, [customers, searchTerm, searchTermNormalized]);
+
+  const filteredCustomers =
+    activeTab === "suppliers" ? filteredSuppliers : filteredClients;
 
   const getInitials = (name) => {
     if (!name) return "?";
@@ -46,7 +87,11 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
 
     // Валидация
     if (!newClient.full_name?.trim()) {
-      setCreateError("Введите имя клиента");
+      setCreateError(
+        activeTab === "suppliers"
+          ? "Введите имя поставщика"
+          : "Введите имя клиента",
+      );
       return;
     }
 
@@ -69,7 +114,7 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
           phone: "",
           email: "",
           date: new Date().toISOString().split("T")[0],
-          type: "client",
+          type: activeTab,
         });
         setShowCreateForm(false);
         setCreateError("");
@@ -83,7 +128,9 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
         error?.detail ||
           error?.message ||
           error?.full_name?.[0] ||
-          "Не удалось создать клиента"
+            (activeTab === "suppliers"
+              ? "Не удалось создать поставщика"
+              : "Не удалось создать клиента")
       );
     } finally {
       setCreating(false);
@@ -100,7 +147,9 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
     <div className="customer-modal-overlay" onClick={onClose}>
       <div className="customer-modal" onClick={(e) => e.stopPropagation()}>
         <div className="customer-modal__header">
-          <h2 className="customer-modal__title">Список должников</h2>
+          <h2 className="customer-modal__title">
+            {title || "Список должников"}
+          </h2>
           <button className="customer-modal__close" onClick={onClose}>
             <X size={24} />
           </button>
@@ -137,17 +186,62 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
             <div className="customer-modal__create-section">
               <button
                 className="customer-modal__create-btn"
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => {
+                  setNewClient((prev) => ({ ...prev, type: activeTab }));
+                  setShowCreateForm(true);
+                }}
               >
                 <Plus size={18} />
-                Создать клиента
+                {activeTab === "suppliers"
+                  ? "Создать поставщика"
+                  : "Создать клиента"}
               </button>
             </div>
 
             <div className="customer-modal__list">
+              <div
+                className="customer-modal__tabs customer-modal__tabs--in-list"
+                role="tablist"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "client"}
+                  className={`customer-modal__tab${
+                    activeTab === "client"
+                      ? " customer-modal__tab--active"
+                      : ""
+                  }`}
+                  onClick={() => setActiveTab("client")}
+                >
+                  Клиенты
+                  <span className="customer-modal__tab-count">
+                    ({filteredClients.length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "suppliers"}
+                  className={`customer-modal__tab${
+                    activeTab === "suppliers"
+                      ? " customer-modal__tab--active"
+                      : ""
+                  }`}
+                  onClick={() => setActiveTab("suppliers")}
+                >
+                  Поставщики
+                  <span className="customer-modal__tab-count">
+                    ({filteredSuppliers.length})
+                  </span>
+                </button>
+              </div>
+
               {filteredCustomers.length === 0 ? (
                 <div className="customer-modal__empty">
-                  Покупатели не найдены
+                  {activeTab === "suppliers"
+                    ? "Поставщики не найдены"
+                    : "Покупатели не найдены"}
                 </div>
               ) : (
                 filteredCustomers.map((customer) => {
@@ -189,7 +283,11 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
           <div className="customer-modal__create-form-wrapper">
             <div className="customer-modal__create-form">
               <div className="customer-modal__create-form-header">
-                <h3>Новый клиент</h3>
+                <h3>
+                  {activeTab === "suppliers"
+                    ? "Новый поставщик"
+                    : "Новый клиент"}
+                </h3>
                 <button
                   className="customer-modal__create-form-close"
                   onClick={() => {
@@ -200,7 +298,7 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
                       phone: "",
                       email: "",
                       date: new Date().toISOString().split("T")[0],
-                      type: "client",
+                      type: activeTab,
                     });
                   }}
                   type="button"
@@ -272,7 +370,7 @@ const CustomerModal = ({ onClose, onSelect, customers = [] }) => {
                       phone: "",
                       email: "",
                       date: new Date().toISOString().split("T")[0],
-                      type: "client",
+                      type: activeTab,
                     });
                   }}
                   disabled={creating}

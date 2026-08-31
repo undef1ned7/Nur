@@ -649,7 +649,7 @@ const CafeOrderHistory = () => {
           await printViaWiFiSimple(payload, parsed.ip, parsed.port);
         } else if (parsed.kind === "usb") {
           await setActivePrinterByKey(parsed.usbKey);
-          await printOrderReceiptJSONViaUSB(payload);
+          await printOrderReceiptJSONViaUSB(payload, { usbKey: parsed.usbKey });
         } else {
           throw new Error("Некорректная настройка принтера кассы");
         }

@@ -99,4 +99,11 @@ export const commonMenu = [
       permission: "can_view_settings",
       implemented: true,
     },
+    {
+      label: "Админка",
+      to: "/platform-admin",
+      icon: menuIcons.shield,
+      requirePlatformAdmin: true,
+      implemented: true,
+    },
   ];

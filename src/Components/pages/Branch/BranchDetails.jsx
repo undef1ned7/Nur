@@ -44,6 +44,8 @@ import {
   BASE_TABS,
   applyBranchTabsRules,
   applySectorTabsRules,
+  SECTOR_EXTRA_TABS,
+  SECTOR_TAB_LABEL_OVERRIDES,
 } from "./branchTabsConfig";
 import api from "../../../api";
 import "./BranchDetails.scss";
@@ -222,6 +224,22 @@ const BranchDetails = () => {
       return "calendar";
     if (routeLower.includes("history") || routeLower.includes("clipboard"))
       return "clipboard";
+    if (routeLower.includes("shifts") || routeLower.includes("смен"))
+      return "calendar";
+    if (
+      routeLower.includes("procurement") ||
+      routeLower.includes("purchasing") ||
+      routeLower.includes("закуп")
+    )
+      return "truckLoading";
+    if (routeLower.includes("suppliers") || routeLower.includes("поставщик"))
+      return "filePerson";
+    if (routeLower.includes("documents") || routeLower.includes("документ"))
+      return "clipboard";
+    if (routeLower.includes("cashier") || routeLower.includes("кассир"))
+      return "cashRegister";
+    if (routeLower.includes("categories") || routeLower.includes("категор"))
+      return "tags";
     if (
       routeLower.includes("analytics") ||
       routeLower.includes("reports") ||
@@ -322,21 +340,40 @@ const BranchDetails = () => {
     return "building";
   };
 
-  // Получение секторных табов
+  // Получение секторных табов (меню сферы + SECTOR_EXTRA_TABS)
   const sectorTabs = useMemo(() => {
     if (!currentSector) return [];
     const sectorKey = getSectorKey(currentSector);
     if (!sectorKey) return [];
     const sectorConfig = MENU_CONFIG.sector[sectorKey] || [];
-    return sectorConfig.map((item) => {
+    const labelOverrides = SECTOR_TAB_LABEL_OVERRIDES[currentSector] || {};
+
+    const fromMenu = sectorConfig.map((item) => {
       const iconName = getIconByRoute(item.to, item.label);
       return {
         id: item.to.replace("/crm/", "").replace(/\//g, "-"),
-        label: item.label,
+        label: labelOverrides[item.to] || item.label,
         icon: getSectorTabIcon(iconName),
         route: item.to,
       };
     });
+
+    const extras = (SECTOR_EXTRA_TABS[currentSector] || []).map((tab) => {
+      const iconName =
+        typeof tab.icon === "string"
+          ? tab.icon
+          : getIconByRoute(tab.route, tab.label);
+      return {
+        id: tab.id,
+        label: labelOverrides[tab.route] || tab.label,
+        icon: getSectorTabIcon(iconName),
+        route: tab.route,
+      };
+    });
+
+    const seenRoutes = new Set(fromMenu.map((t) => t.route));
+    const uniqueExtras = extras.filter((t) => !seenRoutes.has(t.route));
+    return [...fromMenu, ...uniqueExtras];
   }, [currentSector]);
 
   // Загрузка данных филиала
@@ -803,15 +840,38 @@ const BranchDetails = () => {
       else if (routeLower.includes("pilorama/warehouse")) {
         data = await fetchAllPages("/main/products/list/", { branch: id });
       }
-      // Магазин
+      // Магазин / цветочный магазин
       else if (routeLower.includes("market/bar")) {
         data = await fetchAllPages("/main/products/list/", { branch: id });
       } else if (routeLower.includes("market/history")) {
-        // История продаж
         data = await fetchAllPages("/main/pos/sales/", { branch: id });
       } else if (routeLower.includes("market/analytics")) {
-        // Аналитика магазина
+        // Список продаж филиала как срез для аналитики на карточке.
+        // Полный GET /main/analytics/market/?branch= — см. docs/market/branch-tabs.md
         data = await fetchAllPages("/main/pos/sales/", { branch: id });
+      } else if (routeLower.includes("market/procurement")) {
+        data = await fetchAllPages("/main/suppliers/receipts/", {
+          branch: id,
+        });
+      } else if (routeLower.includes("market/suppliers")) {
+        data = await fetchAllPages("/main/clients/", {
+          branch: id,
+          type: "suppliers",
+        });
+      } else if (routeLower.includes("market/documents")) {
+        data = await fetchAllPages("/main/pos/sales/", { branch: id });
+      } else if (routeLower.includes("market/cashier")) {
+        data = await fetchAllPages("/construction/cashboxes/", {
+          branch: id,
+        });
+      } else if (routeLower.includes("market/categories")) {
+        data = await fetchAllPages("/main/categories/", { branch: id });
+      } else if (
+        routeLower === "/crm/shifts" ||
+        routeLower.endsWith("/shifts") ||
+        /\/shifts\/?$/.test(routeLower)
+      ) {
+        data = await fetchAllPages("/construction/shifts/", { branch: id });
       }
 
       // Фильтруем по филиалу, если данные не были отфильтрованы на бэкенде
@@ -1412,7 +1472,28 @@ const BranchDetails = () => {
 
             // Функция для определения колонок таблицы на основе типа данных
             const getTableColumns = () => {
-              if (
+              if (routeLower.includes("market/analytics")) {
+                return ["Дата", "Клиент", "Сумма", "Статус"];
+              } else if (
+                routeLower.includes("/shifts") ||
+                /\/shifts\/?$/.test(routeLower)
+              ) {
+                return ["Открытие", "Кассир", "Касса", "Статус"];
+              } else if (
+                routeLower.includes("procurement") ||
+                routeLower.includes("suppliers/receipt")
+              ) {
+                return ["Дата", "Поставщик", "Сумма", "Статус"];
+              } else if (routeLower.includes("market/suppliers")) {
+                return ["Имя", "Телефон", "Email", "Статус"];
+              } else if (routeLower.includes("market/documents")) {
+                return ["Дата", "Клиент", "Сумма", "Статус"];
+              } else if (
+                routeLower.includes("market/cashier") ||
+                routeLower.includes("cashbox")
+              ) {
+                return ["Название", "Баланс", "Валюта", "Статус"];
+              } else if (
                 routeLower.includes("clients") ||
                 routeLower.includes("client")
               ) {
@@ -1530,7 +1611,76 @@ const BranchDetails = () => {
 
             // Функция для получения значений строки
             const getRowValues = (item) => {
-              if (
+              if (routeLower.includes("market/analytics")) {
+                return [
+                  formatDate(item.created_at || item.date || item.paid_at),
+                  item.client_name ||
+                    item.client?.full_name ||
+                    item.client ||
+                    "—",
+                  formatCurrency(item.total || item.amount || 0),
+                  item.status || "—",
+                ];
+              } else if (
+                routeLower.includes("/shifts") ||
+                /\/shifts\/?$/.test(routeLower)
+              ) {
+                return [
+                  formatDate(item.opened_at || item.created_at || item.date),
+                  item.cashier_name ||
+                    item.cashier?.full_name ||
+                    item.employee_name ||
+                    item.user_name ||
+                    "—",
+                  item.cashbox_name || item.cashbox?.name || item.cashbox || "—",
+                  item.status || (item.closed_at ? "closed" : "open") || "—",
+                ];
+              } else if (
+                routeLower.includes("procurement") ||
+                routeLower.includes("suppliers/receipt")
+              ) {
+                return [
+                  formatDate(item.date || item.created_at || item.received_at),
+                  item.supplier_name ||
+                    item.supplier?.name ||
+                    item.supplier ||
+                    item.client_name ||
+                    "—",
+                  formatCurrency(
+                    item.total_amount || item.total || item.amount || 0
+                  ),
+                  item.status || "—",
+                ];
+              } else if (routeLower.includes("market/suppliers")) {
+                return [
+                  item.full_name || item.name || "—",
+                  item.phone || item.phone_number || "—",
+                  item.email || "—",
+                  item.status || (item.is_active !== false ? "Активен" : "Неактивен"),
+                ];
+              } else if (routeLower.includes("market/documents")) {
+                return [
+                  formatDate(item.created_at || item.date || item.paid_at),
+                  item.client_name ||
+                    item.client?.full_name ||
+                    item.client ||
+                    "—",
+                  formatCurrency(item.total || item.amount || 0),
+                  item.status || "—",
+                ];
+              } else if (
+                routeLower.includes("market/cashier") ||
+                routeLower.includes("cashbox")
+              ) {
+                return [
+                  item.name || item.title || "—",
+                  formatCurrency(
+                    item.balance || item.amount || item.current_balance || 0
+                  ),
+                  item.currency || item.currency_code || "KGS",
+                  item.is_active !== false ? "Активна" : "Неактивна",
+                ];
+              } else if (
                 routeLower.includes("clients") ||
                 routeLower.includes("client")
               ) {

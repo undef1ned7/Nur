@@ -494,6 +494,22 @@ const Sell = () => {
     }
   };
 
+  const toDateInputValue = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const applySingleDayFilter = (daysAgo) => {
+    const target = new Date();
+    target.setHours(0, 0, 0, 0);
+    target.setDate(target.getDate() - daysAgo);
+    const value = toDateInputValue(target);
+    setDateFrom(value);
+    setDateTo(value);
+  };
+
   // Ключ дня (YYYY-MM-DD) для группировки позиций по дате
   const dayKeyOf = (v) => {
     if (!v) return "";
@@ -1246,6 +1262,25 @@ const Sell = () => {
                 onChange={(e) => setDateTo(e.target.value)}
               />
             </label>
+            <div className="sellFiltersModal__field">
+              <span>Быстрый выбор</span>
+              <div className="sellFiltersModal__quick">
+                <button
+                  type="button"
+                  className="sellFiltersModal__quickBtn"
+                  onClick={() => applySingleDayFilter(0)}
+                >
+                  Продажи за сегодня
+                </button>
+                <button
+                  type="button"
+                  className="sellFiltersModal__quickBtn"
+                  onClick={() => applySingleDayFilter(1)}
+                >
+                  Продажи за вчера
+                </button>
+              </div>
+            </div>
             <label className="sellFiltersModal__field">
               <span>Клиент</span>
               <select

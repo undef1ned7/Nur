@@ -53,4 +53,6 @@ export const shouldRedirectToCrm = (path) => {
 export const clearTokens = () => {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
+  localStorage.removeItem("platformAdminSession");
+  localStorage.removeItem("platformAdminImpersonating");
 };

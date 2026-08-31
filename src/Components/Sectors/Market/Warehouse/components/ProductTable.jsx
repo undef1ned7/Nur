@@ -6,6 +6,7 @@ import {
   isMarketWarehouseServiceProduct,
 } from "../../../../../tools/marketWarehouseFilters";
 import noImage from "./placeholder.png";
+import WarehouseListSkeleton from "./WarehouseListSkeleton";
 import "./ProductTable.scss";
 
 /**
@@ -140,19 +141,7 @@ const ProductTable = ({
   // Показываем старые данные во время загрузки (оптимистичное обновление)
   // Только если данных нет вообще - показываем загрузку
   if (loading && products.length === 0) {
-    return (
-      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="warehouse-table w-full min-w-[1100px]">
-          <tbody>
-            <tr>
-              <td colSpan={9} className="warehouse-table__loading">
-                Загрузка...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    );
+    return <WarehouseListSkeleton />;
   }
 
   if (products.length === 0 && !loading) {

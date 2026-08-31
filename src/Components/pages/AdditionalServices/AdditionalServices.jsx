@@ -79,13 +79,19 @@ const AdditionalServices = () => {
               Перейти
             </button>
           ) : null}
-          <button
-            type="button"
-            className="additional-services__button additional-services__button--secondary"
-            onClick={() => handleSocialClick(social.id)}
-          >
-            Подключить
-          </button>
+          {!social.isConnected ? (
+            <button
+              type="button"
+              className="additional-services__button additional-services__button--secondary"
+              onClick={() => handleSocialClick(social.id)}
+            >
+              Подключить
+            </button>
+          ) : (
+            <span className="additional-services__connected-badge">
+              Подключено
+            </span>
+          )}
         </div>
       </div>
     );

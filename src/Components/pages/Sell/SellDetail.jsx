@@ -34,6 +34,7 @@ const usbState = { dev: null, opening: null };
 // ====== 72 мм (80мм принтер) ======
 const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
 
+
 // Шрифт: 'A' (крупнее) или 'B' (мельче). По умолчанию B — ниже строка.
 const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
 
@@ -42,13 +43,13 @@ const CHAR_DOT_WIDTH = FONT === "B" ? 9 : 12;
 
 // межстрочный интервал в точках (уменьшаем высоту строк)
 const LINE_DOT_HEIGHT = Number(
-  localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24)
+  localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24),
 );
 
 // ширина строки в символах исходя из выбранного шрифта
 const CHARS_PER_LINE = Number(
   localStorage.getItem("escpos_cpl") ||
-    Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH)
+    Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH),
 );
 
 // Быстрые тюнеры из консоли:
@@ -135,8 +136,8 @@ const getEncoder = (n) =>
   CP866_CODES.has(n)
     ? encodeCP866
     : CP1251_CODES.has(n)
-    ? encodeCP1251
-    : encodeCP1251;
+      ? encodeCP1251
+      : encodeCP1251;
 
 /* ---------- Рендер PDF в растр (резерв) ---------- */
 async function ensurePdfJs() {
@@ -154,7 +155,7 @@ async function ensurePdfJs() {
   return window.pdfjsLib;
 }
 
-async function pdfBlobToCanvas(pdfBlob, targetWidth = 384) {
+async function pdfBlobToCanvas(pdfBlob, targetWidth = 576) {
   const pdfjsLib = await ensurePdfJs();
   const ab = await pdfBlob.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
@@ -217,7 +218,7 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
       alignLeft.length +
       header.length +
       raster.length +
-      feedAndCut.length
+      feedAndCut.length,
   );
   let o = 0;
   total.set(init, o);
@@ -266,10 +267,10 @@ function buildReceiptFromJSON(payload, opts = {}) {
           Number(
             it.line_total ??
               Number(it.qty ?? it.quantity ?? 0) *
-                Number(it.price ?? it.unit_price ?? 0)
+                Number(it.price ?? it.unit_price ?? 0),
           ),
-        0
-      )
+        0,
+      ),
   );
   const total = Number(payload.total ?? subtotal - discount + tax);
 
@@ -290,13 +291,15 @@ function buildReceiptFromJSON(payload, opts = {}) {
 
   for (const it of items) {
     const name = String(
-      it.name_snapshot ?? it.name ?? it.product_name ?? it.object_name ?? ""
+      it.name_snapshot ?? it.name ?? it.product_name ?? it.object_name ?? "",
     );
     const qty = Number(it.qty ?? it.quantity ?? 0);
     const price = Number(it.price ?? it.unit_price ?? 0);
     const lineTotal = Number(it.line_total ?? qty * price);
     chunks.push(enc(name + "\n"));
-    chunks.push(enc(lr(`${qty} x ${money(price)}`, money(lineTotal), width) + "\n"));
+    chunks.push(
+      enc(lr(`${qty} x ${money(price)}`, money(lineTotal), width) + "\n"),
+    );
   }
 
   chunks.push(enc(divider + "\n"));
@@ -375,7 +378,7 @@ async function tryUsbAutoConnect() {
     devs.find(
       (d) =>
         (!savedVid || d.vendorId === savedVid) &&
-        (!savedPid || d.productId === savedPid)
+        (!savedPid || d.productId === savedPid),
     ) || null
   );
 }
@@ -401,7 +404,7 @@ async function openUsbDevice(dev) {
   for (const intf of cfg.interfaces) {
     for (const alt of intf.alternates) {
       const out = (alt.endpoints || []).find(
-        (e) => e.direction === "out" && e.type === "bulk"
+        (e) => e.direction === "out" && e.type === "bulk",
       );
       if (!out) continue;
 
@@ -427,7 +430,7 @@ async function openUsbDevice(dev) {
     }
   }
   throw new Error(
-    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера."
+    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера.",
   );
 }
 
@@ -616,8 +619,8 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
   const filterField = isStartPlan
     ? item
     : isBuildingCompany
-    ? historyObjectDetail
-    : item;
+      ? historyObjectDetail
+      : item;
 
   useEffect(() => {
     if (!id) {
@@ -642,12 +645,6 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
     };
   }, [id, dispatch, isBuildingCompany]);
 
-  // Автоподключение USB при монтировании
-  useEffect(() => {
-    attachUsbListenersOnce();
-    ensureUsbReadyAuto().catch(() => {});
-  }, []);
-
   const handlePrintReceipt = async () => {
     try {
       const res = await dispatch(getProductCheckout(item?.id)).unwrap();
@@ -655,7 +652,7 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
     } catch (e) {
       console.error("Печать чека не удалась:", e);
       alert(
-        "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF)."
+        "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF).",
       );
     }
   };
@@ -678,7 +675,7 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
 
         // Генерируем PDF из JSON используя InvoicePdfDocument
         const blob = await pdf(
-          <InvoicePdfDocument data={invoiceData} />
+          <InvoicePdfDocument data={invoiceData} />,
         ).toBlob();
 
         const fileName = `invoice_${
@@ -702,7 +699,7 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
       alert(
         err?.message ||
           err?.detail ||
-          "Не удалось скачать накладную. Попробуйте позже."
+          "Не удалось скачать накладную. Попробуйте позже.",
       );
     }
   };
@@ -727,7 +724,9 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
     >
       <div className="sellDetail">
         {loading ? (
-          <div className="sellDetail__loading">Загрузка данных о продаже...</div>
+          <div className="sellDetail__loading">
+            Загрузка данных о продаже...
+          </div>
         ) : (
           <>
             <div className="sellDetail__meta">
@@ -768,7 +767,10 @@ const SellDetail = ({ onClose: onCloseProp, id: idProp }) => {
               )}
             </div>
 
-            <section className="sellDetail__section" aria-label="Позиции продажи">
+            <section
+              className="sellDetail__section"
+              aria-label="Позиции продажи"
+            >
               <h4 className="sellDetail__sectionTitle">
                 Позиции
                 <span className="sellDetail__sectionCount">{items.length}</span>
