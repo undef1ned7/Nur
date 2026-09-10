@@ -8,9 +8,10 @@
  * Контракт бэкенда: docs/consulting/backend/01-leads.md
  */
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
   FaChartPie,
+  FaFileExcel,
   FaInbox,
   FaPlug,
   FaRandom,
@@ -18,8 +19,13 @@ import {
 import api from "../../../../api";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
-import { isConsultingFunnelManager } from "../../../../utils/consultingFunnelAccess";
+import {
+  canAccessConsultingLeadInbox,
+  canManageConsultingLeadFinance,
+  isConsultingFunnelManager,
+} from "../../../../utils/consultingFunnelAccess";
 import { ensurePushPermission } from "../common/useConsultingRealtime";
+import LeadFinanceModal from "./modals/LeadFinanceModal";
 import LeadsAnalytics from "./LeadsAnalytics";
 import LeadsDistribution from "./LeadsDistribution";
 import LeadsInbox from "./LeadsInbox";
@@ -47,12 +53,14 @@ const SECTIONS = [
     label: "Распределение",
     hint: "Кто получает лиды",
     icon: FaRandom,
+    managerOnly: true,
   },
   {
     value: "integration",
     label: "Интеграция",
     hint: "Wazzup и каналы",
     icon: FaPlug,
+    managerOnly: true,
   },
 ];
 
@@ -68,13 +76,21 @@ export default function ConsultingLeads() {
   const alert = useAlert();
   const { profile } = useUser();
   const isManager = isConsultingFunnelManager(profile);
+  const canFinance = canManageConsultingLeadFinance(profile);
+  const [financeOpen, setFinanceOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const visibleSections = useMemo(
+    () => SECTIONS.filter((s) => !s.managerOnly || isManager),
+    [isManager],
+  );
+
   const sectionFromUrl = searchParams.get("tab");
-  const section = SECTIONS.some((s) => s.value === sectionFromUrl)
+  const section = visibleSections.some((s) => s.value === sectionFromUrl)
     ? sectionFromUrl
     : "inbox";
-  const activeSection = SECTIONS.find((s) => s.value === section) || SECTIONS[0];
+  const activeSection =
+    visibleSections.find((s) => s.value === section) || visibleSections[0];
 
   const selectSection = (next) => {
     setSearchParams(
@@ -90,6 +106,7 @@ export default function ConsultingLeads() {
 
   const [roles, setRoles] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [funnels, setFunnels] = useState([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,6 +122,10 @@ export default function ConsultingLeads() {
       .get(EMPLOYEES_URL, { signal: controller.signal })
       .then((res) => setEmployees(asArray(res.data)))
       .catch(() => {});
+    api
+      .get("/consalting/funnels/", { signal: controller.signal })
+      .then((res) => setFunnels(asArray(res.data)))
+      .catch(() => {});
     return () => controller.abort();
   }, []);
 
@@ -118,6 +139,10 @@ export default function ConsultingLeads() {
     ensurePushPermission();
   }, []);
 
+  if (!canAccessConsultingLeadInbox(profile)) {
+    return <Navigate to="/crm/consulting/funnel" replace />;
+  }
+
   return (
     <section className="leads">
       <header className="leads__header">
@@ -129,15 +154,20 @@ export default function ConsultingLeads() {
             или отказа
           </p>
         </div>
-        <div className="leads__headerMeta" aria-hidden>
-          <span className="leads__channelDot leads__channelDot--wa" />
-          <span className="leads__channelDot leads__channelDot--ig" />
-          <span className="leads__channelDot leads__channelDot--tg" />
-        </div>
+        {canFinance && (
+          <button
+            type="button"
+            className="leads__btn leads__btn--finance"
+            onClick={() => setFinanceOpen(true)}
+            title="Рекламный отчёт: показы, лиды, затраты, стоимость лида"
+          >
+            <FaFileExcel aria-hidden /> Финансы
+          </button>
+        )}
       </header>
 
       <nav className="leads__nav" aria-label="Разделы лидов">
-        {SECTIONS.map((s) => {
+        {visibleSections.map((s) => {
           const Icon = s.icon;
           const active = section === s.value;
           return (
@@ -178,10 +208,19 @@ export default function ConsultingLeads() {
           <LeadsAnalytics employees={employees} isManager={isManager} />
         )}
         {section === "settings" && (
-          <LeadsDistribution roles={roles} employees={employees} alert={alert} />
+          <LeadsDistribution
+            roles={roles}
+            employees={employees}
+            funnels={funnels}
+            alert={alert}
+          />
         )}
         {section === "integration" && <WazzupAccountsTab />}
       </div>
+
+      {financeOpen && canFinance && (
+        <LeadFinanceModal alert={alert} onClose={() => setFinanceOpen(false)} />
+      )}
     </section>
   );
 }

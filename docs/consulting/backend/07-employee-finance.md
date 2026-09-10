@@ -30,7 +30,7 @@ class CashOperation(models.Model):
 можно определить, иначе `NULL`.
 
 Модель `CashRequest` (заявка на подтверждение) описана в
-[09-cash-confirmation.md](./09-cash-confirmation.md) — сдача наличных использует
+[../backend-money-tenant/03-cash-confirmation.md](../backend-money-tenant/03-cash-confirmation.md) — сдача наличных использует
 её же с `kind="handover"`.
 
 ## 7.3. Расчёт «на руках»

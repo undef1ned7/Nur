@@ -51,7 +51,54 @@
     font-weight: 700;
   }
 
+  &__cardHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    .clientDetail__cardTitle {
+      margin: 0;
+    }
+  }
+
+  &__modalField--check {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+
+    input {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
   // ---- Календарь абонентских платежей ----
+  &__bulkPay {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px dashed #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+
+  &__bulkPayLabel {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  &__bulkPayProgress {
+    font-size: 12px;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+  }
+
   &__calendar {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -267,5 +314,348 @@
     justify-content: flex-end;
     gap: 10px;
     margin-top: 6px;
+  }
+
+  &__tenant {
+    margin-bottom: 16px;
+  }
+
+  &__tenantGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px 20px;
+    margin: 0 0 12px;
+
+    dt {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    dd {
+      margin: 0;
+      font-weight: 600;
+      font-size: 14px;
+    }
+  }
+
+  &__error--inline {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  &__tenantActions {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  &__tenantField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 180px;
+  }
+
+  &__input {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    background: #fff;
+  }
+
+  &__muted--spaced {
+    margin: 0 0 12px;
+    font-size: 13px;
+  }
+
+  &__btn {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px 14px;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+
+    &--primary {
+      background: var(--primary, #f7d74f);
+      border-color: #e5c93a;
+    }
+  }
+}
+
+/* ==== Модалка «Докупить услугу» ==== */
+/* ==== Модалка «Доп. продажа» ==== */
+.addSale {
+  --line: #e8ebf0;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --accent: #f7d74f;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 720px);
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  &__title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  &__sub {
+    margin: 3px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  &__legend {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+  }
+
+  /* строки-позиции */
+  &__lines {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  &__line {
+    display: grid;
+    grid-template-columns: 1fr 96px 104px 28px;
+    align-items: center;
+    gap: 8px;
+    @media (max-width: 460px) {
+      grid-template-columns: 1fr 84px 92px 24px;
+    }
+  }
+  &__lineName,
+  &__linePrice {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    min-width: 0;
+    &:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+  &__linePrice {
+    text-align: right;
+    font-weight: 700;
+    -moz-appearance: textfield;
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+  &__lineQty {
+    display: grid;
+    grid-template-columns: 26px 1fr 26px;
+    align-items: stretch;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    overflow: hidden;
+    button {
+      border: none;
+      background: #f8fafc;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      &:hover:not(:disabled) { background: #eef2f7; }
+      &:disabled { opacity: 0.4; cursor: default; }
+    }
+    input {
+      border: none;
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+      min-width: 0;
+      -moz-appearance: textfield;
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+    }
+  }
+  &__lineDel {
+    border: none;
+    background: none;
+    font-size: 20px;
+    line-height: 1;
+    color: #cbd5e1;
+    cursor: pointer;
+    padding: 0;
+    &:hover:not(:disabled) { color: #ef4444; }
+    &:disabled { opacity: 0.3; cursor: default; }
+  }
+  &__lineSum {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-top: -2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  &__addLine {
+    align-self: flex-start;
+    border: 1px dashed #cbd5e1;
+    border-radius: 9px;
+    padding: 7px 14px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #334155;
+    cursor: pointer;
+    &:hover:not(:disabled) { border-color: var(--accent); background: #fffbea; }
+    &:disabled { opacity: 0.6; cursor: default; }
+  }
+
+  /* чипы (месяцы рассрочки) */
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    &--tight { gap: 6px; }
+  }
+  &__chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 12px;
+    background: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    &:hover:not(:disabled) { border-color: #cbd5e1; }
+    &:disabled { cursor: default; opacity: 0.6; }
+    &--active {
+      border-color: #e5c93a;
+      background: #fffbea;
+      font-weight: 700;
+    }
+  }
+
+  /* сегменты «Оплата» */
+  &__segment {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px;
+    background: #f1f5f9;
+    border-radius: 12px;
+  }
+  &__segmentBtn {
+    flex: 1 1 auto;
+    min-width: 84px;
+    border: none;
+    border-radius: 9px;
+    padding: 8px 10px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    &:hover:not(:disabled):not(.addSale__segmentBtn--active) { color: var(--ink); }
+    &:disabled { cursor: default; opacity: 0.6; }
+    &--active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+  }
+
+  &__note {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    &:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  /* футер */
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    background: #fcfcfd;
+    flex-wrap: wrap;
+  }
+  &__totalBox {
+    display: grid;
+    gap: 1px;
+  }
+  &__totalLabel {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+  }
+  &__totalValue {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+  &__totalHint {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  &__footerActions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
   }
 }

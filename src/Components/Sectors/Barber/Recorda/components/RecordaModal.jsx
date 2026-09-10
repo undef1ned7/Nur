@@ -1,8 +1,10 @@
 // RecordaModal.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import api from "../../../../../api";
-import { FaPlus, FaTimes, FaChevronDown, FaChevronUp, FaWalking, FaCalendarAlt, FaClock, FaSync, FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaPlus, FaTimes, FaChevronDown, FaChevronUp, FaWalking, FaCalendarAlt, FaClock, FaSync, FaSearch, FaChevronLeft, FaChevronRight, FaTrash } from "react-icons/fa";
 import "../Recorda.scss";
+
+import ConfirmModal from "../../../../pages/Landing/NewLanding/ConfirmModal/ConfirmModal";
 
 import {
   pad,
@@ -14,14 +16,21 @@ import {
   clampToRange,
   BLOCKING,
   STATUS_LABELS,
+  DELETED_STATUS,
   parsePercent,
   calcFinalPrice,
-  OPEN_HOUR,
-  CLOSE_HOUR,
+  defaultWorkBounds,
   todayStr,
   getNowSlot,
   defaultTimeForDate,
   fmtMoney,
+  getServiceQty,
+  expandServiceIds,
+  incrementServiceId,
+  decrementServiceId,
+  setServiceQty,
+  MAX_SERVICE_QTY_PER_ITEM,
+  groupServiceIds,
 } from "./RecordaUtils";
 
 import RecordaTimeField from "./RecordaTimeField";
@@ -60,13 +69,18 @@ const RecordaModal = ({
   clients,
   barbers,
   services,
+  serviceCategoryList = [],
   appointments,
   defaultDate,
   slotDraft = null,
+  workBounds: workBoundsProp,
   onReload,
   onClientsChange,
 }) => {
+  const workBounds = workBoundsProp || defaultWorkBounds();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [formAlerts, setFormAlerts] = useState([]);
   const [fieldErrs, setFieldErrs] = useState({});
 
@@ -95,10 +109,12 @@ const RecordaModal = ({
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState("all");
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [focusedStep, setFocusedStep] = useState(null);
+  const [clientStepPassed, setClientStepPassed] = useState(false);
   const [serviceSearch, setServiceSearch] = useState("");
 
   const isEditing = !!currentRecord;
   const isWalkIn = mode === "walkin" && !isEditing;
+  const isRecordDeleted = status === DELETED_STATUS;
 
   const applyModeDefaults = useCallback((nextMode) => {
     setMode(nextMode);
@@ -106,27 +122,28 @@ const RecordaModal = ({
     setFieldErrs({});
     setTimeExpanded(false);
     setFocusedStep(null);
+    setClientStepPassed(false);
     setServiceSearch("");
 
     if (nextMode === "walkin") {
       setStartDate(todayStr());
-      setStartTime(getNowSlot());
+      setStartTime(getNowSlot(30, workBounds));
       setEndTime("");
       setAutoEnd(true);
       setStatus("confirmed");
       setUseTimeSlots(false);
     } else {
       setStartDate(defaultDate);
-      setStartTime(defaultTimeForDate(defaultDate));
+      setStartTime(defaultTimeForDate(defaultDate, 30, workBounds));
       setEndTime("");
       setAutoEnd(true);
       setStatus("booked");
       setUseTimeSlots(true);
     }
-  }, [defaultDate]);
+  }, [defaultDate, workBounds]);
 
   const closeModal = () => {
-    if (!saving) onClose();
+    if (!saving && !deleting) onClose();
   };
 
   useEffect(() => {
@@ -139,25 +156,23 @@ const RecordaModal = ({
     setServiceCategoryFilter("all");
     setSubmitAttempted(false);
     setFocusedStep(null);
+    setClientStepPassed(false);
     setServiceSearch("");
+    setConfirmDelete(false);
 
     if (currentRecord) {
       const rec = currentRecord;
       setMode("booking");
       setSelClient(rec.client ? String(rec.client) : "");
       const recSvcs = Array.isArray(rec.services)
-        ? rec.services.map((s) =>
-            typeof s === "object" && s !== null
-              ? String(s?.service_id ?? s?.service ?? s?.id ?? "")
-              : String(s)
-          ).filter(Boolean)
+        ? expandServiceIds(rec.services)
         : rec.service
         ? [String(rec.service)]
         : [];
       setSelServices(recSvcs);
       setStartDate(toDate(rec.start_at));
-      setStartTime(clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : ""));
-      setEndTime(clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : ""));
+      setStartTime(clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : "", workBounds));
+      setEndTime(clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : "", workBounds));
 
       setAutoEnd(true);
       setUseTimeSlots(true);
@@ -190,14 +205,14 @@ const RecordaModal = ({
         setSelBarber(String(slotDraft.barberId));
       }
       if (slotDraft?.startTime) {
-        setStartTime(clampToRange(slotDraft.startTime));
+        setStartTime(clampToRange(slotDraft.startTime, workBounds));
         setAutoEnd(true);
       }
       if (slotDraft && initialMode === "booking") {
         setFocusedStep("services");
       }
     }
-  }, [isOpen, currentRecord, defaultDate, initialMode, slotDraft, applyModeDefaults]);
+  }, [isOpen, currentRecord, defaultDate, initialMode, slotDraft, applyModeDefaults, workBounds]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -252,19 +267,52 @@ const RecordaModal = ({
   }, [allServiceItems, selBarber]);
 
   const serviceCategories = useMemo(() => {
-    const map = new Map();
-    serviceItems.forEach((it) => {
-      const id = it.categoryId ? String(it.categoryId) : "__none__";
-      const name = it.categoryName || "Без категории";
-      if (!map.has(id)) {
-        map.set(id, { id, name, count: 0 });
-      }
-      map.get(id).count += 1;
+    const fromServices = () => {
+      const map = new Map();
+      serviceItems.forEach((it) => {
+        const id = it.categoryId ? String(it.categoryId) : "__none__";
+        const name = it.categoryName || "Без категории";
+        if (!map.has(id)) {
+          map.set(id, { id, name });
+        }
+      });
+      return Array.from(map.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, "ru"),
+      );
+    };
+
+    if (!serviceCategoryList.length) {
+      return fromServices();
+    }
+
+    const list = serviceCategoryList
+      .filter((c) => c.active !== false)
+      .map((c) => ({
+        id: String(c.id),
+        name: c.name || "—",
+      }));
+
+    const knownIds = new Set(list.map((c) => c.id));
+
+    if (allServiceItems.some((it) => !it.categoryId)) {
+      list.push({ id: "__none__", name: "Без категории" });
+      knownIds.add("__none__");
+    }
+
+    allServiceItems.forEach((it) => {
+      if (!it.categoryId) return;
+      const id = String(it.categoryId);
+      if (knownIds.has(id)) return;
+      knownIds.add(id);
+      list.push({ id, name: it.categoryName || "—" });
     });
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, "ru"),
-    );
-  }, [serviceItems]);
+
+    return list.sort((a, b) => {
+      if (a.id === "__none__") return 1;
+      if (b.id === "__none__") return -1;
+      return a.name.localeCompare(b.name, "ru");
+    });
+  }, [serviceCategoryList, serviceItems, allServiceItems]);
 
   const filteredServiceItems = useMemo(() => {
     if (serviceCategoryFilter === "all") return serviceItems;
@@ -305,15 +353,26 @@ const RecordaModal = ({
   };
 
   const handleQuickService = (id) => {
-    const sid = String(id);
-    setSelServices((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
-    );
+    setSelServices((prev) => incrementServiceId(prev, id));
   };
+
+  const handleQuickServiceDecrement = (id, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setSelServices((prev) => decrementServiceId(prev, id));
+  };
+
+  const handleSetServiceQty = (id, qty, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setSelServices((prev) => setServiceQty(prev, id, qty));
+  };
+
+  const SERVICE_QTY_PRESETS = [4, 6, 10];
 
   const refreshNowTime = () => {
     setStartDate(todayStr());
-    setStartTime(getNowSlot());
+    setStartTime(getNowSlot(30, workBounds));
     setAutoEnd(true);
   };
 
@@ -329,11 +388,13 @@ const RecordaModal = ({
 
   const statusItems = useMemo(
     () =>
-      Object.entries(STATUS_LABELS).map(([key, label]) => ({
-        id: key,
-        label,
-        search: label,
-      })),
+      Object.entries(STATUS_LABELS)
+        .filter(([key]) => key !== DELETED_STATUS)
+        .map(([key, label]) => ({
+          id: key,
+          label,
+          search: label,
+        })),
     []
   );
 
@@ -359,15 +420,15 @@ const RecordaModal = ({
   /* авто-конец */
   useEffect(() => {
     if (!autoEnd) return;
-    const base = startTime || `${pad(OPEN_HOUR)}:00`;
+    const base = startTime || workBounds.work_start || `${pad(9)}:00`;
     const total = servicesSummary.totalMinutes || 30;
     let mm = minsOf(base) + total;
-    const max = CLOSE_HOUR * 60;
+    const max = workBounds.endMin;
     if (mm > max) mm = max;
     const H = Math.floor(mm / 60);
     const M = mm % 60;
-    setEndTime(`${pad(H)}:${pad(H === CLOSE_HOUR ? 0 : M)}`);
-  }, [startTime, servicesSummary.totalMinutes, autoEnd]);
+    setEndTime(`${pad(H)}:${pad(M)}`);
+  }, [startTime, servicesSummary.totalMinutes, autoEnd, workBounds]);
 
   /* перерасчёт цены по услугам и скидке (для поля ввода) */
   useEffect(() => {
@@ -455,23 +516,23 @@ const RecordaModal = ({
 
   /* strict setters */
   const setStartStrict = (v) => {
-    const vv = clampToRange(v);
+    const vv = clampToRange(v, workBounds);
     setStartTime(vv);
     if (!autoEnd && minsOf(endTime) <= minsOf(vv)) {
-      const mm = Math.min(minsOf(vv) + 1, CLOSE_HOUR * 60);
+      const mm = Math.min(minsOf(vv) + 1, workBounds.endMin);
       const H = Math.floor(mm / 60);
       const M = mm % 60;
-      setEndTime(`${pad(H)}:${pad(H === CLOSE_HOUR ? 0 : M)}`);
+      setEndTime(`${pad(H)}:${pad(M)}`);
     }
   };
 
   const setEndStrict = (v) => {
-    let vv = clampToRange(v);
+    let vv = clampToRange(v, workBounds);
     if (minsOf(vv) <= minsOf(startTime)) {
-      const mm = Math.min(minsOf(startTime) + 1, CLOSE_HOUR * 60);
+      const mm = Math.min(minsOf(startTime) + 1, workBounds.endMin);
       const H = Math.floor(mm / 60);
       const M = mm % 60;
-      vv = `${pad(H)}:${pad(H === CLOSE_HOUR ? 0 : M)}`;
+      vv = `${pad(H)}:${pad(M)}`;
     }
     setEndTime(vv);
     setAutoEnd(false);
@@ -497,7 +558,7 @@ const RecordaModal = ({
     const eM = minsOf(endTime);
 
     if (startTime && endTime) {
-      if (!(inRange(startTime) && inRange(endTime))) {
+      if (!(inRange(startTime, workBounds) && inRange(endTime, workBounds))) {
         errors.startTime = true;
         errors.endTime = true;
       } else if (eM <= sM) {
@@ -549,10 +610,12 @@ const RecordaModal = ({
     const eM = minsOf(endTime);
 
     if (!errs.startTime && !errs.endTime) {
-      if (!(inRange(startTime) && inRange(endTime))) {
+      if (!(inRange(startTime, workBounds) && inRange(endTime, workBounds))) {
         errs.startTime = true;
         errs.endTime = true;
-        alerts.push("Время: 09:00–21:00");
+        alerts.push(
+          `Время: ${workBounds.work_start}–${workBounds.work_end}`,
+        );
       } else if (eM <= sM) {
         errs.endTime = true;
         alerts.push("Конец позже начала");
@@ -690,6 +753,44 @@ const RecordaModal = ({
     }
   };
 
+  const deleteConfirmMessage = useMemo(() => {
+    const parts = [];
+    if (startDate && startTime) {
+      parts.push(`${startDate} ${startTime}`);
+    }
+    if (selectedClientName) {
+      parts.push(selectedClientName);
+    }
+    const details = parts.length ? ` (${parts.join(" · ")})` : "";
+    return `Удалить запись${details}? Она скроется из расписания для сотрудников, но останется видна администратору.`;
+  }, [startDate, startTime, selectedClientName]);
+
+  const handleDelete = async () => {
+    if (!currentRecord?.id || isRecordDeleted) return;
+
+    try {
+      setDeleting(true);
+      setFormAlerts([]);
+
+      await api.patch(`/barbershop/appointments/${currentRecord.id}/`, {
+        status: DELETED_STATUS,
+      });
+
+      await onReload();
+      closeModal();
+    } catch (e) {
+      const d = e?.response?.data;
+      const msg =
+        typeof d === "string"
+          ? d
+          : d?.detail || "Не удалось удалить запись.";
+      setFormAlerts([msg]);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   /* мини-клиент */
   const openMini = () => setMiniOpen(true);
   const closeMini = () => setMiniOpen(false);
@@ -705,6 +806,7 @@ const RecordaModal = ({
   const missingHint = getMissingFieldsHint();
   const submitDisabled =
     saving ||
+    deleting ||
     !validationState.isValid ||
     (selectedStartISO &&
       selectedEndISO &&
@@ -718,6 +820,8 @@ const RecordaModal = ({
 
   const submitLabel = saving
     ? "Сохранение…"
+    : deleting
+    ? "Удаление…"
     : isWalkIn
     ? "Принять клиента"
     : "Сохранить запись";
@@ -730,20 +834,33 @@ const RecordaModal = ({
 
   const bookingActiveStep = useMemo(() => {
     if (!startTime || validationState.errors.startTime) return "datetime";
-    if (!selBarber || validationState.errors.barber) return "barber";
+    if (!selBarber || validationState.errors.barber) {
+      if (!clientStepPassed) return "client";
+      return "barber";
+    }
     if (!selServices.length) return "services";
-    return "client";
+    return "services";
   }, [
     startTime,
     validationState.errors.startTime,
     selBarber,
     validationState.errors.barber,
+    clientStepPassed,
     selServices.length,
   ]);
 
   const activeStep = isWalkIn ? walkInActiveStep : bookingActiveStep;
   const displayStep = focusedStep ?? activeStep;
   const useShellLayout = !isEditing;
+
+  useEffect(() => {
+    if (!useShellLayout) return;
+    if (displayStep === "client" && selClient) {
+      setShowAdvanced(true);
+    } else if (displayStep !== "client") {
+      setShowAdvanced(false);
+    }
+  }, [displayStep, selClient, useShellLayout]);
 
   const progressSteps = useMemo(() => {
     if (isWalkIn) {
@@ -764,13 +881,13 @@ const RecordaModal = ({
         label: "Когда",
         done: !!startTime && !validationState.errors.startTime,
       },
+      { id: "client", label: "Клиент", optional: true, done: !!selClient },
       {
         id: "barber",
         label: "Мастер",
         done: !!selBarber && !validationState.errors.barber,
       },
       { id: "services", label: "Услуги", done: selServices.length > 0 },
-      { id: "client", label: "Клиент", optional: true, done: !!selClient },
     ];
   }, [
     isWalkIn,
@@ -792,8 +909,7 @@ const RecordaModal = ({
         return isWalkIn ? selServices.length > 0 : !!startTime;
       }
       if (stepId === "client") {
-        if (isWalkIn) return !!selBarber;
-        return selServices.length > 0 && !!selBarber;
+        return isWalkIn ? !!selBarber : !!startTime;
       }
       return true;
     },
@@ -816,8 +932,23 @@ const RecordaModal = ({
   );
   const isFirstStep = stepIndex <= 0;
   const isLastStep = stepIndex >= progressSteps.length - 1;
+  const isClientStep = displayStep === "client";
+  const showSkipClient =
+    useShellLayout && isClientStep && !isLastStep && !selClient;
+  const showNextStep =
+    useShellLayout &&
+    !isLastStep &&
+    canProceedFromStep(displayStep) &&
+    !(isClientStep && !selClient);
 
-  const canProceedFromStep = (stepId) => {
+  const goSkipClient = () => {
+    setClientStepPassed(true);
+    if (stepIndex < progressSteps.length - 1) {
+      setFocusedStep(progressSteps[stepIndex + 1].id);
+    }
+  };
+
+  function canProceedFromStep(stepId) {
     if (stepId === "services") return selServices.length > 0;
     if (stepId === "barber") {
       return !!selBarber && !validationState.errors.barber;
@@ -826,7 +957,7 @@ const RecordaModal = ({
       return !!startTime && !!endTime && !validationState.errors.startTime;
     }
     return true;
-  };
+  }
 
   const goToStep = (stepId) => {
     if (!canAccessStep(stepId)) return;
@@ -835,6 +966,7 @@ const RecordaModal = ({
 
   const goNext = () => {
     if (!canProceedFromStep(displayStep)) return;
+    if (displayStep === "client") setClientStepPassed(true);
     if (stepIndex < progressSteps.length - 1) {
       setFocusedStep(progressSteps[stepIndex + 1].id);
     }
@@ -851,7 +983,8 @@ const RecordaModal = ({
       <div className="barberrecorda__panelHead">
         <h4 className="barberrecorda__panelTitle">Какие услуги?</h4>
         <p className="barberrecorda__panelHint">
-          Можно выбрать несколько — сумма и время посчитаются автоматически
+          Одну услугу можно добавить несколько раз — для процедур (укол и т.п.).
+          Используйте + / − или быстрые кнопки ×4, ×6, ×10.
         </p>
       </div>
 
@@ -896,25 +1029,80 @@ const RecordaModal = ({
           <div className="barberrecorda__panelEmpty">Услуги не найдены</div>
         ) : (
           gridServiceItems.map((s) => {
-            const selected = selServices.includes(String(s.id));
+            const qty = getServiceQty(selServices, s.id);
+            const atMax = qty >= MAX_SERVICE_QTY_PER_ITEM;
             return (
-              <button
+              <div
                 key={s.id}
-                type="button"
-                className={`barberrecorda__serviceTile ${
-                  selected ? "is-selected" : ""
+                className={`barberrecorda__serviceTileWrap ${
+                  qty > 0 ? "is-selected" : ""
                 }`}
-                onClick={() => handleQuickService(s.id)}
               >
-                <span className="barberrecorda__serviceTileName">{s.label}</span>
-                <span className="barberrecorda__serviceTileMeta">
-                  {s.minutes ? `${s.minutes} мин` : "—"}
-                  {Number.isFinite(s.price) ? ` · ${fmtMoney(s.price)}` : ""}
-                </span>
-                {selected ? (
-                  <span className="barberrecorda__serviceTileCheck">✓</span>
+                <button
+                  type="button"
+                  className="barberrecorda__serviceTile"
+                  onClick={() => handleQuickService(s.id)}
+                  disabled={atMax}
+                  title={
+                    atMax
+                      ? `Не более ${MAX_SERVICE_QTY_PER_ITEM} раз`
+                      : "Добавить ещё одну"
+                  }
+                >
+                  <span className="barberrecorda__serviceTileName">{s.label}</span>
+                  <span className="barberrecorda__serviceTileMeta">
+                    {s.minutes ? `${s.minutes} мин` : "—"}
+                    {Number.isFinite(s.price) ? ` · ${fmtMoney(s.price)}` : ""}
+                    {qty > 0 && s.minutes
+                      ? ` · итого ${s.minutes * qty} мин`
+                      : ""}
+                  </span>
+                  {qty > 0 ? (
+                    <span className="barberrecorda__serviceTileQty">×{qty}</span>
+                  ) : null}
+                </button>
+                <div className="barberrecorda__serviceTileActions">
+                  <button
+                    type="button"
+                    className="barberrecorda__serviceTileStep"
+                    aria-label={`Убрать одну «${s.label}»`}
+                    disabled={qty === 0}
+                    onClick={(e) => handleQuickServiceDecrement(s.id, e)}
+                  >
+                    −
+                  </button>
+                  <span className="barberrecorda__serviceTileCount">{qty}</span>
+                  <button
+                    type="button"
+                    className="barberrecorda__serviceTileStep"
+                    aria-label={`Добавить «${s.label}»`}
+                    disabled={atMax}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleQuickService(s.id);
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+                {qty > 0 ? (
+                  <div className="barberrecorda__serviceTilePresets">
+                    {SERVICE_QTY_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`barberrecorda__serviceTilePreset ${
+                          qty === preset ? "is-active" : ""
+                        }`}
+                        onClick={(e) => handleSetServiceQty(s.id, preset, e)}
+                      >
+                        ×{preset}
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
-              </button>
+              </div>
             );
           })
         )}
@@ -923,7 +1111,7 @@ const RecordaModal = ({
       {selServices.length > 0 ? (
         <div className="barberrecorda__selectionSummary">
           <span>
-            {servicesSummary.count} усл. · {servicesSummary.totalMinutes} мин
+            {servicesSummary.count} поз. · {servicesSummary.totalMinutes} мин
           </span>
           <strong>{fmtMoney(servicesSummary.totalPrice)}</strong>
         </div>
@@ -1010,12 +1198,10 @@ const RecordaModal = ({
       <div className="barberrecorda__panelHead">
         <h4 className="barberrecorda__panelTitle">
           Клиент
-          {isWalkIn ? (
-            <span className="barberrecorda__panelOptional">необязательно</span>
-          ) : null}
+          <span className="barberrecorda__panelOptional">необязательно</span>
         </h4>
         <p className="barberrecorda__panelHint">
-          Найдите в базе или быстро создайте нового
+          Найдите в базе или быстро создайте нового. Можно пропустить и указать позже.
         </p>
       </div>
       <div className="barberrecorda__clientRow">
@@ -1057,7 +1243,7 @@ const RecordaModal = ({
           onChange={(e) => {
             const d = e.target.value;
             setStartDate(d);
-            setStartTime(defaultTimeForDate(d));
+            setStartTime(defaultTimeForDate(d, 30, workBounds));
             setAutoEnd(true);
           }}
         />
@@ -1086,6 +1272,7 @@ const RecordaModal = ({
             totalMinutes={servicesSummary.totalMinutes || 30}
             onSelectSlot={handleSlotSelect}
             disabled={!selBarber}
+            workBounds={workBounds}
           />
           {startTime ? (
             <div className="barberrecorda__selectedTimeInfo">
@@ -1103,6 +1290,7 @@ const RecordaModal = ({
               value={startTime}
               onChange={setStartStrict}
               invalid={submitAttempted && !!fieldErrs.startTime}
+              workBounds={workBounds}
             />
           </div>
           <div className="barberrecorda__timeFieldWrap">
@@ -1111,6 +1299,7 @@ const RecordaModal = ({
               value={endTime}
               onChange={setEndStrict}
               invalid={submitAttempted && !!fieldErrs.endTime}
+              workBounds={workBounds}
             />
           </div>
         </div>
@@ -1171,6 +1360,7 @@ const RecordaModal = ({
                   value={startTime}
                   onChange={setStartStrict}
                   invalid={submitAttempted && !!fieldErrs.startTime}
+                  workBounds={workBounds}
                 />
               </div>
               <div className="barberrecorda__timeFieldWrap">
@@ -1179,6 +1369,7 @@ const RecordaModal = ({
                   value={endTime}
                   onChange={setEndStrict}
                   invalid={submitAttempted && !!fieldErrs.endTime}
+                  workBounds={workBounds}
                 />
               </div>
             </div>
@@ -1326,6 +1517,12 @@ const RecordaModal = ({
             ) : null}
           </header>
 
+          {isRecordDeleted ? (
+            <div className="barberrecorda__alert barberrecorda__alert--inModal barberrecorda__alert--info">
+              Запись удалена и видна только администратору.
+            </div>
+          ) : null}
+
           {formAlerts.length > 0 ? (
             <div className="barberrecorda__alert barberrecorda__alert--inModal barberrecorda__alert--danger">
               {formAlerts.length === 1 ? (
@@ -1431,8 +1628,8 @@ const RecordaModal = ({
               <div className="barberrecorda__editStack">
                 {renderDateTimePanel()}
                 {renderBarberPanel()}
-                {renderServicesPanel()}
                 {renderClientPanel()}
+                {renderServicesPanel()}
                 {renderAdvancedSection()}
               </div>
             )}
@@ -1451,7 +1648,7 @@ const RecordaModal = ({
                     type="button"
                     className="barberrecorda__btn barberrecorda__btn--ghost"
                     onClick={goPrev}
-                    disabled={saving}
+                    disabled={saving || deleting}
                   >
                     <FaChevronLeft aria-hidden="true" />
                     Назад
@@ -1461,7 +1658,7 @@ const RecordaModal = ({
                     type="button"
                     className="barberrecorda__btn barberrecorda__btn--secondary"
                     onClick={closeModal}
-                    disabled={saving}
+                    disabled={saving || deleting}
                   >
                     Отмена
                   </button>
@@ -1469,15 +1666,39 @@ const RecordaModal = ({
               </div>
 
               <div className="barberrecorda__shellFooterRight">
-                {useShellLayout && !isLastStep && canProceedFromStep(displayStep) ? (
+                {showSkipClient ? (
+                  <button
+                    type="button"
+                    className="barberrecorda__btn barberrecorda__btn--ghost"
+                    onClick={goSkipClient}
+                    disabled={saving || deleting}
+                  >
+                    Пропустить
+                  </button>
+                ) : null}
+
+                {showNextStep ? (
                   <button
                     type="button"
                     className="barberrecorda__btn barberrecorda__btn--primary"
                     onClick={goNext}
-                    disabled={saving}
+                    disabled={saving || deleting}
                   >
                     Далее
                     <FaChevronRight aria-hidden="true" />
+                  </button>
+                ) : null}
+
+                {isEditing && !isRecordDeleted ? (
+                  <button
+                    type="button"
+                    className="barberrecorda__btn barberrecorda__btn--danger"
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={saving || deleting}
+                    title="Удалить запись"
+                  >
+                    <FaTrash aria-hidden="true" />
+                    Удалить
                   </button>
                 ) : null}
 
@@ -1512,6 +1733,13 @@ const RecordaModal = ({
         clients={clients}
         onClientsChange={onClientsChange}
         onSelectClient={setSelClient}
+      />
+
+      <ConfirmModal
+        isOpen={confirmDelete}
+        message={deleteConfirmMessage}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
       />
     </>
   );

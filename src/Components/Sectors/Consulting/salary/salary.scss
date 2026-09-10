@@ -308,9 +308,73 @@
 }
 .salary__tab.is-active{ background:#fff; color:var(--text); box-shadow:0 1px 3px rgba(15,23,42,.12); }
 
-.salary__filters{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
-.salary__filterField{ display:grid; gap:4px; font-size:13px; color:var(--muted); }
-.salary__filterField .salary__input{ min-width:160px; }
+.salary__filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+
+  &--panel {
+    justify-content: flex-end;
+  }
+}
+
+.salary__filterField {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  flex: 0 1 auto;
+  min-width: 0;
+
+  .salary__input {
+    min-width: 148px;
+  }
+
+  &--employee .salary__input {
+    min-width: 200px;
+  }
+}
+
+.cShell--salaryFilters {
+  .cShell__panelHead {
+    align-items: flex-end;
+    row-gap: 12px;
+  }
+
+  @media (max-width: 960px) {
+    .cShell__panelHead {
+      align-items: stretch;
+    }
+
+    .cShell__panelActions {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .salary__filters--panel {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .salary__filters--panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .salary__filterField--employee {
+      grid-column: 1 / -1;
+    }
+
+    .salary__filterField .salary__input {
+      width: 100%;
+      min-width: 0;
+    }
+  }
+}
 
 .salary__subToolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:14px 0; }
 
@@ -344,7 +408,6 @@
 
 @media (max-width:640px){
   .salary__cards{ grid-template-columns:1fr; }
-  .salary__filterField .salary__input{ min-width:0; width:100%; }
 }
 
 /* ===================================================================

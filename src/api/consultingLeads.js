@@ -10,6 +10,7 @@
  * Пока эндпоинт отвечает 404/501, UI показывает понятную заглушку.
  */
 import { BASE, cGet, cPatch, cPost, cPut } from "./consultingHttp";
+import { isMainFunnel } from "../utils/consultingFunnelDefaults";
 
 const URL_LEADS = `${BASE}/inbound-leads/`;
 
@@ -117,6 +118,115 @@ export const getLeadsAnalytics = (params = {}, config) =>
 export const createInboundLead = (payload) =>
   cPost("Create Inbound Lead Error", URL_LEADS, payload);
 
+/**
+ * Фолбэк: гарантировать карточку в канбане воронки для inbound-лида.
+ *
+ * По спеке (docs/consulting/backend-main-funnel-inbound.md §2.3) параллельный
+ * `Lead` на главной воронке должен создавать бэкенд. Пока ручной `POST
+ * /inbound-leads/` этого не делает, создаём карточку с фронта: находим главную
+ * воронку (`is_main`), её первую стадию (`intake`), создаём `Lead` и линкуем
+ * обратно через `PATCH inbound-leads/{id}` (поле `lead`).
+ *
+ * Идемпотентность: если у inbound уже есть `lead` — ничего не делаем.
+ * Ошибки не пробрасываем: создание самого inbound-лида уже прошло.
+ *
+ * @param {Object} inbound - объект из ответа createInboundLead
+ * @returns {Promise<string|null>} id карточки воронки или null
+ */
+export async function ensureFunnelLeadForInbound(inbound) {
+  if (!inbound?.id || inbound.lead) return inbound?.lead || null;
+
+  try {
+    const funnelsRes = await cGet("List Funnels Error", `${BASE}/funnels/`);
+    const funnels = Array.isArray(funnelsRes)
+      ? funnelsRes
+      : funnelsRes?.results || [];
+    const main =
+      funnels.find((f) => isMainFunnel(f) && f.is_active !== false) ||
+      funnels.find((f) => isMainFunnel(f)) ||
+      null;
+    if (!main?.id) return null;
+
+    const stagesRes = await cGet(
+      "List Funnel Stages Error",
+      `${BASE}/funnel-stages/`,
+      { funnel: main.id },
+    );
+    const stages = Array.isArray(stagesRes)
+      ? stagesRes
+      : stagesRes?.results || [];
+    const firstStage =
+      stages.find((s) => s.system_key === "intake") ||
+      stages
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0] ||
+      null;
+
+    const fullName = String(inbound.full_name || "").trim();
+    const phone = String(inbound.phone || "").trim();
+    const lead = await cPost("Create Funnel Lead Error", `${BASE}/leads/`, {
+      funnel: main.id,
+      stage: firstStage?.id || null,
+      title: fullName || phone || "Новый лид",
+      full_name: fullName,
+      phone,
+      source: inbound.source || "manual",
+      description: String(inbound.message || "").trim(),
+      estimated_value: 0,
+      probability: 0,
+    });
+
+    if (lead?.id) {
+      try {
+        await cPatch("Link Inbound Lead Error", `${URL_LEADS}${inbound.id}/`, {
+          lead: lead.id,
+        });
+      } catch {
+        /* связь не критична для отображения карточки на доске */
+      }
+    }
+    return lead?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Зеркало в обратную сторону: для лида, созданного в воронке, завести
+ * связанный `InboundLead`, чтобы карточка появилась и на странице «Лиды».
+ *
+ * Промежуточное решение до перевода «Лидов» на единую модель `Lead`
+ * (docs/consulting/backend-money-tenant/13-unify-leads-single-model.md §7).
+ * Идемпотентность — по синтетическому `external_id = "funnel:<lead_id>"`.
+ * Ошибки не пробрасываются.
+ *
+ * @param {Object} lead - объект из ответа createLead (нужны id/title/full_name/phone)
+ * @returns {Promise<string|null>} id созданного InboundLead или null
+ */
+export async function ensureInboundLeadForFunnelLead(lead) {
+  const leadId = lead?.id;
+  if (!leadId) return null;
+  if (lead.inbound_lead || lead.inbound_lead_id) {
+    return lead.inbound_lead || lead.inbound_lead_id;
+  }
+
+  try {
+    const fullName = String(lead.full_name || lead.contact_name || "").trim();
+    const phone = String(lead.phone || "").trim();
+    const created = await cPost("Mirror Inbound Lead Error", URL_LEADS, {
+      full_name: fullName,
+      phone,
+      source: lead.source || lead.channel || "manual",
+      message: String(lead.description || "").trim(),
+      lead: leadId,
+      external_id: `funnel:${leadId}`,
+    });
+    return created?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Обновить произвольные поля лида. */
 export const updateInboundLead = (id, payload) =>
   cPatch("Update Inbound Lead Error", `${URL_LEADS}${id}/`, payload);
@@ -158,6 +268,47 @@ export const getLeadDistribution = (config) =>
 /** PUT /consalting/lead-distribution/ ← { enabled, strategy, role_ids } */
 export const updateLeadDistribution = (payload) =>
   cPut("Update Lead Distribution Error", `${BASE}/lead-distribution/`, payload);
+
+/* ==================== РЕГИОНАЛЬНЫЕ ВОРОНКИ ==================== */
+
+/** Коды регионов для маршрутизации inbound → воронка города. */
+export const CONSULTING_REGIONS = [
+  {
+    code: "bishkek",
+    label: "Бишкек",
+    phonePrefixes: ["+996312", "+996313", "+996555", "+996700"],
+  },
+  {
+    code: "osh",
+    label: "Ош",
+    phonePrefixes: ["+996322", "+996323"],
+  },
+  {
+    code: "jalal_abad",
+    label: "Джалал-Абад",
+    phonePrefixes: ["+996772", "+996882"],
+  },
+];
+
+/**
+ * GET /consalting/regional-funnel-routing/
+ * @see docs/consulting/regional-funnels-distribution.md
+ */
+export const getRegionalFunnelRouting = (config) =>
+  cGet(
+    "Get Regional Funnel Routing Error",
+    `${BASE}/regional-funnel-routing/`,
+    {},
+    config,
+  );
+
+/** PUT /consalting/regional-funnel-routing/ */
+export const updateRegionalFunnelRouting = (payload) =>
+  cPut(
+    "Update Regional Funnel Routing Error",
+    `${BASE}/regional-funnel-routing/`,
+    payload,
+  );
 
 /* ==================== ВСПОМОГАТЕЛЬНОЕ ==================== */
 

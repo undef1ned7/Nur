@@ -181,8 +181,24 @@ export function ListState({
   emptyAction = null,
   hasActiveFilters = false,
   onResetFilters = null,
+  skeletonRows = 5,
 }) {
-  if (loading) return <div className="cList__state">Загрузка…</div>;
+  if (loading) {
+    return (
+      <div className="cList__skeleton" aria-busy="true" aria-live="polite">
+        <span className="cList__srOnly">Загрузка…</span>
+        {Array.from({ length: skeletonRows }).map((_, i) => (
+          <div className="cList__skeletonRow" key={i} aria-hidden="true">
+            <span className="cList__skeletonAvatar" />
+            <span className="cList__skeletonLines">
+              <span className="cList__skeletonLine cList__skeletonLine--wide" />
+              <span className="cList__skeletonLine cList__skeletonLine--narrow" />
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (error) return <div className="cList__state cList__state--error">{error}</div>;
   if (notReady) {
     return (

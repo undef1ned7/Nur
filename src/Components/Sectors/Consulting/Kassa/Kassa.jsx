@@ -1,9 +1,17 @@
 // src/components/Kassa/Kassa.js
 import React, { useEffect, useMemo, useState } from "react";
-import { FaCashRegister, FaChartBar, FaInbox } from "react-icons/fa";
+import { FaCashRegister, FaChartBar, FaCog, FaInbox } from "react-icons/fa";
 import api from "../../../../api";
+import {
+  createConsultingCashbox,
+  getConsultingCashbox,
+  listConsultingCashboxes,
+  listCashOperations,
+} from "../../../../api/consultingCashbox";
+import { isConsultingCashV2 } from "../../../../utils/consultingMoney";
 import ConsultingReports from "./Reports/Reports";
 import CashRequests from "./CashRequests";
+import KassaSettings from "./KassaSettings";
 import { useAlert } from "../../../../hooks/useDialog";
 import useCounters from "../common/useCounters";
 import { getCashRequestCounters } from "../../../../api/consultingCashbox";
@@ -17,6 +25,21 @@ const listFrom = (res) => res?.data?.results || res?.data || [];
 const money = (v) =>
   (Number(v) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 0 }) + " c";
 const when = (iso) => (iso ? new Date(iso).toLocaleDateString() : "—");
+
+/* скелетон-заглушка вместо голого «Загрузка…» в таблицах кассы */
+const TableSkeletonRows = ({ cols, rows = 4 }) => (
+  <>
+    {Array.from({ length: rows }).map((_, i) => (
+      <tr key={i} className="kassa__skeletonRow" aria-hidden="true">
+        {Array.from({ length: cols }).map((__, j) => (
+          <td key={j}>
+            <span className="kassa__skeletonBar" />
+          </td>
+        ))}
+      </tr>
+    ))}
+  </>
+);
 
 /* =========================== ВЕРХНИЙ КОМПОНЕНТ =========================== */
 export default function ConsultingCafeKassa() {
@@ -70,6 +93,12 @@ export default function ConsultingCafeKassa() {
         hint: "Аналитика по кассам",
         icon: FaChartBar,
       },
+      {
+        value: "settings",
+        label: "Настройки",
+        hint: "Режим подтверждения поступлений",
+        icon: FaCog,
+      },
     ],
     [pendingCount],
   );
@@ -112,6 +141,12 @@ export default function ConsultingCafeKassa() {
           </div>
         )}
 
+        {tab === "settings" && (
+          <div style={{ marginTop: 8 }}>
+            <KassaSettings />
+          </div>
+        )}
+
         {tab === "detail" && selectedId && (
           <CashboxDetailView id={selectedId} onBack={backToList} />
         )}
@@ -134,6 +169,11 @@ function CashboxList({ onOpenDetail }) {
     try {
       setErr("");
       setLoading(true);
+      if (isConsultingCashV2()) {
+        const data = await listConsultingCashboxes();
+        setRows(asArray(data));
+        return;
+      }
       const { data } = await api.get("/construction/cashboxes/");
       setRows(asArray(data));
     } catch (e) {
@@ -164,7 +204,11 @@ function CashboxList({ onOpenDetail }) {
     const title = (name || "").trim();
     if (!title) return alert("Введите название кассы", true);
     try {
-      await api.post("/construction/cashboxes/", { name: title });
+      if (isConsultingCashV2()) {
+        await createConsultingCashbox({ name: title });
+      } else {
+        await api.post("/construction/cashboxes/", { name: title });
+      }
       setCreateOpen(false);
       setName("");
       load();
@@ -215,9 +259,7 @@ function CashboxList({ onOpenDetail }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={5}>Загрузка…</td>
-              </tr>
+              <TableSkeletonRows cols={5} />
             ) : filtered.length ? (
               filtered.map((r, i) => (
                 <tr
@@ -326,6 +368,32 @@ function CashboxDetailView({ id, onBack }) {
     setErr("");
     setLoading(true);
     try {
+      if (isConsultingCashV2()) {
+        const detail = id
+          ? await getConsultingCashbox(id).catch(() => ({ id, name: "Касса" }))
+          : { id: "", name: "Основная касса" };
+        setBox(detail || { id, name: "Касса" });
+        const opsParams = id ? { cashbox: id } : {};
+        const opsData = await listCashOperations(opsParams);
+        const flows = asArray(opsData);
+        const mapped = flows.map((x, i) => {
+          const amt = Number(x.amount ?? 0) || 0;
+          const type = String(x.direction ?? x.type ?? "income").toLowerCase();
+          const isExpense =
+            type === "expense" || type === "outcome" || type === "out";
+          return {
+            id: x.id || `${i}`,
+            type: isExpense ? "expense" : "income",
+            title: x.title || x.comment || x.kind_display || "Операция",
+            amount: Math.abs(amt),
+            created_at: x.created_at || x.confirmed_at || null,
+          };
+        });
+        setOps(mapped);
+        setLoading(false);
+        return;
+      }
+
       let detail = null;
       try {
         detail = (await api.get(`/construction/cashboxes/${id}/detail/owner/`))
@@ -465,9 +533,7 @@ function CashboxDetailView({ id, onBack }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={4}>Загрузка…</td>
-              </tr>
+              <TableSkeletonRows cols={4} />
             ) : err ? (
               <tr>
                 <td colSpan={4} className="kassa__alert kassa__alert--error">

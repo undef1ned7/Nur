@@ -2,8 +2,8 @@
 
 **Фронт:** `Funnel/LeadPaymentModal.jsx` (блок «Абонентская плата»),
 `client/ConsultingClientDetail.jsx`, `client/SubscriptionMatrix.jsx`.
-**Смежные:** [08-sale-cancel.md](./08-sale-cancel.md) (откат),
-[09-cash-confirmation.md](./09-cash-confirmation.md) (приём платежа).
+**Смежные:** [02-sale-cancel.md](./02-sale-cancel.md) (откат),
+[03-cash-confirmation.md](./03-cash-confirmation.md) (приём платежа).
 
 ## 5.1. Что сейчас сломано
 
@@ -84,7 +84,7 @@ class SubscriptionPayment(models.Model):
 - `POST /consalting/sales/` — оформление продажи;
 - `POST /consalting/leads/{id}/register-payment/` — оплата по лиду;
 - переход лида в выигрыш **в финальной воронке** (см.
-  [03-funnel-hierarchy.md](./03-funnel-hierarchy.md), `is_final=True`).
+  [03-funnel-hierarchy.md](../backend/03-funnel-hierarchy.md), `is_final=True`).
 
 ```python
 @transaction.atomic
@@ -111,7 +111,7 @@ def create_sale_side_effects(sale, *, subscription_enabled=True,
         if created:
             generate_schedule(sub, horizon_months=12)
     # 4. зарплата → 02-salary.md
-    # 5. заявка в кассу → 09-cash-confirmation.md
+    # 5. заявка в кассу → 03-cash-confirmation.md
 ```
 
 ### Генерация графика
@@ -149,11 +149,36 @@ POST /consalting/subscription-payments/{id}/pay/
 ```
 
 - Создаёт **заявку в кассу** `kind="subscription"`
-  ([09-cash-confirmation.md](./09-cash-confirmation.md)); платёж переходит в
+  ([03-cash-confirmation.md](./03-cash-confirmation.md)); платёж переходит в
   `paid` только после подтверждения (либо сразу, если подтверждение выключено).
 - Частичная оплата: если `amount < payment.amount`, допускается создание
   «остатка» — либо запретите (проще) с понятным `detail`.
 - Повторная оплата уже оплаченного периода → `400`.
+
+### 5.4a. Оплата нескольких периодов сразу (batch)
+
+Фронт (карточка клиента → «Абонентские платежи» → «Оплатить вперёд N мес.»)
+пока платит **циклом** по `subscription-payments/{id}/pay/` — это `N` заявок в
+кассу. Нужен один эндпоинт, создающий **одну** заявку на `N` ближайших
+`planned/overdue` периодов:
+
+```
+POST /consalting/subscriptions/{id}/pay-periods/
+{ "count": 3, "cashbox": "uuid|null", "payment_method": "cash|transfer", "note": "" }
+```
+
+- Берёт первые `count` неоплаченных периодов графика по `due_date ASC`
+  (при `count > осталось` — только сколько есть; при необходимости достраивает
+  график).
+- Создаёт **одну** `CashRequest` `kind="subscription"` на `count × amount`,
+  `period_month` = диапазон `first..last`.
+- После подтверждения кассиром все `count` периодов → `paid`,
+  `Subscription.paid_through` = `due_date` последнего, `company.end_date`
+  продлевается на `count` периодов (один `extend_tenant_subscription`).
+- Идемпотентность по `(subscription, first_period, count)` в пределах суток.
+
+Когда появится — фронт заменит цикл на один вызов
+(`api/consultingSubscriptions.js` → `paySubscriptionPeriods`).
 
 ## 5.5. Что читает фронт
 
@@ -203,14 +228,80 @@ GET /consalting/subscription-matrix/?month_from=YYYY-MM&month_to=YYYY-MM&search=
   "payment_mode": "cash|transfer|debt|installment",
   "amount": 45000, "debt_months": 6, "prepayment": 10000, "note": "",
 
-  "subscription_enabled": true,          // менеджер подтвердил подключение
+  "subscription_enabled": true,          // менеджер подтвердил подключение / фикс. график
   "subscription_amount": 5000,
   "subscription_period": "month",
-  "subscription_start": "2026-08-01"     // дата первого списания
+  "subscription_start": "2026-08-01",    // дата первого списания
+  "subscription_prepaid_periods": 6,     // сколько периодов оплачено вперёд (>=1)
+  "subscription_autorenew": false,       // true = подписка, false = фикс. график на N мес.
+
+  "items": [                             // разовые доп. услуги (умные весы и т.п.)
+    { "name": "Умные весы", "price": 1200, "quantity": 1 }
+  ],
+  "paid_months": 3                       // дублирует prepaid_periods в сценарии C
 }
 ```
 
-Если полей нет (старый клиент) — берите абонплату из тарифа, старт = сегодня.
+Если полей нет (старый клиент) — берите абонплату из тарифа, старт = сегодня,
+`subscription_prepaid_periods = 1`.
+
+### Три сценария «оплатить за несколько месяцев» из окна оплаты по лиду
+
+Менеджер в `LeadPaymentModal` указывает число месяцев. Что приходит на бэк:
+
+| Сценарий | Условие на фронте | Поля запроса | Что делает бэк |
+|---|---|---|---|
+| **A. Абонплата тарифа** | у тарифа лида есть `subscription_amount` | `subscription_*` + `subscription_prepaid_periods=N` | `Subscription` из тарифа, первые `N` платежей графика → `paid` |
+| **B. Подписка вручную** | тумблер «Вести как подписку» | `subscription_enabled=true`, `subscription_amount=<сумма/мес>`, `subscription_period="month"`, `subscription_start`, `subscription_prepaid_periods=N`, **`subscription_autorenew=true`** | `Subscription` (без тарифа), 12-мес. график, первые `N` → `paid`, **автопродление**, попадает в абонентскую матрицу, после кассы → CRM-аккаунт. `amount` = сумма/мес × `N` |
+| **C. Фикс. график за N мес.** | обычная оплата (галочка выкл.), `N > 1` | `subscription_enabled=true`, `subscription_amount=<amount/N>`, `subscription_period="month"`, `subscription_start`, `subscription_prepaid_periods=N`, **`subscription_autorenew=false`**, `paid_months=N` | Создать `Subscription`/график **ровно на `N` периодов**, все `N` → `paid`. **Без автопродления, без абонентской матрицы, без CRM-аккаунта.** `amount` запроса = сумма основной продажи (за `N` мес.) + разовые `items` |
+
+Сценарии B и C — новые. A уже описан выше.
+
+**`subscription_autorenew` (bool, дефолт `true`)** — ключевое различие B и C:
+
+- `true` — полноценная подписка: 12-мес. график с «планируемыми» будущими
+  строками, автопродление, строка в абонентской матрице, провижен CRM-аккаунта
+  после подтверждения кассой.
+- `false` — **фиксированный оплаченный план**: график ровно на
+  `subscription_prepaid_periods` периодов, все оплачены, будущих «планируемых»
+  строк нет, подписка не продлевается, в матрицу не попадает, CRM-аккаунт
+  автоматически не создаётся. Клиент видит график в карточке; отдельных
+  «неоплаченных» строк там не будет.
+- Поле отсутствует → трактовать как `true` (обратная совместимость со старым
+  фронтом).
+
+**Требование продукта (важно):** график в карточке клиента должен появляться
+**всегда, когда `N > 1`** — и при галочке «Вести как подписку» (B), и без неё
+(C). Разница только в автопродлении/матрице/CRM-аккаунте (управляется
+`subscription_autorenew`).
+
+**`paid_months`:** целое ≥ 1, дефолт 1. Метаданные покрытия, дублируют
+`subscription_prepaid_periods` в сценарии C. Хранить на `Sale.paid_months`,
+отдавать в сериализаторе сделки и в `won`-инфо лида.
+
+### Оплата абонплаты на несколько периодов вперёд
+
+`subscription_prepaid_periods = N` (целое ≥ 1, дефолт 1) — менеджер принял
+оплату сразу за N абонентских периодов (месяцев или лет по `period`).
+
+Поведение бэка после `create_sale_side_effects` создал `Subscription` и график:
+
+1. Взять первые `N` строк `SubscriptionPayment` по `due_date ASC`
+   (при необходимости достроить график, если `N > horizon`).
+2. Пометить их `status="paid"`, `paid_at=now()`, `paid_via="lead_prepayment"`.
+3. Создать **одну** заявку в кассу на сумму `N × subscription_amount`
+   (`kind="subscription"`, см. [03-cash-confirmation.md](./03-cash-confirmation.md)),
+   а не N заявок. `period_month` заявки — диапазон `first..last`.
+4. `Subscription.paid_through = <due_date N-й строки>` (для карточки клиента).
+5. Идемпотентность: повторный `register-payment` того же лида не оплачивает
+   периоды повторно (`get_or_create` по `sale+service` уже защищает график;
+   для оплаты периодов — проверка `status != "paid"`).
+
+`N × subscription_amount` **не** входит в `amount` (это сумма основной
+продажи/сделки) — абонентская предоплата идёт отдельной строкой кассы.
+
+Валидация: `subscription_prepaid_periods` игнорируется, если
+`subscription_enabled=false` или у тарифа нет абонплаты. Значение `< 1` → `1`.
 
 ## 5.7. Чек-лист приёмки
 
@@ -222,3 +313,18 @@ GET /consalting/subscription-matrix/?month_from=YYYY-MM&month_to=YYYY-MM&search=
 - [ ] Оплата периода проходит через кассу и меняет статус на `paid`.
 - [ ] Карточка клиента и матрица показывают одни и те же суммы.
 - [ ] Отмена продажи аннулирует будущие платежи (см. 08).
+- [ ] `subscription_prepaid_periods=N` помечает первые N платежей графика
+      `paid` и создаёт **одну** заявку в кассу на `N × amount`.
+- [ ] Повторный `register-payment` того же лида не оплачивает периоды дважды.
+- [ ] `subscription_prepaid_periods` без абонплаты / при `enabled=false` — игнор.
+- [ ] Сценарий B (`subscription_autorenew=true`): `subscription_amount` без
+      тарифа создаёт `Subscription`, 12-мес. график, автопродление, строка в
+      матрице, `amount` = сумма/мес × N.
+- [ ] Сценарий C (`subscription_autorenew=false`): создаётся график **ровно на
+      N периодов**, все `paid`; нет автопродления, нет строки в матрице, нет
+      CRM-аккаунта. График виден в карточке клиента.
+- [ ] `subscription_autorenew` отсутствует → трактуется как `true`.
+- [ ] `N > 1` → график создаётся **и с галочкой, и без неё** (различие — только
+      автопродление/матрица/CRM).
+- [ ] `items` при `subscription_autorenew=false` — разовые строки чека, в
+      `subscription_amount` не входят.

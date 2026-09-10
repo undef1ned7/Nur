@@ -3,8 +3,8 @@
 **Страница:** `/crm/consulting/client` → вкладка **«Абонентская матрица»**
 (фронт: `src/Components/Sectors/Consulting/client/SubscriptionMatrix.jsx`,
 API-слой `src/api/consultingSubscriptions.js`).
-**Статус:** ⚠️ Бэкенд не реализован. Фронт готов и показывает заглушку при
-`404/501`.
+**Статус:** бэкенд на production (см. backend-money-tenant). Фронт подключён к
+`GET /consalting/subscription-matrix/`.
 
 ## 1. Задача
 

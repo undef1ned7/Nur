@@ -1241,6 +1241,14 @@ import {
   normalizeMarketCashierSettings,
   updateMarketCashierSettings,
 } from "../../../../api/marketCashierSettings";
+import {
+  readWorkScheduleSettings,
+  saveWorkScheduleSettings,
+} from "../../../Sectors/Barber/Recorda/components/recordaWorkHours";
+import {
+  areNotificationsEnabled,
+  setNotificationsEnabled,
+} from "../../../../config/notificationPreferences";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -1331,6 +1339,9 @@ const Settings = () => {
     const saved = localStorage.getItem("sidebarAutoClose");
     if (saved === null) {
       localStorage.setItem("sidebarAutoClose", "false");
+    }
+    if (localStorage.getItem("notificationsEnabled") === null) {
+      setNotificationsEnabled(true);
     }
   }, []);
 
@@ -1513,6 +1524,10 @@ const Settings = () => {
     return false;
   });
 
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(() =>
+    areNotificationsEnabled(),
+  );
+
   // --- Пароли
   const [formData, setFormData] = useState({
     current_password: "",
@@ -1664,6 +1679,7 @@ const Settings = () => {
     e.preventDefault();
     try {
       localStorage.setItem("sidebarAutoClose", String(sidebarAutoClose));
+      setNotificationsEnabled(notificationsEnabled);
       showAlert("success", "Настройки интерфейса успешно сохранены");
     } catch (err) {
       const errorMessage = validateResErrors(err, "Ошибка при сохранении настроек интерфейса");
@@ -1830,12 +1846,50 @@ const Settings = () => {
   const [slugAvailable, setSlugAvailable] = useState(null);
   const [slugSaving, setSlugSaving] = useState(false);
 
+  const [workScheduleStart, setWorkScheduleStart] = useState("09:00");
+  const [workScheduleEnd, setWorkScheduleEnd] = useState("21:00");
+  const [workScheduleSaving, setWorkScheduleSaving] = useState(false);
+
   // Синхронизируем поле с компанией при её загрузке/смене
   useEffect(() => {
     setSlugInput(company?.slug || "");
     setSlugError("");
     setSlugAvailable(null);
   }, [company?.slug]);
+
+  useEffect(() => {
+    const schedule = readWorkScheduleSettings(company);
+    setWorkScheduleStart(schedule.work_start);
+    setWorkScheduleEnd(schedule.work_end);
+  }, [company]);
+
+  const handleSaveWorkSchedule = async () => {
+    setWorkScheduleSaving(true);
+    try {
+      const { savedToApi, schedule } = await saveWorkScheduleSettings({
+        work_start: workScheduleStart,
+        work_end: workScheduleEnd,
+      });
+      setWorkScheduleStart(schedule.work_start);
+      setWorkScheduleEnd(schedule.work_end);
+      if (savedToApi) {
+        await dispatch(getCompany());
+      }
+      showAlert(
+        "success",
+        savedToApi
+          ? "График работы сохранён"
+          : "График сохранён локально (бэкенд пока не принимает поля)",
+      );
+    } catch (e) {
+      showAlert(
+        "error",
+        validateResErrors(e, "Не удалось сохранить график работы"),
+      );
+    } finally {
+      setWorkScheduleSaving(false);
+    }
+  };
 
   const slugChanged = finalizeSlug(slugInput) !== (company?.slug || "");
 
@@ -2669,6 +2723,28 @@ const Settings = () => {
               </div>
 
               <div className="settings__form-group">
+                <label className="settings__label settings__checkboxRow">
+                  <input
+                    type="checkbox"
+                    checked={notificationsEnabled}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setNotificationsEnabledState(newValue);
+                      setNotificationsEnabled(newValue);
+                    }}
+                    className="settings__checkbox"
+                  />
+                  <span>Звук и push-уведомления</span>
+                </label>
+
+                <p className="settings__mutedText settings__mutedText--indent">
+                  {notificationsEnabled
+                    ? "При новых событиях будут звуковые сигналы и системные уведомления (если разрешены браузером). Список в колокольчике остаётся доступным."
+                    : "Звук и системные уведомления отключены. Новые события по-прежнему попадают в колокольчик."}
+                </p>
+              </div>
+
+              <div className="settings__form-group">
                 <h2 className="settings__smallTitle">Режим темы</h2>
                 <IconButton onClick={toggleMode} aria-label="toggle theme">
                   {mode === "dark" ? (
@@ -2793,6 +2869,58 @@ const Settings = () => {
                         Обычно slug приходит из <code>/users/company/</code>.
                       </div>
                     )}
+                  </div>
+                )}
+
+                {isBarberSector && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">
+                        🕘 График работы для записей
+                      </div>
+                      <div className="settings__onlineHint">
+                        Календарь записей показывает слоты в этом диапазоне.
+                        На странице «Записи» график можно изменить кнопкой
+                        с часами. Для выбранного мастера — его график из API.
+                      </div>
+                    </div>
+
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Начало</div>
+                      <div className="settings__onlineValue">
+                        <input
+                          type="time"
+                          className="settings__onlineInput"
+                          value={workScheduleStart}
+                          onChange={(e) => setWorkScheduleStart(e.target.value)}
+                          step={1800}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Конец</div>
+                      <div className="settings__onlineValue">
+                        <input
+                          type="time"
+                          className="settings__onlineInput"
+                          value={workScheduleEnd}
+                          onChange={(e) => setWorkScheduleEnd(e.target.value)}
+                          step={1800}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="settings__actions" style={{ marginTop: 12 }}>
+                      <button
+                        type="button"
+                        className="settings__btn settings__btn--primary"
+                        onClick={handleSaveWorkSchedule}
+                        disabled={workScheduleSaving}
+                      >
+                        {workScheduleSaving ? "Сохранение..." : "Сохранить график"}
+                      </button>
+                    </div>
                   </div>
                 )}
 

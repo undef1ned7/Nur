@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import styles from "./Reports.module.scss";
 import { FaChartLine, FaPrint, FaSync, FaFilter } from "react-icons/fa";
 import api from "../../../../../api";
+import {
+  listCashOperations,
+  listConsultingCashboxes,
+} from "../../../../../api/consultingCashbox";
+import { isConsultingCashV2 } from "../../../../../utils/consultingMoney";
 
 /* ────────── утилиты ────────── */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -73,6 +78,12 @@ export default function ConsultingReports() {
   /* ── кассы из консалтинга (если нет — работаем без селекта) */
   const fetchBoxes = async () => {
     try {
+      if (isConsultingCashV2()) {
+        const data = await listConsultingCashboxes();
+        setBoxes(listFrom({ data }) || []);
+        setBoxId("ALL");
+        return;
+      }
       const r = await api
         .get("/consulting/cashboxes/")
         .catch(() => ({ data: [] }));
@@ -89,6 +100,45 @@ export default function ConsultingReports() {
   const fetchAllFlows = async () => {
     setLoading(true);
     try {
+      if (isConsultingCashV2()) {
+        const params =
+          boxId && boxId !== "ALL" ? { cashbox: boxId } : {};
+        let acc = [];
+        let page = 1;
+        let guard = 0;
+        while (guard < 60) {
+          const data = await listCashOperations({
+            ...params,
+            page,
+            page_size: 100,
+          });
+          const chunk = listFrom({ data });
+          acc.push(...chunk);
+          if (!data?.next) break;
+          page += 1;
+          guard += 1;
+        }
+        const mapped = acc.map((x, i) => {
+          const rawAmt = toNum(x.amount);
+          const rawType = String(x.direction ?? x.type ?? "income").toLowerCase();
+          const type =
+            rawType === "expense" || rawType === "outcome" || rawType === "out"
+              ? "expense"
+              : "income";
+          return {
+            id: x.id || i,
+            type,
+            amount: Math.abs(rawAmt),
+            created_at: x.created_at || x.confirmed_at,
+            title: x.title || x.comment || x.kind_display || "Операция",
+            cashbox: x.cashbox || x.cashbox_id || null,
+          };
+        });
+        setFlows(mapped);
+        setLoading(false);
+        return;
+      }
+
       // параметр кассы (если выбран)
       const boxParam =
         boxId && boxId !== "ALL" ? `cashbox=${encodeURIComponent(boxId)}` : "";

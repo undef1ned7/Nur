@@ -1,94 +1,94 @@
 import { menuIcons } from "../menuIcons";
 
 export const consultingMenu = [
-      // 1. Лид → сделка → чат
-      {
-        label: "Лиды",
-        to: "/crm/consulting/leads",
-        icon: menuIcons.listAlt,
-        // Отдельного права can_view_leads ещё нет на бэке — гейтим вместе с
-        // воронкой (лиды питают воронку). См. docs/consulting/leads-whatsapp.md.
-        permission: "can_view_funnel",
-        implemented: true,
-      },
-      {
-        label: "Воронка продаж",
-        to: "/crm/consulting/funnel",
-        icon: menuIcons.layers,
-        permission: "can_view_funnel",
-        implemented: true,
-      },
-      {
-        label: "Чаты",
-        to: "/crm/consulting/chats/whatsapp",
-        icon: menuIcons.comments,
-        permission: "can_view_funnel",
-        implemented: true,
-      },
-      // 2. Клиенты и продажи
-      {
-        label: "Клиенты",
-        to: "/crm/consulting/client",
-        icon: menuIcons.users,
-        permission: "can_view_clients",
-        implemented: true,
-      },
-      {
-        label: "Запросы клиентов",
-        to: "/crm/consulting/client-requests",
-        icon: menuIcons.clipboardList,
-        permission: "can_view_client_requests",
-        implemented: true,
-      },
-      {
-        label: "Продажи",
-        to: "/crm/consulting/sale",
-        icon: menuIcons.shoppingCart,
-        permission: "can_view_sale",
-        implemented: true,
-      },
-      {
-        label: "Услуги",
-        to: "/crm/consulting/services",
-        icon: menuIcons.cogs,
-        permission: "can_view_services",
-        implemented: true,
-      },
-      {
-        label: "Бронирование",
-        to: "/crm/consulting/bookings",
-        icon: menuIcons.calendar,
-        permission: "can_view_booking",
-        implemented: true,
-      },
-      // 3. Деньги и отчёты
-      {
-        label: "Касса",
-        to: "/crm/consulting/kassa",
-        icon: menuIcons.cashRegister,
-        permission: "can_view_cashbox",
-        implemented: true,
-      },
-      {
-        label: "Зарплата",
-        to: "/crm/consulting/salary",
-        icon: menuIcons.moneyBill,
-        permission: "can_view_salary",
-        implemented: true,
-      },
-      {
-        label: "Аналитика",
-        to: "/crm/consulting/analytics",
-        icon: menuIcons.chartBar,
-        permission: "can_view_analytics",
-        implemented: true,
-      },
-      // 4. Команда
-      {
-        label: "Сотрудники",
-        to: "/crm/consulting/teachers",
-        icon: menuIcons.chalkboard,
-        permission: "can_view_employees",
-        implemented: true,
-      },
-    ];
+  // 1. Лид → сделка → чат
+  {
+    label: "Лиды",
+    to: "/crm/consulting/leads",
+    icon: menuIcons.listAlt,
+    // Общий inbox и настройки — owner/admin или can_view_leads_inbox.
+    // Продавец работает через «Воронку» и «Чаты» (только свои диалоги).
+    permission: "can_view_leads_inbox",
+    implemented: true,
+  },
+  {
+    label: "Воронка продаж",
+    to: "/crm/consulting/funnel",
+    icon: menuIcons.layers,
+    permission: "can_view_funnel",
+    implemented: true,
+  },
+  {
+    label: "Чаты",
+    to: "/crm/consulting/chats/whatsapp",
+    icon: menuIcons.comments,
+    permission: "can_view_funnel",
+    implemented: true,
+  },
+  // 2. Клиенты и продажи
+  {
+    label: "Клиенты",
+    to: "/crm/consulting/client",
+    icon: menuIcons.users,
+    permission: "can_view_clients",
+    implemented: true,
+  },
+  {
+    label: "Запросы клиентов",
+    to: "/crm/consulting/client-requests",
+    icon: menuIcons.clipboardList,
+    permission: "can_view_client_requests",
+    implemented: true,
+  },
+  {
+    label: "Продажи",
+    to: "/crm/consulting/sale",
+    icon: menuIcons.shoppingCart,
+    permission: "can_view_sale",
+    implemented: true,
+  },
+  {
+    label: "Услуги",
+    to: "/crm/consulting/services",
+    icon: menuIcons.cogs,
+    permission: "can_view_services",
+    implemented: true,
+  },
+  {
+    label: "Бронирование",
+    to: "/crm/consulting/bookings",
+    icon: menuIcons.calendar,
+    permission: "can_view_booking",
+    implemented: true,
+  },
+  // 3. Деньги и отчёты
+  {
+    label: "Касса",
+    to: "/crm/consulting/kassa",
+    icon: menuIcons.cashRegister,
+    permission: "can_view_cashbox",
+    implemented: true,
+  },
+  {
+    label: "Зарплата",
+    to: "/crm/consulting/salary",
+    icon: menuIcons.moneyBill,
+    permission: "can_view_salary",
+    implemented: true,
+  },
+  {
+    label: "Аналитика",
+    to: "/crm/consulting/analytics",
+    icon: menuIcons.chartBar,
+    permission: "can_view_analytics",
+    implemented: true,
+  },
+  // 4. Команда
+  {
+    label: "Сотрудники",
+    to: "/crm/consulting/teachers",
+    icon: menuIcons.chalkboard,
+    permission: "can_view_employees",
+    implemented: true,
+  },
+];

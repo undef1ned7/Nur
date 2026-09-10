@@ -22,6 +22,7 @@
 | [receipt-price-edit-discount.md](./receipt-price-edit-discount.md) | Цена vs скидка в receipt JSON |
 | [sale-consultant-commission.md](./sale-consultant-commission.md) | Консультант и комиссия |
 | [scales-weight-products.md](./scales-weight-products.md) | Весовой товар |
+| [piece-sale-from-pack.md](./piece-sale-from-pack.md) | Поштучная продажа из упаковки (касса) |
 | [alternate-barcodes.md](./alternate-barcodes.md) | Альтернативные штрихкоды |
 | [add-product-to-warehouse.md](./add-product-to-warehouse.md) | Добавление товара / приход |
 | [debt-sale-return-annul.md](./debt-sale-return-annul.md) | Долг / возврат / аннуляция |

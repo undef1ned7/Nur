@@ -95,8 +95,13 @@ const MARKET_ACCESS_TYPES = [
 const SECTOR_ACCESS_TYPES = {
   Барбершоп: [
     {
-      value: "Клиенты Барбершопа",
-      label: "Клиенты Барбершопа",
+      value: "Аналитика",
+      label: "Аналитика",
+      backendKey: "can_view_cashbox",
+    },
+    {
+      value: "Клиенты",
+      label: "Клиенты",
       backendKey: "can_view_barber_clients",
     },
     {
@@ -313,6 +318,11 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_funnel",
     },
     {
+      value: "Создание воронок",
+      label: "Создание воронок",
+      backendKey: "can_create_funnel",
+    },
+    {
       value: "Управление лидами воронки",
       label: "Управление лидами воронки",
       backendKey: "can_manage_funnel_leads",
@@ -321,6 +331,26 @@ const SECTOR_ACCESS_TYPES = {
       value: "Управление стадиями воронки",
       label: "Управление стадиями воронки",
       backendKey: "can_manage_funnel_stages",
+    },
+    {
+      value: "Inbox лидов (все входящие)",
+      label: "Inbox лидов (все входящие)",
+      backendKey: "can_view_leads_inbox",
+    },
+    {
+      value: "Финансы лидов (рекламный отчёт)",
+      label: "Финансы лидов (рекламный отчёт)",
+      backendKey: "can_manage_lead_ad_spend",
+    },
+    {
+      value: "Все лиды воронки",
+      label: "Все лиды воронки",
+      backendKey: "can_view_all_funnel_leads",
+    },
+    {
+      value: "Все продажи компании",
+      label: "Все продажи компании",
+      backendKey: "can_view_all_sales",
     },
   ],
   Производство: [
@@ -367,13 +397,19 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
       ? "Барбершоп"
       : sectorName;
 
-  // Для тарифа "Старт" — только базовые; кафе дополняем сектором без кухни
+  // Для тарифа "Старт" — только базовые; кафе и barber-like дополняем сектором
   if (isStartPlan(tariff)) {
     if (normalizedSectorName === "Кафе") {
       const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
         (a) => a.backendKey !== "can_view_cafe_cook",
       );
       return mergeAccessTypesWithoutDuplicates(basicAccess, cafeNoCook);
+    }
+    if (normalizedSectorName === "Барбершоп") {
+      return mergeAccessTypesWithoutDuplicates(
+        basicAccess,
+        SECTOR_ACCESS_TYPES["Барбершоп"] || [],
+      );
     }
     return basicAccess;
   }
@@ -430,6 +466,19 @@ const CAFE_WAITER_ORDER_SPECIAL_KEYS = new Set([
   "can_view_cafe_order_pay",
   "can_view_cafe_order_return",
 ]);
+
+/** Старые подписи доступов → тот же backendKey (для загрузки состояния чекбоксов). */
+const ACCESS_LABEL_ALIASES = {
+  can_view_cashbox: ["Касса", "Аналитика"],
+  can_view_barber_clients: ["Клиенты Барбершопа", "Клиенты"],
+  can_view_employees: ["Сотрудники"],
+};
+
+const isEmployeeAccessEnabled = (employeeAccesses, accessType) => {
+  if (employeeAccesses?.includes(accessType.value)) return true;
+  const aliases = ACCESS_LABEL_ALIASES[accessType.backendKey] || [];
+  return aliases.some((label) => employeeAccesses?.includes(label));
+};
 
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
 
@@ -521,6 +570,10 @@ const AccessList = ({
         ремонтные_и_отделочные_работы: "building",
         архитектура_и_дизайн: "building",
         барбершоп: "barber",
+        услуги: "services",
+        services: "services",
+        стоматология: "dentistry",
+        dentistry: "dentistry",
         гостиница: "hostel",
         школа: "school",
         магазин: "market",
@@ -537,6 +590,9 @@ const AccessList = ({
       const configKey = sectorMapping[sectorKey] || sectorKey;
       const sectorConfig = MENU_CONFIG.sector[configKey] || [];
       const startPlan = isStartPlan(tariff);
+      const isBarberLikeConfig = ["barber", "services", "dentistry"].includes(
+        configKey,
+      );
 
       if (startPlan) {
         // Кафе на «Старт»: секторные права есть в сайдбаре (без кухни) —
@@ -545,6 +601,9 @@ const AccessList = ({
           sectorItems = sectorConfig.filter(
             (item) => item.to !== "/crm/cafe/cook" && passesHideRules(item),
           );
+        } else if (isBarberLikeConfig) {
+          // Барбершоп / Услуги / Стоматология — те же секторные права, что в меню
+          sectorItems = sectorConfig.filter(passesHideRules);
         }
         // Остальные секторы на «Старт» — без секторных чекбоксов (как раньше)
       } else {
@@ -605,8 +664,18 @@ const AccessList = ({
         allMenuPermissions.add("can_view_cafe_order_pay");
         allMenuPermissions.add("can_view_cafe_order_return");
       } else if (String(sectorName || "").trim() === "Консалтинг") {
+        allMenuPermissions.add("can_create_funnel");
         allMenuPermissions.add("can_manage_funnel_leads");
         allMenuPermissions.add("can_manage_funnel_stages");
+      } else if (
+        ["Барбершоп", "Услуги", "Стоматология"].includes(
+          String(sectorName || "").trim(),
+        )
+      ) {
+        allMenuPermissions.add("can_view_shifts");
+        (SECTOR_ACCESS_TYPES["Барбершоп"] || []).forEach((accessType) => {
+          allMenuPermissions.add(accessType.backendKey);
+        });
       }
     }
 
@@ -689,74 +758,96 @@ const AccessList = ({
       });
     }
 
-    // Маппим permissions обратно в доступы из BASIC_ACCESS_TYPES и SECTOR_ACCESS_TYPES
+    // Список доступов строим из пунктов меню сайдбара (те же подписи, что в sidebar)
     const result = [];
+    const seenPermissions = new Set();
+
+    const pushMenuAccess = (item, category) => {
+      if (!item?.permission) return;
+      if (
+        item.permission === "can_view_branch" &&
+        companyAllows("can_view_branch") !== true
+      ) {
+        return;
+      }
+
+      const entry = {
+        value: item.label,
+        label: item.label,
+        backendKey: item.permission,
+        category,
+      };
+
+      if (seenPermissions.has(item.permission)) {
+        if (category === "sector") {
+          const idx = result.findIndex((r) => r.backendKey === item.permission);
+          if (idx >= 0) result[idx] = entry;
+        }
+        return;
+      }
+
+      seenPermissions.add(item.permission);
+      result.push(entry);
+    };
+
+    sectorItems.forEach((item) => pushMenuAccess(item, "sector"));
+    basicItems.forEach((item) => pushMenuAccess(item, "basic"));
+
     const normalizedSectorName =
       sectorName === "Услуги" || sectorName === "Стоматология"
         ? "Барбершоп"
         : sectorName;
     const sectorAccessList = SECTOR_ACCESS_TYPES[normalizedSectorName] || [];
-    const sectorBackendKeys = new Set(
-      sectorAccessList.map((accessType) => accessType.backendKey),
+
+    const pushRegistryAccess = (accessType, category) => {
+      if (seenPermissions.has(accessType.backendKey)) return;
+      if (
+        accessType.backendKey === "can_view_branch" &&
+        companyAllows("can_view_branch") !== true
+      ) {
+        return;
+      }
+      if (!allMenuPermissions.has(accessType.backendKey)) return;
+      seenPermissions.add(accessType.backendKey);
+      result.push({ ...accessType, category });
+    };
+
+    sectorAccessList.forEach((accessType) =>
+      pushRegistryAccess(accessType, "sector"),
+    );
+    BASIC_ACCESS_TYPES.forEach((accessType) =>
+      pushRegistryAccess(accessType, "basic"),
     );
 
-    // Базовые доступы (секторные ключи пропускаем — у них свои подписи)
-    BASIC_ACCESS_TYPES.forEach((accessType) => {
-      if (sectorBackendKeys.has(accessType.backendKey)) return;
-      // "Филиалы" должны отображаться только если у компании есть активная доп. услуга
-      if (accessType.backendKey === "can_view_branch") {
-        // Проверяем, есть ли активная доп. услуга у компании
-        if (
-          companyAllows("can_view_branch") === true &&
-          allMenuPermissions.has(accessType.backendKey)
-        ) {
-          result.push(accessType);
-        }
-      } else if (allMenuPermissions.has(accessType.backendKey)) {
-        result.push(accessType);
-      }
-    });
-
-    // Секторные доступы
-    sectorAccessList.forEach((accessType) => {
-      if (
-        allMenuPermissions.has(accessType.backendKey) &&
-        !result.some((r) => r.backendKey === accessType.backendKey)
-      ) {
-        result.push(accessType);
-      }
-    });
-
-    // Добавляем доп. услуги, которые активны у компании или профиля, но еще не добавлены
+    // Доп. услуги, активные у компании или профиля
     allMenuPermissions.forEach((permission) => {
-      // Проверяем, что это доп. услуга и её еще нет в результате
+      if (seenPermissions.has(permission)) return;
+
       if (additionalServicesMapping[permission]) {
-        const exists = result.some((r) => r.backendKey === permission);
-        if (!exists) {
-          result.push(additionalServicesMapping[permission]);
-        }
-      } else {
-        // Проверяем динамические доп. услуги из конфигурации
-        // Если permission есть в allMenuPermissions, но нет в маппинге,
-        // это может быть динамическая услуга (например, "Склад", "Филиалы")
-        let dynamicService = MENU_CONFIG.additional.find(
+        seenPermissions.add(permission);
+        result.push({
+          ...additionalServicesMapping[permission],
+          category: "additional",
+        });
+        return;
+      }
+
+      let dynamicService = MENU_CONFIG.additional.find(
+        (s) => s.permission === permission,
+      );
+      if (!dynamicService) {
+        dynamicService = ADDITIONAL_SERVICES_CONFIG.find(
           (s) => s.permission === permission,
         );
-        if (!dynamicService) {
-          dynamicService = ADDITIONAL_SERVICES_CONFIG.find(
-            (s) => s.permission === permission,
-          );
-        }
-        if (
-          dynamicService &&
-          !result.some((r) => r.backendKey === permission)
-        ) {
-          result.push({
-            value: dynamicService.label,
-            label: dynamicService.label,
-            backendKey: dynamicService.permission,
-          });
-        }
+      }
+      if (dynamicService) {
+        seenPermissions.add(permission);
+        result.push({
+          value: dynamicService.label,
+          label: dynamicService.label,
+          backendKey: dynamicService.permission,
+          category: "additional",
+        });
       }
     });
 
@@ -769,8 +860,9 @@ const AccessList = ({
 
     const initialAccess = {};
     availableAccessTypes.forEach((accessType) => {
-      initialAccess[accessType.backendKey] = employeeAccesses?.includes(
-        accessType.value,
+      initialAccess[accessType.backendKey] = isEmployeeAccessEnabled(
+        employeeAccesses,
+        accessType,
       );
     });
 
@@ -787,8 +879,9 @@ const AccessList = ({
 
     const newAccessState = {};
     availableAccessTypes.forEach((accessType) => {
-      newAccessState[accessType.backendKey] = employeeAccesses?.includes(
-        accessType.value,
+      newAccessState[accessType.backendKey] = isEmployeeAccessEnabled(
+        employeeAccesses,
+        accessType,
       );
     });
     setSelectedAccess(newAccessState);
@@ -806,12 +899,20 @@ const AccessList = ({
 
   // Разделяем на базовые, секторные и доп. услуги
   const basicAccessTypes = useMemo(() => {
+    const fromCategory = availableAccessTypes.filter(
+      (type) => type.category === "basic",
+    );
+    if (fromCategory.length) return fromCategory;
     return availableAccessTypes.filter((type) =>
       BASIC_ACCESS_TYPES.some((basic) => basic.backendKey === type.backendKey),
     );
   }, [availableAccessTypes]);
 
   const sectorAccessTypes = useMemo(() => {
+    const fromCategory = availableAccessTypes.filter(
+      (type) => type.category === "sector",
+    );
+    if (fromCategory.length) return fromCategory;
     return availableAccessTypes.filter(
       (type) =>
         !BASIC_ACCESS_TYPES.some(
@@ -848,7 +949,8 @@ const AccessList = ({
     }
 
     return availableAccessTypes.filter((type) => {
-      // Проверяем, есть ли это в маппинге базовых доп. услуг
+      if (type.category === "additional") return true;
+      if (type.category && type.category !== "additional") return false;
       if (additionalServicesMapping[type.backendKey]) {
         return true;
       }

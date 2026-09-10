@@ -1,6 +1,6 @@
 // src/Components/Sectors/Consulting/client/SubscriptionMatrix.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getSubscriptionMatrix } from "../../../../api/consultingSubscriptions";
+import { getSubscriptionMatrix, normalizeSubscriptionPaymentStatus } from "../../../../api/consultingSubscriptions";
 import "./SubscriptionMatrix.scss";
 
 const RU_MONTHS = [
@@ -217,7 +217,9 @@ export default function SubscriptionMatrix() {
                     {months.map((mk) => {
                       const cell = row.cells?.[mk];
                       const status = cell
-                        ? cell.status || (cell.paid ? "paid" : "planned")
+                        ? normalizeSubscriptionPaymentStatus(
+                            cell.status || (cell.paid ? "paid" : "planned"),
+                          )
                         : "none";
                       return (
                         <td

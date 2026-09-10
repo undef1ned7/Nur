@@ -15,6 +15,11 @@ const normalizeName = (s) =>
     .replace(/\s+/g, " ")
     .toLowerCase();
 
+const normalizeCategoryId = (id) => {
+  const s = String(id ?? "").trim();
+  return s || null;
+};
+
 const parseMoney = (raw) => {
   const cleaned = String(raw).replace(/\s/g, "").replace(",", ".");
   const n = Number(cleaned);
@@ -30,10 +35,17 @@ const focusFirstError = (errs) => {
   if (el?.focus) el.focus();
 };
 
-const validateService = ({ name, price, services, currentService }) => {
+const validateService = ({
+  name,
+  price,
+  categoryId,
+  services,
+  currentService,
+}) => {
   const alerts = [];
   const errs = {};
   const nn = normalizeName(name);
+  const categoryKey = normalizeCategoryId(categoryId);
 
   if (!nn) {
     errs.name = true;
@@ -42,11 +54,12 @@ const validateService = ({ name, price, services, currentService }) => {
     const duplicate = services.some(
       (s) =>
         normalizeName(s.name) === nn &&
+        normalizeCategoryId(s.categoryId) === categoryKey &&
         (!currentService?.id || s.id !== currentService.id),
     );
     if (duplicate) {
       errs.name = true;
-      alerts.push("Такая услуга уже есть.");
+      alerts.push("Такая услуга уже есть в этой категории.");
     }
   }
 
@@ -180,6 +193,7 @@ const ServiceModal = ({
     const { errs, alerts, priceNum } = validateService({
       name,
       price: priceStr,
+      categoryId,
       services,
       currentService,
     });

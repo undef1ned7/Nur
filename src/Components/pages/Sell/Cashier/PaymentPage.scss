@@ -561,6 +561,23 @@
     gap: 10px;
   }
 
+  &__without-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+  }
+
   &__accept-btn {
     width: 100%;
     padding: 14px;

@@ -54,9 +54,9 @@ export const createConsultingSale = createAsyncThunk(
       const { data: response } = await api.post("/consalting/sales/", data);
       return response;
     } catch (e) {
-      return rejectWithValue(e);
+      return rejectWithValue(e.response?.data || e.message);
     }
-  }
+  },
 );
 
 export const createConsultingRequest = createAsyncThunk(

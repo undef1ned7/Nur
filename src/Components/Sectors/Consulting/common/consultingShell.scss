@@ -22,7 +22,7 @@
   --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgba(20, 24, 40, 0.06);
   --shadow-md: 0 6px 20px rgba(20, 24, 40, 0.08);
-  --ctrlH: 40px;
+  --ctrlH: 44px;
 
   box-sizing: border-box;
   /* width:auto + margin: блок занимает доступную ширину МИНУС отступы.
@@ -97,13 +97,14 @@
   &__nav {
     display: grid;
     gap: 10px;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   }
 
   &__navItem {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
+    min-width: 0;
     padding: 14px 16px;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -144,6 +145,7 @@
     flex: 0 0 40px;
     width: 40px;
     height: 40px;
+    margin-top: 1px;
     border-radius: 12px;
     display: grid;
     place-items: center;
@@ -164,6 +166,7 @@
     font-size: 14px;
     font-weight: 800;
     letter-spacing: -0.01em;
+    line-height: 1.25;
     color: #334155;
   }
 
@@ -171,9 +174,11 @@
     font-size: 11.5px;
     font-weight: 600;
     color: var(--muted);
-    white-space: nowrap;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   &__panel {
@@ -191,9 +196,26 @@
 
   &__panelHead {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 0 2px;
+  }
+
+  &__panelHeadMain {
+    display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 0 2px;
+    min-width: 0;
+  }
+
+  &__panelActions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   &__panelTitle {
@@ -383,8 +405,8 @@
   }
 
   @media (max-width: 640px) {
-    &__navHint {
-      display: none;
+    &__nav {
+      grid-template-columns: 1fr;
     }
 
     &__panel {

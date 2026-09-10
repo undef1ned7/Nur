@@ -34,6 +34,11 @@
     flex-shrink: 0;
   }
 
+  /* Слот для действий страницы: пустой — не занимает места и не создаёт gap. */
+  &__actionsSlot {
+    display: contents;
+  }
+
   &__project {
     display: flex;
     align-items: center;

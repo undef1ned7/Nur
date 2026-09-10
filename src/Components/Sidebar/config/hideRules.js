@@ -25,7 +25,10 @@ export const HIDE_RULES = [
     },
   },
   {
-    when: { tariff: "Старт", sectorNotIn: ["Кафе", "Магазин", "Цветочный магазин"] },
+    when: {
+      tariff: "Старт",
+      sectorNotIn: ["Кафе", "Магазин", "Цветочный магазин"],
+    },
     hide: {
       labels: [
         "Обзор",
@@ -249,8 +252,10 @@ export const HIDE_RULES = [
         "/crm/sklad",
         "/crm/zakaz",
         "/crm/analytics",
-        "/crm/consulting/kassa",
+        "/crm/kassa",
         "/crm/raspisanie",
+        "/crm/consulting/sale",
+        "/crm/consulting/salary",
       ],
     },
   },

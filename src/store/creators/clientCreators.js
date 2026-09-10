@@ -1,6 +1,11 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api/";
 import { normalizeDealCreateInput } from "../../tools/clientDeals";
+import { isConsultingCashV2 } from "../../utils/consultingMoney";
+import {
+  flattenSubscriptionPayments,
+  getClientSubscriptions,
+} from "../../api/consultingSubscriptions";
 export const fetchClientsAsync = createAsyncThunk(
   "client/fetchAll",
   async (clientParams, { rejectWithValue }) => {
@@ -208,6 +213,17 @@ export const cancellationOfPayment = createAsyncThunk(
 export const getClientSubscriptionSchedule = createAsyncThunk(
   "client/subscriptionSchedule",
   async (clientId, { rejectWithValue }) => {
+    if (isConsultingCashV2()) {
+      try {
+        const data = await getClientSubscriptions(clientId);
+        return flattenSubscriptionPayments(data);
+      } catch (err) {
+        if (err?.status === 404 || err?.status === 501) {
+          return [];
+        }
+        return rejectWithValue(err);
+      }
+    }
     try {
       const { data } = await api.get(
         `/main/clients/${clientId}/subscription-schedule/`,

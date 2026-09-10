@@ -1,3 +1,5 @@
+import { areNotificationsEnabled } from "./notificationPreferences";
+
 /**
  * Звук уведомлений.
  *
@@ -17,6 +19,7 @@ let audioInstance = null;
  */
 export function playNotificationSound() {
   try {
+    if (!areNotificationsEnabled()) return;
     if (typeof Audio === "undefined") return;
     if (!audioInstance) {
       audioInstance = new Audio(NOTIFICATION_SOUND);

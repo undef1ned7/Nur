@@ -187,58 +187,62 @@ const Salary = () => {
     [isOwnerOrAdmin],
   );
 
+  const showPeriodFilters = tab === TABS.ACCRUALS || tab === TABS.PAYOUTS;
+
+  const periodFilters = showPeriodFilters ? (
+    <div className="salary__filters salary__filters--panel">
+      <label className="salary__filterField">
+        <span>С</span>
+        <input
+          type="date"
+          className="salary__input"
+          value={dateFrom}
+          max={dateTo}
+          onChange={(e) => setDateFrom(e.target.value)}
+        />
+      </label>
+      <label className="salary__filterField">
+        <span>По</span>
+        <input
+          type="date"
+          className="salary__input"
+          value={dateTo}
+          min={dateFrom}
+          onChange={(e) => setDateTo(e.target.value)}
+        />
+      </label>
+      {isOwnerOrAdmin && (
+        <label className="salary__filterField salary__filterField--employee">
+          <span>Сотрудник</span>
+          <select
+            className="salary__input"
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+          >
+            <option value="">Все сотрудники</option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>
+                {employeeName(e)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  ) : null;
+
   return (
     <ConsultingShell
+      className={showPeriodFilters ? "cShell--salaryFilters" : ""}
       eyebrow="Консалтинг · Деньги"
       title="Зарплата"
       subtitle="Автоматическое начисление процента с закрытых продаж"
       nav={visibleTabs}
       navValue={tab}
       onNavChange={setTab}
+      panelActions={periodFilters}
     >
       <div className="salary salary--embedded">
-      {(tab === TABS.ACCRUALS || tab === TABS.PAYOUTS) && (
-        <div className="salary__filters">
-          <label className="salary__filterField">
-            <span>С</span>
-            <input
-              type="date"
-              className="salary__input"
-              value={dateFrom}
-              max={dateTo}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </label>
-          <label className="salary__filterField">
-            <span>По</span>
-            <input
-              type="date"
-              className="salary__input"
-              value={dateTo}
-              min={dateFrom}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </label>
-          {isOwnerOrAdmin && (
-            <label className="salary__filterField">
-              <span>Сотрудник</span>
-              <select
-                className="salary__input"
-                value={userFilter}
-                onChange={(e) => setUserFilter(e.target.value)}
-              >
-                <option value="">Все сотрудники</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {employeeName(e)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-      )}
-
       {tab === TABS.ACCRUALS && (
         <AccrualsTab
           dateFrom={dateFrom}

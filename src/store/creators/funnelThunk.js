@@ -1,6 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../api";
 import { normalizeDealCreateInput } from "../../tools/clientDeals";
+import { isConsultingCashV2 } from "../../utils/consultingMoney";
 import {
   fetchAccessibleFunnelBoards,
   fetchFunnelBoard,
@@ -653,6 +654,17 @@ export const registerLeadPayment = createAsyncThunk(
       subscription_amount,
       subscription_period,
       subscription_start,
+      // Оплата абонплаты на несколько периодов вперёд: бэк помечает первые N
+      // платежей графика оплаченными. Не передано / 1 — прежнее поведение.
+      subscription_prepaid_periods,
+      // true — полноценная подписка (автопродление, матрица, CRM-аккаунт);
+      // false — фиксированный оплаченный график на N мес. без продления.
+      subscription_autorenew,
+      // Разовая оплата за N месяцев (метаданные покрытия).
+      paid_months,
+      // Разовые доп. услуги при оплате: [{ name, price, quantity }].
+      // Их сумма уже включена в `amount`; бэк заводит строки чека.
+      items,
     },
     { rejectWithValue },
   ) => {
@@ -669,11 +681,18 @@ export const registerLeadPayment = createAsyncThunk(
           subscription_amount,
           subscription_period,
           subscription_start,
+          subscription_prepaid_periods,
+          subscription_autorenew,
+          paid_months,
+          items,
         },
       );
       return data;
     } catch (e) {
-      if (e?.response?.status === 404 || e?.response?.status === 501) {
+      if (
+        !isConsultingCashV2() &&
+        (e?.response?.status === 404 || e?.response?.status === 501)
+      ) {
         try {
           const { data: lead } = await api.get(`${BASE}/leads/${leadId}/`);
           const clientId = lead.client || lead.client_id;
@@ -703,7 +722,20 @@ export const registerLeadPayment = createAsyncThunk(
             amount,
             debtMonths: debt_months,
             prepayment,
-            note: [note, payLabel].filter(Boolean).join(" · "),
+            note: [
+              note,
+              payLabel,
+              Number(paid_months) > 1 ? `оплачено за ${paid_months} мес.` : null,
+              Array.isArray(items) && items.length
+                ? `доп. услуги: ${items
+                    .map((it) =>
+                      it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name,
+                    )
+                    .join(", ")}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           });
           dealPayload.lead = leadId;
           dealPayload.payment_method = payment_mode;

@@ -43,8 +43,7 @@ const CLIENT_NAV = [
   },
 ];
 
-const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString("ru-RU") + " с";
+const fmtMoney = (v) => (Number(v) || 0).toLocaleString("ru-RU") + " с";
 
 const fmtDate = (value) => {
   if (!value) return "—";
@@ -101,9 +100,9 @@ export default function ConsultingClients() {
         .sort(
           (a, b) =>
             new Date(b.updated_at || b.created_at || 0) -
-            new Date(a.updated_at || a.created_at || 0)
+            new Date(a.updated_at || a.created_at || 0),
         ),
-    [rows]
+    [rows],
   );
 
   const onCreate = () => {
@@ -154,9 +153,8 @@ export default function ConsultingClients() {
           </button>
         ) : null
       }
-    >
-      <div className="clients clients--embedded">
-        {tab === "list" && (
+      panelActions={
+        tab === "list" ? (
           <div className="clients__toolbar">
             <label className="clients__search">
               <FaSearch className="clients__searchIcon" aria-hidden />
@@ -186,8 +184,10 @@ export default function ConsultingClients() {
               </span>
             )}
           </div>
-        )}
-
+        ) : null
+      }
+    >
+      <div className="clients clients--embedded">
         {tab === "matrix" && <SubscriptionMatrix />}
 
         {tab === "list" && (
@@ -205,9 +205,7 @@ export default function ConsultingClients() {
                     <li
                       key={c.id}
                       className="cShell__card clients__card"
-                      onClick={() =>
-                        navigate(`/crm/consulting/client/${c.id}`)
-                      }
+                      onClick={() => navigate(`/crm/consulting/client/${c.id}`)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter")
                           navigate(`/crm/consulting/client/${c.id}`);
@@ -232,9 +230,6 @@ export default function ConsultingClients() {
                                 {c.phone || "Телефон не указан"}
                               </div>
                             </div>
-                            <span className="clients__money">
-                              {fmtMoney(c.score)}
-                            </span>
                           </div>
                           <div className="clients__cardFoot">
                             <span>{fmtDate(c.date || c.created_at)}</span>
@@ -242,6 +237,7 @@ export default function ConsultingClients() {
                             <span>{c.salesperson_display || "—"}</span>
                           </div>
                         </div>
+                        {/* <span className="clients__money">{fmtMoney(c.score)}</span> */}
                       </div>
                       <div
                         className="cShell__cardActions"
@@ -368,7 +364,7 @@ const ClientForm = ({ id, onClose }) => {
       ? String(current.price)
       : current?.score != null
         ? String(current.score)
-        : ""
+        : "",
   );
   const { services: availableServices } = useConsulting();
 
@@ -378,7 +374,7 @@ const ClientForm = ({ id, onClose }) => {
   const handleServiceChange = (e) => {
     const selectedServiceId = e.target.value;
     const selectedService = availableServices.find(
-      (s) => String(s.id) === String(selectedServiceId)
+      (s) => String(s.id) === String(selectedServiceId),
     );
 
     setService(selectedServiceId);
@@ -432,7 +428,7 @@ const ClientForm = ({ id, onClose }) => {
     try {
       if (editing) {
         await dispatch(
-          updateClientAsync({ clientId: current.id, updatedData: dtoEdit })
+          updateClientAsync({ clientId: current.id, updatedData: dtoEdit }),
         ).unwrap();
       } else {
         await dispatch(createClientAsync(dtoCreate)).unwrap();
@@ -442,7 +438,7 @@ const ClientForm = ({ id, onClose }) => {
       console.error(e2);
       setErr(
         (typeof e2 === "string" ? e2 : e2?.detail) ||
-          "Не удалось сохранить клиента."
+          "Не удалось сохранить клиента.",
       );
     } finally {
       setSaving(false);

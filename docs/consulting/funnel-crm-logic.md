@@ -1,5 +1,8 @@
 # Консалтинг — Воронка продаж: аудит CRM-логики
 
+**Бэкенд (лид→клиент, оплата):** [backend-money-tenant/08-lead-client-conversion.md](./backend-money-tenant/08-lead-client-conversion.md),
+[backend-money-tenant/06-regional-funnels-routing.md](./backend-money-tenant/06-regional-funnels-routing.md).
+
 **Страница:** `/crm/consulting/funnel` (фронт:
 `src/Components/Sectors/Consulting/Funnel/Funnel.jsx`, thunks
 `src/store/creators/funnelThunk.js`).

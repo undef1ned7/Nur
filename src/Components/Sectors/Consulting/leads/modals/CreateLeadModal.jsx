@@ -4,7 +4,10 @@
  */
 import { useState } from "react";
 import { FaTimes } from "react-icons/fa";
-import { createInboundLead } from "../../../../../api/consultingLeads";
+import {
+  createInboundLead,
+  ensureFunnelLeadForInbound,
+} from "../../../../../api/consultingLeads";
 import { LEAD_SOURCES } from "../../../../../utils/consultingLeadSources";
 
 export default function CreateLeadModal({ onClose, onCreated, onError }) {
@@ -15,23 +18,37 @@ export default function CreateLeadModal({ onClose, onCreated, onError }) {
     message: "",
   });
   const [saving, setSaving] = useState(false);
+  const [fieldError, setFieldError] = useState(false);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+    if (k === "full_name" || k === "phone") setFieldError(false);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.full_name.trim() && !form.phone.trim()) {
-      onError?.("Укажите имя или телефон лида.");
+      setFieldError(true);
       return;
     }
+    setFieldError(false);
     setSaving(true);
     try {
-      await createInboundLead({
+      const inbound = await createInboundLead({
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         source: form.source,
         message: form.message.trim(),
+        // Ручной лид не из мессенджера — внешнего чата нет. Бэк помечает
+        // external_id обязательным и дедуплицирует по нему, поэтому шлём
+        // уникальный синтетический id, а не пустую строку.
+        external_id: `manual:${
+          globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)
+        }`,
       });
+      // Пока бэк не создаёт параллельную карточку в воронке для ручного лида —
+      // делаем это с фронта, чтобы лид попал в /crm/consulting/funnel.
+      await ensureFunnelLeadForInbound(inbound);
       onCreated?.();
     } catch (e2) {
       onError?.(e2?.detail || "Не удалось создать лид.");
@@ -67,20 +84,28 @@ export default function CreateLeadModal({ onClose, onCreated, onError }) {
           <div className="leads__field">
             <label className="leads__label">Имя</label>
             <input
-              className="cList__input"
+              className={`cList__input${fieldError ? " is-invalid" : ""}`}
               value={form.full_name}
               onChange={set("full_name")}
               autoFocus
+              aria-invalid={fieldError || undefined}
+              aria-describedby={fieldError ? "create-lead-error" : undefined}
             />
+            {fieldError ? (
+              <p className="leads__fieldError" id="create-lead-error">
+                Укажите имя или телефон лида
+              </p>
+            ) : null}
           </div>
           <div className="leads__field">
             <label className="leads__label">Телефон</label>
             <input
-              className="cList__input"
+              className={`cList__input${fieldError ? " is-invalid" : ""}`}
               value={form.phone}
               onChange={set("phone")}
               placeholder="+996700000000"
               inputMode="tel"
+              aria-invalid={fieldError || undefined}
             />
           </div>
           <div className="leads__field">

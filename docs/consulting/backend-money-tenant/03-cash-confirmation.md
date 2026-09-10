@@ -87,12 +87,12 @@ class CashConfirmationSettings(models.Model):
 ```
 
 **Важно:** к кассовой операции (`CashOperation`) добавляется обязательная привязка
-к сотруднику — `user = FK(User)` — см. [07-employee-finance.md](./07-employee-finance.md).
+к сотруднику — `user = FK(User)` — см. [07-employee-finance.md](../backend/07-employee-finance.md).
 Без неё невозможен разрез «кто внёс».
 
 ## 9.3. Когда создаётся заявка
 
-Внутри `create_sale_side_effects` (см. [05-subscription.md](./05-subscription.md)),
+Внутри `create_sale_side_effects` (см. [01-subscription.md](./01-subscription.md)),
 после создания продажи:
 
 ```python
@@ -114,6 +114,9 @@ def needs_confirmation(company, payment_method, author):
 ## 9.4. Эндпоинты
 
 ```
+GET  /consalting/cashbox/cashboxes/              # список касс компании
+POST /consalting/cashbox/cashboxes/              { "name", "department_name?" }
+GET  /consalting/cashbox/cashboxes/{id}/         # одна касса + analytics (income/expense)
 GET  /consalting/cashbox/requests/            # status, kind, user, cashbox, date_from/to, search, page
 GET  /consalting/cashbox/requests/counters/
 POST /consalting/cashbox/requests/{id}/confirm/   { "cashbox": "uuid|null", "comment": "" }

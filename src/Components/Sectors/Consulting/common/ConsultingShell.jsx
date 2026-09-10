@@ -14,6 +14,7 @@ export default function ConsultingShell({
   onNavChange = null,
   panelTitle = null,
   panelHint = null,
+  panelActions = null,
   children,
   className = "",
 }) {
@@ -73,13 +74,18 @@ export default function ConsultingShell({
       <div className="cShell__panel">
         {showPanelHead ? (
           <div className="cShell__panelHead">
-            <h2 className="cShell__panelTitle">
-              {panelTitle ?? activeNav?.label}
-            </h2>
-            {(panelHint ?? activeNav?.hint) ? (
-              <p className="cShell__panelHint">
-                {panelHint ?? activeNav?.hint}
-              </p>
+            <div className="cShell__panelHeadMain">
+              <h2 className="cShell__panelTitle">
+                {panelTitle ?? activeNav?.label}
+              </h2>
+              {(panelHint ?? activeNav?.hint) ? (
+                <p className="cShell__panelHint">
+                  {panelHint ?? activeNav?.hint}
+                </p>
+              ) : null}
+            </div>
+            {panelActions ? (
+              <div className="cShell__panelActions">{panelActions}</div>
             ) : null}
           </div>
         ) : null}

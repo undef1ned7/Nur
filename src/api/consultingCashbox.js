@@ -2,26 +2,71 @@
  * Консалтинг: касса — операции с фильтрами, заявки на подтверждение прихода
  * (ТЗ №9) и сдача наличных сотрудником (ТЗ №7).
  *
- * Контракт: docs/consulting/backend/09-cash-confirmation.md,
+ * Контракт: docs/consulting/backend-money-tenant/03-cash-confirmation.md,
  * docs/consulting/backend/07-employee-finance.md.
  *
  * Ключевое правило учёта: неподтверждённая заявка НЕ входит в остаток кассы.
  * Поэтому список заявок и список операций — разные ресурсы.
  */
+import api from "./index";
 import { BASE, cGet, cPost, cPut } from "./consultingHttp";
+import {
+  isCashExpenseType,
+  normalizeCashConfirmMode,
+  normalizeCashRequestCounters,
+} from "../utils/consultingMoney";
 
 const URL_CASH = `${BASE}/cashbox`;
+
+const asList = (data) =>
+  Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+
+const isNotReady = (e) => e?.status === 404 || e?.status === 501;
+
+/** Legacy-кассы (общая модель CashBox) — пока бэк не выкатил /cashbox/cashboxes/. */
+async function listLegacyConstructionCashboxes(params = {}, config = {}) {
+  const res = await api.get("/construction/cashboxes/", {
+    params,
+    signal: config.signal,
+  });
+  return asList(res.data);
+}
+
+/** Собрать уникальные кассы из подтверждённых операций. */
+async function deriveCashboxesFromOperations(config = {}) {
+  const data = await cGet(
+    "List Cash Operations Error",
+    `${URL_CASH}/operations/`,
+    { page_size: 200 },
+    config,
+  );
+  const map = new Map();
+  for (const op of asList(data)) {
+    const id = op.cashbox ?? op.cashbox_id;
+    if (id == null || id === "") continue;
+    const key = String(id);
+    if (map.has(key)) continue;
+    map.set(key, {
+      id,
+      name: op.cashbox_name || op.cashbox_display || `Касса ${key.slice(0, 8)}`,
+      department_name: op.department_name || "",
+    });
+  }
+  return [...map.values()];
+}
 
 export const CASH_REQUEST_STATUS = {
   PENDING: "pending",
   CONFIRMED: "confirmed",
   REJECTED: "rejected",
+  CANCELED: "canceled",
 };
 
 export const CASH_REQUEST_STATUS_LABELS = {
   [CASH_REQUEST_STATUS.PENDING]: "Ожидает подтверждения",
   [CASH_REQUEST_STATUS.CONFIRMED]: "Подтверждено",
   [CASH_REQUEST_STATUS.REJECTED]: "Отклонено",
+  [CASH_REQUEST_STATUS.CANCELED]: "Снято",
 };
 
 /** Что породило заявку — от этого зависит текст в списке и права. */
@@ -47,6 +92,82 @@ export const CASH_REJECT_REASONS = [
   { value: "other", label: "Другое" },
 ];
 
+/* ==================== КАССЫ (consalting) ==================== */
+
+/**
+ * Список касс консалтинга.
+ * GET /consalting/cashbox/cashboxes/
+ *
+ * На prod (2026-09) эндпоинт может отсутствовать (404) — тогда fallback:
+ * /construction/cashboxes/ → уникальные cashbox из operations.
+ */
+export async function listConsultingCashboxes(params = {}, config = {}) {
+  try {
+    return await cGet(
+      "List Consulting Cashboxes Error",
+      `${URL_CASH}/cashboxes/`,
+      params,
+      config,
+    );
+  } catch (e) {
+    if (!isNotReady(e)) throw e;
+  }
+  try {
+    return await listLegacyConstructionCashboxes(params, config);
+  } catch (e) {
+    const st = e?.response?.status ?? e?.status;
+    if (st && st !== 404 && st !== 501) throw e;
+  }
+  try {
+    const derived = await deriveCashboxesFromOperations(config);
+    if (derived.length) return derived;
+  } catch (e) {
+    if (!isNotReady(e)) throw e;
+  }
+  return [{ id: "", name: "Основная касса", department_name: "Консалтинг" }];
+}
+
+/**
+ * POST /consalting/cashbox/cashboxes/
+ * @param {Object} payload - { name, department_name? }
+ */
+export async function createConsultingCashbox(payload) {
+  try {
+    return await cPost(
+      "Create Consulting Cashbox Error",
+      `${URL_CASH}/cashboxes/`,
+      payload,
+    );
+  } catch (e) {
+    if (!isNotReady(e)) throw e;
+    const res = await api.post("/construction/cashboxes/", payload);
+    return res.data;
+  }
+}
+
+/**
+ * GET /consalting/cashbox/cashboxes/{id}/
+ */
+export async function getConsultingCashbox(id, config = {}) {
+  if (!id) {
+    return { id: "", name: "Основная касса", department_name: "Консалтинг" };
+  }
+  try {
+    return await cGet(
+      "Get Consulting Cashbox Error",
+      `${URL_CASH}/cashboxes/${id}/`,
+      {},
+      config,
+    );
+  } catch (e) {
+    if (!isNotReady(e)) throw e;
+    const res = await api.get(`/construction/cashboxes/${id}/`, {
+      signal: config.signal,
+    });
+    return res.data;
+  }
+}
+
 /* ==================== ЗАЯВКИ НА ПОДТВЕРЖДЕНИЕ ==================== */
 
 /**
@@ -63,13 +184,15 @@ export const listCashRequests = (params = {}, config) =>
  * GET /consalting/cashbox/requests/counters/
  * @returns {{ pending, confirmed, rejected, pending_amount }}
  */
-export const getCashRequestCounters = (params = {}, config) =>
-  cGet(
+export const getCashRequestCounters = async (params = {}, config) => {
+  const data = await cGet(
     "Cash Request Counters Error",
     `${URL_CASH}/requests/counters/`,
     params,
     config,
   );
+  return normalizeCashRequestCounters(data);
+};
 
 /**
  * Подтвердить приход — только после этого деньги попадают в остаток кассы.
@@ -133,17 +256,33 @@ export const getCashReconciliation = (params = {}, config) =>
  * @returns {{ mode: "always"|"cash_only"|"off", skip_for_cashier: boolean,
  *   overdue_hours: number }}
  */
-export const getCashConfirmationSettings = (config) =>
-  cGet(
+export const getCashConfirmationSettings = async (config) => {
+  const data = await cGet(
     "Get Cash Confirmation Settings Error",
     `${URL_CASH}/confirmation-settings/`,
     {},
     config,
   );
+  if (!data || typeof data !== "object") return data;
+  return { ...data, mode: normalizeCashConfirmMode(data.mode) };
+};
 
-export const updateCashConfirmationSettings = (payload) =>
-  cPut(
-    "Update Cash Confirmation Settings Error",
-    `${URL_CASH}/confirmation-settings/`,
-    payload,
-  );
+/** Прод принимает POST; спека — PUT. */
+export const updateCashConfirmationSettings = async (payload) => {
+  try {
+    return await cPost(
+      "Update Cash Confirmation Settings Error",
+      `${URL_CASH}/confirmation-settings/`,
+      payload,
+    );
+  } catch (e) {
+    if (e?.status !== 405 && e?.status !== 404) throw e;
+    return cPut(
+      "Update Cash Confirmation Settings Error",
+      `${URL_CASH}/confirmation-settings/`,
+      payload,
+    );
+  }
+};
+
+export { isCashExpenseType };

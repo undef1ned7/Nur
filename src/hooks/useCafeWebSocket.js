@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useUser } from '../store/slices/userSlice';
 import api from '../api';
 import logger from '../utils/logger';
+import { areNotificationsEnabled } from '../config/notificationPreferences';
 
 /**
  * Универсальный хук для подключения к WebSocket кафе
@@ -303,7 +304,10 @@ export const useCafeOrdersWebSocket = (options = {}) => {
                 });
 
                 // Уведомление
-                if (Notification.permission === 'granted') {
+                if (
+                    areNotificationsEnabled() &&
+                    Notification.permission === 'granted'
+                ) {
                     new Notification('📋 Новый заказ', {
                         body: `Стол №${newOrder.table_number}, сумма: ${newOrder.total_amount}`,
                         icon: '/favicon.ico',

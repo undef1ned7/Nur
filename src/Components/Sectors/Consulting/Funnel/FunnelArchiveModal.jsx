@@ -5,8 +5,13 @@ import { getFunnelDisplayName } from "../../../../utils/consultingFunnelDefaults
 import {
   filterFunnelsForUser,
   isConsultingFunnelManager,
+  shouldIsolateConsultingByOwner,
 } from "../../../../utils/consultingFunnelAccess";
-import { employeeDisplayName } from "../../../../utils/consultingFunnelLeadUtils";
+import {
+  employeeDisplayName,
+  isLeadOwner,
+  resolveCurrentUserId,
+} from "../../../../utils/consultingFunnelLeadUtils";
 
 const fmtMoney = (v) =>
   v == null || v === "" ? "—" : Number(v).toLocaleString() + " с";
@@ -29,6 +34,8 @@ export default function FunnelArchiveModal({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const isManager = isConsultingFunnelManager(profile);
+  const isolateByOwner = shouldIsolateConsultingByOwner(profile);
+  const myUserId = resolveCurrentUserId(profile);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,8 +73,11 @@ export default function FunnelArchiveModal({
         visibleFunnelIds.has(String(l.funnel || l.funnel_id)),
       );
     }
+    if (isolateByOwner && myUserId) {
+      list = list.filter((l) => isLeadOwner(l, myUserId));
+    }
     return list;
-  }, [rows, isManager, visibleFunnelIds]);
+  }, [rows, isManager, visibleFunnelIds, isolateByOwner, myUserId]);
 
   const groups = useMemo(() => {
     const map = new Map();

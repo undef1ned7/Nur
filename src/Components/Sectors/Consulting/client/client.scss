@@ -6,7 +6,7 @@
   --border: #e5e7eb;
   --surface: #ffffff;
   --radius: 14px;
-  --ctrlH: 40px;
+  --ctrlH: 44px;
 
   box-sizing: border-box;
   width: 100%;
@@ -376,12 +376,6 @@
     color: #334155;
   }
 
-  &__money {
-    font-size: 13px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-
   &__rowActions {
     display: inline-flex;
     align-items: center;
@@ -434,6 +428,19 @@
 
   &__card {
     cursor: pointer;
+
+    .cShell__cardMain {
+      align-items: center;
+    }
+  }
+
+  &__money {
+    flex-shrink: 0;
+    align-self: center;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   &__cardFoot {
@@ -497,8 +504,8 @@
   }
 
   &__iconBtn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;

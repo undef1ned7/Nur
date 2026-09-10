@@ -1,42 +1,115 @@
 /**
- * Консалтинг: Абонентская матрица клиентов.
+ * Консалтинг: абонентка — матрица, график клиента, оплата периода.
  *
- * Возвращает таблицу «ФИО × услуга × месяцы»: по строке на каждую купленную
- * клиентом услугу (один клиент с несколькими услугами = несколько строк), по
- * колонке на каждый месяц периода, в ячейке — абонентский платёж и его статус.
- * Бэкенд ещё не реализован — спецификация: docs/consulting/subscription-matrix.md
+ * Контракт: docs/consulting/subscription-matrix.md,
+ * docs/consulting/backend-money-tenant/01-subscription.md
  */
-import api from ".";
+import { BASE, cGet, cPost } from "./consultingHttp";
 
-const reject = (label) => (error) => {
-  if (error.response) {
-    console.error(`${label}:`, error.response.data);
-    const data = error.response.data;
-    const payload =
-      data && typeof data === "object" ? { ...data } : { detail: data };
-    payload.status = error.response.status;
-    return Promise.reject(payload);
-  }
-  return Promise.reject(error);
+export const SUBSCRIPTION_PAYMENT_STATUS = {
+  PLANNED: "planned",
+  PAID: "paid",
+  OVERDUE: "overdue",
+  CANCELED: "canceled",
+  /** Бэкенд: scheduled | pending — маппим в UI как planned */
+  SCHEDULED: "scheduled",
+  PENDING: "pending",
 };
+
+/** Статусы платежа, по которым можно нажать «Оплатить». */
+export const PAYABLE_SUBSCRIPTION_STATUSES = new Set([
+  SUBSCRIPTION_PAYMENT_STATUS.PLANNED,
+  SUBSCRIPTION_PAYMENT_STATUS.OVERDUE,
+  SUBSCRIPTION_PAYMENT_STATUS.SCHEDULED,
+  SUBSCRIPTION_PAYMENT_STATUS.PENDING,
+]);
+
+/**
+ * Бэкенд: scheduled, pending, paid, overdue, canceled.
+ * UI/ТЗ: planned, paid, overdue, canceled.
+ */
+export function normalizeSubscriptionPaymentStatus(raw) {
+  const s = String(raw || "").toLowerCase();
+  if (s === "scheduled" || s === "pending") return SUBSCRIPTION_PAYMENT_STATUS.PLANNED;
+  if (s === "paid") return SUBSCRIPTION_PAYMENT_STATUS.PAID;
+  if (s === "overdue") return SUBSCRIPTION_PAYMENT_STATUS.OVERDUE;
+  if (s === "canceled" || s === "cancelled") return SUBSCRIPTION_PAYMENT_STATUS.CANCELED;
+  if (s === "planned") return SUBSCRIPTION_PAYMENT_STATUS.PLANNED;
+  return s || SUBSCRIPTION_PAYMENT_STATUS.PLANNED;
+}
+
+export function isPayableSubscriptionStatus(raw) {
+  const s = String(raw || "").toLowerCase();
+  return PAYABLE_SUBSCRIPTION_STATUSES.has(s) || s === "scheduled" || s === "pending";
+}
 
 /**
  * Абонентская матрица за период.
- * GET /consalting/subscription-matrix/?month_from=YYYY-MM&month_to=YYYY-MM
- * @param {Object} params - { month_from, month_to, search }
- * @returns {{ months: string[], rows: Array<{
- *   client_id, client_name, service_id, service_name,
- *   subscription_amount, subscription_period,
- *   cells: { [month: string]: { amount, status } }
- * }> }}
+ * GET /consalting/subscription-matrix/
  */
-export const getSubscriptionMatrix = async (params = {}) => {
-  try {
-    const { data } = await api.get("/consalting/subscription-matrix/", {
-      params,
-    });
-    return data;
-  } catch (error) {
-    return reject("Get Subscription Matrix Error")(error);
+export const getSubscriptionMatrix = (params = {}, config) =>
+  cGet(
+    "Get Subscription Matrix Error",
+    `${BASE}/subscription-matrix/`,
+    params,
+    config,
+  );
+
+/**
+ * Подключённые абонентки клиента + график платежей.
+ * GET /consalting/clients/{id}/subscriptions/
+ */
+export const getClientSubscriptions = (clientId, config) =>
+  cGet(
+    "Get Client Subscriptions Error",
+    `${BASE}/clients/${clientId}/subscriptions/`,
+    {},
+    config,
+  );
+
+/**
+ * Оплата одного периода абонентки → заявка в кассу kind=subscription.
+ * POST /consalting/subscription-payments/{id}/pay/
+ * @param {string|number} paymentId - SubscriptionPayment.id
+ * @param {Object} payload - { cashbox?, payment_method: "cash"|"transfer", amount, note? }
+ */
+export const paySubscriptionPayment = (paymentId, payload) =>
+  cPost(
+    "Pay Subscription Payment Error",
+    `${BASE}/subscription-payments/${paymentId}/pay/`,
+    payload,
+  );
+
+/**
+ * Разворачивает payments из ответа subscriptions в плоский список для UI-календаря.
+ * @param {object} data - ответ GET subscriptions (results или массив)
+ * @returns {Array<object>}
+ */
+export function flattenSubscriptionPayments(data) {
+  const subs = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data)
+      ? data
+      : [];
+  const rows = [];
+  for (const sub of subs) {
+    const payments = sub.payments || [];
+    for (const p of payments) {
+      const status = normalizeSubscriptionPaymentStatus(p.status);
+      rows.push({
+        ...p,
+        status,
+        subscription_id: sub.id,
+        service_display: sub.service_display,
+        tariff_display: sub.tariff_display,
+        period: p.period_month || p.period,
+        payment_id: p.id,
+      });
+    }
   }
-};
+  return rows.sort((a, b) =>
+    String(a.period_month || a.period || "").localeCompare(
+      String(b.period_month || b.period || ""),
+    ),
+  );
+}

@@ -1,0 +1,54 @@
+.cRegionFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  min-height: 38px;
+
+  &__icon {
+    color: #94a3b8;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  &__select {
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    padding: 8px 4px 8px 0;
+    cursor: pointer;
+    max-width: 220px;
+
+    &:disabled {
+      cursor: default;
+      color: #94a3b8;
+    }
+  }
+
+  &--sm {
+    min-height: 32px;
+    border-radius: 8px;
+
+    .cRegionFilter__select {
+      font-size: 12px;
+      padding: 5px 4px 5px 0;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .cRegionFilter {
+    background: #0f172a;
+    border-color: #1e293b;
+
+    &__select {
+      color: #e2e8f0;
+    }
+  }
+}
