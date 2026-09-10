@@ -1,7 +1,14 @@
 // src/components/ClientRequests/ClientRequests.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import "./client-requests.scss";
-import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
+import {
+  FaPlus,
+  FaSearch,
+  FaTimes,
+  FaEdit,
+  FaTrash,
+  FaCheck,
+} from "react-icons/fa";
 import { useDispatch } from "react-redux";
 import {
   getConsultingRequests,
@@ -19,9 +26,22 @@ import ConsultingShell from "../common/ConsultingShell";
 import useConsultingList from "../common/useConsultingList";
 import { Pagination } from "../common/ListControls";
 import { plural } from "../common/listUtils";
-import { listConsultingRequests } from "../../../../api/consultingCatalog";
+import {
+  listConsultingRequests,
+  acceptConsultingRequest,
+  declineConsultingRequest,
+} from "../../../../api/consultingCatalog";
+import api from "../../../../api";
+import { useUser } from "../../../../store/slices/userSlice";
 
 const clean = (s) => String(s || "").trim();
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+const employeeName = (e) =>
+  [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim() ||
+  e?.full_name ||
+  e?.email ||
+  "—";
 const toLocalDT = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
 const statusRu = (v) =>
   ({
@@ -57,6 +77,8 @@ export default function ConsultingClientRequests() {
 
   const { error } = useSelector((s) => s.consulting);
   const clients = useSelector((s) => s.client?.list ?? []); // адаптируй под свой слайс клиентов
+  const { profile } = useUser();
+  const myId = profile?.id ? String(profile.id) : "";
 
   /**
    * Запросы клиентов грузятся с сервера: поиск и статус уходят в параметры
@@ -82,12 +104,87 @@ export default function ConsultingClientRequests() {
   const [editingId, setEditingId] = useState(null);
 
   /* форма */
-  const emptyForm = { client: "", title: "", status: "new", note: "" };
+  const emptyForm = {
+    client: "",
+    title: "",
+    status: "new",
+    note: "",
+    assigned_to: "",
+  };
   const [form, setForm] = useState(emptyForm);
+
+  /* сотрудники — для назначения ответственного по заявке */
+  const [employees, setEmployees] = useState([]);
+  const empById = useMemo(() => {
+    const m = new Map();
+    employees.forEach((e) => m.set(String(e.id), e));
+    return m;
+  }, [employees]);
+  const assigneeName = (row) =>
+    row?.assigned_to_display ||
+    (row?.assigned_to
+      ? employeeName(empById.get(String(row.assigned_to))) || "—"
+      : "");
 
   /* просмотр (для done) */
   const [viewOpen, setViewOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
+
+  /* принятие/отказ от назначенной заявки (только назначенный сотрудник) */
+  const [decisionBusyId, setDecisionBusyId] = useState(null);
+  const [declineFor, setDeclineFor] = useState(null);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineErr, setDeclineErr] = useState("");
+
+  // Заявка ждёт ответа исполнителя: бэк ставит acceptance="pending" при
+  // назначении; пока поля нет — считаем ожидающей новую назначенную заявку.
+  const isPendingAccept = (r) =>
+    !!r?.assigned_to &&
+    (r.acceptance === "pending" ||
+      (!r.acceptance && r.status === "new")) &&
+    r.status !== "done" &&
+    r.status !== "canceled";
+  const needsMyDecision = (r) =>
+    isPendingAccept(r) && String(r.assigned_to) === myId;
+
+  const acceptRequest = async (r) => {
+    setDecisionBusyId(r.id);
+    try {
+      await acceptConsultingRequest(r.id);
+      reloadRequests();
+      alert("Заявка принята — переведена в работу.");
+    } catch (e) {
+      alert(
+        (typeof e === "string" ? e : e?.detail) || "Не удалось принять заявку.",
+        true,
+      );
+    } finally {
+      setDecisionBusyId(null);
+    }
+  };
+
+  const submitDecline = async () => {
+    const reason = declineReason.trim();
+    if (!reason) {
+      setDeclineErr("Укажите причину отказа.");
+      return;
+    }
+    setDecisionBusyId(declineFor.id);
+    try {
+      await declineConsultingRequest(declineFor.id, reason);
+      setDeclineFor(null);
+      setDeclineReason("");
+      setDeclineErr("");
+      reloadRequests();
+      alert("Вы отказались от заявки. Владельцу отправлено уведомление.");
+    } catch (e) {
+      setDeclineErr(
+        (typeof e === "string" ? e : e?.detail) || "Не удалось отправить отказ.",
+      );
+    } finally {
+      setDecisionBusyId(null);
+    }
+  };
 
   /* inline-клиент */
   const [newClientOpen, setNewClientOpen] = useState(false);
@@ -100,6 +197,15 @@ export default function ConsultingClientRequests() {
     dispatch(fetchClientsAsync());
     dispatch(getConsultingRequests());
   }, [dispatch]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .get("/users/employees/", { signal: controller.signal })
+      .then((res) => setEmployees(asArray(res.data)))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   // После создания/изменения/удаления перечитываем текущую страницу.
   const reloadRequests = requestsList.refresh;
@@ -142,6 +248,7 @@ export default function ConsultingClientRequests() {
       title: r.name || "",
       status: r.status || "new",
       note: r.description || "",
+      assigned_to: r.assigned_to ? String(r.assigned_to) : "",
     });
     setFormErr("");
     setFormOpen(true);
@@ -166,6 +273,9 @@ export default function ConsultingClientRequests() {
       name: clean(form.title), // бэку нужен name
       status: form.status || "new",
       description: clean(form.note), // бэку нужен description
+      // Ответственный сотрудник. Пустое → null (снять назначение). Бэк по
+      // смене assigned_to шлёт сотруднику WS-уведомление.
+      assigned_to: form.assigned_to || null,
     };
 
     setSaving(true);
@@ -306,6 +416,10 @@ export default function ConsultingClientRequests() {
                   r.client_display ||
                   clientById.get(String(r.client))?.full_name ||
                   "—";
+                const who = assigneeName(r);
+                const decide = needsMyDecision(r);
+                const waitingOther = isPendingAccept(r) && !decide;
+                const busyDecision = decisionBusyId === r.id;
                 return (
                   <li key={r.id} className="cShell__card">
                     <div className="cShell__cardMain">
@@ -325,11 +439,51 @@ export default function ConsultingClientRequests() {
                           >
                             {statusRu(r.status)}
                           </span>
+                          <span
+                            className={`clientreqs__assignee${
+                              who ? "" : " clientreqs__assignee--none"
+                            }`}
+                          >
+                            {who || "Не назначен"}
+                          </span>
+                          {decide && (
+                            <span className="clientreqs__assignTag clientreqs__assignTag--me">
+                              Вам назначена
+                            </span>
+                          )}
+                          {waitingOther && (
+                            <span className="clientreqs__assignTag clientreqs__assignTag--wait">
+                              Ждёт ответа сотрудника
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <div className="cShell__cardActions">
-                      {isDone ? (
+                      {decide ? (
+                        <>
+                          <button
+                            className="clientreqs__btn clientreqs__btn--primary"
+                            onClick={() => acceptRequest(r)}
+                            title="Принять заявку в работу"
+                            disabled={busyDecision}
+                          >
+                            <FaCheck /> Принять
+                          </button>
+                          <button
+                            className="clientreqs__btn clientreqs__btn--danger"
+                            onClick={() => {
+                              setDeclineFor(r);
+                              setDeclineReason("");
+                              setDeclineErr("");
+                            }}
+                            title="Отказаться от заявки"
+                            disabled={busyDecision}
+                          >
+                            <FaTimes /> Отказать
+                          </button>
+                        </>
+                      ) : isDone ? (
                         <button
                           className="clientreqs__btn clientreqs__btn--secondary"
                           onClick={() => openView(r)}
@@ -537,7 +691,24 @@ export default function ConsultingClientRequests() {
                       <option value="canceled">Отменена</option>
                     </select>
                   </div>
-                  <div />
+                  {/* Ответственный сотрудник */}
+                  <div className="clientreqs__field">
+                    <label className="clientreqs__label">Сотрудник</label>
+                    <select
+                      className="clientreqs__input clientreqs__control"
+                      value={form.assigned_to}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, assigned_to: e.target.value }))
+                      }
+                    >
+                      <option value="">— не назначен —</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={String(emp.id)}>
+                          {employeeName(emp)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   {/* Заметка */}
                   <div className="clientreqs__field clientreqs__field--full">
@@ -623,6 +794,10 @@ export default function ConsultingClientRequests() {
                   <b>{statusRu(viewRow.status)}</b>
                 </div>
                 <div className="clientreqs__viewRow">
+                  <span>Сотрудник</span>
+                  <b>{assigneeName(viewRow) || "Не назначен"}</b>
+                </div>
+                <div className="clientreqs__viewRow">
                   <span>Создано</span>
                   <b>{toLocalDT(viewRow.created_at)}</b>
                 </div>
@@ -644,6 +819,81 @@ export default function ConsultingClientRequests() {
                   onClick={() => setViewOpen(false)}
                 >
                   Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Отказ от назначенной заявки — причина обязательна */}
+        {declineFor && (
+          <div
+            className="clientreqs__overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => decisionBusyId !== declineFor.id && setDeclineFor(null)}
+          >
+            <div
+              className="clientreqs__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="clientreqs__modalHeader">
+                <h3 className="clientreqs__modalTitle">Отказаться от заявки</h3>
+                <button
+                  className="clientreqs__iconBtn"
+                  onClick={() => setDeclineFor(null)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {!!declineErr && (
+                <div className="clientreqs__alert clientreqs__alert--error">
+                  {declineErr}
+                </div>
+              )}
+
+              <div className="clientreqs__form">
+                <div className="clientreqs__field clientreqs__field--full">
+                  <label className="clientreqs__label">
+                    Причина отказа <span className="clientreqs__req">*</span>
+                  </label>
+                  <textarea
+                    className="clientreqs__input"
+                    rows={3}
+                    autoFocus
+                    placeholder="Например: занят другими заявками, не мой профиль"
+                    value={declineReason}
+                    onChange={(e) => {
+                      setDeclineReason(e.target.value);
+                      setDeclineErr("");
+                    }}
+                  />
+                  <div className="clientreqs__hint">
+                    Заявка вернётся владельцу, ему придёт уведомление.
+                  </div>
+                </div>
+              </div>
+
+              <div className="clientreqs__formActions">
+                <button
+                  type="button"
+                  className="clientreqs__btn"
+                  onClick={() => setDeclineFor(null)}
+                  disabled={decisionBusyId === declineFor.id}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="clientreqs__btn clientreqs__btn--danger"
+                  onClick={submitDecline}
+                  disabled={decisionBusyId === declineFor.id}
+                >
+                  {decisionBusyId === declineFor.id
+                    ? "Отправка…"
+                    : "Отказаться"}
                 </button>
               </div>
             </div>

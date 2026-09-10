@@ -4,13 +4,17 @@
  * Основной путь — POST /assign/. Если спец-эндпоинт ещё не поднят на сервере,
  * откатываемся на обычный PATCH, чтобы менеджер мог работать уже сейчас.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import {
   assignInboundLead,
   updateInboundLead,
 } from "../../../../../api/consultingLeads";
 import { employeeName } from "../Leads";
+
+const empRegionCodes = (e) =>
+  (Array.isArray(e?.consulting_region_codes) ? e.consulting_region_codes : [])
+    .map((c) => String(c || "").toLowerCase());
 
 export default function AssignLeadModal({
   lead,
@@ -21,6 +25,17 @@ export default function AssignLeadModal({
 }) {
   const [owner, setOwner] = useState(lead.owner ? String(lead.owner) : "");
   const [saving, setSaving] = useState(false);
+
+  // Назначаем только сотрудников региона лида (если регион известен и у
+  // сотрудников есть данные о регионе). Иначе — весь список.
+  const regionCode = String(lead?.region_code || lead?.region || "").toLowerCase();
+  const scopedEmployees = useMemo(() => {
+    if (!regionCode) return employees;
+    const withRegion = employees.filter((e) => empRegionCodes(e).length);
+    if (!withRegion.length) return employees;
+    const match = employees.filter((e) => empRegionCodes(e).includes(regionCode));
+    return match.length ? match : employees;
+  }, [employees, regionCode]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -77,7 +92,7 @@ export default function AssignLeadModal({
               autoFocus
             >
               <option value="">Выберите сотрудника</option>
-              {employees.map((e) => (
+              {scopedEmployees.map((e) => (
                 <option key={e.id} value={e.id}>
                   {employeeName(e)}
                 </option>

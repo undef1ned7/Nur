@@ -80,6 +80,63 @@ export function isRoleFunnel(funnel) {
   return !!funnel?.custom_role;
 }
 
+/**
+ * id родительской воронки (для подворонок сотрудников, привязанных к
+ * региональной воронке). См.
+ * docs/consulting/backend-money-tenant/17-employee-region-subfunnels.md
+ */
+export function getFunnelParentId(funnel) {
+  const raw =
+    funnel?.parent_funnel ??
+    funnel?.parent_funnel_id ??
+    funnel?.parent ??
+    null;
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "object") {
+    const id = raw.id ?? raw.uuid ?? raw.pk;
+    return id != null ? String(id) : null;
+  }
+  return String(raw);
+}
+
+/** Идентификатор сотрудника-создателя (владельца) подворонки. */
+export function getFunnelOwnerUserId(funnel) {
+  const raw =
+    funnel?.owner_user ??
+    funnel?.owner_user_id ??
+    funnel?.created_by ??
+    funnel?.created_by_id ??
+    null;
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "object") {
+    const id = raw.id ?? raw.uuid ?? raw.pk;
+    return id != null ? String(id) : null;
+  }
+  return String(raw);
+}
+
+/** Читаемое имя сотрудника-создателя подворонки (если бэкенд его отдал). */
+export function getFunnelOwnerUserName(funnel) {
+  const raw =
+    funnel?.owner_user_name ||
+    funnel?.owner_name ||
+    funnel?.created_by_name ||
+    (typeof funnel?.owner_user === "object"
+      ? funnel.owner_user?.full_name ||
+        [funnel.owner_user?.first_name, funnel.owner_user?.last_name]
+          .filter(Boolean)
+          .join(" ")
+      : "");
+  return String(raw || "").trim();
+}
+
+/** Подворонка сотрудника: создана сотрудником и привязана к региональной воронке. */
+export function isEmployeeFunnel(funnel) {
+  if (!funnel) return false;
+  if (funnel.funnel_kind === "employee") return true;
+  return !!getFunnelParentId(funnel);
+}
+
 /** Воронки, которые владелец/админ не может удалять или менять метаданные. */
 export function isProtectedFunnel(funnel) {
   if (!funnel) return false;

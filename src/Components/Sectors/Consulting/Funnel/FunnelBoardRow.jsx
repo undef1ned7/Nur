@@ -272,10 +272,14 @@ export default function FunnelBoardRow({
   // funnel row reorder (pointer-based, из Funnel.jsx)
   funnelDragId, isDragOver, onFunnelHandlePointerDown,
   unreadByLeadId,
+  // single = одна воронка на весь экран (переключение вкладками сверху):
+  // без сворачивания и без карточки-обёртки, доска тянется на всю высоту.
+  single = false,
 }) {
   const dispatch = useDispatch();
   const [dragOverStage, setDragOverStage] = useState(null);
   const [collapsed, setCollapsed] = useState(() => isFunnelCollapsed(funnel.id));
+  const effectiveCollapsed = single ? false : collapsed;
   const [visibleByCol, setVisibleByCol] = useState({});
   const [prevFilterRevision, setPrevFilterRevision] = useState(filterRevision);
 
@@ -416,7 +420,7 @@ export default function FunnelBoardRow({
   /* ── early returns ── */
   if (!board) {
     return (
-      <section className="funnel__row">
+      <section className={single ? "funnel__row funnel__row--single" : "funnel__row"}>
         <div className="funnel__rowHead">
           <h3 className="funnel__rowTitle">{getFunnelDisplayName(funnel)}</h3>
         </div>
@@ -427,7 +431,7 @@ export default function FunnelBoardRow({
 
   if (!rawColumns.length && !rawUnassigned.length) {
     return (
-      <section className="funnel__row">
+      <section className={single ? "funnel__row funnel__row--single" : "funnel__row"}>
         <div className="funnel__rowHead">
           <h3 className="funnel__rowTitle">
             {getFunnelDisplayName(funnel)}
@@ -441,7 +445,15 @@ export default function FunnelBoardRow({
           </div>
         </div>
         <div className="funnel__placeholder funnel__placeholder--sm">
-          Нет стадий. Добавьте стадию для работы с лидами.
+          {totalLeads > 0 ? (
+            <>
+              В воронке {totalLeads} лид(ов), но не настроены стадии — поэтому
+              карточки не видны на доске. Добавьте стадии (минимум «Новые
+              заявки» и «Завершено»), и лиды появятся.
+            </>
+          ) : (
+            <>Нет стадий. Добавьте стадию для работы с лидами.</>
+          )}
         </div>
       </section>
     );
@@ -454,15 +466,17 @@ export default function FunnelBoardRow({
       data-funnel-id={String(funnel.id)}
       className={[
         "funnel__row",
-        collapsed        ? "funnel__row--collapsed" : "",
+        single           ? "funnel__row--single"    : "",
+        effectiveCollapsed ? "funnel__row--collapsed" : "",
         isDraggingThisRow ? "funnel__row--dragging"  : "",
         isDragOver && !isDraggingThisRow ? "funnel__row--dragOver" : "",
       ].filter(Boolean).join(" ")}
     >
       <div className="funnel__rowHead">
         {/* drag handle — только если есть доступ на изменение воронки.
-            Перетаскивание на pointer-событиях (кросс-браузерно + тач). */}
-        {canEditMeta && (
+            Перетаскивание на pointer-событиях (кросс-браузерно + тач).
+            В режиме single переключение/порядок — вкладками сверху. */}
+        {!single && canEditMeta && (
           <span
             className="funnel__rowDragHandle"
             title="Перетащить воронку"
@@ -472,28 +486,33 @@ export default function FunnelBoardRow({
           </span>
         )}
 
-        <button type="button" className="funnel__rowToggle"
-          onClick={toggleCollapsed} aria-expanded={!collapsed}>
-          <span className="funnel__rowChevron" aria-hidden>
-            {collapsed ? "▸" : "▾"}
-          </span>
-          <span className="funnel__rowTitle">
-            {getFunnelDisplayName(funnel)}
-            {tag && <span className="funnel__rowTag">{tag}</span>}
-          </span>
-          {collapsed && (
-            <span className="funnel__rowMeta funnel__rowMeta--inline">{totalLeads} лид(ов)</span>
-          )}
-        </button>
+        <div className="funnel__rowHeadMain">
+          <button type="button" className="funnel__rowToggle"
+            onClick={single ? undefined : toggleCollapsed}
+            aria-expanded={!effectiveCollapsed}>
+            {!single && (
+              <span className="funnel__rowChevron" aria-hidden>
+                {effectiveCollapsed ? "▸" : "▾"}
+              </span>
+            )}
+            <span className="funnel__rowTitle">
+              {getFunnelDisplayName(funnel)}
+              {tag && <span className="funnel__rowTag">{tag}</span>}
+            </span>
+            {effectiveCollapsed && (
+              <span className="funnel__rowMeta funnel__rowMeta--inline">{totalLeads} лид(ов)</span>
+            )}
+          </button>
 
-        {!collapsed && (
-          <p className="funnel__rowMeta">
-            {shownLeads !== totalLeads
-              ? `Показано ${shownLeads} из ${totalLeads}`
-              : `${totalLeads} лид(ов)`}
-            {hasFilters ? " · фильтр" : ""}
-          </p>
-        )}
+          {!effectiveCollapsed && (
+            <p className="funnel__rowMeta">
+              {shownLeads !== totalLeads
+                ? `Показано ${shownLeads} из ${totalLeads}`
+                : `${totalLeads} лид(ов)`}
+              {hasFilters ? " · фильтр" : ""}
+            </p>
+          )}
+        </div>
 
         <div className="funnel__rowActions">
           {canEditSettings && (
@@ -517,7 +536,7 @@ export default function FunnelBoardRow({
         </div>
       </div>
 
-      {!collapsed && (
+      {!effectiveCollapsed && (
         <div className="funnel__board funnel__board--row" ref={boardRef}>
           {columns.map((col) => {
             const colKey = String(col.stage?.id || "stage");

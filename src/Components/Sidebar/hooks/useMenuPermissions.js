@@ -1,5 +1,20 @@
 import { useCallback } from "react";
 import { useUser } from "../../../store/slices/userSlice";
+import {
+  isConsultingFunnelManager,
+  isConsultingRegionalSupervisor,
+} from "../../../utils/consultingFunnelAccess";
+
+// Пункты меню консалтинга, доступные руководителю региона (в рамках его региона).
+const SUPERVISOR_MENU_PERMS = new Set([
+  "can_view_leads_inbox",
+  "can_view_funnel",
+  "can_view_sale",
+  "can_view_clients",
+  "can_view_client_requests",
+  "can_view_analytics",
+  "can_view_employees",
+]);
 
 /**
  * Хук для работы с permissions пользователя
@@ -18,9 +33,20 @@ export const useMenuPermissions = () => {
       if (!profile || !permission) {
         return false;
       }
+      // Руководитель региона: доступ к своему набору пунктов консалтинга.
+      if (
+        isConsultingRegionalSupervisor(profile) &&
+        SUPERVISOR_MENU_PERMS.has(permission)
+      ) {
+        return true;
+      }
       if (permission === "can_view_funnel") {
         if (profile.can_view_funnel === true) return true;
         return profile.can_view_sale === true;
+      }
+      if (permission === "can_view_leads_inbox") {
+        if (isConsultingFunnelManager(profile)) return true;
+        return profile.can_view_leads_inbox === true;
       }
       return profile[permission] === true;
     },

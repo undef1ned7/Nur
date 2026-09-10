@@ -33,7 +33,10 @@
   "compare_period": { "date_from": "2026-05-29", "date_to": "2026-06-27" },
   "kpis": {
     "revenue":              { "current": 62200.0, "previous": 33244.0, "diff": 28956.0, "percent": 87.1 },
-    "paid_income":          {},
+    "net_revenue":          { "current": 58000.0, "previous": 31000.0, "diff": 27000.0, "percent": 87.1 },
+    "cancellations":        { "current": 4200.0, "previous": 2244.0, "diff": 1956.0, "percent": 87.1 },
+    "paid_income":          { "current": 55000.0, "previous": 28000.0, "diff": 27000.0, "percent": 96.4 },
+    "pending_cash":         { "current": 315000.0, "previous": 120000.0, "diff": 195000.0, "percent": 162.5 },
     "sales_count":          {}, "avg_check": {}, "subscription_mrr": {},
     "leads": {}, "requests": {}, "messages": {}, "avg_response_minutes": {}
   },

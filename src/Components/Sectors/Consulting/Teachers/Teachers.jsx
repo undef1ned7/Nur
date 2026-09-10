@@ -28,7 +28,11 @@ import { convertEmployeeAccessesToLabels } from "../../Barber/Masters/employeeAc
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import ConsultingShell from "../common/ConsultingShell";
 
-import { normalizeFunnelGrants } from "../../../../utils/consultingFunnelAccess";
+import {
+  normalizeFunnelGrants,
+  isConsultingRegionalSupervisor,
+} from "../../../../utils/consultingFunnelAccess";
+import useConsultingRegions from "../common/useConsultingRegions";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 const TEACHERS_NAV = [
@@ -106,6 +110,13 @@ const normalizeEmployee = (e = {}) => {
     role: e.role ?? null,
     custom_role: e.custom_role ?? null,
     role_display: e.role_display ?? "",
+    consulting_region_codes: Array.isArray(e.consulting_region_codes)
+      ? e.consulting_region_codes.map((x) => String(x).trim().toLowerCase())
+      : Array.isArray(e.consulting_regions)
+      ? e.consulting_regions.map((r) =>
+          String(r?.code ?? r).trim().toLowerCase(),
+        )
+      : [],
     commission_percent: Number.isFinite(pct) ? pct : 0,
   };
 };
@@ -117,8 +128,47 @@ const ruLabelSys = (code) => {
   const c = String(code || "").toLowerCase();
   if (c === "owner") return "Владелец";
   if (c === "admin") return "Администратор";
+  if (c === "supervisor") return "Руководитель региона";
+  if (c === "rop") return "РОП";
   return code || "";
 };
+
+/**
+ * Мультивыбор регионов для роли «Руководитель региона».
+ * Чистый компонент без хуков — рендерит чекбоксы по справочнику регионов.
+ */
+function RegionChecklist({ regions, value, onChange, disabled }) {
+  const selected = new Set(value || []);
+  const toggle = (code) => {
+    const next = new Set(selected);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
+    onChange(Array.from(next));
+  };
+  if (!regions.length) {
+    return (
+      <p className="Schoolteachers__hint">
+        Список регионов пуст. Сначала настройте региональные воронки
+        (Лиды → Распределение), затем назначайте руководителя.
+      </p>
+    );
+  }
+  return (
+    <div className="Schoolteachers__regionGrid">
+      {regions.map((r) => (
+        <label key={r.code} className="Schoolteachers__regionOpt">
+          <input
+            type="checkbox"
+            checked={selected.has(r.code)}
+            onChange={() => toggle(r.code)}
+            disabled={disabled}
+          />
+          <span>{r.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
 
 const sysCodeFromName = (name) => {
   const l = String(name || "")
@@ -193,8 +243,24 @@ function ConsultingSchoolTeachers() {
   const confirm = useConfirm();
   const alert = useAlert();
   const { company, profile, tariff } = useUser();
+
+  /* ===== регионы (руководитель заводит сотрудников в свой регион) ===== */
+  const regionCtl = useConsultingRegions(profile);
+  const isRegionalSupervisor = isConsultingRegionalSupervisor(profile);
+  const employeeRegionOptions = regionCtl.scopedRegions;
+  const navItems = useMemo(
+    () =>
+      isRegionalSupervisor
+        ? TEACHERS_NAV.filter((n) => n.value !== "roles")
+        : TEACHERS_NAV,
+    [isRegionalSupervisor],
+  );
+
   /* ===== tabs ===== */
-  const [tab, setTab] = useState("employees"); // 'employees' | 'roles' | 'rating'
+  const [tabState, setTab] = useState("employees"); // 'employees' | 'roles' | 'rating'
+  // Руководителю региона вкладка «Роли» недоступна — подменяем на «Сотрудники».
+  const tab =
+    isRegionalSupervisor && tabState === "roles" ? "employees" : tabState;
   // Открытая карточка сотрудника (ТЗ №6/№7): показатели, КПД и его финансы.
   const [cardEmployee, setCardEmployee] = useState(null);
 
@@ -231,6 +297,8 @@ function ConsultingSchoolTeachers() {
     last_name: "",
     roleChoice: "",
     commission_percent: "",
+    region_code: "",
+    region_codes: [],
   };
   const [empForm, setEmpForm] = useState(emptyEmp);
   const [openLogin, setOpenLogin] = useState(false);
@@ -255,6 +323,7 @@ function ConsultingSchoolTeachers() {
     last_name: "",
     roleChoice: "",
     commission_percent: "",
+    region_codes: [],
   };
   const [empEditForm, setEmpEditForm] = useState(emptyEmpEdit);
   const [empDeletingIds, setEmpDeletingIds] = useState(new Set());
@@ -558,11 +627,22 @@ function ConsultingSchoolTeachers() {
     return m;
   }, [roles]);
 
+  // «Руководитель региона» доступен owner/admin, если в компании есть регионы
+  // (или уже есть сотрудник с этой ролью — чтобы его можно было открыть на
+  // редактирование, пока справочник регионов ещё грузится).
+  const canAssignSupervisor =
+    regionCtl.isManager &&
+    (regionCtl.regions.length > 0 ||
+      employees.some((e) => String(e.role).toLowerCase() === "supervisor"));
+
   const roleOptions = useMemo(() => {
     const sys = SYSTEM_ROLES.map((code) => ({
       key: `sys:${code}`,
       label: ruLabelSys(code),
     }));
+    if (canAssignSupervisor) {
+      sys.push({ key: "sys:supervisor", label: ruLabelSys("supervisor") });
+    }
     const cus = roles
       .filter((r) => !sysCodeFromName(r.name))
       .map((r) => ({ key: `cus:${r.id}`, label: String(r.name || "").trim() }));
@@ -576,7 +656,7 @@ function ConsultingSchoolTeachers() {
       }
     }
     return out.sort((a, b) => a.label.localeCompare(b.label, "ru"));
-  }, [roles]);
+  }, [roles, canAssignSupervisor]);
 
   const roleChoiceKeys = useMemo(
     () => new Set(roleOptions.map((o) => o.key)),
@@ -760,15 +840,30 @@ function ConsultingSchoolTeachers() {
     const roleChoice = empForm.roleChoice;
     const pctParsed = parsePercent(empForm.commission_percent);
 
-    if (!email || !first_name || !last_name || !roleChoice)
-      return setEmpErr("Заполните Email, Имя, Фамилию и выберите роль.");
+    // Руководитель региона: роль всегда «продавец», регион обязателен.
+    const forcedRegion =
+      isRegionalSupervisor && employeeRegionOptions.length === 1
+        ? employeeRegionOptions[0].code
+        : empForm.region_code;
+
+    if (!email || !first_name || !last_name)
+      return setEmpErr("Заполните Email, Имя и Фамилию.");
+    if (!isRegionalSupervisor && !roleChoice)
+      return setEmpErr("Выберите роль.");
     if (!isEmailValid(email)) return setEmpErr("Неверный формат e-mail.");
     if (isEmailDuplicate(email))
       return setEmpErr("Сотрудник с таким e-mail уже существует.");
     if (!isHumanName(first_name) || !isHumanName(last_name))
       return setEmpErr("Имя и Фамилия: 2–60 символов (буквы, пробел, ' -).");
-    if (!roleChoiceKeys.has(roleChoice))
+    if (!isRegionalSupervisor && !roleChoiceKeys.has(roleChoice))
       return setEmpErr("Выберите доступную роль.");
+    if (isRegionalSupervisor && employeeRegionOptions.length > 1 && !forcedRegion)
+      return setEmpErr("Выберите регион сотрудника.");
+    // owner/admin создаёт руководителя региона — нужен хотя бы один регион.
+    const isSupervisorChoice =
+      !isRegionalSupervisor && roleChoice === "sys:supervisor";
+    if (isSupervisorChoice && !empForm.region_codes.length)
+      return setEmpErr("Выберите хотя бы один регион для руководителя.");
     if (pctParsed === null)
       return setEmpErr("Процент должен быть числом от 0 до 100.");
 
@@ -784,12 +879,24 @@ function ConsultingSchoolTeachers() {
       commission: commissionValue,
       ...accessDefaults,
     };
-    if (roleChoice.startsWith("sys:")) {
+    if (isRegionalSupervisor) {
+      // Бэк всё равно клампит (см. 12-regional-supervisor-rbac.md §6),
+      // но шлём корректно и с фронта.
+      payload.role = "salesperson";
+      payload.custom_role = null;
+    } else if (roleChoice.startsWith("sys:")) {
       payload.role = roleChoice.slice(4);
       payload.custom_role = null;
     } else if (roleChoice.startsWith("cus:")) {
       payload.custom_role = roleChoice.slice(4);
       payload.role = null;
+    }
+    if (isSupervisorChoice) {
+      // роль «supervisor» уже проставлена из sys:-ветки выше; регионы — из формы
+      payload.consulting_region_codes = empForm.region_codes;
+    } else if (forcedRegion) {
+      payload.region_code = forcedRegion;
+      payload.consulting_region_codes = [forcedRegion];
     }
 
     setEmpSaving(true);
@@ -840,6 +947,9 @@ function ConsultingSchoolTeachers() {
       roleChoice: toRoleChoice(u),
       commission_percent:
         u.commission_percent != null ? String(u.commission_percent) : "",
+      region_codes: Array.isArray(u.consulting_region_codes)
+        ? u.consulting_region_codes.map((x) => String(x).toLowerCase())
+        : [],
     });
     setEmpEditOpen(true);
   };
@@ -865,6 +975,9 @@ function ConsultingSchoolTeachers() {
       );
     if (!roleChoiceKeys.has(roleChoice))
       return setEmpEditErr("Выберите доступную роль.");
+    const isSupervisorChoice = roleChoice === "sys:supervisor";
+    if (isSupervisorChoice && !empEditForm.region_codes.length)
+      return setEmpEditErr("Выберите хотя бы один регион для руководителя.");
     if (pctParsed === null)
       return setEmpEditErr("Процент должен быть числом от 0 до 100.");
 
@@ -882,6 +995,12 @@ function ConsultingSchoolTeachers() {
     } else if (roleChoice.startsWith("cus:")) {
       payload.custom_role = roleChoice.slice(4);
       payload.role = null;
+    }
+    if (isSupervisorChoice) {
+      payload.consulting_region_codes = empEditForm.region_codes;
+    } else if (empEditForm.region_codes.length) {
+      // роль больше не «руководитель» — снимаем региональную привязку
+      payload.consulting_region_codes = [];
     }
 
     setEmpEditSaving(true);
@@ -933,7 +1052,7 @@ function ConsultingSchoolTeachers() {
         eyebrow="Консалтинг · Команда"
         title="Сотрудники"
         subtitle="Роли, сотрудники и рейтинг эффективности"
-        nav={TEACHERS_NAV}
+        nav={navItems}
         navValue="employees"
         onNavChange={(v) => {
           setCardEmployee(null);
@@ -956,7 +1075,7 @@ function ConsultingSchoolTeachers() {
       eyebrow="Консалтинг · Команда"
       title="Сотрудники"
       subtitle="Роли, сотрудники и рейтинг эффективности"
-      nav={TEACHERS_NAV}
+      nav={navItems}
       navValue={tab}
       onNavChange={setTab}
       headerActions={
@@ -1119,6 +1238,13 @@ function ConsultingSchoolTeachers() {
             const deleting = empDeletingIds.has(u.id);
             const pct =
               u.commission_percent != null ? `${u.commission_percent}%` : "—%";
+            const regionText =
+              String(u.role).toLowerCase() === "supervisor" &&
+              u.consulting_region_codes?.length
+                ? u.consulting_region_codes
+                    .map((c) => regionCtl.regionLabel(c))
+                    .join(", ")
+                : "";
 
             return (
               <div key={u.id} className="Schoolteachers__card">
@@ -1134,6 +1260,12 @@ function ConsultingSchoolTeachers() {
                       <span>{u.email || "—"}</span>
                       <span>•</span>
                       <span>{roleLabel}</span>
+                      {regionText ? (
+                        <>
+                          <span>•</span>
+                          <span>Регионы: {regionText}</span>
+                        </>
+                      ) : null}
                       <span>•</span>
                       <span>Комиссия: {pct}</span>
                     </div>
@@ -1436,26 +1568,107 @@ function ConsultingSchoolTeachers() {
                   />
                 </div>
 
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Роль <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <select
-                    className="Schoolteachers__input"
-                    value={empForm.roleChoice}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, roleChoice: e.target.value }))
-                    }
-                    required
-                  >
-                    <option value="">Выберите роль</option>
-                    {roleOptions.map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {isRegionalSupervisor ? (
+                  <div className="Schoolteachers__field Schoolteachers__field--full">
+                    <label className="Schoolteachers__label">Роль</label>
+                    <input
+                      className="Schoolteachers__input"
+                      value="Продавец"
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                ) : (
+                  <div className="Schoolteachers__field Schoolteachers__field--full">
+                    <label className="Schoolteachers__label">
+                      Роль <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <select
+                      className="Schoolteachers__input"
+                      value={empForm.roleChoice}
+                      onChange={(e) =>
+                        setEmpForm((p) => ({ ...p, roleChoice: e.target.value }))
+                      }
+                      required
+                    >
+                      <option value="">Выберите роль</option>
+                      {roleOptions.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* owner/admin создаёт руководителя региона — мультивыбор регионов */}
+                {!isRegionalSupervisor &&
+                  empForm.roleChoice === "sys:supervisor" && (
+                    <div className="Schoolteachers__field Schoolteachers__field--full">
+                      <label className="Schoolteachers__label">
+                        Регионы руководителя{" "}
+                        <span className="Schoolteachers__req">*</span>
+                      </label>
+                      <RegionChecklist
+                        regions={regionCtl.regions}
+                        value={empForm.region_codes}
+                        onChange={(region_codes) =>
+                          setEmpForm((p) => ({ ...p, region_codes }))
+                        }
+                        disabled={empSaving}
+                      />
+                      <p className="Schoolteachers__hint">
+                        Руководитель увидит лиды, воронки и сотрудников только
+                        выбранных регионов и сможет заводить в них продавцов.
+                      </p>
+                    </div>
+                  )}
+
+                {/* Регион (руководитель заводит сотрудника в свой регион) */}
+                {employeeRegionOptions.length > 0 &&
+                  (isRegionalSupervisor || regionCtl.isManager) &&
+                  empForm.roleChoice !== "sys:supervisor" && (
+                    <div className="Schoolteachers__field Schoolteachers__field--full">
+                      <label className="Schoolteachers__label">
+                        Регион
+                        {isRegionalSupervisor &&
+                        employeeRegionOptions.length > 1 ? (
+                          <span className="Schoolteachers__req">*</span>
+                        ) : null}
+                      </label>
+                      {isRegionalSupervisor &&
+                      employeeRegionOptions.length === 1 ? (
+                        <input
+                          className="Schoolteachers__input"
+                          value={employeeRegionOptions[0].label}
+                          disabled
+                          readOnly
+                        />
+                      ) : (
+                        <select
+                          className="Schoolteachers__input"
+                          value={empForm.region_code}
+                          onChange={(e) =>
+                            setEmpForm((p) => ({
+                              ...p,
+                              region_code: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">
+                            {isRegionalSupervisor
+                              ? "Выберите регион"
+                              : "Без региона"}
+                          </option>
+                          {employeeRegionOptions.map((r) => (
+                            <option key={r.code} value={r.code}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
 
                 {/* % от продажи */}
                 <div className="Schoolteachers__field Schoolteachers__field--full">
@@ -1623,6 +1836,27 @@ function ConsultingSchoolTeachers() {
                     ))}
                   </select>
                 </div>
+
+                {empEditForm.roleChoice === "sys:supervisor" && (
+                  <div className="Schoolteachers__field Schoolteachers__field--full">
+                    <label className="Schoolteachers__label">
+                      Регионы руководителя{" "}
+                      <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <RegionChecklist
+                      regions={regionCtl.regions}
+                      value={empEditForm.region_codes}
+                      onChange={(region_codes) =>
+                        setEmpEditForm((p) => ({ ...p, region_codes }))
+                      }
+                      disabled={empEditSaving}
+                    />
+                    <p className="Schoolteachers__hint">
+                      Руководитель увидит лиды, воронки и сотрудников только
+                      выбранных регионов.
+                    </p>
+                  </div>
+                )}
 
                 {/* % от продажи */}
                 <div className="Schoolteachers__field Schoolteachers__field--full">

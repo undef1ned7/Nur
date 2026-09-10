@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { areNotificationsEnabled } from '../../../config/notificationPreferences';
 
 export default function NotificationCafeSound({
     notificationKey,
@@ -79,6 +80,7 @@ export default function NotificationCafeSound({
 
     // Основной эффект воспроизведения
     useEffect(() => {
+        if (!areNotificationsEnabled()) return;
         if (!activeAudioRef?.current) return;
 
         // Пропускаем первый вызов
@@ -114,6 +116,7 @@ export default function NotificationCafeSound({
     }, [notificationKey, audioUnlocked, activeAudioRef]);
 
     useEffect(() => {
+        if (!areNotificationsEnabled()) return;
         if (!notification) return;
 
         // Дедуп: если ключ тот же — не добавляем второй тост

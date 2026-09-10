@@ -1,5 +1,13 @@
 // src/Components/Sectors/Consulting/Funnel/Funnel.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  startTransition,
+} from "react";
+import { createPortal } from "react-dom";
 import "./Funnel.scss";
 import { useDispatch } from "react-redux";
 import {
@@ -44,13 +52,27 @@ import { useFunnelBoardWebSocket } from "../../../../hooks/useFunnelBoardWebSock
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
+  canCreateConsultingFunnel,
   canManageLeadsInFunnel,
   canViewConsultingFunnel,
   filterFunnelsForUser,
+  getUserRegionCodes,
   isConsultingFunnelManager,
+  resolveFunnelRegionCode,
+  shouldIsolateConsultingByOwner,
 } from "../../../../utils/consultingFunnelAccess";
 import {
+  buildFunnelTree,
+  resolveTopFunnel,
+  sumChildLeadCounts,
+} from "../../../../utils/consultingFunnelTree";
+import useConsultingRegions from "../common/useConsultingRegions";
+import RegionFilter from "../common/RegionFilter";
+import { TENANT_PROVISION_LABELS } from "../../../../utils/consultingMoney";
+import {
   getFunnelDisplayName,
+  getFunnelOwnerUserName,
+  getFunnelParentId,
   isProtectedFunnel,
   isSystemStage,
   isCompletedStage,
@@ -66,8 +88,15 @@ import {
   isLeadOwner,
   resolveCurrentUserId,
 } from "../../../../utils/consultingFunnelLeadUtils";
-import { calcConsultingSaleTotal, formatTariffSubscription, resolveTariffPrice } from "../../../../utils/consultingSalePricing";
-import { ensurePushPermission, useConsultingRealtime } from "../common/useConsultingRealtime";
+import {
+  calcConsultingSaleTotal,
+  formatTariffSubscription,
+  resolveTariffPrice,
+} from "../../../../utils/consultingSalePricing";
+import {
+  ensurePushPermission,
+  useConsultingRealtime,
+} from "../common/useConsultingRealtime";
 import {
   consultingChatPath,
   CRM_CHAT_CHANNELS,
@@ -99,6 +128,7 @@ import {
   listWazzupChats,
   normalizeChatMessage,
 } from "../../../../api/consultingWazzup";
+import { ensureInboundLeadForFunnelLead } from "../../../../api/consultingLeads";
 
 // Персональное событие воронки: lead.assigned (Wazzup) и consulting.lead.*.
 const isFunnelLeadEvent = isConsultingFunnelRealtimeEvent;
@@ -110,6 +140,23 @@ const isFunnelLeadEvent = isConsultingFunnelRealtimeEvent;
  * move-stage) работает всегда. По умолчанию выключено — на проде этих URL ещё нет.
  */
 const FUNNEL_V2 = import.meta.env.VITE_FUNNEL_V2 === "true";
+
+/**
+ * Есть ли в воронке WON/финальная стадия. Нужно, чтобы не дёргать `win`
+ * там, где бэк ответит `400 «В воронке нет WON-стадии»` (например
+ * региональные воронки, созданные без системных стадий).
+ */
+const funnelHasWonStage = (funnel, board) => {
+  const stages =
+    (Array.isArray(funnel?.stages) && funnel.stages.length && funnel.stages) ||
+    (board?.columns || []).map((c) => c.stage).filter(Boolean);
+  return stages.some(
+    (s) =>
+      s?.stage_type === "won" ||
+      s?.system_key === "completed" ||
+      s?.is_success === true,
+  );
+};
 
 /* ===================== справочники ===================== */
 const STATUS_LABELS = {
@@ -168,14 +215,18 @@ const fmtDate = (v) => {
 // краткая сумма: 50000 -> «50 тыс», 1250000 -> «1.25 млн»
 const fmtMoneyShort = (v) => {
   const n = Number(v) || 0;
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n % 1_000_000 ? 2 : 0) + " млн";
+  if (n >= 1_000_000)
+    return (n / 1_000_000).toFixed(n % 1_000_000 ? 2 : 0) + " млн";
   if (n >= 1_000) return Math.round(n / 1000) + " тыс";
   return String(n);
 };
 
 // инициалы для аватара владельца
 const initials = (name) => {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (!parts.length) return "—";
   return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
 };
@@ -213,28 +264,57 @@ const errToText = (err, fallback = "Что-то пошло не так.") => {
   return parts.join("\n") || fallback;
 };
 
+/**
+ * Порталит переданные элементы в слот глобального хедера (#header-actions-slot).
+ * Слот отрисовывает <Header>, поэтому кнопки появляются в шапке только пока
+ * смонтирована эта страница.
+ */
+function HeaderActionsPortal({ children }) {
+  // Хедер смонтирован выше Outlet, поэтому слот уже есть в DOM к моменту
+  // рендера страницы (она подгружается лениво через React.lazy).
+  const slot =
+    typeof document !== "undefined"
+      ? document.getElementById("header-actions-slot")
+      : null;
+  return slot ? createPortal(children, slot) : null;
+}
+
 /* ===================== главный экран ===================== */
 export default function ConsultingFunnel() {
   const dispatch = useDispatch();
   const confirm = useConfirm();
   const { profile } = useUser();
   const isManager = isConsultingFunnelManager(profile);
+  const canCreateFunnel = canCreateConsultingFunnel(profile);
+  const isolateByOwner = shouldIsolateConsultingByOwner(profile);
   const [searchParams, setSearchParams] = useSearchParams();
   const leadFromUrl = searchParams.get("lead");
   const tabFromUrl = searchParams.get("tab");
   const canViewFunnel = canViewConsultingFunnel(profile);
 
-  const {
-    funnels = [],
-    loading,
-    error,
-    allowedTransitions,
-  } = useFunnel();
+  const { funnels = [], loading, error, allowedTransitions } = useFunnel();
 
-  const visibleFunnels = useMemo(
-    () => filterFunnelsForUser(funnels, profile),
-    [funnels, profile]
+  const regionCtl = useConsultingRegions(profile);
+  const [regionFilterRaw, setRegionFilter] = useState("");
+  // supervisor с одним регионом — фильтр зафиксирован на его регионе.
+  const regionFilter = regionCtl.fixedRegionCode || regionFilterRaw;
+
+  // Регион текущего сотрудника — к нему бэкенд привяжет созданную им воронку.
+  const myRegionCode = useMemo(
+    () => getUserRegionCodes(profile)[0] || "",
+    [profile],
   );
+  const myRegionLabel = myRegionCode ? regionCtl.regionLabel(myRegionCode) : "";
+
+  const visibleFunnels = useMemo(() => {
+    const base = filterFunnelsForUser(funnels, profile);
+    if (!regionFilter) return base;
+    return base.filter((f) => {
+      const rc = resolveFunnelRegionCode(f);
+      // воронки без региона (главная, «Внедрение») показываем всегда
+      return !rc || rc === regionFilter;
+    });
+  }, [funnels, profile, regionFilter]);
 
   const visibleFunnelIdsKey = useMemo(
     () =>
@@ -266,14 +346,10 @@ export default function ConsultingFunnel() {
     return "mine";
   });
 
-  // Сотрудник не видит чужие лиды — только «Мои» (+ «Пул» для claim).
-  const effectiveOwnerScope = isManager
-    ? ownerScope
-    : ownerScope === "pool"
-      ? "pool"
-      : "mine";
+  // Продавец видит только свои лиды — без «Все» и без пула чужих заявок.
+  const effectiveOwnerScope = isManager ? ownerScope : "mine";
 
-  if (!isManager && ownerScope === "all") {
+  if (!isManager && ownerScope !== "mine") {
     setOwnerScope("mine");
     try {
       localStorage.setItem("consulting_funnel_scope_v1", "mine");
@@ -294,6 +370,14 @@ export default function ConsultingFunnel() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
   const [unreadByLeadId, setUnreadByLeadId] = useState({});
+  // Активная воронка (одна на весь экран, переключение вкладками сверху).
+  const [activeFunnelId, setActiveFunnelId] = useState(() => {
+    try {
+      return localStorage.getItem("consulting_funnel_active_v1") || "";
+    } catch {
+      return "";
+    }
+  });
   const leadModalRef = useRef(null);
   const funnelChatMessageHandlerRef = useRef(null);
   const deeplinkFetchRef = useRef("");
@@ -304,8 +388,13 @@ export default function ConsultingFunnel() {
   // Порядок воронок per-user. Источник истины — сервер (user-preferences),
   // localStorage используется как кэш и fallback при отсутствии эндпоинта (404).
   const [funnelOrderIds, setFunnelOrderIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("consulting_funnel_order_v1") || "[]"); }
-    catch { return []; }
+    try {
+      return JSON.parse(
+        localStorage.getItem("consulting_funnel_order_v1") || "[]",
+      );
+    } catch {
+      return [];
+    }
   });
 
   // При загрузке тянем серверный порядок; пустой ответ/404 — оставляем localStorage.
@@ -396,61 +485,60 @@ export default function ConsultingFunnel() {
     );
   };
 
-  const { isConnected, userId: wsUserId, isManager: wsIsManager } =
-    useFunnelBoardWebSocket({
-      funnelIdsKey: visibleFunnelIdsKey,
-      enabled: !!visibleFunnelIdsKey,
-      onUpsert: (lead) => {
-        if (!lead?.id) return;
-        if (lead.funnel) {
-          setBoardsMap((prev) => ({
-            ...prev,
-            [lead.funnel]: upsertLeadOnBoardMap(prev[lead.funnel], lead),
-          }));
-          return;
-        }
-        // lead.updated / in_work без funnel — найти доску и смержить статус
-        setBoardsMap((prev) => {
-          for (const key of Object.keys(prev)) {
-            if (findLeadOnBoard(prev[key], lead.id)) {
-              return {
-                ...prev,
-                [key]: upsertLeadOnBoardMap(prev[key], lead),
-              };
-            }
+  const { userId: wsUserId, isManager: wsIsManager } = useFunnelBoardWebSocket({
+    funnelIdsKey: visibleFunnelIdsKey,
+    enabled: !!visibleFunnelIdsKey,
+    onUpsert: (lead) => {
+      if (!lead?.id) return;
+      if (lead.funnel) {
+        setBoardsMap((prev) => ({
+          ...prev,
+          [lead.funnel]: upsertLeadOnBoardMap(prev[lead.funnel], lead),
+        }));
+        return;
+      }
+      // lead.updated / in_work без funnel — найти доску и смержить статус
+      setBoardsMap((prev) => {
+        for (const key of Object.keys(prev)) {
+          if (findLeadOnBoard(prev[key], lead.id)) {
+            return {
+              ...prev,
+              [key]: upsertLeadOnBoardMap(prev[key], lead),
+            };
           }
-          return prev;
-        });
-      },
-      onRemove: (data) => {
-        const fid = data?.funnel || data?.funnel_id;
-        const lid = data?.id;
-        if (!lid) return;
-        if (fid) {
-          setBoardsMap((prev) => ({
-            ...prev,
-            [fid]: removeLeadFromBoardMap(prev[fid], lid),
-          }));
-          return;
         }
-        setBoardsMap((prev) => {
-          const next = { ...prev };
-          for (const key of Object.keys(next)) {
-            next[key] = removeLeadFromBoardMap(next[key], lid);
-          }
-          return next;
-        });
-      },
-      onAssigned: (lead) =>
-        setNotice(`Вам назначен лид: ${lead?.title || "без названия"}`),
-      onReconnect: refreshAllBoards,
-      onChatMessage: (frame) => {
-        const type = String(frame?.type || "").toLowerCase();
-        if (type !== "new_message") return;
-        const data = frame?.data || frame?.payload || frame;
-        funnelChatMessageHandlerRef.current?.(data);
-      },
-    });
+        return prev;
+      });
+    },
+    onRemove: (data) => {
+      const fid = data?.funnel || data?.funnel_id;
+      const lid = data?.id;
+      if (!lid) return;
+      if (fid) {
+        setBoardsMap((prev) => ({
+          ...prev,
+          [fid]: removeLeadFromBoardMap(prev[fid], lid),
+        }));
+        return;
+      }
+      setBoardsMap((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(next)) {
+          next[key] = removeLeadFromBoardMap(next[key], lid);
+        }
+        return next;
+      });
+    },
+    onAssigned: (lead) =>
+      setNotice(`Вам назначен лид: ${lead?.title || "без названия"}`),
+    onReconnect: refreshAllBoards,
+    onChatMessage: (frame) => {
+      const type = String(frame?.type || "").toLowerCase();
+      if (type !== "new_message") return;
+      const data = frame?.data || frame?.payload || frame;
+      funnelChatMessageHandlerRef.current?.(data);
+    },
+  });
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -525,7 +613,12 @@ export default function ConsultingFunnel() {
       const kept = prev.filter((id) => currentIds.includes(id));
       const added = currentIds.filter((id) => !kept.includes(id));
       const next = [...kept, ...added];
-      try { localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(next)); } catch {}
+      try {
+        localStorage.setItem(
+          "consulting_funnel_order_v1",
+          JSON.stringify(next),
+        );
+      } catch {}
       return next;
     });
   }, [visibleFunnels]);
@@ -537,28 +630,99 @@ export default function ConsultingFunnel() {
       .filter(Boolean);
   }, [funnelOrderIds, visibleFunnels]);
 
+  const funnelFromUrl = searchParams.get("funnel");
+
+  // Дерево воронок: региональные (корневые) воронки + подворонки сотрудников,
+  // привязанные к ним через parent_funnel.
+  const funnelTree = useMemo(
+    () => buildFunnelTree(visibleFunnels),
+    [visibleFunnels],
+  );
+
+  // Верхний ряд вкладок — только корневые воронки, в пользовательском порядке.
+  const topFunnels = useMemo(() => {
+    const roots = funnelTree.roots;
+    if (!funnelOrderIds.length) return roots;
+    const ordered = funnelOrderIds
+      .map((id) => roots.find((f) => String(f.id) === id))
+      .filter(Boolean);
+    const rest = roots.filter((f) => !funnelOrderIds.includes(String(f.id)));
+    return [...ordered, ...rest];
+  }, [funnelTree, funnelOrderIds]);
+
+  const activeFunnel = useMemo(() => {
+    if (!sortedFunnels.length) return null;
+    return (
+      sortedFunnels.find((f) => String(f.id) === String(activeFunnelId)) ||
+      sortedFunnels.find((f) => String(f.id) === String(funnelFromUrl)) ||
+      topFunnels[0] ||
+      sortedFunnels[0]
+    );
+  }, [sortedFunnels, topFunnels, activeFunnelId, funnelFromUrl]);
+
+  // Корневая (региональная) воронка активной вкладки и её подворонки сотрудников.
+  const activeTopFunnel = useMemo(
+    () =>
+      activeFunnel ? resolveTopFunnel(activeFunnel, funnelTree.byId) : null,
+    [activeFunnel, funnelTree],
+  );
+
+  const activeSubFunnels = useMemo(
+    () =>
+      activeTopFunnel
+        ? funnelTree.childrenByParent.get(String(activeTopFunnel.id)) || []
+        : [],
+    [activeTopFunnel, funnelTree],
+  );
+
+  const selectFunnel = useCallback(
+    (id) => {
+      const sid = String(id);
+      setActiveFunnelId(sid);
+      try {
+        localStorage.setItem("consulting_funnel_active_v1", sid);
+      } catch {
+        /* ignore */
+      }
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("funnel", sid);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   // Переупорядочивание воронок — на pointer-событиях (см. usePointerReorder).
-  // Порядок засеивается из текущего видимого порядка (sortedFunnels), иначе при
-  // пустом localStorage indexOf вернул бы -1 и перестановка не применилась бы.
+  // Порядок засеивается из текущего видимого порядка верхних вкладок
+  // (topFunnels), подворонки сотрудников в ряд вкладок не входят.
   const handleFunnelReorder = useCallback(
     (dragId, targetId) => {
       if (!dragId || dragId === targetId) return;
       setFunnelOrderIds(() => {
-        const ids = sortedFunnels.map((f) => String(f.id));
+        const ids = topFunnels.map((f) => String(f.id));
         const from = ids.indexOf(String(dragId));
         const to = ids.indexOf(String(targetId));
         if (from === -1 || to === -1) return ids;
         ids.splice(from, 1);
         ids.splice(to, 0, String(dragId));
         try {
-          localStorage.setItem("consulting_funnel_order_v1", JSON.stringify(ids));
-        } catch { /* localStorage недоступен — порядок не сохранится, не критично */ }
+          localStorage.setItem(
+            "consulting_funnel_order_v1",
+            JSON.stringify(ids),
+          );
+        } catch {
+          /* localStorage недоступен — порядок не сохранится, не критично */
+        }
         // Сохраняем на сервер (per-user). Ошибку/404 игнорируем — localStorage кэш.
         dispatch(saveFunnelOrder(ids));
         return ids;
       });
     },
-    [sortedFunnels, dispatch]
+    [topFunnels, dispatch],
   );
 
   const {
@@ -566,7 +730,7 @@ export default function ConsultingFunnel() {
     overId: funnelDragOverId,
     onHandlePointerDown: onFunnelHandlePointerDown,
   } = usePointerReorder({
-    itemSelector: ".funnel__row",
+    itemSelector: ".funnel__ftab",
     idAttr: "data-funnel-id",
     onReorder: handleFunnelReorder,
   });
@@ -589,7 +753,11 @@ export default function ConsultingFunnel() {
   }, [boardsMap]);
 
   const myUserId =
-    wsUserId || profile?.id || profile?.user_id || localStorage.getItem("userId") || "";
+    wsUserId ||
+    profile?.id ||
+    profile?.user_id ||
+    localStorage.getItem("userId") ||
+    "";
 
   const persistOwnerScope = useCallback(
     (next) => {
@@ -653,8 +821,7 @@ export default function ConsultingFunnel() {
   );
 
   const matchLead = useMemo(
-    () => (lead) =>
-      inScope(lead, effectiveOwnerScope) && matchLeadBase(lead),
+    () => (lead) => inScope(lead, effectiveOwnerScope) && matchLeadBase(lead),
     [inScope, effectiveOwnerScope, matchLeadBase],
   );
 
@@ -728,8 +895,16 @@ export default function ConsultingFunnel() {
     }».`;
 
     const alreadyMoved =
-      movedLead?.funnel &&
-      String(movedLead.funnel) !== String(funnel.id);
+      movedLead?.funnel && String(movedLead.funnel) !== String(funnel.id);
+
+    // Без WON-стадии `win` вернёт 400 — перенос делает бэк либо оператор вручную.
+    if (!alreadyMoved && !funnelHasWonStage(funnel, boardsMap[funnel.id])) {
+      await refreshAllBoards();
+      setNotice(
+        `Лид отмечен как завершённый. ${movedText} Если он не переехал — перенесите вручную.`,
+      );
+      return;
+    }
 
     try {
       if (!alreadyMoved) {
@@ -753,10 +928,10 @@ export default function ConsultingFunnel() {
     const funnel = visibleFunnels.find((f) => f.id === funnelId);
     if (!board || !funnel || !canManageLeadsInFunnel(profile, funnel)) return;
 
-    const lead =
-      [...(board.columns || []).flatMap((c) => c.leads || []), ...(board.unassigned || [])].find(
-        (l) => l.id === leadId,
-      );
+    const lead = [
+      ...(board.columns || []).flatMap((c) => c.leads || []),
+      ...(board.unassigned || []),
+    ].find((l) => l.id === leadId);
     if (lead && !canDragLead(lead, board, profile, true, myUserId)) {
       setNotice(
         lead.owner && !isLeadOwner(lead, myUserId) && !isManager
@@ -788,7 +963,7 @@ export default function ConsultingFunnel() {
         }
       } else {
         await dispatch(
-          updateLead({ id: leadId, data: { stage: null } })
+          updateLead({ id: leadId, data: { stage: null } }),
         ).unwrap();
       }
     } catch (e) {
@@ -804,6 +979,7 @@ export default function ConsultingFunnel() {
 
   const openLeadModal = useCallback(
     (funnelId, leadId, tab) => {
+      if (funnelId) setActiveFunnelId(String(funnelId));
       setLeadModal({
         funnelId,
         leadId,
@@ -888,6 +1064,7 @@ export default function ConsultingFunnel() {
     }
 
     if (foundFunnelId) {
+      setActiveFunnelId(String(foundFunnelId));
       setLeadModal({
         funnelId: foundFunnelId,
         leadId: leadFromUrl,
@@ -916,6 +1093,7 @@ export default function ConsultingFunnel() {
           data.funnel_id ||
           (visibleFunnels[0] && visibleFunnels[0].id);
         if (!funnelId) return;
+        setActiveFunnelId(String(funnelId));
         setLeadModal({
           funnelId: String(funnelId),
           leadId: leadFromUrl,
@@ -998,7 +1176,7 @@ export default function ConsultingFunnel() {
     : null;
   const activeLeadStages = (activeLeadBoard?.columns || []).map((c) => c.stage);
   const activeLeadFunnel = visibleFunnels.find(
-    (f) => f.id === activeLeadModalFunnelId
+    (f) => f.id === activeLeadModalFunnelId,
   );
   const activeLeadCanManage = canManageLeadsInFunnel(profile, activeLeadFunnel);
 
@@ -1018,88 +1196,73 @@ export default function ConsultingFunnel() {
 
   return (
     <section className="funnel">
-      <header className="funnel__header">
-        <div>
-          <p className="funnel__eyebrow">Консалтинг · Воронка</p>
-          <h2 className="funnel__title">Воронка продаж</h2>
-          <p className="funnel__subtitle">
-            {visibleFunnels.length
-              ? `${visibleFunnels.length} воронок с доступом`
-              : "Канбан-доска лидов"}
-            {visibleFunnelIdsKey && (
-              <span
-                className={`funnel__live${isConnected ? " funnel__live--on" : ""}`}
-                title={
-                  isConnected
-                    ? "Обновления в реальном времени"
-                    : "Подключение к обновлениям…"
-                }
-              >
-                {isConnected ? "● Live" : "○ …"}
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div className="funnel__actions">
+      {/* Действия страницы вынесены в глобальный хедер (только для этой страницы). */}
+      <HeaderActionsPortal>
+        <div className="funnelHeaderActions">
           <button
             type="button"
-            className="funnel__btn"
+            className="funnelHeaderActions__btn"
             onClick={() => setArchiveOpen(true)}
           >
             Архив
           </button>
-          {isManager && (
-            <button className="funnel__btn" onClick={() => setFunnelFormOpen(true)}>
+          {canCreateFunnel && (
+            <button
+              type="button"
+              className="funnelHeaderActions__btn funnelHeaderActions__btn--primary"
+              onClick={() => setFunnelFormOpen(true)}
+            >
               + Воронка
             </button>
           )}
         </div>
-      </header>
+      </HeaderActionsPortal>
 
       {!!error && <div className="funnel__error">{errToText(error)}</div>}
       {!!notice && <div className="funnel__notice">{notice}</div>}
 
       {visibleFunnels.length > 0 && (
         <div className="funnel__toolbar">
-          <div className="funnel__scope" role="group" aria-label="Чьи лиды">
-            {(isManager
-              ? [
-                  { id: "mine", label: "Мои" },
-                  { id: "all", label: "Все" },
-                  { id: "pool", label: "Пул" },
-                ]
-              : [
-                  { id: "mine", label: "Мои" },
-                  { id: "pool", label: "Пул" },
-                ]
-            ).map((s) => {
-              const count = scopeCounts[s.id] || 0;
-              const highlight = s.id === "pool" && count > 0;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`funnel__scopeBtn${
-                    effectiveOwnerScope === s.id
-                      ? " funnel__scopeBtn--active"
-                      : ""
-                  }`}
-                  onClick={() => persistOwnerScope(s.id)}
-                  title={`${s.label}: ${count}`}
-                >
-                  {s.label}
-                  <span
-                    className={`funnel__scopeCount${
-                      highlight ? " funnel__scopeCount--alert" : ""
+          {isManager ? (
+            <div className="funnel__scope" role="group" aria-label="Чьи лиды">
+              {[
+                { id: "mine", label: "Мои" },
+                { id: "all", label: "Все" },
+                { id: "pool", label: "Пул" },
+              ].map((s) => {
+                const count = scopeCounts[s.id] || 0;
+                const highlight = s.id === "pool" && count > 0;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`funnel__scopeBtn${
+                      effectiveOwnerScope === s.id
+                        ? " funnel__scopeBtn--active"
+                        : ""
                     }`}
+                    onClick={() => persistOwnerScope(s.id)}
+                    title={`${s.label}: ${count}`}
                   >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    {s.label}
+                    <span
+                      className={`funnel__scopeCount${
+                        highlight ? " funnel__scopeCount--alert" : ""
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="funnel__scopeHint">
+              {isolateByOwner
+                ? "Показаны только лиды, где вы ответственный"
+                : "Мои лиды"}
+            </p>
+          )}
 
           <div className="funnel__searchWrap">
             <span className="funnel__searchIcon" aria-hidden>
@@ -1121,6 +1284,19 @@ export default function ConsultingFunnel() {
               </button>
             )}
           </div>
+
+          {!regionCtl.fixedRegionCode &&
+            (regionCtl.scopedRegions.length > 1 ||
+              (regionCtl.allowAllRegions && regionCtl.regions.length > 0)) && (
+              <RegionFilter
+                regions={regionCtl.regions}
+                scopedRegions={regionCtl.scopedRegions}
+                value={regionFilter}
+                onChange={setRegionFilter}
+                allowAll={regionCtl.allowAllRegions}
+                size="sm"
+              />
+            )}
 
           {isManager && owners.length > 1 && (
             <select
@@ -1185,56 +1361,196 @@ export default function ConsultingFunnel() {
         <div className="funnel__placeholder">Загрузка…</div>
       ) : !visibleFunnels.length ? (
         <div className="funnel__placeholder">
-          {isManager
+          {canCreateFunnel
             ? "Создайте воронку, чтобы начать работу."
             : "Нет доступных воронок. Обратитесь к администратору."}
         </div>
       ) : (
-        <div className="funnel__rows">
-          {sortedFunnels.map((f) => (
-            <FunnelBoardRow
-              key={f.id}
-              funnel={f}
-              board={boardsMap[f.id]}
-              profile={profile}
-              isManager={isManager}
-              matchLead={matchLead}
-              hasFilters={hasFilters}
-              filterRevision={filterRevision}
-              currentUserId={myUserId}
-              dragState={dragState}
-              onDragStart={(funnelId, leadId) =>
-                setDragState({ funnelId, leadId })
-              }
-              onDragEnd={() => setDragState(null)}
-              onDropStage={onDropToStage}
-              claimBusyId={claimBusyId}
-              onClaimLead={(_leadId) => refreshBoard(f.id)}
-              onOpenLead={(funnelId, leadId) =>
-                openLeadModal(funnelId, leadId)
-              }
-              onCreateLead={(funnelId, stageId) =>
-                setLeadModal({ funnelId, create: true, stageId })
-              }
-              unreadByLeadId={unreadByLeadId}
-              onTransferLead={(funnelId, lead) =>
-                setTransferModal({ sourceFunnelId: funnelId, sourceLead: lead })
-              }
-              onEditFunnel={(funnel) => setFunnelEditTarget(funnel)}
-              onDeleteFunnel={onDeleteFunnel}
-              onAddStage={(id) => setStageFormFunnelId(id)}
-              onEditStage={(funnelId, stage) =>
-                setStageEditTarget({ funnelId, stage })
-              }
-              onDeleteStage={onDeleteStage}
-              allowedTransitions={allowedTransitions}
-              onRefreshBoard={() => refreshBoard(f.id)}
-              funnelDragId={funnelDragId}
-              isDragOver={funnelDragOverId === String(f.id)}
-              onFunnelHandlePointerDown={onFunnelHandlePointerDown}
-            />
-          ))}
-        </div>
+        <>
+          <div className="funnel__ftabs" role="tablist" aria-label="Воронки">
+            {topFunnels.map((f) => {
+              const fb = boardsMap[f.id];
+              const count = fb?.funnel?.leads_count;
+              const kids =
+                funnelTree.childrenByParent.get(String(f.id)) || [];
+              const kidsCount = sumChildLeadCounts(kids, boardsMap);
+              const isActive =
+                activeTopFunnel && String(activeTopFunnel.id) === String(f.id);
+              const sid = String(f.id);
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={!!isActive}
+                  data-funnel-id={sid}
+                  className={[
+                    "funnel__ftab",
+                    isActive ? "funnel__ftab--active" : "",
+                    kids.length ? "funnel__ftab--hasKids" : "",
+                    funnelDragId === sid ? "funnel__ftab--dragging" : "",
+                    funnelDragOverId === sid && funnelDragId !== sid
+                      ? "funnel__ftab--dragOver"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => selectFunnel(f.id)}
+                >
+                  {topFunnels.length > 1 && (
+                    <span
+                      className="funnel__ftabGrip"
+                      title="Перетащить воронку"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => onFunnelHandlePointerDown?.(e, sid)}
+                    >
+                      ⠿
+                    </span>
+                  )}
+                  <span className="funnel__ftabName">
+                    {getFunnelDisplayName(f)}
+                  </span>
+                  {count != null && (
+                    <span className="funnel__ftabCount">{count}</span>
+                  )}
+                  {kids.length > 0 && (
+                    <span
+                      className="funnel__ftabKids"
+                      title={`Подворонок сотрудников: ${kids.length}${
+                        kidsCount ? `, лидов в них: ${kidsCount}` : ""
+                      }`}
+                    >
+                      +{kids.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeSubFunnels.length > 0 && activeTopFunnel && (
+            <div
+              className="funnel__subtabs"
+              role="tablist"
+              aria-label="Подворонки сотрудников"
+            >
+              <span className="funnel__subtabsLabel">
+                {getFunnelDisplayName(activeTopFunnel)}:
+              </span>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={
+                  !!activeFunnel &&
+                  String(activeFunnel.id) === String(activeTopFunnel.id)
+                }
+                className={[
+                  "funnel__subtab",
+                  "funnel__subtab--region",
+                  activeFunnel &&
+                  String(activeFunnel.id) === String(activeTopFunnel.id)
+                    ? "funnel__subtab--active"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => selectFunnel(activeTopFunnel.id)}
+              >
+                <span className="funnel__subtabDot funnel__subtabDot--region" />
+                Регион целиком
+                {boardsMap[activeTopFunnel.id]?.funnel?.leads_count != null && (
+                  <span className="funnel__subtabCount">
+                    {boardsMap[activeTopFunnel.id].funnel.leads_count}
+                  </span>
+                )}
+              </button>
+              {activeSubFunnels.map((c) => {
+                const ownerName = getFunnelOwnerUserName(c);
+                const cCount = boardsMap[c.id]?.funnel?.leads_count;
+                const cActive =
+                  activeFunnel && String(activeFunnel.id) === String(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={!!cActive}
+                    className={[
+                      "funnel__subtab",
+                      cActive ? "funnel__subtab--active" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => selectFunnel(c.id)}
+                    title={
+                      ownerName
+                        ? `Воронка сотрудника: ${ownerName}`
+                        : "Воронка сотрудника"
+                    }
+                  >
+                    <span className="funnel__subtabDot" />
+                    <span className="funnel__subtabName">
+                      {getFunnelDisplayName(c)}
+                    </span>
+                    {ownerName && (
+                      <span className="funnel__subtabOwner">· {ownerName}</span>
+                    )}
+                    {cCount != null && (
+                      <span className="funnel__subtabCount">{cCount}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="funnel__stageArea">
+            {activeFunnel && (
+              <FunnelBoardRow
+                key={activeFunnel.id}
+                single
+                funnel={activeFunnel}
+                board={boardsMap[activeFunnel.id]}
+                profile={profile}
+                isManager={isManager}
+                matchLead={matchLead}
+                hasFilters={hasFilters}
+                filterRevision={filterRevision}
+                currentUserId={myUserId}
+                dragState={dragState}
+                onDragStart={(funnelId, leadId) =>
+                  setDragState({ funnelId, leadId })
+                }
+                onDragEnd={() => setDragState(null)}
+                onDropStage={onDropToStage}
+                claimBusyId={claimBusyId}
+                onClaimLead={(_leadId) => refreshBoard(activeFunnel.id)}
+                onOpenLead={(funnelId, leadId) =>
+                  openLeadModal(funnelId, leadId)
+                }
+                onCreateLead={(funnelId, stageId) =>
+                  setLeadModal({ funnelId, create: true, stageId })
+                }
+                unreadByLeadId={unreadByLeadId}
+                onTransferLead={(funnelId, lead) =>
+                  setTransferModal({
+                    sourceFunnelId: funnelId,
+                    sourceLead: lead,
+                  })
+                }
+                onEditFunnel={(funnel) => setFunnelEditTarget(funnel)}
+                onDeleteFunnel={onDeleteFunnel}
+                onAddStage={(id) => setStageFormFunnelId(id)}
+                onEditStage={(funnelId, stage) =>
+                  setStageEditTarget({ funnelId, stage })
+                }
+                onDeleteStage={onDeleteStage}
+                allowedTransitions={allowedTransitions}
+                onRefreshBoard={() => refreshBoard(activeFunnel.id)}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {funnelFormOpen && (
@@ -1242,6 +1558,8 @@ export default function ConsultingFunnel() {
           funnels={visibleFunnels}
           boardsMap={boardsMap}
           employees={owners}
+          isManager={isManager}
+          employeeRegionLabel={myRegionLabel}
           onClose={() => {
             setFunnelFormOpen(false);
             dispatch(getFunnels());
@@ -1255,6 +1573,8 @@ export default function ConsultingFunnel() {
           funnels={visibleFunnels}
           boardsMap={boardsMap}
           employees={owners}
+          isManager={isManager}
+          employeeRegionLabel={myRegionLabel}
           onClose={() => {
             setFunnelEditTarget(null);
             refreshBoard(funnelEditTarget.id);
@@ -1299,6 +1619,7 @@ export default function ConsultingFunnel() {
           key={`${leadModal.leadId}:${leadModal.initialTab || ""}`}
           leadId={leadModal.leadId}
           funnelId={activeLeadModalFunnelId}
+          funnel={activeLeadFunnel}
           board={activeLeadBoard}
           stages={activeLeadStages}
           wsUserId={wsUserId}
@@ -1385,7 +1706,10 @@ function Column({
     .join(" ");
 
   const stageColor = stage?.color || "#cbd5e1";
-  const sum = leads.reduce((acc, l) => acc + (Number(l.estimated_value) || 0), 0);
+  const sum = leads.reduce(
+    (acc, l) => acc + (Number(l.estimated_value) || 0),
+    0,
+  );
   const systemStage = !unassigned && isSystemStage(stage);
 
   return (
@@ -1404,7 +1728,10 @@ function Column({
             {stage?.name || "—"}
           </span>
           {systemStage && (
-            <span className="funnel__colLock" title="Системная стадия (нельзя изменить)">
+            <span
+              className="funnel__colLock"
+              title="Системная стадия (нельзя изменить)"
+            >
               🔒
             </span>
           )}
@@ -1447,7 +1774,16 @@ function Column({
 }
 
 /* ===================== Карточка лида ===================== */
-function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads = true }) {
+function LeadCard({
+  lead,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onClick,
+  onClaim,
+  claimBusy,
+  canManageLeads = true,
+}) {
   const inPool = !lead.owner;
 
   return (
@@ -1468,10 +1804,25 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
         </div>
         <div className="funnel__cardTopRight">
           {inPool && <span className="funnel__poolBadge">Пул</span>}
+          {lead.tenant_provision_status &&
+            lead.tenant_provision_status !== "none" && (
+              <span
+                className={`funnel__tenantBadge funnel__tenantBadge--${lead.tenant_provision_status}`}
+                title={
+                  lead.tenant_provision_status_display ||
+                  TENANT_PROVISION_LABELS[lead.tenant_provision_status] ||
+                  lead.tenant_provision_status
+                }
+              >
+                {lead.tenant_provision_status_display ||
+                  TENANT_PROVISION_LABELS[lead.tenant_provision_status] ||
+                  "CRM"}
+              </span>
+            )}
           {lead.score_grade && (
             <span
               className={`funnel__grade funnel__grade--${String(
-                lead.score_grade
+                lead.score_grade,
               ).toLowerCase()}`}
               title={`Скоринг: ${lead.score_value ?? "—"}`}
             >
@@ -1504,7 +1855,10 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
       </div>
 
       {lead.probability != null && Number(lead.probability) > 0 && (
-        <div className="funnel__cardProbWrap" title={`Вероятность ${lead.probability}%`}>
+        <div
+          className="funnel__cardProbWrap"
+          title={`Вероятность ${lead.probability}%`}
+        >
           <div className="funnel__cardProbTrack">
             <div
               className="funnel__cardProbFill"
@@ -1628,6 +1982,8 @@ function FunnelForm({
   funnels = [],
   boardsMap = {},
   employees = [],
+  isManager = false,
+  employeeRegionLabel = "",
   onClose,
 }) {
   const dispatch = useDispatch();
@@ -1643,6 +1999,27 @@ function FunnelForm({
     existing ? isMainFunnel(existing) : false,
   );
 
+  /* --------- привязка к региональной воронке (родитель) --------- */
+  // Кандидаты в родители — региональные воронки верхнего уровня.
+  const parentOptions = useMemo(
+    () =>
+      funnels.filter(
+        (f) =>
+          resolveFunnelRegionCode(f) &&
+          !getFunnelParentId(f) &&
+          !isMainFunnel(f) &&
+          !isRoleFunnel(f) &&
+          String(f.id) !== String(existing?.id),
+      ),
+    [funnels, existing?.id],
+  );
+  const [parentFunnel, setParentFunnel] = useState(
+    existing ? getFunnelParentId(existing) || "" : "",
+  );
+  // Поле «родитель» доступно только руководству и только для обычных воронок.
+  const canChooseParent =
+    isManager && !roleFunnel && !isMainFunnel(existing) && !lockedMeta;
+
   /* --------- иерархия воронок: «что дальше» (ТЗ №3) --------- */
   const [nextFunnel, setNextFunnel] = useState(
     existing?.next_funnel ? String(existing.next_funnel) : "",
@@ -1650,13 +2027,13 @@ function FunnelForm({
   const [nextStage, setNextStage] = useState(
     existing?.next_stage ? String(existing.next_stage) : "",
   );
-  const [nextAssign, setNextAssign] = useState(
-    existing?.next_assign || "keep",
-  );
+  const [nextAssign, setNextAssign] = useState(existing?.next_assign || "keep");
   const [nextAssignUser, setNextAssignUser] = useState(
     existing?.next_assign_user ? String(existing.next_assign_user) : "",
   );
-  const [isFinal, setIsFinal] = useState(existing?.is_final ?? !existing?.next_funnel);
+  const [isFinal, setIsFinal] = useState(
+    existing?.is_final ?? !existing?.next_funnel,
+  );
   const [slaHours, setSlaHours] = useState(
     existing?.stage_sla_hours ? String(existing.stage_sla_hours) : "",
   );
@@ -1690,7 +2067,9 @@ function FunnelForm({
         // Цепочка обработки: куда лид уходит после завершения в этой воронке.
         next_funnel: nextFunnel || null,
         next_stage: nextFunnel ? nextStage || null : null,
-        next_assign: nextFunnel ? nextAssign : null,
+        // next_assign на бэке — не-nullable CharField с default "keep":
+        // без цепочки шлём "keep", а не null, иначе 400.
+        next_assign: nextFunnel ? nextAssign : "keep",
         next_assign_user:
           nextFunnel && nextAssign === "user" ? nextAssignUser || null : null,
         // Продажа, абонентка и зарплата оформляются только в финальной воронке —
@@ -1712,9 +2091,16 @@ function FunnelForm({
         payload.is_main = !!isMain;
         if (isMain) payload.funnel_kind = "main";
       }
+      // Привязка к региональной воронке:
+      //  • руководитель выбирает родителя вручную;
+      //  • обычный сотрудник родителя не выбирает — бэкенд сам привяжет воронку
+      //    к региональной воронке его региона (parent_funnel не отправляем).
+      if (canChooseParent && !isMain) {
+        payload.parent_funnel = parentFunnel || null;
+      }
       if (isEdit) {
         await dispatch(
-          updateFunnel({ id: existing.id, data: payload })
+          updateFunnel({ id: existing.id, data: payload }),
         ).unwrap();
       } else {
         await dispatch(createFunnel(payload)).unwrap();
@@ -1724,7 +2110,9 @@ function FunnelForm({
       setErr(
         errToText(
           e2,
-          isEdit ? "Не удалось сохранить воронку." : "Не удалось создать воронку.",
+          isEdit
+            ? "Не удалось сохранить воронку."
+            : "Не удалось создать воронку.",
         ),
       );
     } finally {
@@ -1797,6 +2185,51 @@ function FunnelForm({
               предыдущей.
             </p>
           </>
+        )}
+
+        {canChooseParent && !isMain && (
+          <div className="funnel__field">
+            <label className="funnel__label">Региональная воронка</label>
+            <select
+              className="funnel__input"
+              value={parentFunnel}
+              onChange={(e) => setParentFunnel(e.target.value)}
+            >
+              <option value="">— Верхний уровень (без региона) —</option>
+              {parentOptions.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {getFunnelDisplayName(f)}
+                </option>
+              ))}
+            </select>
+            <small className="funnel__hint">
+              Воронка станет подворонкой выбранного региона: на доске владельца
+              она появится во вкладке региона рядом с воронками других
+              сотрудников.
+            </small>
+          </div>
+        )}
+
+        {!isManager && !isEdit && (
+          <div className="funnel__field">
+            <div className="funnel__parentHint">
+              <span className="funnel__parentHintIcon" aria-hidden>
+                📍
+              </span>
+              {employeeRegionLabel ? (
+                <span>
+                  Воронка будет привязана к региону{" "}
+                  <strong>{employeeRegionLabel}</strong> и станет видна вашему
+                  руководителю во вкладке этого региона.
+                </span>
+              ) : (
+                <span>
+                  Ваш регион не задан в профиле — воронку привяжет руководитель.
+                  Обратитесь к нему, если она не появится в нужном регионе.
+                </span>
+              )}
+            </div>
+          </div>
         )}
 
         <div className="funnel__chainBlock">
@@ -2003,7 +2436,10 @@ function StageForm({ funnelId, stage, nextOrder, onClose }) {
   };
 
   return (
-    <Modal title={isEdit ? "Редактирование стадии" : "Новая стадия"} onClose={onClose}>
+    <Modal
+      title={isEdit ? "Редактирование стадии" : "Новая стадия"}
+      onClose={onClose}
+    >
       {!!err && <div className="funnel__error">{err}</div>}
       <form className="funnel__form" onSubmit={submit}>
         <div className="funnel__grid2">
@@ -2104,7 +2540,8 @@ function StageForm({ funnelId, stage, nextOrder, onClose }) {
               Разрешить прыжки через стадии
             </label>
             <p className="funnel__hint">
-              Финальность (успех/провал) определяется типом стадии автоматически.
+              Финальность (успех/провал) определяется типом стадии
+              автоматически.
             </p>
           </>
         ) : (
@@ -2236,9 +2673,21 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
       const created = await dispatch(createLead(payload)).unwrap();
       if (participants.length && created?.id) {
         await dispatch(
-          setLeadParticipants({ id: created.id, participant_ids: participants }),
+          setLeadParticipants({
+            id: created.id,
+            participant_ids: participants,
+          }),
         ).unwrap();
       }
+      // Пока «Лиды» — отдельная база (InboundLead): зеркалим лид туда, чтобы
+      // списки совпадали. См. 13-unify-leads-single-model.md §7.
+      ensureInboundLeadForFunnelLead({
+        ...created,
+        full_name: created?.full_name || form.full_name.trim(),
+        phone: created?.phone || form.phone.trim(),
+        source: created?.source || form.source.trim() || "manual",
+        description: created?.description || form.description.trim(),
+      });
       setPostCreateLead(created);
     } catch (e2) {
       setErr(errToText(e2, "Не удалось создать лид."));
@@ -2250,188 +2699,191 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
   return (
     <>
       <Modal title="Новый лид" onClose={onClose}>
-      <form className="funnel__form" onSubmit={submit}>
-        {funnel && (
-          <p className="funnel__hint">
-            Воронка: <strong>{getFunnelDisplayName(funnel)}</strong>
-          </p>
-        )}
-        {!!err && <div className="funnel__error">{err}</div>}
-        <div className="funnel__field">
-          <label className="funnel__label">Название *</label>
-          <input
-            className="funnel__input"
-            value={form.title}
-            onChange={set("title")}
-            autoFocus
-          />
-        </div>
+        <form className="funnel__form" onSubmit={submit}>
+          {funnel && (
+            <p className="funnel__hint">
+              Воронка: <strong>{getFunnelDisplayName(funnel)}</strong>
+            </p>
+          )}
+          {!!err && <div className="funnel__error">{err}</div>}
+          <div className="funnel__field">
+            <label className="funnel__label">Название *</label>
+            <input
+              className="funnel__input"
+              value={form.title}
+              onChange={set("title")}
+              autoFocus
+            />
+          </div>
 
-        <div className="funnel__field">
-          <label className="funnel__label">Сотрудники воронки</label>
-          <FunnelEmployeesPicker
-            funnelId={funnelId}
-            value={participants}
-            onChange={setParticipants}
-            disabled={saving}
-          />
-        </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Сотрудники воронки</label>
+            <FunnelEmployeesPicker
+              funnelId={funnelId}
+              value={participants}
+              onChange={setParticipants}
+              disabled={saving}
+            />
+          </div>
 
-        <div className="funnel__grid2">
-          <div className="funnel__field">
-            <label className="funnel__label">Услуга (опционально)</label>
-            <select
-              className="funnel__input"
-              value={form.service}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  service: e.target.value,
-                  tariff: "",
-                }))
-              }
-            >
-              <option value="">Не выбрана</option>
-              {visibleServices.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="funnel__field">
-            <label className="funnel__label">Тариф (опционально)</label>
-            <select
-              className="funnel__input"
-              value={form.tariff}
-              onChange={set("tariff")}
-              disabled={!serviceTariffs.length}
-            >
-              <option value="">Базовая цена</option>
-              {serviceTariffs.map((t) => {
-                const sub = formatTariffSubscription(t);
-                return (
-                  <option key={t.id || t.name} value={t.id || t.name}>
-                    {t.name} — {resolveTariffPrice(t, funnelRoleId).toLocaleString()} с
-                    {sub ? ` (+ абон. ${sub})` : ""}
-                  </option>
-                );
-              })}
-            </select>
-            {tariffSubHint && (
-              <p className="funnel__hint">Абонентская плата: {tariffSubHint}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="funnel__grid2">
-          <div className="funnel__field">
-            <label className="funnel__label">Стадия</label>
-            <select
-              className="funnel__input"
-              value={form.stage}
-              onChange={set("stage")}
-            >
-              <option value="">Без стадии</option>
-              {(stages || []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="funnel__field">
-            <label className="funnel__label">Источник</label>
-            <input
-              className="funnel__input"
-              value={form.source}
-              onChange={set("source")}
-              placeholder="Сайт, Instagram…"
-            />
-          </div>
-        </div>
-        <div className="funnel__grid2">
-          <div className="funnel__field">
-            <label className="funnel__label">Контактное лицо</label>
-            <input
-              className="funnel__input"
-              value={form.full_name}
-              onChange={set("full_name")}
-            />
-          </div>
-          <div className="funnel__field">
-            <label className="funnel__label">Телефон</label>
-            <input
-              className="funnel__input"
-              value={form.phone}
-              onChange={set("phone")}
-              placeholder="+996700000000"
-            />
-          </div>
-        </div>
-        <div className="funnel__grid2">
-          <div className="funnel__field">
-            <label className="funnel__label">Email</label>
-            <input
-              className="funnel__input"
-              type="email"
-              value={form.email}
-              onChange={set("email")}
-            />
-          </div>
-          <div className="funnel__field">
-            <label className="funnel__label">Оценочная сумма, с</label>
-            <input
-              className="funnel__input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.estimated_value}
-              onChange={set("estimated_value")}
-            />
-          </div>
-        </div>
-        <div className="funnel__grid2">
-          <div className="funnel__field">
-            <label className="funnel__label">Вероятность, %</label>
-            <input
-              className="funnel__input"
-              type="number"
-              min="0"
-              max="100"
-              value={form.probability}
-              onChange={set("probability")}
-            />
-          </div>
-          {FUNNEL_V2 && (
+          <div className="funnel__grid2">
             <div className="funnel__field">
-              <label className="funnel__label">Срочность</label>
+              <label className="funnel__label">Услуга (опционально)</label>
               <select
                 className="funnel__input"
-                value={form.urgency}
-                onChange={set("urgency")}
+                value={form.service}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    service: e.target.value,
+                    tariff: "",
+                  }))
+                }
               >
-                {URGENCY.map((u) => (
-                  <option key={u.value} value={u.value}>
-                    {u.label}
+                <option value="">Не выбрана</option>
+                {visibleServices.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-        </div>
-        <div className="funnel__field">
-          <label className="funnel__label">Описание</label>
-          <textarea
-            className="funnel__input"
-            rows={3}
-            value={form.description}
-            onChange={set("description")}
-          />
-        </div>
-        <FormActions saving={saving} onClose={onClose} />
-      </form>
-    </Modal>
+            {/* <div className="funnel__field">
+              <label className="funnel__label">Тариф (опционально)</label>
+              <select
+                className="funnel__input"
+                value={form.tariff}
+                onChange={set("tariff")}
+                disabled={!serviceTariffs.length}
+              >
+                <option value="">Базовая цена</option>
+                {serviceTariffs.map((t) => {
+                  const sub = formatTariffSubscription(t);
+                  return (
+                    <option key={t.id || t.name} value={t.id || t.name}>
+                      {t.name} —{" "}
+                      {resolveTariffPrice(t, funnelRoleId).toLocaleString()} с
+                      {sub ? ` (+ абон. ${sub})` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              {tariffSubHint && (
+                <p className="funnel__hint">
+                  Абонентская плата: {tariffSubHint}
+                </p>
+              )}
+            </div> */}
+            <div className="funnel__field">
+              <label className="funnel__label">Стадия</label>
+              <select
+                className="funnel__input"
+                value={form.stage}
+                onChange={set("stage")}
+              >
+                <option value="">Без стадии</option>
+                {(stages || []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="funnel__grid2">
+            <div className="funnel__field">
+              <label className="funnel__label">Вероятность, %</label>
+              <input
+                className="funnel__input"
+                type="number"
+                min="0"
+                max="100"
+                value={form.probability}
+                onChange={set("probability")}
+              />
+            </div>
+            <div className="funnel__field">
+              <label className="funnel__label">Источник</label>
+              <input
+                className="funnel__input"
+                value={form.source}
+                onChange={set("source")}
+                placeholder="Сайт, Instagram…"
+              />
+            </div>
+          </div>
+          <div className="funnel__grid2">
+            <div className="funnel__field">
+              <label className="funnel__label">Контактное лицо</label>
+              <input
+                className="funnel__input"
+                value={form.full_name}
+                onChange={set("full_name")}
+              />
+            </div>
+            <div className="funnel__field">
+              <label className="funnel__label">Телефон</label>
+              <input
+                className="funnel__input"
+                value={form.phone}
+                onChange={set("phone")}
+                placeholder="+996700000000"
+              />
+            </div>
+          </div>
+          <div className="funnel__grid2">
+            <div className="funnel__field">
+              <label className="funnel__label">Email</label>
+              <input
+                className="funnel__input"
+                type="email"
+                value={form.email}
+                onChange={set("email")}
+              />
+            </div>
+            <div className="funnel__field">
+              <label className="funnel__label">Оценочная сумма, с</label>
+              <input
+                className="funnel__input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.estimated_value}
+                onChange={set("estimated_value")}
+              />
+            </div>
+          </div>
+          <div className="funnel__grid2">
+            {FUNNEL_V2 && (
+              <div className="funnel__field">
+                <label className="funnel__label">Срочность</label>
+                <select
+                  className="funnel__input"
+                  value={form.urgency}
+                  onChange={set("urgency")}
+                >
+                  {URGENCY.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Описание</label>
+            <textarea
+              className="funnel__input"
+              rows={3}
+              value={form.description}
+              onChange={set("description")}
+            />
+          </div>
+          <FormActions saving={saving} onClose={onClose} />
+        </form>
+      </Modal>
       {postCreateLead && (
         <LeadCreateClientModal
           lead={postCreateLead}
@@ -2462,6 +2914,7 @@ function findLead(board, leadId) {
 function LeadDetail({
   leadId,
   funnelId,
+  funnel: funnelProp,
   board: boardProp,
   stages,
   wsUserId,
@@ -2478,7 +2931,12 @@ function LeadDetail({
 }) {
   const dispatch = useDispatch();
   const confirm = useConfirm();
-  const { board: boardFromStore, lossReasons = [], timeline, tasks } = useFunnel();
+  const {
+    board: boardFromStore,
+    lossReasons = [],
+    timeline,
+    tasks,
+  } = useFunnel();
   const board = boardProp || boardFromStore;
   const lead = findLead(board, leadId);
 
@@ -2713,7 +3171,7 @@ function LeadDetail({
           {lead.score_grade && (
             <span
               className={`funnel__grade funnel__grade--${String(
-                lead.score_grade
+                lead.score_grade,
               ).toLowerCase()}`}
             >
               {lead.score_grade} · {lead.score_value ?? "—"}
@@ -2735,7 +3193,9 @@ function LeadDetail({
             </Link>
           )}
           {lead.is_at_risk && (
-            <span className="funnel__chip funnel__chip--risk">⚠ Под риском</span>
+            <span className="funnel__chip funnel__chip--risk">
+              ⚠ Под риском
+            </span>
           )}
           {inPool ? (
             <span className="funnel__chip funnel__chip--pool">Общий пул</span>
@@ -2744,7 +3204,9 @@ function LeadDetail({
               <span className="funnel__chip">{lead.owner_display}</span>
             )
           )}
-          {CRM_CHAT_CHANNELS.includes(String(lead.source || "").toLowerCase()) &&
+          {CRM_CHAT_CHANNELS.includes(
+            String(lead.source || "").toLowerCase(),
+          ) &&
             consultingChatPath(leadId, lead.source) && (
               <Link
                 to={consultingChatPath(leadId, lead.source)}
@@ -2757,7 +3219,11 @@ function LeadDetail({
         </div>
         <div className="funnel__detailActions">
           {canManageLeads && inPool && (
-            <button className="funnel__btn funnel__btn--primary" onClick={onClaim} disabled={busy}>
+            <button
+              className="funnel__btn funnel__btn--primary"
+              onClick={onClaim}
+              disabled={busy}
+            >
               Взять в работу
             </button>
           )}
@@ -2854,7 +3320,11 @@ function LeadDetail({
           )}
           {FUNNEL_V2 && canTouch && (
             <>
-              <button className="funnel__btn" onClick={onRecalc} disabled={busy}>
+              <button
+                className="funnel__btn"
+                onClick={onRecalc}
+                disabled={busy}
+              >
                 ↻ Скоринг
               </button>
               {!closed && (
@@ -2884,7 +3354,8 @@ function LeadDetail({
       {!canTouch && !inPool && (
         <p className="funnel__hint funnel__hint--lock">
           С этим лидом может взаимодействовать только назначенный сотрудник
-          {lead.owner_display ? ` (${lead.owner_display})` : ""} или руководитель.
+          {lead.owner_display ? ` (${lead.owner_display})` : ""} или
+          руководитель.
         </p>
       )}
 
@@ -2933,8 +3404,8 @@ function LeadDetail({
       )}
       {completedLocked && (
         <p className="funnel__hint funnel__hint--lock">
-          Лид на стадии «Завершено». Редактирование и перемещение доступны только
-          администратору или владельцу.
+          Лид на стадии «Завершено». Редактирование и перемещение доступны
+          только администратору или владельцу.
         </p>
       )}
       {FUNNEL_V2 && tab === "timeline" && (
@@ -2943,8 +3414,8 @@ function LeadDetail({
       {FUNNEL_V2 && tab === "tasks" && (
         <TasksTab leadId={leadId} tasks={tasks} />
       )}
-      {tab === "messenger" && (
-        canTouch ? (
+      {tab === "messenger" &&
+        (canTouch ? (
           <LeadMessengerPanel
             key={lead.id}
             lead={lead}
@@ -2956,8 +3427,7 @@ function LeadDetail({
           <p className="funnel__hint funnel__hint--lock">
             Чат доступен только назначенному сотруднику или руководителю.
           </p>
-        )
-      )}
+        ))}
       {createClientOpen && (
         <LeadCreateClientModal
           lead={lead}
@@ -2974,9 +3444,48 @@ function LeadDetail({
         <LeadPaymentModal
           lead={lead}
           onClose={() => setPaymentOpen(false)}
-          onSuccess={() => {
+          onSuccess={async (result) => {
             setPaymentOpen(false);
-            onNotice?.("Оплата оформлена.");
+            const movedByServer =
+              result?.funnel && String(result.funnel) !== String(funnelId);
+            if (movedByServer) {
+              onNotice?.("Оплата оформлена. Лид передан в следующую воронку.");
+              if (onLeadWon) await onLeadWon();
+              else onBoardRefresh?.();
+              onClose();
+              return;
+            }
+            const chained =
+              funnelProp?.next_funnel && funnelProp?.is_final !== true;
+            // `win` для перехода по цепочке работает только если в воронке есть
+            // WON-стадия. Иначе перенос — задача бэка (register-payment), а
+            // фронт просто обновляет доску, не пугая ошибкой 400.
+            if (chained && funnelHasWonStage(funnelProp, boardProp)) {
+              try {
+                await dispatch(winLead({ id: leadId })).unwrap();
+                onNotice?.(
+                  "Оплата оформлена. Лид передан в воронку внедрения.",
+                );
+                if (onLeadWon) await onLeadWon();
+                else onBoardRefresh?.();
+                onClose();
+              } catch (e) {
+                onNotice?.("Оплата оформлена.");
+                onBoardRefresh?.();
+                setErr(
+                  errToText(
+                    e,
+                    "Автопередача в воронку внедрения не удалась — перенесите лид вручную.",
+                  ),
+                );
+              }
+              return;
+            }
+            onNotice?.(
+              chained
+                ? "Оплата оформлена. Передача в следующую воронку — на стороне сервера или вручную."
+                : "Оплата оформлена.",
+            );
             onBoardRefresh?.();
           }}
         />
@@ -2997,7 +3506,7 @@ function LoseForm({ leadId, lossReasons, onDone, onError }) {
     setBusy(true);
     try {
       await dispatch(
-        loseLead({ id: leadId, loss_reason: reason, loss_comment: comment })
+        loseLead({ id: leadId, loss_reason: reason, loss_comment: comment }),
       ).unwrap();
       onDone();
     } catch (e) {
@@ -3067,7 +3576,9 @@ function LeadInfoForm({ lead, funnelId, stages, onClose, readOnly = false }) {
     budget_confirmed: !!lead.budget_confirmed,
     decision_maker_engaged: !!lead.decision_maker_engaged,
     avg_response_minutes:
-      lead.avg_response_minutes != null ? String(lead.avg_response_minutes) : "",
+      lead.avg_response_minutes != null
+        ? String(lead.avg_response_minutes)
+        : "",
     next_action_type: lead.next_action_type || "",
     next_action_date: toLocalInput(lead.next_action_date),
     next_action_note: lead.next_action_note || "",
@@ -3134,7 +3645,10 @@ function LeadInfoForm({ lead, funnelId, stages, onClose, readOnly = false }) {
   };
 
   return (
-    <form className="funnel__form" onSubmit={readOnly ? (e) => e.preventDefault() : submit}>
+    <form
+      className="funnel__form"
+      onSubmit={readOnly ? (e) => e.preventDefault() : submit}
+    >
       {readOnly && (
         <p className="funnel__hint">
           Режим просмотра. Для создания и изменения лидов нужен доступ
@@ -3144,239 +3658,239 @@ function LeadInfoForm({ lead, funnelId, stages, onClose, readOnly = false }) {
       {!!err && <div className="funnel__error">{err}</div>}
 
       <fieldset disabled={readOnly} className="funnel__fieldset">
-      <div className="funnel__field">
-        <label className="funnel__label">Название *</label>
-        <input
-          className="funnel__input"
-          value={form.title}
-          onChange={set("title")}
-        />
-      </div>
+        <div className="funnel__field">
+          <label className="funnel__label">Название *</label>
+          <input
+            className="funnel__input"
+            value={form.title}
+            onChange={set("title")}
+          />
+        </div>
 
-      <div className="funnel__grid2">
-        <div className="funnel__field">
-          <label className="funnel__label">Стадия</label>
-          <select
-            className="funnel__input"
-            value={form.stage}
-            onChange={set("stage")}
-          >
-            <option value="">Без стадии</option>
-            {(stages || []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="funnel__field">
-          <label className="funnel__label">Источник</label>
-          <select
-            className="funnel__input"
-            value={form.source}
-            onChange={set("source")}
-          >
-            <option value="">—</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="instagram">Instagram</option>
-            <option value="telegram">Telegram</option>
-            <option value="manual">Вручную</option>
-            {form.source &&
-              !["whatsapp", "instagram", "telegram", "manual", ""].includes(
-                form.source,
-              ) && <option value={form.source}>{form.source}</option>}
-          </select>
-        </div>
-      </div>
-
-      <div className="funnel__grid2">
-        <div className="funnel__field">
-          <label className="funnel__label">Контактное лицо</label>
-          <input
-            className="funnel__input"
-            value={form.full_name}
-            onChange={set("full_name")}
-          />
-        </div>
-        <div className="funnel__field">
-          <label className="funnel__label">Телефон</label>
-          <input
-            className="funnel__input"
-            value={form.phone}
-            onChange={set("phone")}
-          />
-        </div>
-      </div>
-
-      <div className="funnel__grid2">
-        <div className="funnel__field">
-          <label className="funnel__label">Email</label>
-          <input
-            className="funnel__input"
-            type="email"
-            value={form.email}
-            onChange={set("email")}
-          />
-        </div>
-        <div className="funnel__field">
-          <label className="funnel__label">Оценочная сумма, с</label>
-          <input
-            className="funnel__input"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.estimated_value}
-            onChange={set("estimated_value")}
-          />
-        </div>
-      </div>
-
-      <div className="funnel__grid2">
-        <div className="funnel__field">
-          <label className="funnel__label">Вероятность, %</label>
-          <input
-            className="funnel__input"
-            type="number"
-            min="0"
-            max="100"
-            value={form.probability}
-            onChange={set("probability")}
-          />
-        </div>
-        {FUNNEL_V2 && (
+        <div className="funnel__grid2">
           <div className="funnel__field">
-            <label className="funnel__label">Срочность</label>
+            <label className="funnel__label">Стадия</label>
             <select
               className="funnel__input"
-              value={form.urgency}
-              onChange={set("urgency")}
+              value={form.stage}
+              onChange={set("stage")}
             >
-              {URGENCY.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
+              <option value="">Без стадии</option>
+              {(stages || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
             </select>
           </div>
-        )}
-      </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Источник</label>
+            <select
+              className="funnel__input"
+              value={form.source}
+              onChange={set("source")}
+            >
+              <option value="">—</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="telegram">Telegram</option>
+              <option value="manual">Вручную</option>
+              {form.source &&
+                !["whatsapp", "instagram", "telegram", "manual", ""].includes(
+                  form.source,
+                ) && <option value={form.source}>{form.source}</option>}
+            </select>
+          </div>
+        </div>
 
-      {FUNNEL_V2 && (
-        <>
-          <div className="funnel__sectionTitle">Квалификация и скоринг</div>
-          <div className="funnel__grid2">
-            <label className="funnel__check">
-              <input
-                type="checkbox"
-                checked={form.budget_confirmed}
-                onChange={setChk("budget_confirmed")}
-              />
-              Бюджет подтверждён
-            </label>
-            <label className="funnel__check">
-              <input
-                type="checkbox"
-                checked={form.decision_maker_engaged}
-                onChange={setChk("decision_maker_engaged")}
-              />
-              ЛПР вовлечён
-            </label>
+        <div className="funnel__grid2">
+          <div className="funnel__field">
+            <label className="funnel__label">Контактное лицо</label>
+            <input
+              className="funnel__input"
+              value={form.full_name}
+              onChange={set("full_name")}
+            />
           </div>
           <div className="funnel__field">
-            <label className="funnel__label">Среднее время ответа, мин</label>
+            <label className="funnel__label">Телефон</label>
+            <input
+              className="funnel__input"
+              value={form.phone}
+              onChange={set("phone")}
+            />
+          </div>
+        </div>
+
+        <div className="funnel__grid2">
+          <div className="funnel__field">
+            <label className="funnel__label">Email</label>
+            <input
+              className="funnel__input"
+              type="email"
+              value={form.email}
+              onChange={set("email")}
+            />
+          </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Оценочная сумма, с</label>
             <input
               className="funnel__input"
               type="number"
               min="0"
-              value={form.avg_response_minutes}
-              onChange={set("avg_response_minutes")}
+              step="0.01"
+              value={form.estimated_value}
+              onChange={set("estimated_value")}
             />
           </div>
+        </div>
 
-          <div className="funnel__sectionTitle">Следующее действие</div>
-          <div className="funnel__grid2">
+        <div className="funnel__grid2">
+          <div className="funnel__field">
+            <label className="funnel__label">Вероятность, %</label>
+            <input
+              className="funnel__input"
+              type="number"
+              min="0"
+              max="100"
+              value={form.probability}
+              onChange={set("probability")}
+            />
+          </div>
+          {FUNNEL_V2 && (
             <div className="funnel__field">
-              <label className="funnel__label">Тип</label>
+              <label className="funnel__label">Срочность</label>
               <select
                 className="funnel__input"
-                value={form.next_action_type}
-                onChange={set("next_action_type")}
+                value={form.urgency}
+                onChange={set("urgency")}
               >
-                <option value="">—</option>
-                {ACTION_TYPES.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
+                {URGENCY.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
                   </option>
                 ))}
               </select>
             </div>
+          )}
+        </div>
+
+        {FUNNEL_V2 && (
+          <>
+            <div className="funnel__sectionTitle">Квалификация и скоринг</div>
+            <div className="funnel__grid2">
+              <label className="funnel__check">
+                <input
+                  type="checkbox"
+                  checked={form.budget_confirmed}
+                  onChange={setChk("budget_confirmed")}
+                />
+                Бюджет подтверждён
+              </label>
+              <label className="funnel__check">
+                <input
+                  type="checkbox"
+                  checked={form.decision_maker_engaged}
+                  onChange={setChk("decision_maker_engaged")}
+                />
+                ЛПР вовлечён
+              </label>
+            </div>
             <div className="funnel__field">
-              <label className="funnel__label">Дата</label>
+              <label className="funnel__label">Среднее время ответа, мин</label>
               <input
                 className="funnel__input"
-                type="datetime-local"
-                value={form.next_action_date}
-                onChange={set("next_action_date")}
+                type="number"
+                min="0"
+                value={form.avg_response_minutes}
+                onChange={set("avg_response_minutes")}
               />
             </div>
-          </div>
-          <div className="funnel__field">
-            <label className="funnel__label">Заметка</label>
-            <input
-              className="funnel__input"
-              value={form.next_action_note}
-              onChange={set("next_action_note")}
-            />
-          </div>
-        </>
-      )}
 
-      <div className="funnel__field">
-        <label className="funnel__label">Описание</label>
-        <textarea
-          className="funnel__input"
-          rows={3}
-          value={form.description}
-          onChange={set("description")}
-        />
-      </div>
+            <div className="funnel__sectionTitle">Следующее действие</div>
+            <div className="funnel__grid2">
+              <div className="funnel__field">
+                <label className="funnel__label">Тип</label>
+                <select
+                  className="funnel__input"
+                  value={form.next_action_type}
+                  onChange={set("next_action_type")}
+                >
+                  <option value="">—</option>
+                  {ACTION_TYPES.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="funnel__field">
+                <label className="funnel__label">Дата</label>
+                <input
+                  className="funnel__input"
+                  type="datetime-local"
+                  value={form.next_action_date}
+                  onChange={set("next_action_date")}
+                />
+              </div>
+            </div>
+            <div className="funnel__field">
+              <label className="funnel__label">Заметка</label>
+              <input
+                className="funnel__input"
+                value={form.next_action_note}
+                onChange={set("next_action_note")}
+              />
+            </div>
+          </>
+        )}
 
-      {(lead.stage_entered_at || lead.last_activity_at) && (
-        <p className="funnel__hint">
-          В стадии с {fmtDate(lead.stage_entered_at)} · последняя активность{" "}
-          {fmtDate(lead.last_activity_at)}
-        </p>
-      )}
+        <div className="funnel__field">
+          <label className="funnel__label">Описание</label>
+          <textarea
+            className="funnel__input"
+            rows={3}
+            value={form.description}
+            onChange={set("description")}
+          />
+        </div>
+
+        {(lead.stage_entered_at || lead.last_activity_at) && (
+          <p className="funnel__hint">
+            В стадии с {fmtDate(lead.stage_entered_at)} · последняя активность{" "}
+            {fmtDate(lead.last_activity_at)}
+          </p>
+        )}
       </fieldset>
 
       {!readOnly && (
-      <div className="funnel__formActions">
-        <button
-          type="button"
-          className="funnel__btn funnel__btn--danger"
-          onClick={onDelete}
-          disabled={deleting || saving}
-        >
-          {deleting ? "Удаление…" : "Удалить"}
-        </button>
-        <div className="funnel__formActionsRight">
+        <div className="funnel__formActions">
           <button
             type="button"
-            className="funnel__btn"
-            onClick={onClose}
-            disabled={saving}
+            className="funnel__btn funnel__btn--danger"
+            onClick={onDelete}
+            disabled={deleting || saving}
           >
-            Отмена
+            {deleting ? "Удаление…" : "Удалить"}
           </button>
-          <button
-            type="submit"
-            className="funnel__btn funnel__btn--primary"
-            disabled={saving}
-          >
-            {saving ? "Сохранение…" : "Сохранить"}
-          </button>
+          <div className="funnel__formActionsRight">
+            <button
+              type="button"
+              className="funnel__btn"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="funnel__btn funnel__btn--primary"
+              disabled={saving}
+            >
+              {saving ? "Сохранение…" : "Сохранить"}
+            </button>
+          </div>
         </div>
-      </div>
       )}
       {!readOnly ? null : (
         <div className="funnel__formActions funnel__formActions--end">
@@ -3405,7 +3919,12 @@ function TimelineTab({ leadId, timeline }) {
     setBusy(true);
     try {
       await dispatch(
-        addLeadActivity({ leadId, type, title: title.trim(), body: body.trim() })
+        addLeadActivity({
+          leadId,
+          type,
+          title: title.trim(),
+          body: body.trim(),
+        }),
       ).unwrap();
       setTitle("");
       setBody("");
@@ -3500,7 +4019,7 @@ function TasksTab({ leadId, tasks }) {
           type,
           title: title.trim(),
           due_date: fromLocalInput(due),
-        })
+        }),
       ).unwrap();
       setTitle("");
       setDue("");
@@ -3516,7 +4035,7 @@ function TasksTab({ leadId, tasks }) {
       updateLeadTask({
         id: t.id,
         data: { status: t.status === "done" ? "open" : "done" },
-      })
+      }),
     );
 
   const remove = (id) => dispatch(deleteLeadTask(id));
@@ -3616,7 +4135,10 @@ function AnalyticsModal({ funnelId, onClose }) {
           <>
             <div className="funnel__statGrid">
               <Stat label="Сделок" value={t?.deals ?? 0} />
-              <Stat label="В работе, сумма" value={fmtMoney(t?.pipeline_value)} />
+              <Stat
+                label="В работе, сумма"
+                value={fmtMoney(t?.pipeline_value)}
+              />
               <Stat label="Выиграно" value={t?.won ?? 0} />
               <Stat label="Проиграно" value={t?.lost ?? 0} />
               <Stat

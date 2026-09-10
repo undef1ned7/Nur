@@ -1,5 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { FaSearch, FaThLarge, FaList, FaExclamationTriangle, FaFilter, FaTimes, FaUser, FaCut, FaCalendarAlt, FaClock, FaMoneyBillWave, FaPercent, FaTag } from "react-icons/fa";
+import {
+  FaSearch,
+  FaThLarge,
+  FaList,
+  FaExclamationTriangle,
+  FaFilter,
+  FaTimes,
+  FaUser,
+  FaCut,
+  FaCalendarAlt,
+  FaClock,
+  FaMoneyBillWave,
+  FaPercent,
+  FaTag,
+  FaChevronLeft,
+  FaChevronRight,
+} from "react-icons/fa";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import BarberSelect from "../common/BarberSelect";
@@ -10,22 +26,15 @@ import {
   timeISO,
   fmtMoney,
   statusLabel,
-  monthNames,
   pad,
   num,
+  todayStr,
+  formatHistoryDateLabel,
+  formatHistoryDateFull,
 } from "./HistoryUtils";
 import "./History.scss";
 
 
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "Все" },
-  { value: "completed", label: "Завершено" },
-  { value: "booked", label: "Забронировано" },
-  { value: "confirmed", label: "Подтверждено" },
-  { value: "canceled", label: "Отменено" },
-  { value: "no_show", label: "Не явился" },
-];
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Новые" },
@@ -34,12 +43,25 @@ const SORT_OPTIONS = [
   { value: "price_asc", label: "Дешевле" },
 ];
 
-const pluralRecords = (n) => {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
-  return "записей";
+const QUICK_STATUS = [
+  { value: "all", label: "Все" },
+  { value: "completed", label: "Завершено" },
+  { value: "booked", label: "Бронь" },
+  { value: "confirmed", label: "Подтв." },
+  { value: "canceled", label: "Отмена" },
+];
+
+const clientInitials = (name) => {
+  const parts = String(name || "?")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
 };
 
 const History = () => {
@@ -51,10 +73,9 @@ const History = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  const [yearFilter, setYearFilter] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
-  const [dayFilter, setDayFilter] = useState("");
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [page, setPage] = useState(1);
+  const dateInputRef = useRef(null);
 
   // Server-side список: состояние данных
   const [appointments, setAppointments] = useState([]);
@@ -120,35 +141,13 @@ const History = () => {
     }
   };
 
-  // Формирование date_start и date_end из фильтров
+  // Диапазон даты для API (по умолчанию — сегодня)
   const getDateRange = useCallback(() => {
-    if (!yearFilter) return { date_start: null, date_end: null };
+    if (!selectedDate) return { date_start: null, date_end: null };
+    return { date_start: selectedDate, date_end: selectedDate };
+  }, [selectedDate]);
 
-    const year = Number(yearFilter);
-    if (!Number.isFinite(year)) return { date_start: null, date_end: null };
-
-    let dateStart = `${year}-01-01`;
-    let dateEnd = `${year}-12-31`;
-
-    if (monthFilter) {
-      const month = Number(monthFilter);
-      if (Number.isFinite(month) && month >= 1 && month <= 12) {
-        const daysInMonth = new Date(year, month, 0).getDate();
-        dateStart = `${year}-${pad(month)}-01`;
-        dateEnd = `${year}-${pad(month)}-${pad(daysInMonth)}`;
-
-        if (dayFilter) {
-          const day = Number(dayFilter);
-          if (Number.isFinite(day) && day >= 1 && day <= daysInMonth) {
-            dateStart = `${year}-${pad(month)}-${pad(day)}`;
-            dateEnd = dateStart;
-          }
-        }
-      }
-    }
-
-    return { date_start: dateStart, date_end: dateEnd };
-  }, [yearFilter, monthFilter, dayFilter]);
+  const isToday = selectedDate === todayStr();
 
   // Debounce для search (400ms)
   useEffect(() => {
@@ -170,7 +169,7 @@ const History = () => {
   // Сброс page при изменении search или ordering или фильтров
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, sortBy, statusFilter, yearFilter, monthFilter, dayFilter]);
+  }, [debouncedSearch, sortBy, statusFilter, selectedDate]);
 
   // Основной эффект для загрузки appointments (server-side)
   useEffect(() => {
@@ -187,7 +186,7 @@ const History = () => {
     const currentRequestId = ++requestIdRef.current;
 
     // Формируем query params
-    const params = {};
+    const params = { page_size: 500 };
     if (debouncedSearch.trim()) {
       params.search = debouncedSearch.trim();
     }
@@ -284,6 +283,18 @@ const History = () => {
     };
   }, [debouncedSearch, sortBy, page, statusFilter, getDateRange]);
 
+  const dayTotal = useMemo(
+    () =>
+      appointments.reduce((sum, a) => {
+        const price = num(a?.price);
+        return sum + (price ?? 0);
+      }, 0),
+    [appointments],
+  );
+
+  const dateLabel = formatHistoryDateLabel(selectedDate, isToday);
+  const dateSubtitle = formatHistoryDateFull(selectedDate);
+
   // Cleanup при размонтировании компонента
   useEffect(() => {
     return () => {
@@ -302,45 +313,37 @@ const History = () => {
 
   
 
-  /* Options for year/month/day filters */
-  const yearOptions = useMemo(
-    () => [
-      { value: "", label: "Все" },
-      { value: "2025", label: "2025" },
-      { value: "2026", label: "2026" },
-      { value: "2027", label: "2027" },
-    ],
-    []
-  );
+  const hasFilters =
+    search ||
+    statusFilter !== "all" ||
+    sortBy !== "newest" ||
+    selectedDate !== todayStr();
 
-  const monthOptions = useMemo(
-    () => [
-      { value: "", label: "Все" },
-      ...monthNames.map((label, idx) => ({ value: String(idx + 1), label })),
-    ],
-    []
-  );
+  const handleReset = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setSortBy("newest");
+    setSelectedDate(todayStr());
+    setPage(1);
+    setFiltersOpen(false);
+  };
 
-  const daysInMonth = useMemo(() => {
-    if (!yearFilter || !monthFilter) return 31;
-    const y = Number(yearFilter);
-    const m = Number(monthFilter);
-    if (!Number.isFinite(y) || !Number.isFinite(m)) return 31;
-    return new Date(y, m, 0).getDate();
-  }, [yearFilter, monthFilter]);
+  const handleClearFilters = () => {
+    setStatusFilter("all");
+    setSortBy("newest");
+  };
 
-  const dayOptions = useMemo(
-    () => [
-      { value: "", label: "Все" },
-      ...Array.from({ length: daysInMonth }).map((_, i) => ({
-        value: String(i + 1),
-        label: pad(i + 1),
-      })),
-    ],
-    [daysInMonth]
-  );
+  const shiftDate = (days) => {
+    const d = new Date(`${selectedDate}T12:00:00`);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    );
+  };
 
-  // Вычисляем totalPages на основе count
+  const openDatePicker = () => {
+    dateInputRef.current?.showPicker?.();
+  };
   const totalPages = useMemo(() => {
     if (appointmentsCount === 0) return 1;
     const pageSize = appointments.length || 1;
@@ -350,52 +353,6 @@ const History = () => {
     }
     return page;
   }, [appointmentsCount, appointments.length, appointmentsNext, page]);
-
-  const counterText = loading
-    ? "Загрузка..."
-    : appointmentsCount === 0
-    ? "Нет записей"
-    : `${appointmentsCount} ${pluralRecords(appointmentsCount)}`;
-
-  /* Check if filters are active */
-  const activeFiltersCount = [
-    statusFilter && statusFilter !== "all" ? statusFilter : null,
-    sortBy !== "newest" ? sortBy : null,
-    yearFilter,
-  ].filter(Boolean).length;
-
-  const hasFilters = search || activeFiltersCount > 0;
-
-  const handleReset = () => {
-    setSearch("");
-    setStatusFilter("all");
-    setSortBy("newest");
-    setYearFilter("");
-    setMonthFilter("");
-    setDayFilter("");
-    setPage(1);
-    setFiltersOpen(false);
-  };
-
-  const handleClearFilters = () => {
-    setStatusFilter("all");
-    setSortBy("newest");
-    setYearFilter("");
-    setMonthFilter("");
-    setDayFilter("");
-  };
-
-  /* Handlers with cascade reset */
-  const handleYearChange = (val) => {
-    setYearFilter(val);
-    setMonthFilter("");
-    setDayFilter("");
-  };
-
-  const handleMonthChange = (val) => {
-    setMonthFilter(val);
-    setDayFilter("");
-  };
 
   /* Get record data - используем данные напрямую из API */
   const getRecordData = (a) => {
@@ -546,20 +503,24 @@ const History = () => {
         className="barberhistory__card"
         onClick={() => setSelectedRecord(a)}
       >
-        <div className="barberhistory__cardHead">
-          <h4 className="barberhistory__cardTitle">{data.date}</h4>
+        <div className="barberhistory__cardMain">
+          <span className="barberhistory__cardAvatar" aria-hidden="true">
+            {clientInitials(data.client)}
+          </span>
+          <div className="barberhistory__cardInfo">
+            <div className="barberhistory__cardTop">
+              <strong className="barberhistory__cardClient">{data.client}</strong>
+              <span className="barberhistory__cardTime">{data.time}</span>
+            </div>
+            <p className="barberhistory__cardService">{data.service}</p>
+            <span className="barberhistory__cardBarber">{data.barber}</span>
+          </div>
+        </div>
+        <div className="barberhistory__cardFoot">
           <span className={`barberhistory__badge barberhistory__badge--${data.statusKey}`}>
             {data.statusText}
           </span>
-        </div>
-        <div className="barberhistory__cardBody">
-          <div className="barberhistory__cardRow">
-            <span>Клиент: <strong>{data.client}</strong></span>
-          </div>
-          <div className="barberhistory__cardTotal">
-            <span className="barberhistory__cardTotalLabel">Итого:</span>
-            <span className="barberhistory__cardTotalValue">{fmtMoney(data.totalPrice)}</span>
-          </div>
+          <span className="barberhistory__cardPrice">{fmtMoney(data.totalPrice)}</span>
         </div>
       </article>
     );
@@ -570,9 +531,10 @@ const History = () => {
       <table className="barberhistory__table">
         <thead>
           <tr>
-            <th>Дата</th>
+            <th>Время</th>
             <th>Клиент</th>
-            <th>Итого</th>
+            <th>Услуги</th>
+            <th>Сумма</th>
             <th>Статус</th>
           </tr>
         </thead>
@@ -586,8 +548,19 @@ const History = () => {
                 className="barberhistory__row"
                 onClick={() => setSelectedRecord(a)}
               >
-                <td>{data.date}</td>
-                <td>{data.client}</td>
+                <td className="barberhistory__cellTime">{data.time}</td>
+                <td>
+                  <div className="barberhistory__clientCell">
+                    <span className="barberhistory__clientAvatar" aria-hidden="true">
+                      {clientInitials(data.client)}
+                    </span>
+                    <div>
+                      <span className="barberhistory__clientName">{data.client}</span>
+                      <span className="barberhistory__clientMeta">{data.barber}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="barberhistory__cellService">{data.service}</td>
                 <td className="barberhistory__cellPrice">{fmtMoney(data.totalPrice)}</td>
                 <td>
                   <span className={`barberhistory__badge barberhistory__badge--${data.statusKey}`}>
@@ -604,186 +577,233 @@ const History = () => {
 
   return (
     <section className="barberhistory">
-      <div className="barberhistory__topRow">
-        <span className="barberhistory__counter">{counterText}</span>
-        {hasFilters && (
-          <button
-            type="button"
-            className="barberhistory__resetBtn"
-            onClick={handleReset}
-          >
-            Сбросить
-          </button>
-        )}
-      </div>
+      <header className="barberhistory__hero">
+        <div className="barberhistory__heroMain">
+          <div className="barberhistory__dateNav">
+            <button
+              type="button"
+              className="barberhistory__navBtn"
+              onClick={() => shiftDate(-1)}
+              aria-label="Предыдущий день"
+            >
+              <FaChevronLeft />
+            </button>
 
-      <div className="barberhistory__actions">
+            <button
+              type="button"
+              className="barberhistory__dateDisplay"
+              onClick={openDatePicker}
+              title="Выбрать дату"
+            >
+              <input
+                ref={dateInputRef}
+                type="date"
+                className="barberhistory__dateHidden"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+              <FaCalendarAlt className="barberhistory__calIcon" />
+              <span className="barberhistory__dateText">{dateLabel}</span>
+            </button>
+
+            <button
+              type="button"
+              className="barberhistory__navBtn"
+              onClick={() => shiftDate(1)}
+              aria-label="Следующий день"
+            >
+              <FaChevronRight />
+            </button>
+
+            {!isToday ? (
+              <button
+                type="button"
+                className="barberhistory__todayBtn"
+                onClick={() => setSelectedDate(todayStr())}
+              >
+                Сегодня
+              </button>
+            ) : null}
+          </div>
+          <p className="barberhistory__heroSub">{dateSubtitle}</p>
+        </div>
+
+        <div className="barberhistory__heroStats" aria-live="polite">
+          <div className="barberhistory__stat">
+            <span className="barberhistory__statLabel">Записей</span>
+            <strong className="barberhistory__statValue">
+              {loading ? "…" : appointmentsCount}
+            </strong>
+          </div>
+          <div className="barberhistory__stat barberhistory__stat--money">
+            <span className="barberhistory__statLabel">Выручка за день</span>
+            <strong className="barberhistory__statValue">
+              {loading ? "…" : fmtMoney(dayTotal)}
+            </strong>
+          </div>
+        </div>
+      </header>
+
+      <div className="barberhistory__toolbar">
         <div className="barberhistory__searchWrap">
           <FaSearch className="barberhistory__searchIcon" />
           <input
             className="barberhistory__searchInput"
-            placeholder="Поиск..."
+            placeholder="Клиент, услуга, мастер..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Поиск"
           />
         </div>
 
-        {/* Кнопка "Фильтры" */}
-        <div className="barberhistory__filtersWrap">
-          <button
-            type="button"
-            className={`barberhistory__filtersBtn ${filtersOpen ? "is-open" : ""} ${activeFiltersCount > 0 ? "has-active" : ""}`}
-            onClick={() => setFiltersOpen(!filtersOpen)}
-          >
-            <FaFilter />
-            <span>Фильтры</span>
-            {activeFiltersCount > 0 && (
-              <span className="barberhistory__filtersBadge">{activeFiltersCount}</span>
-            )}
-          </button>
+        <div className="barberhistory__statusChips" role="group" aria-label="Статус">
+          {QUICK_STATUS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={`barberhistory__statusChip ${
+                statusFilter === item.value ? "is-active" : ""
+              }`}
+              onClick={() => setStatusFilter(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
-        <div className="barberhistory__viewToggle">
-          <button
-            className={`barberhistory__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
-            onClick={() => handleViewModeChange("table")}
-            title="Список"
-            aria-label="Список"
-          >
-            <FaList />
-          </button>
-          <button
-            className={`barberhistory__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
-            onClick={() => handleViewModeChange("cards")}
-            title="Карточки"
-            aria-label="Карточки"
-          >
-            <FaThLarge />
-          </button>
+        <div className="barberhistory__toolbarActions">
+          <div className="barberhistory__filtersWrap">
+            <button
+              type="button"
+              className={`barberhistory__filtersBtn barberhistory__filtersBtn--compact ${
+                filtersOpen ? "is-open" : ""
+              } ${sortBy !== "newest" ? "has-active" : ""}`}
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              title="Сортировка"
+            >
+              <FaFilter />
+            </button>
+          </div>
+
+          <div className="barberhistory__viewToggle">
+            <button
+              className={`barberhistory__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
+              onClick={() => handleViewModeChange("table")}
+              title="Список"
+              aria-label="Список"
+            >
+              <FaList />
+            </button>
+            <button
+              className={`barberhistory__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
+              onClick={() => handleViewModeChange("cards")}
+              title="Карточки"
+              aria-label="Карточки"
+            >
+              <FaThLarge />
+            </button>
+          </div>
+
+          {hasFilters ? (
+            <button
+              type="button"
+              className="barberhistory__resetBtn"
+              onClick={handleReset}
+            >
+              Сбросить
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {/* Модальное окно фильтров */}
+      {/* Модальное окно фильтров — только сортировка */}
       {filtersOpen && (
         <>
           <div className="barberhistory__filtersOverlay" onClick={() => setFiltersOpen(false)} />
           <div className="barberhistory__filtersPanel">
-              <div className="barberhistory__filtersPanelHeader">
-                <span className="barberhistory__filtersPanelTitle">Фильтры</span>
+            <div className="barberhistory__filtersPanelHeader">
+              <span className="barberhistory__filtersPanelTitle">Сортировка</span>
+              <button
+                type="button"
+                className="barberhistory__filtersPanelClose"
+                onClick={() => setFiltersOpen(false)}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="barberhistory__filtersPanelBody">
+              <div className="barberhistory__filtersPanelRow">
+                <label className="barberhistory__filtersPanelLabel">Порядок</label>
+                <BarberSelect
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={SORT_OPTIONS}
+                  placeholder="Сортировка"
+                />
+              </div>
+            </div>
+
+            {sortBy !== "newest" ? (
+              <div className="barberhistory__filtersPanelFooter">
                 <button
                   type="button"
-                  className="barberhistory__filtersPanelClose"
-                  onClick={() => setFiltersOpen(false)}
+                  className="barberhistory__filtersPanelClear"
+                  onClick={handleClearFilters}
                 >
-                  <FaTimes />
+                  По умолчанию
                 </button>
               </div>
-
-              <div className="barberhistory__filtersPanelBody">
-                <div className="barberhistory__filtersPanelRow">
-                  <label className="barberhistory__filtersPanelLabel">Статус</label>
-                  <BarberSelect
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={STATUS_OPTIONS}
-                    placeholder="Все статусы"
-                  />
-                </div>
-
-                <div className="barberhistory__filtersPanelRow">
-                  <label className="barberhistory__filtersPanelLabel">Сортировка</label>
-                  <BarberSelect
-                    value={sortBy}
-                    onChange={setSortBy}
-                    options={SORT_OPTIONS}
-                    placeholder="Сортировка"
-                  />
-                </div>
-
-                <div className="barberhistory__filtersPanelRow">
-                  <label className="barberhistory__filtersPanelLabel">Год</label>
-                  <BarberSelect
-                    value={yearFilter}
-                    onChange={handleYearChange}
-                    options={yearOptions}
-                    placeholder="Все годы"
-                  />
-                </div>
-
-                <div className="barberhistory__filtersPanelRow">
-                  <label className="barberhistory__filtersPanelLabel">Месяц</label>
-                  <BarberSelect
-                    value={monthFilter}
-                    onChange={handleMonthChange}
-                    options={monthOptions}
-                    placeholder="Все месяцы"
-                    disabled={!yearFilter}
-                  />
-                </div>
-
-                <div className="barberhistory__filtersPanelRow">
-                  <label className="barberhistory__filtersPanelLabel">День</label>
-                  <BarberSelect
-                    value={dayFilter}
-                    onChange={setDayFilter}
-                    options={dayOptions}
-                    placeholder="Все дни"
-                    disabled={!yearFilter || !monthFilter}
-                  />
-                </div>
-              </div>
-
-              {activeFiltersCount > 0 && (
-                <div className="barberhistory__filtersPanelFooter">
-                  <button
-                    type="button"
-                    className="barberhistory__filtersPanelClear"
-                    onClick={handleClearFilters}
-                  >
-                    Очистить
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-      {!!err && <div className="barberhistory__alert">{err}</div>}
-
-      {!isLoggedIn && !loading && appointments.length === 0 && (
-        <div className="barberhistory__warning">
-          <FaExclamationTriangle className="barberhistory__warningIcon" />
-          <span>Войдите, чтобы увидеть историю записей</span>
-        </div>
-      )}
-
-      {loading ? (
-        <Loading message="Загрузка..." />
-      ) : appointments.length === 0 ? (
-        <div className="barberhistory__empty">
-          {hasFilters ? "Не найдено" : "Нет записей"}
-        </div>
-      ) : (
-        <>
-          {viewMode === "cards" ? (
-            <div className="barberhistory__list">
-              {appointments.map(renderCard)}
-            </div>
-          ) : (
-            renderTable()
-          )}
-
-          <Pager
-            count={appointmentsCount}
-            page={page}
-            totalPages={totalPages}
-            next={appointmentsNext}
-            previous={appointmentsPrevious}
-            onChange={setPage}
-          />
+            ) : null}
+          </div>
         </>
       )}
+
+      <div className="barberhistory__board">
+        {!!err && <div className="barberhistory__alert">{err}</div>}
+
+        {!isLoggedIn && !loading && appointments.length === 0 ? (
+          <div className="barberhistory__warning">
+            <FaExclamationTriangle className="barberhistory__warningIcon" />
+            <span>Войдите, чтобы увидеть историю записей</span>
+          </div>
+        ) : null}
+
+        {loading ? (
+          <Loading message="Загрузка..." />
+        ) : appointments.length === 0 ? (
+          <div className="barberhistory__empty">
+            <FaCalendarAlt className="barberhistory__emptyIcon" aria-hidden="true" />
+            <strong>
+              {hasFilters ? "Ничего не найдено" : "На этот день записей нет"}
+            </strong>
+            <p>
+              {hasFilters
+                ? "Измените фильтры или выберите другую дату"
+                : "Записи за выбранный день появятся здесь"}
+            </p>
+          </div>
+        ) : (
+          <>
+            {viewMode === "cards" ? (
+              <div className="barberhistory__list">
+                {appointments.map(renderCard)}
+              </div>
+            ) : (
+              renderTable()
+            )}
+
+            <Pager
+              count={appointmentsCount}
+              page={page}
+              totalPages={totalPages}
+              next={appointmentsNext}
+              previous={appointmentsPrevious}
+              onChange={setPage}
+            />
+          </>
+        )}
+      </div>
 
       {renderModal()}
     </section>

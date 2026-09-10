@@ -1,8 +1,8 @@
 // RecordaServicesPicker.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FaSearch, FaTimes, FaChevronDown } from "react-icons/fa";
+import { FaSearch, FaChevronDown } from "react-icons/fa";
 import "../Recorda.scss";
-import { fmtMoney } from "./RecordaUtils";
+import { fmtMoney, groupServiceIds, incrementServiceId, decrementServiceId, getServiceQty, setServiceQty, MAX_SERVICE_QTY_PER_ITEM } from "./RecordaUtils";
 
 const RecordaServicesPicker = ({
   items = [],
@@ -128,19 +128,27 @@ const RecordaServicesPicker = ({
   const handlePickMulti = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
-    onChange?.([...safeSelected, String(id)]);
+    onChange?.(incrementServiceId(safeSelected, id));
     setQ("");
     setOpen(false);
     resetCreateSignals();
   };
 
-  const handleRemoveMulti = (e, index) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const next = safeSelected.filter((_, i) => i !== index);
-    onChange?.(next);
+  const groupedSelected = useMemo(
+    () => groupServiceIds(safeSelected),
+    [safeSelected],
+  );
+
+  const handleIncrement = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChange?.(incrementServiceId(safeSelected, id));
+  };
+
+  const handleDecrement = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChange?.(decrementServiceId(safeSelected, id));
   };
 
   /* ===========================
@@ -277,8 +285,7 @@ const RecordaServicesPicker = ({
             <div className="barberrecorda__svcSummaryCard">
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.count}</span>
-                <span className="barberrecorda__svcSummaryLabel">услуг</span>
-                
+                <span className="barberrecorda__svcSummaryLabel">поз.</span>
               </div>
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.totalMinutes}</span>
@@ -291,32 +298,67 @@ const RecordaServicesPicker = ({
           )}
 
           <div className="barberrecorda__svcCards">
-            {safeSelected.map((id, idx) => {
+            {groupedSelected.map(({ id, qty }) => {
               const it = items.find((x) => String(x.id) === String(id));
               if (!it) return null;
 
               const name = it.label || "Услуга";
               const mm = it.minutes || 0;
               const price = it.price;
+              const lineTotal =
+                Number.isFinite(price) && qty > 1 ? price * qty : price;
 
               return (
-                <div key={`${id}-${idx}`} className="barberrecorda__svcCard" title={name}>
-                  <div className="barberrecorda__svcCardIndex">{idx + 1}</div>
+                <div key={id} className="barberrecorda__svcCard" title={name}>
+                  <div className="barberrecorda__svcCardQtyCtrl">
+                    <button
+                      type="button"
+                      className="barberrecorda__svcCardQtyBtn"
+                      aria-label={`Убрать одну «${name}»`}
+                      onClick={(e) => handleDecrement(e, id)}
+                    >
+                      −
+                    </button>
+                    <span className="barberrecorda__svcCardQtyValue">{qty}</span>
+                    <button
+                      type="button"
+                      className="barberrecorda__svcCardQtyBtn"
+                      aria-label={`Добавить «${name}»`}
+                      disabled={qty >= MAX_SERVICE_QTY_PER_ITEM}
+                      onClick={(e) => handleIncrement(e, id)}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="barberrecorda__svcCardPresets">
+                    {[4, 6, 10].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={`barberrecorda__svcCardPreset ${
+                          qty === preset ? "is-active" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onChange?.(setServiceQty(safeSelected, id, preset));
+                        }}
+                      >
+                        ×{preset}
+                      </button>
+                    ))}
+                  </div>
                   <div className="barberrecorda__svcCardMain">
                     <div className="barberrecorda__svcCardTitle">{name}</div>
                     <div className="barberrecorda__svcCardMeta">
-                      {mm ? `${mm}м` : "—"}{" "}
-                      {Number.isFinite(price) ? `· ${fmtMoney(price)}` : ""}
+                      {mm ? `${mm * qty}м` : "—"}
+                      {Number.isFinite(lineTotal)
+                        ? ` · ${fmtMoney(lineTotal)}`
+                        : Number.isFinite(price)
+                        ? ` · ${fmtMoney(price)}`
+                        : ""}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="barberrecorda__svcCardDel"
-                    aria-label="Убрать услугу"
-                    onClick={(e) => handleRemoveMulti(e, idx)}
-                  >
-                    <FaTimes />
-                  </button>
                 </div>
               );
             })}

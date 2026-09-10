@@ -1,23 +1,37 @@
 // RecordaHeader.jsx
 import React, { useRef, useState } from "react";
-import { FaPlus, FaChevronLeft, FaChevronRight, FaCalendarAlt, FaFilter, FaTimes, FaWalking } from "react-icons/fa";
+import {
+  FaPlus,
+  FaChevronLeft,
+  FaChevronRight,
+  FaCalendarAlt,
+  FaFilter,
+  FaTimes,
+  FaWalking,
+  FaTrash,
+  FaArrowLeft,
+  FaClock,
+} from "react-icons/fa";
 import BarberSelect from "../../common/BarberSelect";
+import { RECORDA_VIEW } from "./RecordaUtils";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Все статусы" },
   { value: "booked", label: "Забронировано" },
   { value: "confirmed", label: "Подтверждено" },
   { value: "completed", label: "Завершено" },
-  { value: "cancelled", label: "Отменено" },
+  { value: "canceled", label: "Отменено" },
   { value: "no_show", label: "Не явился" },
 ];
 
 const RecordaHeader = ({
+  viewMode = RECORDA_VIEW.SCHEDULE,
   fltDate,
   fltBarber,
   fltStatus,
   barbers,
   recordsCount,
+  deletedCount = 0,
   onDateChange,
   onBarberChange,
   onStatusChange,
@@ -27,27 +41,33 @@ const RecordaHeader = ({
   isToday,
   onAddClick,
   onWalkInClick,
+  onOpenDeletedView,
+  onBackToSchedule,
+  canViewDeleted = false,
+  workBounds,
+  onOpenWorkSchedule,
 }) => {
   const dateInputRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const isDeletedView = viewMode === RECORDA_VIEW.DELETED;
 
   const barberOptions = [
     { value: "", label: "Все мастера" },
     ...barbers.map((b) => ({ value: String(b.id), label: b.name })),
   ];
 
-  // Считаем активные фильтры
   const activeFiltersCount = [
     fltBarber ? fltBarber : null,
-    fltStatus ? fltStatus : null,
+    !isDeletedView && fltStatus ? fltStatus : null,
   ].filter(Boolean).length;
 
   const handleClearFilters = () => {
     onBarberChange("");
-    onStatusChange("");
+    if (!isDeletedView) {
+      onStatusChange("");
+    }
   };
 
-  // Форматирование даты для отображения
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -55,117 +75,179 @@ const RecordaHeader = ({
     return d.toLocaleDateString("ru-RU", options);
   };
 
-  // Открыть пикер даты
   const openDatePicker = () => {
     dateInputRef.current?.showPicker?.();
   };
 
   return (
     <>
-      <div className="barberrecorda__topBar">
-        {/* Навигация по датам */}
-        <div className="barberrecorda__dateNav">
-          <button
-            type="button"
-            className="barberrecorda__navBtn"
-            onClick={onPrevDay}
-            aria-label="Предыдущий день"
-            title="Предыдущий день"
-          >
-            <FaChevronLeft />
-          </button>
-
-          <button
-            type="button"
-            className="barberrecorda__dateDisplay"
-            onClick={openDatePicker}
-            title="Выбрать дату"
-          >
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="barberrecorda__dateHidden"
-              value={fltDate}
-              onChange={(e) => onDateChange(e.target.value)}
-            />
-            <FaCalendarAlt className="barberrecorda__calIcon" />
-            <span className="barberrecorda__dateText">
-              {formatDisplayDate(fltDate)}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="barberrecorda__navBtn"
-            onClick={onNextDay}
-            aria-label="Следующий день"
-            title="Следующий день"
-          >
-            <FaChevronRight />
-          </button>
-
-          {!isToday && (
+      <div
+        className={`barberrecorda__topBar ${
+          isDeletedView ? "barberrecorda__topBar--deleted" : ""
+        }`}
+      >
+        {isDeletedView ? (
+          <>
             <button
               type="button"
-              className="barberrecorda__todayBtn"
-              onClick={onToday}
+              className="barberrecorda__backBtn"
+              onClick={onBackToSchedule}
             >
-              Сегодня
+              <FaArrowLeft aria-hidden="true" />
+              К расписанию
             </button>
-          )}
-        </div>
 
-        {/* Счётчик записей */}
+            <div className="barberrecorda__deletedTitleWrap">
+              <h2 className="barberrecorda__deletedTitle">Удалённые записи</h2>
+              <p className="barberrecorda__deletedSubtitle">
+                Видны только администратору
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="barberrecorda__dateNav">
+            <button
+              type="button"
+              className="barberrecorda__navBtn"
+              onClick={onPrevDay}
+              aria-label="Предыдущий день"
+              title="Предыдущий день"
+            >
+              <FaChevronLeft />
+            </button>
+
+            <button
+              type="button"
+              className="barberrecorda__dateDisplay"
+              onClick={openDatePicker}
+              title="Выбрать дату"
+            >
+              <input
+                ref={dateInputRef}
+                type="date"
+                className="barberrecorda__dateHidden"
+                value={fltDate}
+                onChange={(e) => onDateChange(e.target.value)}
+              />
+              <FaCalendarAlt className="barberrecorda__calIcon" />
+              <span className="barberrecorda__dateText">
+                {formatDisplayDate(fltDate)}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="barberrecorda__navBtn"
+              onClick={onNextDay}
+              aria-label="Следующий день"
+              title="Следующий день"
+            >
+              <FaChevronRight />
+            </button>
+
+            {!isToday && (
+              <button
+                type="button"
+                className="barberrecorda__todayBtn"
+                onClick={onToday}
+              >
+                Сегодня
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="barberrecorda__counter">
           <span className="barberrecorda__counterNum">{recordsCount}</span>
           <span className="barberrecorda__counterLabel">
-            {recordsCount === 1 ? "запись" : recordsCount >= 2 && recordsCount <= 4 ? "записи" : "записей"}
+            {recordsCount === 1
+              ? "запись"
+              : recordsCount >= 2 && recordsCount <= 4
+              ? "записи"
+              : "записей"}
           </span>
         </div>
 
-        {/* Кнопка "Фильтры" */}
+        {!isDeletedView && workBounds ? (
+          <button
+            type="button"
+            className="barberrecorda__workHoursBtn"
+            onClick={onOpenWorkSchedule}
+            title="График работы календаря"
+          >
+            <FaClock aria-hidden="true" />
+            <span className="barberrecorda__workHoursText">
+              {workBounds.work_start}–{workBounds.work_end}
+            </span>
+          </button>
+        ) : null}
+
         <div className="barberrecorda__filtersWrap">
           <button
             type="button"
-            className={`barberrecorda__filtersBtn ${filtersOpen ? "is-open" : ""} ${activeFiltersCount > 0 ? "has-active" : ""}`}
+            className={`barberrecorda__filtersBtn ${
+              filtersOpen ? "is-open" : ""
+            } ${activeFiltersCount > 0 ? "has-active" : ""}`}
             onClick={() => setFiltersOpen(!filtersOpen)}
           >
             <FaFilter />
             <span>Фильтры</span>
             {activeFiltersCount > 0 && (
-              <span className="barberrecorda__filtersBadge">{activeFiltersCount}</span>
+              <span className="barberrecorda__filtersBadge">
+                {activeFiltersCount}
+              </span>
             )}
           </button>
         </div>
 
-        {/* Кнопки добавления */}
-        <button
-          type="button"
-          className="barberrecorda__btn barberrecorda__btn--walkin"
-          onClick={onWalkInClick}
-          aria-label="Клиент пришёл без записи"
-          title="Клиент пришёл без записи"
-        >
-          <FaWalking />
-          <span className="barberrecorda__btnText">Клиент пришёл</span>
-        </button>
+        {!isDeletedView && canViewDeleted ? (
+          <button
+            type="button"
+            className="barberrecorda__btn barberrecorda__btn--deletedNav"
+            onClick={onOpenDeletedView}
+            title="Удалённые записи"
+          >
+            <FaTrash aria-hidden="true" />
+            <span className="barberrecorda__btnText">Удалённые</span>
+            {deletedCount > 0 ? (
+              <span className="barberrecorda__deletedNavBadge">{deletedCount}</span>
+            ) : null}
+          </button>
+        ) : null}
 
-        <button
-          type="button"
-          className="barberrecorda__btn barberrecorda__btn--primary"
-          onClick={onAddClick}
-          aria-label="Запланировать запись"
-          title="Запланировать запись"
-        >
-          <FaPlus />
-          <span className="barberrecorda__btnText">Записать</span>
-        </button>
+        {!isDeletedView ? (
+          <>
+            <button
+              type="button"
+              className="barberrecorda__btn barberrecorda__btn--walkin"
+              onClick={onWalkInClick}
+              aria-label="Клиент пришёл без записи"
+              title="Клиент пришёл без записи"
+            >
+              <FaWalking />
+              <span className="barberrecorda__btnText">Клиент пришёл</span>
+            </button>
+
+            <button
+              type="button"
+              className="barberrecorda__btn barberrecorda__btn--primary"
+              onClick={onAddClick}
+              aria-label="Запланировать запись"
+              title="Запланировать запись"
+            >
+              <FaPlus />
+              <span className="barberrecorda__btnText">Записать</span>
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {/* Модальное окно фильтров */}
       {filtersOpen && (
         <>
-          <div className="barberrecorda__filtersOverlay" onClick={() => setFiltersOpen(false)} />
+          <div
+            className="barberrecorda__filtersOverlay"
+            onClick={() => setFiltersOpen(false)}
+          />
           <div className="barberrecorda__filtersPanel">
             <div className="barberrecorda__filtersPanelHeader">
               <span className="barberrecorda__filtersPanelTitle">Фильтры</span>
@@ -189,15 +271,17 @@ const RecordaHeader = ({
                 />
               </div>
 
-              <div className="barberrecorda__filtersPanelRow">
-                <label className="barberrecorda__filtersPanelLabel">Статус</label>
-                <BarberSelect
-                  value={fltStatus}
-                  onChange={onStatusChange}
-                  options={STATUS_OPTIONS}
-                  placeholder="Все статусы"
-                />
-              </div>
+              {!isDeletedView ? (
+                <div className="barberrecorda__filtersPanelRow">
+                  <label className="barberrecorda__filtersPanelLabel">Статус</label>
+                  <BarberSelect
+                    value={fltStatus}
+                    onChange={onStatusChange}
+                    options={STATUS_OPTIONS}
+                    placeholder="Все статусы"
+                  />
+                </div>
+              ) : null}
             </div>
 
             {activeFiltersCount > 0 && (

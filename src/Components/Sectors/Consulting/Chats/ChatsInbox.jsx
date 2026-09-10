@@ -537,7 +537,18 @@ export default function ChatsInbox() {
 
           <div className="crmInbox__list">
             {loading ? (
-              <div className="crmInbox__emptyHint">Загрузка…</div>
+              <div className="crmInbox__skeleton" aria-busy="true" aria-live="polite">
+                <span className="crmInbox__srOnly">Загрузка…</span>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div className="crmInbox__skeletonItem" key={i} aria-hidden="true">
+                    <span className="crmInbox__skeletonAvatar" />
+                    <span className="crmInbox__skeletonBody">
+                      <span className="crmInbox__skeletonLine crmInbox__skeletonLine--wide" />
+                      <span className="crmInbox__skeletonLine crmInbox__skeletonLine--narrow" />
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : filtered.length ? (
               filtered.map((t) => {
                 const active =

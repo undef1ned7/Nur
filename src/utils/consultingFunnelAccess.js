@@ -1,19 +1,164 @@
 import {
+  getFunnelOwnerUserId,
   isMainFunnel,
   isProtectedFunnel,
   isRoleFunnel,
 } from "./consultingFunnelDefaults";
 
-/** Владелец / админ. */
+/** Роль «Руководитель региона» — см. docs/consulting/backend-money-tenant/12-regional-supervisor-rbac.md */
+export const CONSULTING_SUPERVISOR_ROLE = "supervisor";
+
+/** Владелец / админ — полный доступ ко всем лидам, воронкам и настройкам. */
 export function isConsultingFunnelManager(profile) {
   const role = String(profile?.role || "").toLowerCase();
-  return role === "owner" || role === "admin";
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "rop"
+  );
+}
+
+/** Руководитель региона: видит только свои регионы, внутри — все лиды. */
+export function isConsultingRegionalSupervisor(profile) {
+  return (
+    String(profile?.role || "").toLowerCase() === CONSULTING_SUPERVISOR_ROLE
+  );
+}
+
+/** Коды регионов пользователя (нормализованные, lower-case). */
+export function getUserRegionCodes(profile) {
+  const raw = profile?.consulting_region_codes;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => String(c || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Код региона воронки (region_code / region). */
+export function resolveFunnelRegionCode(funnel) {
+  const raw = funnel?.region_code ?? funnel?.region ?? null;
+  if (raw == null || raw === "") return null;
+  return String(raw).trim().toLowerCase();
+}
+
+/** Регион в зоне ответственности пользователя. Manager — любой регион. */
+export function isRegionInUserScope(profile, regionCode) {
+  if (isConsultingFunnelManager(profile)) return true;
+  const codes = getUserRegionCodes(profile);
+  if (!codes.length) return false;
+  return codes.includes(String(regionCode || "").trim().toLowerCase());
+}
+
+/**
+ * Режим «только свои» лиды/сделки (роль «Продавец/Менеджер» без расширенных прав).
+ * Явный флаг `can_view_all_funnel_leads` снимает изоляцию без смены role.
+ */
+export function shouldIsolateConsultingByOwner(profile) {
+  if (!profile || !canViewConsultingFunnel(profile)) return false;
+  if (isConsultingFunnelManager(profile)) return false;
+  // Руководитель региона видит ВСЕ лиды своего региона, не только свои.
+  if (isConsultingRegionalSupervisor(profile)) return false;
+  const role = String(profile?.role || "").toLowerCase();
+  if (role === "salesperson") return true;
+  if (isPermissionEnabled(profile.can_view_all_funnel_leads)) return false;
+  return true;
+}
+
+/** @deprecated alias */
+export function isConsultingSalesRep(profile) {
+  return shouldIsolateConsultingByOwner(profile);
+}
+
+/** Общий inbox «Лиды» (все входящие, распределение, интеграция) — только руководство. */
+export function canAccessConsultingLeadInbox(profile) {
+  if (!profile) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  // Руководитель региона видит inbox своего региона.
+  if (isConsultingRegionalSupervisor(profile)) return true;
+  if (isPermissionEnabled(profile.can_view_leads_inbox)) return true;
+  return false;
+}
+
+/** Настройки распределения / региональные правила / Wazzup — только owner/admin/rop. */
+export function canAccessConsultingLeadSettings(profile) {
+  return isConsultingFunnelManager(profile);
+}
+
+/**
+ * Рекламный отчёт по лидам (кнопка «Финансы» на странице «Лиды»): ведение
+ * расходов на рекламу — показы, лиды, сумма затрат, стоимость лида.
+ * Доступ: owner/admin/rop либо сотрудник с правом `can_manage_lead_ad_spend`.
+ * Контракт бэкенда: docs/consulting/backend/08-lead-ad-spend.md
+ */
+export function canManageConsultingLeadFinance(profile) {
+  if (!profile) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  return isPermissionEnabled(profile.can_manage_lead_ad_spend);
+}
+
+/** Разовое выравнивание базы лидов по регионам (redistribute) — только руководство. */
+export function canRedistributeRegionalLeads(profile) {
+  return isConsultingFunnelManager(profile);
+}
+
+/** Заведение сотрудников: owner/admin/rop или руководитель региона (в свой регион). */
+export function canManageConsultingEmployees(profile) {
+  if (!profile) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  if (isConsultingRegionalSupervisor(profile)) return true;
+  return isPermissionEnabled(profile.can_view_employees);
+}
+
+/** Может ли создавать сотрудников с ролью выше «продавца» / расширенными правами. */
+export function canCreateElevatedEmployees(profile) {
+  return isConsultingFunnelManager(profile);
+}
+
+/** Идентификаторы текущего пользователя (id / user / employee) — строками. */
+export function resolveProfileUserIds(profile) {
+  return [
+    profile?.id,
+    profile?.user_id,
+    profile?.user,
+    profile?.employee_id,
+    profile?.employee,
+  ]
+    .filter((v) => v != null && v !== "")
+    .map(String);
+}
+
+/**
+ * Создание собственных воронок. Owner/admin/rop — всегда; обычный сотрудник —
+ * по праву `can_create_funnel`. Воронка сотрудника привязывается бэкендом к
+ * региональной воронке его региона (см.
+ * docs/consulting/backend-money-tenant/17-employee-region-subfunnels.md).
+ */
+export function canCreateConsultingFunnel(profile) {
+  if (!profile) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  return isPermissionEnabled(profile.can_create_funnel);
+}
+
+/** Список всех продаж компании; без права — только свои (`user=` на API). */
+export function canViewAllConsultingSales(profile) {
+  if (!profile) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  // Руководитель региона видит продажи своего региона (скоуп — на бэке).
+  if (isConsultingRegionalSupervisor(profile)) return true;
+  if (isPermissionEnabled(profile.can_view_all_sales)) return true;
+  return false;
+}
+
+/** Ограничить список воронок: только ролевая + явные grants (без auto-main). */
+export function shouldRestrictConsultingFunnelVisibility(profile) {
+  return shouldIsolateConsultingByOwner(profile);
 }
 
 /** Просмотр страницы воронки (с обратной совместимостью по can_view_sale). */
 export function canViewConsultingFunnel(profile) {
   if (!profile) return false;
   if (isConsultingFunnelManager(profile)) return true;
+  if (isConsultingRegionalSupervisor(profile)) return true;
   if (profile.can_view_funnel === true) return true;
   return profile.can_view_sale === true;
 }
@@ -75,12 +220,31 @@ export function filterFunnelsForUser(funnels, profile) {
   if (!canViewConsultingFunnel(profile)) return [];
   if (isConsultingFunnelManager(profile)) return list;
 
+  // Руководитель региона: воронки своих регионов + явные grants.
+  if (isConsultingRegionalSupervisor(profile)) {
+    const codes = new Set(getUserRegionCodes(profile));
+    const grantIds = getFunnelGrantMaps(profile).viewIds;
+    return list.filter((f) => {
+      const rc = resolveFunnelRegionCode(f);
+      if (rc && codes.has(rc)) return true;
+      return grantIds.has(String(f.id));
+    });
+  }
+
   const allowed = new Set();
   const customRole = resolveCustomRoleId(profile);
+  const restrictFunnels = shouldRestrictConsultingFunnelVisibility(profile);
+  const selfIds = new Set(resolveProfileUserIds(profile));
 
   list.forEach((f) => {
     if (customRole && resolveCustomRoleId(f) === customRole) allowed.add(f.id);
-    if (!customRole && isMainFunnel(f)) allowed.add(f.id);
+    // Главная воронка для inbound — только если нет режима изоляции продавца
+    // (региональные менеджеры видят только свою воронку из grants / роли).
+    if (!restrictFunnels && !customRole && isMainFunnel(f)) allowed.add(f.id);
+    if (!restrictFunnels && customRole && isMainFunnel(f)) allowed.add(f.id);
+    // Подворонка, созданная самим сотрудником, — всегда видна её автору.
+    const ownerUserId = getFunnelOwnerUserId(f);
+    if (ownerUserId && selfIds.has(ownerUserId)) allowed.add(f.id);
   });
 
   getFunnelGrantMaps(profile).viewIds.forEach((id) => allowed.add(String(id)));
@@ -92,6 +256,12 @@ export function filterFunnelsForUser(funnels, profile) {
 export function canManageLeadsInFunnel(profile, funnel) {
   if (!profile || !funnel) return false;
   if (isConsultingFunnelManager(profile)) return true;
+
+  // Руководитель региона управляет лидами воронок своего региона.
+  if (isConsultingRegionalSupervisor(profile)) {
+    const rc = resolveFunnelRegionCode(funnel);
+    if (rc && getUserRegionCodes(profile).includes(rc)) return true;
+  }
 
   const funnelId = String(funnel.id);
   const { manageIds } = getFunnelGrantMaps(profile);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
+import { areNotificationsEnabled } from "../../../../config/notificationPreferences";
 
 /**
  * Реалтайм для сектора «Консалтинг» поверх общего per-user сокета уведомлений
@@ -16,6 +17,7 @@ import { useSelector } from "react-redux";
 
 export function ensurePushPermission() {
   try {
+    if (!areNotificationsEnabled()) return;
     if (
       typeof Notification !== "undefined" &&
       Notification.permission === "default"
@@ -29,6 +31,7 @@ export function ensurePushPermission() {
 
 function showDesktopPush(title, body) {
   try {
+    if (!areNotificationsEnabled()) return;
     if (typeof Notification === "undefined") return;
     if (
       Notification.permission === "granted" &&

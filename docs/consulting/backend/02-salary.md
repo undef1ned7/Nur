@@ -178,7 +178,7 @@ if fixed:
 прошлый месяц. Идемпотентность — `UniqueConstraint(fields=["sale", "kind"],
 condition=~Q(status="canceled"))`.
 
-Отмена/возврат продажи → см. [08-sale-cancel.md](./08-sale-cancel.md) §8.4 п.3.
+Отмена/возврат продажи → см. [../backend-money-tenant/02-sale-cancel.md](../backend-money-tenant/02-sale-cancel.md) §8.4 п.3.
 
 ## 2.5. Оклад
 

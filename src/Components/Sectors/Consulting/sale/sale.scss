@@ -271,8 +271,8 @@
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 10px;
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     display: grid;
     place-items: center;
     cursor: pointer;
@@ -414,6 +414,7 @@
 
   &__cardActions {
     display: flex;
+    align-items: center;
     gap: 8px;
     flex-wrap: wrap;
     margin-top: auto;
@@ -442,8 +443,123 @@
     margin-bottom: 12px;
   }
 
+  &__filtersBar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  &__filtersToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+    &.is-active {
+      background: var(--text);
+      border-color: var(--text);
+      color: #fff;
+    }
+  }
+
+  &__filtersBadge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #111;
+    font-size: 11px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__filtersToggle.is-active &__filtersBadge {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+  }
+
+  &__filtersRefresh {
+    flex: 0 0 auto;
+  }
+
+  &__filtersRefreshDesktop {
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 720px) {
+    &__filtersBar {
+      display: flex;
+    }
+
+    &__filters {
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      margin-bottom: 0;
+
+      &--open {
+        display: flex;
+        margin-bottom: 12px;
+      }
+
+      .cList__search {
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+      }
+
+      .cList__input {
+        width: 100%;
+      }
+
+      .cList__period {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .cList__periodPresets {
+        flex-wrap: wrap;
+      }
+
+      .cList__periodDates {
+        width: 100%;
+      }
+
+      .cList__periodDates .cList__input {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+
+      .sale__filtersSpacer,
+      .sale__filtersRefreshDesktop {
+        display: none;
+      }
+    }
+  }
+
   &__status {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 3px 9px;
     border-radius: 999px;
     background: #dcfce7;
@@ -451,6 +567,7 @@
     font-size: 11.5px;
     font-weight: 700;
     white-space: nowrap;
+    line-height: 1.2;
 
     &--canceled {
       background: #fee2e2;
@@ -541,7 +658,7 @@
   }
 
   &__segment {
-    height: 34px;
+    height: 36px;
     padding: 0 14px;
     border: 0;
     border-radius: 8px;

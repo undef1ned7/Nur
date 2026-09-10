@@ -103,8 +103,13 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
     Маркет: MARKET_ACCESS_TYPES,
     Барбершоп: [
       {
-        value: "Клиенты Барбершопа",
-        label: "Клиенты Барбершопа",
+        value: "Аналитика",
+        label: "Аналитика",
+        backendKey: "can_view_cashbox",
+      },
+      {
+        value: "Клиенты",
+        label: "Клиенты",
         backendKey: "can_view_barber_clients",
       },
       {

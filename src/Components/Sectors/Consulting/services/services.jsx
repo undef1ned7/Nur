@@ -34,7 +34,10 @@ const emptyServiceForm = () => ({
   name: "",
   price: "0",
   description: "",
-  tariffs: [],
+  // «Дополнительные услуги» — {название, цена}. Хранятся в поле `tariffs`
+  // (бэк не трогаем), но в UI слово «тариф» больше не используется.
+  // Одна пустая строка показана сразу, чтобы поля были на виду.
+  tariffs: [{ name: "", price: "" }],
   role_prices: [], // [{ custom_role, price }] — цена услуги для конкретных ролей
   custom_role: "", // роль, к которой относится услуга ("" = общая, видна везде)
 });
@@ -51,7 +54,7 @@ function RolePricesEditor({
   const rows = rolePrices;
 
   const usedRoleIds = new Set(
-    rows.map((r) => String(r.custom_role || "")).filter(Boolean)
+    rows.map((r) => String(r.custom_role || "")).filter(Boolean),
   );
 
   const setRow = (idx, patch) =>
@@ -132,111 +135,67 @@ function RolePricesEditor({
   );
 }
 
-function TariffEditor({ tariffs, roles, onChange, disabled }) {
-  const rows = tariffs?.length
-    ? tariffs
-    : [
-        {
-          name: "",
-          price: "",
-          subscription_amount: "",
-          subscription_period: "month",
-          role_prices: [],
-        },
-      ];
+/* Дополнительные услуги — упрощённый список {название, цена}.
+   Хранится в том же поле `tariffs`, что и раньше (бэк не трогаем), но в UI
+   слово «тариф» больше не используется. Всегда показываем минимум одну строку,
+   чтобы поля были на виду. Пустые строки при сохранении отбрасываются. */
+function AdditionalServicesEditor({ items, onChange, disabled }) {
+  const rows =
+    Array.isArray(items) && items.length ? items : [{ name: "", price: "" }];
 
-  const setRow = (idx, patch) => {
-    const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-    onChange(next);
-  };
-
-  const addRow = () =>
-    onChange([...rows, { name: "", price: "", role_prices: [] }]);
-
+  const setRow = (idx, patch) =>
+    onChange(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const addRow = () => onChange([...rows, { name: "", price: "" }]);
   const removeRow = (idx) => {
     const next = rows.filter((_, i) => i !== idx);
-    onChange(next.length ? next : [{ name: "", price: "", role_prices: [] }]);
+    onChange(next.length ? next : [{ name: "", price: "" }]);
   };
 
   return (
     <div className="services__tariffs">
       <div className="services__tariffsHead">
-        <span className="services__label">Тарифы</span>
+        <span className="services__label">Дополнительные услуги</span>
         <button
           type="button"
           className="services__btn services__btn--secondary"
           onClick={addRow}
           disabled={disabled}
         >
-          <FaPlus /> Тариф
+          <FaPlus /> Доп. услуга
         </button>
       </div>
       {rows.map((row, idx) => (
-        <div key={idx} className="services__tariffBlock">
-          <div className="services__tariffRow">
-            <input
-              className="services__input"
-              placeholder="Название тарифа"
-              value={row.name}
-              onChange={(e) => setRow(idx, { name: e.target.value })}
-              disabled={disabled}
-            />
-            <input
-              className="services__input"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Цена"
-              value={row.price}
-              onChange={(e) => setRow(idx, { price: e.target.value })}
-              disabled={disabled}
-            />
-            <input
-              className="services__input services__input--sub"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Абон. плата"
-              title="Абонентская плата (опционально)"
-              value={row.subscription_amount ?? ""}
-              onChange={(e) =>
-                setRow(idx, { subscription_amount: e.target.value })
-              }
-              disabled={disabled}
-            />
-            <select
-              className="services__input services__input--subPeriod"
-              value={row.subscription_period || "month"}
-              onChange={(e) =>
-                setRow(idx, { subscription_period: e.target.value })
-              }
-              disabled={disabled || !row.subscription_amount}
-              title="Период абонентской платы"
-            >
-              <option value="month">/ мес.</option>
-              <option value="year">/ год</option>
-            </select>
-            <button
-              type="button"
-              className="services__iconBtn"
-              onClick={() => removeRow(idx)}
-              disabled={disabled || rows.length <= 1}
-              aria-label="Удалить тариф"
-            >
-              <FaTrash />
-            </button>
-          </div>
-          <RolePricesEditor
-            rolePrices={row.role_prices || []}
-            roles={roles}
-            onChange={(role_prices) => setRow(idx, { role_prices })}
+        <div key={idx} className="services__tariffRow">
+          <input
+            className="services__input"
+            placeholder="Название доп. услуги"
+            value={row.name}
+            onChange={(e) => setRow(idx, { name: e.target.value })}
             disabled={disabled}
-            compact
           />
+          <input
+            className="services__input"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Цена, с"
+            value={row.price}
+            onChange={(e) => setRow(idx, { price: e.target.value })}
+            disabled={disabled}
+          />
+          <button
+            type="button"
+            className="services__iconBtn"
+            onClick={() => removeRow(idx)}
+            disabled={disabled || (rows.length <= 1 && !row.name && !row.price)}
+            aria-label="Удалить дополнительную услугу"
+          >
+            <FaTrash />
+          </button>
         </div>
       ))}
       <p className="services__hint">
-        При сохранении тарифы заменяются целиком. Пустые строки не отправляются.
+        Необязательно. Пустые строки при сохранении не отправляются.
       </p>
     </div>
   );
@@ -266,7 +225,9 @@ export default function ConsultingServices({
 
   const effLoading = loading || loadingFromSlice || servicesList.loading;
   const effError = error || errorFromSlice || servicesList.error;
-  const [viewMode, setViewMode] = usePersistedViewMode(SERVICES_VIEW_STORAGE_KEY);
+  const [viewMode, setViewMode] = usePersistedViewMode(
+    SERVICES_VIEW_STORAGE_KEY,
+  );
 
   /* создание */
   const [createOpen, setCreateOpen] = useState(false);
@@ -333,9 +294,9 @@ export default function ConsultingServices({
         .sort(
           (a, b) =>
             new Date(b.updated_at || b.created_at || 0) -
-            new Date(a.updated_at || a.created_at || 0)
+            new Date(a.updated_at || a.created_at || 0),
         ),
-    [servicesList.items]
+    [servicesList.items],
   );
 
   /* группировка услуг по ролям: каждая роль — отдельный блок,
@@ -371,26 +332,34 @@ export default function ConsultingServices({
     const tariffs = normalizeTariffsForApi(f.tariffs);
     const rolePrices = normalizeRolePricesForApi(f.role_prices);
 
-    if (!title) return setErrState("Укажите название услуги."), false;
+    if (!title) return (setErrState("Укажите название услуги."), false);
     if (title.length < 2 || title.length > 120)
-      return setErrState("Название: 2–120 символов."), false;
+      return (setErrState("Название: 2–120 символов."), false);
     if (!tariffs.length && !(price > 0))
-      return setErrState("Укажите цену или добавьте хотя бы один тариф."), false;
+      return (
+        setErrState(
+          "Укажите абонентскую плату или добавьте дополнительную услугу с ценой.",
+        ),
+        false
+      );
     if (tariffs.some((t) => !t.name || t.price < 0))
-      return setErrState("У каждого тарифа должны быть название и цена ≥ 0."), false;
+      return (
+        setErrState(
+          "У каждой дополнительной услуги должны быть название и цена ≥ 0.",
+        ),
+        false
+      );
     // Пустая (без роли) строка цены по роли — подсказка вместо молчаливого игнора
     if (
       (f.role_prices || []).some(
-        (r) => !r.custom_role && String(r.price || "").trim() !== ""
+        (r) => !r.custom_role && String(r.price || "").trim() !== "",
       )
     )
-      return (
-        setErrState("Выберите роль для указанной цены по роли."), false
-      );
+      return (setErrState("Выберите роль для указанной цены по роли."), false);
     if (rolePrices.some((r) => r.price < 0))
-      return setErrState("Цена по роли не может быть отрицательной."), false;
+      return (setErrState("Цена по роли не может быть отрицательной."), false);
     if (String(f.description || "").length > 800)
-      return setErrState("Описание: максимум 800 символов."), false;
+      return (setErrState("Описание: максимум 800 символов."), false);
     setErrState("");
     return true;
   };
@@ -423,7 +392,7 @@ export default function ConsultingServices({
     } catch (err) {
       setCreateErr(
         (typeof err === "string" ? err : err?.detail) ||
-          "Не удалось создать услугу. Попробуйте ещё раз."
+          "Не удалось создать услугу. Попробуйте ещё раз.",
       );
     } finally {
       setCreateSaving(false);
@@ -442,17 +411,21 @@ export default function ConsultingServices({
         custom_role: r.custom_role ? String(r.custom_role) : "",
         price: r.price != null ? String(r.price) : "",
       })),
-      tariffs: (s.tariffs || []).map((t) => ({
-        name: t.name || "",
-        price: String(t.price ?? ""),
-        subscription_amount:
-          t.subscription_amount != null ? String(t.subscription_amount) : "",
-        subscription_period: t.subscription_period || "month",
-        role_prices: (t.role_prices || []).map((r) => ({
-          custom_role: r.custom_role ? String(r.custom_role) : "",
-          price: r.price != null ? String(r.price) : "",
-        })),
-      })),
+      tariffs: (s.tariffs || []).length
+        ? (s.tariffs || []).map((t) => ({
+            name: t.name || "",
+            price: String(t.price ?? ""),
+            subscription_amount:
+              t.subscription_amount != null
+                ? String(t.subscription_amount)
+                : "",
+            subscription_period: t.subscription_period || "month",
+            role_prices: (t.role_prices || []).map((r) => ({
+              custom_role: r.custom_role ? String(r.custom_role) : "",
+              price: r.price != null ? String(r.price) : "",
+            })),
+          }))
+        : [{ name: "", price: "" }],
     });
     setEditErr("");
     setEditOpen(true);
@@ -469,7 +442,7 @@ export default function ConsultingServices({
     setEditSaving(true);
     try {
       await dispatch(
-        editConsultingService({ id: editForm.id, data: dto })
+        editConsultingService({ id: editForm.id, data: dto }),
       ).unwrap();
       setEditOpen(false);
       setEditForm(emptyServiceForm());
@@ -478,7 +451,7 @@ export default function ConsultingServices({
     } catch (err) {
       setEditErr(
         (typeof err === "string" ? err : err?.detail) ||
-          "Не удалось сохранить изменения. Попробуйте ещё раз."
+          "Не удалось сохранить изменения. Попробуйте ещё раз.",
       );
     } finally {
       setEditSaving(false);
@@ -488,30 +461,27 @@ export default function ConsultingServices({
   /* УДАЛЕНИЕ */
   const removeService = (s) => {
     if (!s?.id) return;
-    confirm(
-      `Удалить услугу «${s.title ?? s.name ?? "—"}»?`,
-      async (result) => {
-        if (!result) return;
-        setDeletingIds((prev) => new Set(prev).add(s.id));
-        try {
-          await dispatch(deleteConsultingService(s.id)).unwrap();
-          dispatch(getConsultingServices());
-      servicesList.refresh();
-        } catch (err) {
-          alert(
-            (typeof err === "string" ? err : err?.detail) ||
-              "Не удалось удалить услугу.",
-            true
-          );
-        } finally {
-          setDeletingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(s.id);
-            return next;
-          });
-        }
+    confirm(`Удалить услугу «${s.title ?? s.name ?? "—"}»?`, async (result) => {
+      if (!result) return;
+      setDeletingIds((prev) => new Set(prev).add(s.id));
+      try {
+        await dispatch(deleteConsultingService(s.id)).unwrap();
+        dispatch(getConsultingServices());
+        servicesList.refresh();
+      } catch (err) {
+        alert(
+          (typeof err === "string" ? err : err?.detail) ||
+            "Не удалось удалить услугу.",
+          true,
+        );
+      } finally {
+        setDeletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(s.id);
+          return next;
+        });
       }
-    );
+    });
   };
 
   const renderServiceActions = (s) => (
@@ -535,33 +505,14 @@ export default function ConsultingServices({
     </>
   );
 
-  const formatTariffs = (s) =>
-    (s.tariffs || []).length
-      ? (s.tariffs || [])
-          .map((t) => {
-            const sub =
-              Number(t.subscription_amount) > 0
-                ? `; абон. ${Number(t.subscription_amount).toLocaleString()} с/${
-                    t.subscription_period === "year" ? "год" : "мес"
-                  }`
-                : "";
-            const roles =
-              (t.role_prices || []).length
-                ? `; роли: ${(t.role_prices || []).length}`
-                : "";
-            return `${t.name}: ${money(t.price)}${sub}${roles}`;
-          })
-          .join("; ")
-      : "—";
-
   const formatRolePrices = (entity) =>
     (entity.role_prices || []).length
       ? (entity.role_prices || [])
           .map(
             (r) =>
               `${roleNameById.get(String(r.custom_role)) || "роль"}: ${money(
-                r.price
-              )}`
+                r.price,
+              )}`,
           )
           .join("; ")
       : "—";
@@ -570,7 +521,7 @@ export default function ConsultingServices({
     <ConsultingShell
       eyebrow="Консалтинг · Каталог"
       title="Услуги"
-      subtitle="Справочник услуг, тарифов и цен по ролям"
+      subtitle="Справочник услуг и цен по ролям"
       headerActions={
         <>
           <ViewModeToggle
@@ -588,9 +539,7 @@ export default function ConsultingServices({
         </>
       }
       panelTitle="Список услуг"
-    >
-      <div className="services services--embedded">
-      <div className="services__toolbar services__toolbar--search">
+      panelActions={
         <div className="services__search">
           <FaSearch className="services__mutedIcon" aria-hidden />
           <input
@@ -602,437 +551,399 @@ export default function ConsultingServices({
             disabled={disabled}
           />
         </div>
-      </div>
+      }
+    >
+      <div className="services services--embedded">
+        <div className="services__meta">
+          <span>
+            Найдено: {servicesList.count} {plural.services(servicesList.count)}
+          </span>
+        </div>
 
-      <div className="services__meta">
-        <span>
-          Найдено: {servicesList.count} {plural.services(servicesList.count)}
-        </span>
-      </div>
+        {effLoading && <div className="services__alert">Загрузка…</div>}
+        {!!effError && (
+          <div className="services__alert">{String(effError)}</div>
+        )}
 
-      {effLoading && <div className="services__alert">Загрузка…</div>}
-      {!!effError && <div className="services__alert">{String(effError)}</div>}
-
-      {!effLoading && viewMode === VIEW_MODES.TABLE && (
-        !filtered.length ? (
-          <div className="services__empty">Ничего не найдено</div>
-        ) : (
-          groupedByRole.map((group) => (
-            <div className="services__group" key={group.id}>
-              <h3 className="services__groupTitle">
-                {group.name}
-                <span className="services__groupCount">{group.items.length}</span>
-              </h3>
-              <div className="services__tableWrap">
-                <table className="services__table">
-                  <thead>
-                    <tr>
-                      <th>Название</th>
-                      <th>Базовая цена</th>
-                      <th>Цены по ролям</th>
-                      <th>Тарифы</th>
-                      <th>Описание</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.items.map((s) => (
-                      <tr key={s.id}>
-                        <td
-                          className="services__ellipsis"
-                          title={s.title ?? s.name}
-                        >
-                          {s.title ?? s.name ?? "—"}
-                        </td>
-                        <td>{money(s.price)}</td>
-                        <td
-                          className="services__ellipsis"
-                          title={formatRolePrices(s)}
-                        >
-                          {formatRolePrices(s)}
-                        </td>
-                        <td
-                          className="services__ellipsis"
-                          title={formatTariffs(s)}
-                        >
-                          {formatTariffs(s)}
-                        </td>
-                        <td className="services__ellipsis" title={s.description}>
-                          {s.description || "—"}
-                        </td>
-                        <td className="services__rowActions">
-                          {renderServiceActions(s)}
-                        </td>
+        {!effLoading &&
+          viewMode === VIEW_MODES.TABLE &&
+          (!filtered.length ? (
+            <div className="services__empty">Ничего не найдено</div>
+          ) : (
+            groupedByRole.map((group) => (
+              <div className="services__group" key={group.id}>
+                <h3 className="services__groupTitle">
+                  {group.name}
+                  <span className="services__groupCount">
+                    {group.items.length}
+                  </span>
+                </h3>
+                <div className="services__tableWrap">
+                  <table className="services__table">
+                    <thead>
+                      <tr>
+                        <th>Название</th>
+                        <th>Базовая цена</th>
+                        <th>Цены по ролям</th>
+                        <th>Описание</th>
+                        <th />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {group.items.map((s) => (
+                        <tr key={s.id}>
+                          <td
+                            className="services__ellipsis"
+                            title={s.title ?? s.name}
+                          >
+                            {s.title ?? s.name ?? "—"}
+                          </td>
+                          <td>{money(s.price)}</td>
+                          <td
+                            className="services__ellipsis"
+                            title={formatRolePrices(s)}
+                          >
+                            {formatRolePrices(s)}
+                          </td>
+                          <td
+                            className="services__ellipsis"
+                            title={s.description}
+                          >
+                            {s.description || "—"}
+                          </td>
+                          <td className="services__rowActions">
+                            {renderServiceActions(s)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))
-        )
-      )}
+            ))
+          ))}
 
-      {!effLoading && viewMode === VIEW_MODES.CARDS && (
-        !filtered.length ? (
-          <div className="services__cardsEmpty">Ничего не найдено</div>
-        ) : (
-          groupedByRole.map((group) => (
-            <div className="services__group" key={group.id}>
-              <h3 className="services__groupTitle">
-                {group.name}
-                <span className="services__groupCount">{group.items.length}</span>
-              </h3>
-              <div className="services__cards">
-                {group.items.map((s) => (
-                  <article key={s.id} className="services__card">
-                    <h3 className="services__cardTitle" title={s.title ?? s.name}>
-                      {s.title ?? s.name ?? "—"}
-                    </h3>
-                    <dl className="services__cardMeta">
-                      <div>
-                        <dt>Базовая цена</dt>
-                        <dd>{money(s.price)}</dd>
-                      </div>
-                      {(s.role_prices || []).length ? (
-                        <div className="services__cardMetaRow--full">
-                          <dt>Цены по ролям</dt>
-                          <dd>
-                            <ul className="services__tariffList">
-                              {(s.role_prices || []).map((r, i) => (
-                                <li key={r.custom_role || i}>
-                                  {roleNameById.get(String(r.custom_role)) ||
-                                    "роль"}{" "}
-                                  — {money(r.price)}
-                                </li>
-                              ))}
-                            </ul>
-                          </dd>
+        {!effLoading &&
+          viewMode === VIEW_MODES.CARDS &&
+          (!filtered.length ? (
+            <div className="services__cardsEmpty">Ничего не найдено</div>
+          ) : (
+            groupedByRole.map((group) => (
+              <div className="services__group" key={group.id}>
+                <h3 className="services__groupTitle">
+                  {group.name}
+                  <span className="services__groupCount">
+                    {group.items.length}
+                  </span>
+                </h3>
+                <div className="services__cards">
+                  {group.items.map((s) => (
+                    <article key={s.id} className="services__card">
+                      <h3
+                        className="services__cardTitle"
+                        title={s.title ?? s.name}
+                      >
+                        {s.title ?? s.name ?? "—"}
+                      </h3>
+                      <dl className="services__cardMeta">
+                        <div>
+                          <dt>Базовая цена</dt>
+                          <dd>{money(s.price)}</dd>
                         </div>
-                      ) : null}
-                      <div className="services__cardMetaRow--full">
-                        <dt>Тарифы</dt>
-                        <dd>
-                          {(s.tariffs || []).length ? (
-                            <ul className="services__tariffList">
-                              {(s.tariffs || []).map((t) => (
-                                <li key={t.id || t.name}>
-                                  {t.name} — {money(t.price)}
-                                  {(t.role_prices || []).length
-                                    ? ` (роли: ${(t.role_prices || []).length})`
-                                    : ""}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            "—"
-                          )}
-                        </dd>
+                        {(s.role_prices || []).length ? (
+                          <div className="services__cardMetaRow--full">
+                            <dt>Цены по ролям</dt>
+                            <dd>
+                              <ul className="services__tariffList">
+                                {(s.role_prices || []).map((r, i) => (
+                                  <li key={r.custom_role || i}>
+                                    {roleNameById.get(String(r.custom_role)) ||
+                                      "роль"}{" "}
+                                    — {money(r.price)}
+                                  </li>
+                                ))}
+                              </ul>
+                            </dd>
+                          </div>
+                        ) : null}
+                        {(s.tariffs || []).length ? (
+                          <div className="services__cardMetaRow--full">
+                            <dt>Доп. услуги</dt>
+                            <dd>
+                              <ul className="services__tariffList">
+                                {(s.tariffs || []).map((t) => (
+                                  <li key={t.id || t.name}>
+                                    {t.name} — {money(t.price)}
+                                  </li>
+                                ))}
+                              </ul>
+                            </dd>
+                          </div>
+                        ) : null}
+                        {s.description ? (
+                          <div className="services__cardMetaRow--full">
+                            <dt>Описание</dt>
+                            <dd>{s.description}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                      <div className="services__cardActions">
+                        {renderServiceActions(s)}
                       </div>
-                      {s.description ? (
-                        <div className="services__cardMetaRow--full">
-                          <dt>Описание</dt>
-                          <dd>{s.description}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                    <div className="services__cardActions">
-                      {renderServiceActions(s)}
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
-        )
-      )}
+            ))
+          ))}
 
-      {/* ====== CREATE MODAL ====== */}
-      <Pagination
-        page={servicesList.page}
-        totalPages={servicesList.totalPages}
-        count={servicesList.count}
-        pageSize={servicesList.pageSize}
-        onPage={servicesList.setPage}
-        onPageSize={servicesList.setPageSize}
-        unitLabel={plural.services}
-        loading={servicesList.loading}
-      />
+        {/* ====== CREATE MODAL ====== */}
+        <Pagination
+          page={servicesList.page}
+          totalPages={servicesList.totalPages}
+          count={servicesList.count}
+          pageSize={servicesList.pageSize}
+          onPage={servicesList.setPage}
+          onPageSize={servicesList.setPageSize}
+          unitLabel={plural.services}
+          loading={servicesList.loading}
+        />
 
-      {createOpen && (
-        <div
-          className="services__overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !createSaving && setCreateOpen(false)}
-        >
-          <div className="services__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="services__modalHeader">
-              <h3 className="services__modalTitle">Новая услуга</h3>
-              <button
-                className="services__iconBtn"
-                onClick={() => !createSaving && setCreateOpen(false)}
-                aria-label="Закрыть"
+        {createOpen && (
+          <div
+            className="services__overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !createSaving && setCreateOpen(false)}
+          >
+            <div
+              className="services__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="services__modalHeader">
+                <h3 className="services__modalTitle">Новая услуга</h3>
+                <button
+                  className="services__iconBtn"
+                  onClick={() => !createSaving && setCreateOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {!!createErr && (
+                <div className="services__alert">{createErr}</div>
+              )}
+
+              <form
+                className="services__form"
+                onSubmit={submitCreate}
+                noValidate
               >
-                <FaTimes />
-              </button>
-            </div>
+                <div className="services__formGrid">
+                  <div className="services__field">
+                    <label className="services__label">Название *</label>
+                    <input
+                      className="services__input"
+                      value={createForm.name}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({ ...p, name: e.target.value }))
+                      }
+                      maxLength={120}
+                      required
+                      disabled={createSaving || disabled}
+                    />
+                  </div>
 
-            {!!createErr && <div className="services__alert">{createErr}</div>}
+                  <div className="services__field">
+                    <label className="services__label">
+                      Абонентская плата, с
+                    </label>
+                    <input
+                      className="services__input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={createForm.price}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({ ...p, price: e.target.value }))
+                      }
+                      disabled={createSaving || disabled}
+                    />
+                  </div>
 
-            <form className="services__form" onSubmit={submitCreate} noValidate>
-              <div className="services__formGrid">
-                <div className="services__field">
-                  <label className="services__label">Название *</label>
-                  <input
-                    className="services__input"
-                    value={createForm.name}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, name: e.target.value }))
-                    }
-                    maxLength={120}
-                    required
-                    disabled={createSaving || disabled}
-                  />
+                  <div className="services__field services__field--full">
+                    <AdditionalServicesEditor
+                      items={createForm.tariffs}
+                      onChange={(tariffs) =>
+                        setCreateForm((p) => ({ ...p, tariffs }))
+                      }
+                      disabled={createSaving || disabled}
+                    />
+                  </div>
                 </div>
 
-                <div className="services__field">
-                  <label className="services__label">Базовая цена, с</label>
-                  <input
-                    className="services__input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={createForm.price}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, price: e.target.value }))
-                    }
-                    disabled={createSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field">
-                  <label className="services__label">Роль</label>
-                  <select
-                    className="services__input"
-                    value={createForm.custom_role}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({
-                        ...p,
-                        custom_role: e.target.value,
-                      }))
-                    }
+                <div className="services__formActions">
+                  <button
+                    type="button"
+                    className="services__btn"
+                    onClick={() => setCreateOpen(false)}
+                    disabled={createSaving}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="services__btn services__btn--primary"
                     disabled={createSaving || disabled}
                   >
-                    <option value="">Общая (видна во всех воронках)</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name || "—"}
-                      </option>
-                    ))}
-                  </select>
+                    {createSaving ? "Сохранение…" : "Создать"}
+                  </button>
                 </div>
-
-                <div className="services__field services__field--full">
-                  <RolePricesEditor
-                    rolePrices={createForm.role_prices}
-                    roles={roles}
-                    onChange={(role_prices) =>
-                      setCreateForm((p) => ({ ...p, role_prices }))
-                    }
-                    disabled={createSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field services__field--full">
-                  <TariffEditor
-                    tariffs={createForm.tariffs}
-                    roles={roles}
-                    onChange={(tariffs) =>
-                      setCreateForm((p) => ({ ...p, tariffs }))
-                    }
-                    disabled={createSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field services__field--full">
-                  <label className="services__label">Описание</label>
-                  <textarea
-                    className="services__input"
-                    rows={3}
-                    maxLength={800}
-                    placeholder="Краткое описание услуги"
-                    value={createForm.description}
-                    onChange={(e) =>
-                      setCreateForm((p) => ({
-                        ...p,
-                        description: e.target.value,
-                      }))
-                    }
-                    disabled={createSaving || disabled}
-                  />
-                </div>
-              </div>
-
-              <div className="services__formActions">
-                <button
-                  type="button"
-                  className="services__btn"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createSaving}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="services__btn services__btn--primary"
-                  disabled={createSaving || disabled}
-                >
-                  {createSaving ? "Сохранение…" : "Создать"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ====== EDIT MODAL ====== */}
-      {editOpen && (
-        <div
-          className="services__overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !editSaving && setEditOpen(false)}
-        >
-          <div className="services__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="services__modalHeader">
-              <h3 className="services__modalTitle">Изменить услугу</h3>
-              <button
-                className="services__iconBtn"
-                onClick={() => !editSaving && setEditOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
+              </form>
             </div>
+          </div>
+        )}
 
-            {!!editErr && <div className="services__alert">{editErr}</div>}
+        {/* ====== EDIT MODAL ====== */}
+        {editOpen && (
+          <div
+            className="services__overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !editSaving && setEditOpen(false)}
+          >
+            <div
+              className="services__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="services__modalHeader">
+                <h3 className="services__modalTitle">Изменить услугу</h3>
+                <button
+                  className="services__iconBtn"
+                  onClick={() => !editSaving && setEditOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-            <form className="services__form" onSubmit={submitEdit} noValidate>
-              <div className="services__formGrid">
-                <div className="services__field">
-                  <label className="services__label">Название *</label>
-                  <input
-                    className="services__input"
-                    value={editForm.name}
-                    onChange={(e) =>
-                      setEditForm((p) => ({ ...p, name: e.target.value }))
-                    }
-                    maxLength={120}
-                    required
-                    disabled={editSaving || disabled}
-                  />
+              {!!editErr && <div className="services__alert">{editErr}</div>}
+
+              <form className="services__form" onSubmit={submitEdit} noValidate>
+                <div className="services__formGrid">
+                  <div className="services__field">
+                    <label className="services__label">Название *</label>
+                    <input
+                      className="services__input"
+                      value={editForm.name}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, name: e.target.value }))
+                      }
+                      maxLength={120}
+                      required
+                      disabled={editSaving || disabled}
+                    />
+                  </div>
+
+                  <div className="services__field">
+                    <label className="services__label">Базовая цена, с</label>
+                    <input
+                      className="services__input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editForm.price}
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, price: e.target.value }))
+                      }
+                      disabled={editSaving || disabled}
+                    />
+                  </div>
+
+                  <div className="services__field">
+                    <label className="services__label">Роль</label>
+                    <select
+                      className="services__input"
+                      value={editForm.custom_role}
+                      onChange={(e) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          custom_role: e.target.value,
+                        }))
+                      }
+                      disabled={editSaving || disabled}
+                    >
+                      <option value="">Общая (видна во всех воронках)</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name || "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="services__field services__field--full">
+                    <RolePricesEditor
+                      rolePrices={editForm.role_prices}
+                      roles={roles}
+                      onChange={(role_prices) =>
+                        setEditForm((p) => ({ ...p, role_prices }))
+                      }
+                      disabled={editSaving || disabled}
+                    />
+                  </div>
+
+                  <div className="services__field services__field--full">
+                    <AdditionalServicesEditor
+                      items={editForm.tariffs}
+                      onChange={(tariffs) =>
+                        setEditForm((p) => ({ ...p, tariffs }))
+                      }
+                      disabled={editSaving || disabled}
+                    />
+                  </div>
+
+                  <div className="services__field services__field--full">
+                    <label className="services__label">Описание</label>
+                    <textarea
+                      className="services__input"
+                      rows={3}
+                      maxLength={800}
+                      placeholder="Краткое описание услуги"
+                      value={editForm.description}
+                      onChange={(e) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          description: e.target.value,
+                        }))
+                      }
+                      disabled={editSaving || disabled}
+                    />
+                  </div>
                 </div>
 
-                <div className="services__field">
-                  <label className="services__label">Базовая цена, с</label>
-                  <input
-                    className="services__input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editForm.price}
-                    onChange={(e) =>
-                      setEditForm((p) => ({ ...p, price: e.target.value }))
-                    }
-                    disabled={editSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field">
-                  <label className="services__label">Роль</label>
-                  <select
-                    className="services__input"
-                    value={editForm.custom_role}
-                    onChange={(e) =>
-                      setEditForm((p) => ({
-                        ...p,
-                        custom_role: e.target.value,
-                      }))
-                    }
+                <div className="services__formActions">
+                  <button
+                    type="button"
+                    className="services__btn"
+                    onClick={() => setEditOpen(false)}
+                    disabled={editSaving}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="services__btn services__btn--primary"
                     disabled={editSaving || disabled}
                   >
-                    <option value="">Общая (видна во всех воронках)</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name || "—"}
-                      </option>
-                    ))}
-                  </select>
+                    {editSaving ? "Сохранение…" : "Сохранить"}
+                  </button>
                 </div>
-
-                <div className="services__field services__field--full">
-                  <RolePricesEditor
-                    rolePrices={editForm.role_prices}
-                    roles={roles}
-                    onChange={(role_prices) =>
-                      setEditForm((p) => ({ ...p, role_prices }))
-                    }
-                    disabled={editSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field services__field--full">
-                  <TariffEditor
-                    tariffs={editForm.tariffs}
-                    roles={roles}
-                    onChange={(tariffs) =>
-                      setEditForm((p) => ({ ...p, tariffs }))
-                    }
-                    disabled={editSaving || disabled}
-                  />
-                </div>
-
-                <div className="services__field services__field--full">
-                  <label className="services__label">Описание</label>
-                  <textarea
-                    className="services__input"
-                    rows={3}
-                    maxLength={800}
-                    placeholder="Краткое описание услуги"
-                    value={editForm.description}
-                    onChange={(e) =>
-                      setEditForm((p) => ({
-                        ...p,
-                        description: e.target.value,
-                      }))
-                    }
-                    disabled={editSaving || disabled}
-                  />
-                </div>
-              </div>
-
-              <div className="services__formActions">
-                <button
-                  type="button"
-                  className="services__btn"
-                  onClick={() => setEditOpen(false)}
-                  disabled={editSaving}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="services__btn services__btn--primary"
-                  disabled={editSaving || disabled}
-                >
-                  {editSaving ? "Сохранение…" : "Сохранить"}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </ConsultingShell>
   );

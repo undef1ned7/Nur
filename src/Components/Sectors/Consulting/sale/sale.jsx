@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./sale.scss";
-import { FaBan, FaPlus, FaSyncAlt, FaTimes, FaTrash } from "react-icons/fa";
+import { FaBan, FaFilter, FaPlus, FaSyncAlt, FaTimes, FaTrash } from "react-icons/fa";
 import { DEAL_STATUS_RU } from "../../../pages/Sell/Sell";
 import { useDispatch } from "react-redux";
 import {
   createConsultingSale,
-  getConsultingRows,
   getConsultingServices,
 } from "../../../../store/creators/consultingThunk";
 import {
@@ -13,6 +12,7 @@ import {
   SALE_STATUS_LABELS,
   listConsultingSales,
 } from "../../../../api/consultingSales";
+import { listConsultingCashboxes } from "../../../../api/consultingCashbox";
 import { useConsulting } from "../../../../store/slices/consultingSlice";
 import {
   createClientAsync,
@@ -26,6 +26,11 @@ import {
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { canViewAllConsultingSales } from "../../../../utils/consultingFunnelAccess";
+import {
+  isConsultingCashV2,
+  mapDealStatusToPaymentMode,
+} from "../../../../utils/consultingMoney";
 import {
   calcConsultingSaleTotal,
   normalizeSaleItemsForApi,
@@ -132,21 +137,33 @@ export default function ConsultingSale({
   const dispatch = useDispatch();
   const alert = useAlert();
   const { services = [] } = useConsulting();
+  const { company, profile } = useUser();
+  const viewAllSales = canViewAllConsultingSales(profile);
+  const myUserId = profile?.id ? String(profile.id) : "";
 
   /**
    * Список продаж грузится с сервера постранично: поиск, статус и период
-   * уходят в query-параметры. Справочники (услуги, клиенты) по-прежнему берём
-   * из стора — они нужны формам целиком.
+   * уходят в query-параметры. Продавец без can_view_all_sales видит только свои.
    */
   const salesList = useConsultingList({
     fetcher: listConsultingSales,
-    filters: { status: "", date_from: "", date_to: "" },
+    filters: {
+      status: "",
+      date_from: "",
+      date_to: "",
+      user: viewAllSales ? "" : myUserId,
+    },
     prefix: "s",
+    mapParams: useCallback((p) => {
+      const { user, ...rest } = p;
+      if (user) return { ...rest, user };
+      return rest;
+    }, []),
   });
   const rows = salesList.items;
   const [cancelFor, setCancelFor] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { list: clients = [] } = useClient();
-  const { company, profile } = useUser();
   // Роль продавца определяет цену услуги/тарифа (цены по ролям).
   const sellerRoleId = profile?.custom_role ? String(profile.custom_role) : null;
   /* модалка создания продажи */
@@ -164,7 +181,9 @@ export default function ConsultingSale({
   const [debtMonths, setDebtMonths] = useState("");
   const [prepayment, setPrepayment] = useState("");
   const [cashboxId, setCashboxId] = useState("");
+  const [consultingCashboxes, setConsultingCashboxes] = useState([]);
   const { list: cashBoxes } = useCash();
+  const cashboxOptions = isConsultingCashV2() ? consultingCashboxes : cashBoxes;
 
   // Храним клиента и прочее здесь
   const [saleData, setSaleData] = useState({
@@ -196,6 +215,14 @@ export default function ConsultingSale({
   const selectedService = useMemo(() => {
     return services.find((x) => String(x.id) === String(serviceId)) || null;
   }, [services, serviceId]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (salesList.filters.status) count += 1;
+    if (salesList.filters.date_from || salesList.filters.date_to) count += 1;
+    if (salesList.searchInput?.trim()) count += 1;
+    return count;
+  }, [salesList.filters, salesList.searchInput]);
 
   const serviceTariffs = useMemo(
     () => (Array.isArray(selectedService?.tariffs) ? selectedService.tariffs : []),
@@ -272,9 +299,25 @@ export default function ConsultingSale({
     };
 
     try {
-      // Если извне передан onCreateSale — дадим ему шанс, но основной путь — thunk
       if (onCreateSale) {
         await onCreateSale(payload);
+      } else if (isConsultingCashV2()) {
+        const payment_mode = mapDealStatusToPaymentMode(dealStatus);
+        await dispatch(
+          createConsultingSale({
+            ...payload,
+            payment_mode,
+            debt_months:
+              dealStatus === "Долги" || dealStatus === "Предоплата"
+                ? Number(debtMonths) || undefined
+                : undefined,
+            prepayment:
+              dealStatus === "Предоплата"
+                ? Number(prepayment) || undefined
+                : undefined,
+            cashbox: cashboxId || undefined,
+          }),
+        ).unwrap();
       } else {
         const sale = await dispatch(createConsultingSale(payload)).unwrap();
         const saleTotal = Number(sale.total) || previewTotal;
@@ -284,15 +327,13 @@ export default function ConsultingSale({
             title: selectedService.name ?? selectedService.title ?? "Услуга",
             statusRu: dealStatus,
             amount: saleTotal,
-            // prepayment только при "Предоплата"
             prepayment:
               dealStatus === "Предоплата" ? Number(prepayment) : undefined,
-            // debtMonths и для "Долги", и для "Предоплата"
             debtMonths:
               dealStatus === "Долги" || dealStatus === "Предоплата"
                 ? Number(debtMonths)
                 : undefined,
-          })
+          }),
         ).unwrap();
 
         await dispatch(
@@ -310,14 +351,13 @@ export default function ConsultingSale({
                 : saleTotal,
             source_cashbox_flow_id: sale.id,
             source_business_operation_id: "Продажа консалтинг",
-          })
+          }),
         ).unwrap();
       }
 
       // после успешного создания: закрываем модалку, чистим форму, можно рефетчить
       setOpen(false);
       resetForm();
-      dispatch(getConsultingRows());
       salesList.refresh();
     } catch (err) {
       setFormErr(
@@ -372,20 +412,35 @@ export default function ConsultingSale({
   useEffect(() => {
     dispatch(fetchClientsAsync());
     dispatch(getConsultingServices());
-    dispatch(getConsultingRows());
-    dispatch(getCashBoxes());
+    if (!isConsultingCashV2()) {
+      dispatch(getCashBoxes());
+    }
   }, [dispatch]);
 
-  // Автоматически выбираем первую кассу по индексу
   useEffect(() => {
-    if (cashBoxes && cashBoxes.length > 0 && !cashboxId) {
-      const firstCashBox = cashBoxes[0];
-      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
-      if (firstCashBoxId) {
-        setCashboxId(String(firstCashBoxId));
-      }
+    if (!isConsultingCashV2()) return;
+    const controller = new AbortController();
+    listConsultingCashboxes({}, { signal: controller.signal })
+      .then((data) => {
+        const rows = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : [];
+        setConsultingCashboxes(rows);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  // Автоматически выбираем первую кассу
+  useEffect(() => {
+    if (cashboxOptions?.length > 0 && !cashboxId) {
+      const first = cashboxOptions[0];
+      const firstId = first?.id || first?.uuid || "";
+      if (firstId) setCashboxId(String(firstId));
     }
-  }, [cashBoxes, cashboxId]);
+  }, [cashboxOptions, cashboxId]);
 
   return (
     <ConsultingShell
@@ -408,7 +463,33 @@ export default function ConsultingSale({
       panelTitle="Список продаж"
     >
       <div className="sale sale--embedded">
-      <div className="cList__toolbar sale__filters">
+      <div className="sale__filtersBar">
+        <button
+          type="button"
+          className={`sale__filtersToggle${filtersOpen || activeFilterCount ? " is-active" : ""}`}
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+        >
+          <FaFilter aria-hidden />
+          Фильтры
+          {activeFilterCount > 0 && (
+            <span className="sale__filtersBadge">{activeFilterCount}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className="sale__btn sale__filtersRefresh"
+          onClick={salesList.refresh}
+          title="Обновить"
+          disabled={salesList.loading}
+        >
+          <FaSyncAlt aria-hidden />
+        </button>
+      </div>
+
+      <div
+        className={`cList__toolbar sale__filters${filtersOpen ? " sale__filters--open" : ""}`}
+      >
         <SearchInput
           value={salesList.searchInput}
           onChange={salesList.setSearch}
@@ -435,10 +516,10 @@ export default function ConsultingSale({
             salesList.setFilters({ date_from, date_to })
           }
         />
-        <span className="cList__toolbarSpacer" />
+        <span className="cList__toolbarSpacer sale__filtersSpacer" />
         <button
           type="button"
-          className="sale__btn"
+          className="sale__btn sale__filtersRefreshDesktop"
           onClick={salesList.refresh}
           title="Обновить"
           disabled={salesList.loading}
@@ -447,8 +528,8 @@ export default function ConsultingSale({
         </button>
       </div>
 
-      {/* подсказки, если пустые справочники */}
-      {services.length === 0 && (
+      {/* подсказки, если пустые справочники — не показываем вместе с "Загрузка…" */}
+      {!salesList.loading && !salesList.notReady && services.length === 0 && (
         <div className="sale__alert">
           Справочник услуг пуст. Создайте услуги в разделе «Услуги».
         </div>
@@ -733,6 +814,31 @@ export default function ConsultingSale({
 
                 <div className="sale__field sale__field--full">
                   <label className="sale__label">Касса *</label>
+                  <select
+                    className="sale__input"
+                    value={cashboxId}
+                    onChange={(e) => setCashboxId(e.target.value)}
+                    required={isConsultingCashV2()}
+                    disabled={disabled || !cashboxOptions.length}
+                  >
+                    <option value="">
+                      {cashboxOptions.length
+                        ? "Выберите кассу"
+                        : "Нет доступных касс"}
+                    </option>
+                    {cashboxOptions.map((cb) => {
+                      const id = cb.id || cb.uuid;
+                      const label =
+                        cb.name ||
+                        cb.department_name ||
+                        `Касса #${id}`;
+                      return (
+                        <option key={id} value={String(id)}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
                 {/* Инлайн форма клиента */}

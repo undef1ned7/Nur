@@ -3,6 +3,34 @@ export const PAGE_SIZE = 100;
 
 export const pad = (n) => String(n).padStart(2, "0");
 
+export const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`;
+};
+
+export const formatHistoryDateLabel = (dateStr, isTodayDate = false) => {
+  if (isTodayDate) return "Сегодня";
+  if (!dateStr) return "—";
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("ru-RU", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+  });
+};
+
+export const formatHistoryDateFull = (dateStr) => {
+  if (!dateStr) return "—";
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
 export const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 

@@ -256,10 +256,10 @@ const Layout = () => {
                 toggleSidebar={toggleSidebar}
                 isSidebarOpen={isSidebarOpen}
               />
-              {!isSidebarOpen && (
+              {!isSidebarOpen && isArrowView && (
                 <button
                   type="button"
-                  className={`mobile-menu-fab${isArrowView ? " mobile-menu-fab--raised" : ""}`}
+                  className="mobile-menu-fab mobile-menu-fab--raised"
                   onClick={toggleSidebar}
                   aria-label="Открыть меню"
                   title="Меню"

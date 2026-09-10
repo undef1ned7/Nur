@@ -61,6 +61,13 @@ const PaymentPage = ({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
   const [selectedBank, setSelectedBank] = useState("");
+  const [withoutCheck, setWithoutCheck] = useState(() => {
+    try {
+      return localStorage.getItem("sell_withoutCheck") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [receiptData, setReceiptData] = useState(null);
   const [printing, setPrinting] = useState(false);
   const [alertModal, setAlertModal] = useState({
@@ -332,25 +339,28 @@ const PaymentPage = ({
         checkoutCashReceived = deferredPrepaymentValue.toFixed(2);
       }
 
-      // Сначала проверяем подключение тихо, без окна.
-      // Если принтер не найден — спрашиваем подключение через системный диалог.
-      let isPrinterConnected = await checkPrinterConnection();
-      if (!isPrinterConnected) {
-        console.log(
-          "[PaymentPage] Принтер не найден автоматически, открываем диалог подключения..."
-        );
-        isPrinterConnected = await ensurePrinterConnectedInteractively();
+      // Если включено «Без чека» — не проверяем принтер и не печатаем.
+      const shouldPrintReceipt = !withoutCheck;
+      let isPrinterConnected = false;
+      if (shouldPrintReceipt) {
+        let isPrinterConnectedProbe = await checkPrinterConnection();
+        if (!isPrinterConnectedProbe) {
+          console.log(
+            "[PaymentPage] Принтер не найден автоматически, открываем диалог подключения..."
+          );
+          isPrinterConnectedProbe = await ensurePrinterConnectedInteractively();
+        }
+        isPrinterConnected = isPrinterConnectedProbe;
+        console.log("[PaymentPage] Результат проверки принтера перед оплатой:", {
+          isPrinterConnected,
+        });
       }
-      console.log("[PaymentPage] Результат проверки принтера перед оплатой:", {
-        isPrinterConnected,
-      });
 
       // Выполняем checkout
-      // Передаем bool: true только если принтер подключен
       const result = await dispatch(
         productCheckout({
           id: saleId,
-          bool: isPrinterConnected, // print_receipt - только если принтер подключен
+          bool: shouldPrintReceipt && isPrinterConnected,
           clientId: selectedCustomer?.id || null,
           payment_method: paymentMethodApi,
           cash_received:
@@ -493,8 +503,8 @@ const PaymentPage = ({
         const saleIdForReceipt =
           result.payload?.sale_id || result.payload?.id || saleId;
 
-        // Пытаемся автоматически распечатать чек только если принтер подключен
-        if (isPrinterConnected) {
+        // Пытаемся автоматически распечатать чек только если выбран режим с чеком
+        if (shouldPrintReceipt && isPrinterConnected) {
           try {
             // Сначала печатаем из checkout JSON (там ekassa/ekassa_fiscal),
             // чтобы использовать новый формат ККМ.
@@ -1192,7 +1202,27 @@ const PaymentPage = ({
           )}
 
           <div className="payment-page__actions">
+            <label className="payment-page__without-check" htmlFor="sellWithoutCheck">
+              Без чека
+              <input
+                id="sellWithoutCheck"
+                type="checkbox"
+                checked={withoutCheck}
+                onChange={(e) => {
+                  setWithoutCheck(e.target.checked);
+                  try {
+                    localStorage.setItem(
+                      "sell_withoutCheck",
+                      String(e.target.checked),
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+            </label>
             <button
+              type="button"
               className="payment-page__accept-btn"
               onClick={handleAcceptPayment}
             >

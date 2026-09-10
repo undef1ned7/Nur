@@ -25,6 +25,7 @@ import { validateResErrors } from "../../../../tools/validateResErrors";
 import api from "../../../api";
 import Loading from "../../common/Loading/Loading";
 import DataContainer from "../../common/DataContainer/DataContainer";
+import { computeCashflowsHasNext, cashflowsPaginationButtons } from "../../../../tools/cashflowsPagination";
 
 const CASHFLOWS_PAGE_SIZE = 100;
 const REPORT_PAGE_SIZE = 200;
@@ -198,9 +199,13 @@ const KassaDet = () => {
         setFlowsList(flows);
         setFlowsTotalCount(count);
         setFlowsHasNext(
-          Boolean(data.next) ||
-            (count != null && pageNum * CASHFLOWS_PAGE_SIZE < count) ||
-            (count == null && flows.length === CASHFLOWS_PAGE_SIZE),
+          computeCashflowsHasNext({
+            dataNext: data.next,
+            count,
+            pageNum,
+            pageSize: CASHFLOWS_PAGE_SIZE,
+            resultsLength: flows.length,
+          }),
         );
       } catch (err) {
         const errorMessage = validateResErrors(err, "Ошибка при загрузке потоков. ");
@@ -946,32 +951,42 @@ const KassaDet = () => {
               )}
             </div>
             {!flowsLoading &&
-              (filteredCashflows.length > 0 || flowsPage > 1 || flowsHasNext) && (
+              (filteredCashflows.length > 0 || flowsPage > 1 || flowsHasNext) && (() => {
+                const { showPrev, showNext } = cashflowsPaginationButtons({
+                  pageNum: flowsPage,
+                  hasNext: flowsHasNext,
+                });
+                return (
                 <div className="kassa-pagination" role="navigation" aria-label="Страницы движений">
-                  <button
-                    type="button"
-                    className="kassa__btn kassa__btn--secondary"
-                    disabled={flowsPage <= 1 || flowsLoading}
-                    onClick={() => setFlowsPage((p) => Math.max(1, p - 1))}
-                  >
-                    Назад
-                  </button>
+                  {showPrev && (
+                    <button
+                      type="button"
+                      className="kassa__btn kassa__btn--secondary"
+                      disabled={flowsLoading}
+                      onClick={() => setFlowsPage((p) => Math.max(1, p - 1))}
+                    >
+                      Назад
+                    </button>
+                  )}
                   <span className="kassa-pagination__info">
                     Страница {flowsPage}
                     {flowsTotalCount != null
                       ? ` · ${flowsTotalCount} записей`
                       : ""}
                   </span>
-                  <button
-                    type="button"
-                    className="kassa__btn kassa__btn--secondary"
-                    disabled={!flowsHasNext || flowsLoading}
-                    onClick={() => setFlowsPage((p) => p + 1)}
-                  >
-                    Вперёд
-                  </button>
+                  {showNext && (
+                    <button
+                      type="button"
+                      className="kassa__btn kassa__btn--secondary"
+                      disabled={flowsLoading}
+                      onClick={() => setFlowsPage((p) => p + 1)}
+                    >
+                      Вперёд
+                    </button>
+                  )}
                 </div>
-              )}
+                );
+              })()}
           </DataContainer>
 
         </>

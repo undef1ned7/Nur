@@ -1,23 +1,42 @@
 // RecordaTimeField.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import "../Recorda.scss";
-import { OPEN_HOUR, CLOSE_HOUR, pad } from "./RecordaUtils";
+import { defaultWorkBounds, minsOf, pad } from "./RecordaUtils";
 
-const RecordaTimeField = ({ value, onChange, invalid }) => {
-  const [h, m] = (value || `${pad(OPEN_HOUR)}:00`)
+const RecordaTimeField = ({ value, onChange, invalid, workBounds }) => {
+  const bounds = workBounds || defaultWorkBounds();
+  const startMin = bounds.startMin;
+  const endMin = bounds.endMin;
+  const endHour = Math.floor(endMin / 60);
+  const endMinute = endMin % 60;
+
+  const [h, m] = (value || bounds.work_start || "09:00")
     .split(":")
     .map((v) => parseInt(v || 0, 10));
 
-  const hours = Array.from(
-    { length: CLOSE_HOUR - OPEN_HOUR + 1 },
-    (_, i) => OPEN_HOUR + i
-  );
+  const hours = useMemo(() => {
+    const list = [];
+    for (let hour = Math.floor(startMin / 60); hour <= endHour; hour += 1) {
+      list.push(hour);
+    }
+    return list;
+  }, [startMin, endHour]);
+
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
   const setHM = (H, M) => {
-    let hh = Math.min(Math.max(H, OPEN_HOUR), CLOSE_HOUR);
-    let mm = Math.min(Math.max(M, 0), 59);
-    if (hh === CLOSE_HOUR) mm = 0;
+    let hh = H;
+    let mm = M;
+    const total = hh * 60 + mm;
+
+    if (total < startMin) {
+      hh = Math.floor(startMin / 60);
+      mm = startMin % 60;
+    } else if (total > endMin) {
+      hh = endHour;
+      mm = endMinute;
+    }
+
     onChange(`${pad(hh)}:${pad(mm)}`);
   };
 
@@ -25,7 +44,7 @@ const RecordaTimeField = ({ value, onChange, invalid }) => {
     <div className={`br-time ${invalid ? "is-invalid-input" : ""}`}>
       <select
         className="br-time__h"
-        value={pad(h || OPEN_HOUR)}
+        value={pad(h || Math.floor(startMin / 60))}
         onChange={(e) => setHM(parseInt(e.target.value, 10), m || 0)}
       >
         {hours.map((H) => (
@@ -37,9 +56,15 @@ const RecordaTimeField = ({ value, onChange, invalid }) => {
       <span className="br-time__sep">:</span>
       <select
         className="br-time__m"
-        value={pad(h === CLOSE_HOUR ? 0 : Number.isNaN(m) ? 0 : m)}
+        value={pad(
+          minsOf(`${pad(h)}:${pad(m)}`) >= endMin && h === endHour
+            ? endMinute
+            : Number.isNaN(m)
+            ? 0
+            : m,
+        )}
         onChange={(e) =>
-          setHM(h || OPEN_HOUR, parseInt(e.target.value, 10))
+          setHM(h || Math.floor(startMin / 60), parseInt(e.target.value, 10))
         }
       >
         {minutes.map((M) => (

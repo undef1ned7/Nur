@@ -34,3 +34,10 @@ npm run printer-bridge   # локальный мост для принтера (
 ## Environment
 
 `.env` (см. `.env.example`): `VITE_API_URL`, `VITE_WS_API_URL`, `DEV_BACKEND` (прокси dev-сервера), `VITE_REGISTER_ACCESS_*`.
+
+## Backend-документация
+
+Если задача требует правок API, **сразу** добавлять спецификацию в `docs/`
+(по сектору: `docs/services/`, `docs/market/`, `docs/consulting/backend/` и т.д.).
+Формат — как в существующих ТЗ: задача, контракт API, модель, чек-лист приёмки,
+ссылки на фронт. Пример: [docs/services/appointment-soft-delete.md](./docs/services/appointment-soft-delete.md).

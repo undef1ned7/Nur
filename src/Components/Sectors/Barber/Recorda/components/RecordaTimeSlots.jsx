@@ -1,6 +1,6 @@
 // RecordaTimeSlots.jsx
 import React, { useMemo } from "react";
-import { pad, OPEN_HOUR, CLOSE_HOUR, minsOf, ts, BLOCKING, toDate } from "./RecordaUtils";
+import { pad, minsOf, ts, BLOCKING, toDate, defaultWorkBounds } from "./RecordaUtils";
 import "../Recorda.scss";
 
 const SLOT_MINUTES = 30;
@@ -18,11 +18,14 @@ const RecordaTimeSlots = ({
   totalMinutes = 30,
   onSelectSlot,
   disabled = false,
+  workBounds,
 }) => {
+  const bounds = workBounds || defaultWorkBounds();
+
   // Генерация всех слотов
   const slots = useMemo(() => {
     const arr = [];
-    for (let m = OPEN_HOUR * 60; m < CLOSE_HOUR * 60; m += SLOT_MINUTES) {
+    for (let m = bounds.startMin; m < bounds.endMin; m += SLOT_MINUTES) {
       const h = Math.floor(m / 60);
       const mm = m % 60;
       arr.push({
@@ -31,7 +34,7 @@ const RecordaTimeSlots = ({
       });
     }
     return arr;
-  }, []);
+  }, [bounds.startMin, bounds.endMin]);
 
   // Определение занятых слотов
   const busySlots = useMemo(() => {
@@ -71,7 +74,7 @@ const RecordaTimeSlots = ({
 
       // Проверяем, хватит ли места для услуги
       const endNeeded = slot.mins + totalMinutes;
-      if (endNeeded > CLOSE_HOUR * 60) {
+      if (endNeeded > bounds.endMin) {
         map.set(slot.time, false);
         return;
       }
@@ -89,7 +92,7 @@ const RecordaTimeSlots = ({
     });
 
     return map;
-  }, [slots, busySlots, totalMinutes]);
+  }, [slots, busySlots, totalMinutes, bounds.endMin]);
 
   // Выбранный диапазон
   const selectedRange = useMemo(() => {

@@ -572,12 +572,32 @@ export default function ConsultingAnalytics() {
               tone="money"
             />
             <KpiCard
+              label="Чистая выручка"
+              value={money(kpiValue(kpis.net_revenue))}
+              percent={kpiMeta(kpis.net_revenue).percent}
+              description={
+                kpiValue(kpis.cancellations) != null
+                  ? `Отмены: ${money(kpiValue(kpis.cancellations))}`
+                  : "Продажи минус отмены и возвраты"
+              }
+              icon={TrendingUp}
+              tone="money"
+            />
+            <KpiCard
               label="Оплачено"
               value={money(kpiValue(kpis.paid_income))}
               percent={kpiMeta(kpis.paid_income).percent}
-              description="Фактически полученные деньги"
+              description="Фактически полученные деньги (касса)"
               icon={Banknote}
               tone="success"
+            />
+            <KpiCard
+              label="В ожидании кассы"
+              value={money(kpiValue(kpis.pending_cash))}
+              percent={kpiMeta(kpis.pending_cash).percent}
+              description="Заявки до подтверждения кассиром"
+              icon={Clock}
+              tone="warn"
             />
             <KpiCard
               label="Продаж"

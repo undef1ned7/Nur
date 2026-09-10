@@ -219,13 +219,76 @@ GET /consalting/inbound-leads/analytics/?date_from=&date_to=&owner=&source=
 Уточнения:
 
 - `revenue` считается по связанным продажам **за вычетом отменённых и
-  возвратов** (см. [08-sale-cancel.md](./08-sale-cancel.md)). Отменённая продажа
+  возвратов** (см. [../backend-money-tenant/02-sale-cancel.md](../backend-money-tenant/02-sale-cancel.md)). Отменённая продажа
   также **не считается** конверсией: если продажа по лиду отменена, лид
   возвращается из `converted` (см. `lead_action` в отмене).
 - `by_day` — только дни внутри периода, включая дни с нулями (фронт рисует
   график и ждёт непрерывный ряд).
 - Средние времена — в минутах, `null` если данных нет.
 - Сотруднику отдаём только его срез (`by_user` из одной строки).
+
+## 1.5b. Ручное создание inbound → карточка в воронке
+
+**Проблема:** `POST /consalting/inbound-leads/` (source `manual`, из окна «Новый
+лид» на `/crm/consulting/leads`) создаёт только `InboundLead` с `lead=null`.
+Карточка в канбане воронки (`/crm/consulting/funnel`) не появляется — менеджер
+не видит лид на доске. Webhook-путь (Wazzup) карточку создаёт, ручной — нет.
+
+**Ожидание:** ручное создание работает по той же политике, что webhook
+(см. [../backend-main-funnel-inbound.md](../backend-main-funnel-inbound.md) §2.1,
+§2.3) — параллельно с `InboundLead` создаётся `Lead` на **главной** воронке.
+
+### Контракт
+
+`POST /consalting/inbound-leads/` при успешном создании `InboundLead`:
+
+```text
+1. main = Funnel.objects.filter(company=…, is_main=True, is_active=True).first()
+2. IF main is None:
+     - InboundLead создаётся, lead=null (как сейчас), лог WARNING
+3. stage = первая системная стадия main (system_key="intake" / order=0)
+4. Lead.objects.create(
+       funnel=main, stage=stage,
+       title=full_name or phone or "Новый лид",
+       full_name=…, phone=…, source=source ("manual"),
+       description=message, status="new", owner=null,
+   )
+5. InboundLead.lead = Lead; InboundLead.save()
+6. Запустить авто-распределение (§ раздачи в backend-main-funnel-inbound.md §3):
+     round_robin/least_loaded → Lead.owner + InboundLead.owner + status=assigned
+     manual → owner=null (пул на main)
+7. WS: /ws/consalting/funnel/ → lead.created (payload с funnel = main id)
+     + персональный lead.assigned владельцу (если распределилось)
+```
+
+Идемпотентность: повторный `POST` с тем же `external_id` не создаёт второй
+`Lead` (как и второй `InboundLead`).
+
+### Ответ
+
+`POST` возвращает объект `InboundLead` (тот же сериализатор, что список) с
+заполненным `lead` — id созданной карточки воронки. Фронт по нему строит ссылку
+«Открыть в воронке» и снимает свой временный фолбэк.
+
+### Фронтовый фолбэк (снять после деплоя бэка)
+
+Пока контракт не задеплоен, фронт сам создаёт карточку:
+`ensureFunnelLeadForInbound()` в [`src/api/consultingLeads.js`](../../../src/api/consultingLeads.js)
+— ищет `is_main`-воронку, её стадию `intake`, делает `POST /consalting/leads/` и
+`PATCH /consalting/inbound-leads/{id}/ { lead }`. Вызывается из
+[`CreateLeadModal.jsx`](../../../src/Components/Sectors/Consulting/leads/modals/CreateLeadModal.jsx).
+Когда бэк начнёт возвращать `lead` в ответе `POST /inbound-leads/`, фолбэк
+становится no-op (guard `if (inbound.lead) return`) и его можно удалить.
+
+### Чек-лист приёмки
+
+- [ ] `POST /consalting/inbound-leads/` с `source=manual` создаёт `Lead` на
+      воронке с `is_main=True`, стадия `intake`.
+- [ ] `InboundLead.lead` в ответе `POST` заполнен id карточки.
+- [ ] Нет главной воронки → `InboundLead` создаётся, `lead=null`, WARNING в лог.
+- [ ] Авто-распределение отрабатывает так же, как для webhook-лида.
+- [ ] Повтор `POST` с тем же `external_id` не плодит вторую карточку.
+- [ ] WS `lead.created` уходит на `/ws/consalting/funnel/` с `funnel` = main id.
 
 ## 1.6. Напоминания по отложенным
 

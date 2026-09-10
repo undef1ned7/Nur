@@ -1,5 +1,12 @@
 // RecordaCalendar.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { DELETED_STATUS, isScheduleBlocking, fmtMoney } from "./RecordaUtils";
+import {
+  clockMinFromDate,
+  END_OF_DAY_MIN,
+  formatWorkSlotTime,
+  buildMinuteToPxMapper,
+} from "./recordaWorkHours";
 
 const STATUS_LABELS = {
   booked: "Забронировано",
@@ -7,6 +14,7 @@ const STATUS_LABELS = {
   completed: "Завершено",
   canceled: "Отменено",
   no_show: "Не явился",
+  [DELETED_STATUS]: "Удалено",
 };
 
 const STATUS_LABELS_SHORT = {
@@ -14,26 +22,16 @@ const STATUS_LABELS_SHORT = {
   confirmed: "Подтв.",
   completed: "Готово",
   canceled: "Отмена",
-  no_show: "Не явился",
+  no_show: "Не яв.",
+  [DELETED_STATUS]: "Удал.",
 };
 
-/* компактная шкала */
-const PX_PER_MIN = 32 / 30;
-const MIN_EVENT_H = 72;
-
-const OPEN_HOUR = 9;
-const CLOSE_HOUR = 21;
-const SLOT_MIN = 30;
-
-const estimateContentMin = (svc, client, phone) => {
-  const wrapLen = 30;
-  const lines =
-    1 +
-    Math.ceil(String(svc || "").length / wrapLen) +
-    Math.ceil(String(client || "").length / wrapLen) +
-    (phone ? 1 : 0);
-  return 30 + lines * 18 + 10;
-};
+const MIN_EVENT_H = 18;
+const COMPACT_MAX_MIN = 45;
+const STICK_CHIP_H = 30;
+const STICK_CHIP_W = 156;
+const STICK_LANE_GAP = 5;
+const STICK_MIN_H = 22;
 
 const colorByStatus = (status) => {
   switch (status) {
@@ -67,6 +65,12 @@ const colorByStatus = (status) => {
         border: "#F59E0B",
         shadow: "0 4px 14px rgba(245,158,11,.18)",
       };
+    case DELETED_STATUS:
+      return {
+        bg: "#F3F4F6",
+        border: "#9CA3AF",
+        shadow: "0 4px 14px rgba(107,114,128,.12)",
+      };
     default:
       return {
         bg: "#F3F4F6",
@@ -76,39 +80,36 @@ const colorByStatus = (status) => {
   }
 };
 
-const layoutForBarber = (
-  list,
-  COL_HEADER_H,
-  toTime,
-  serviceNamesFromRecord,
-  clientName,
-  clientPhone
-) => {
+const layoutForBarber = (list, minuteMapper, workBounds = { startMin: 9 * 60 }) => {
+  const map = minuteMapper;
+  const originPx = map?.originPx ?? 0;
+
   const items = list.map((r) => {
     const start = new Date(r.start_at);
     const end = new Date(r.end_at);
-    const startM = start.getHours() * 60 + start.getMinutes();
-    const endM = end.getHours() * 60 + end.getMinutes();
-    const topMin = Math.max(0, startM - OPEN_HOUR * 60);
-    const durMin = Math.max(15, endM - startM);
-
-    const svc = serviceNamesFromRecord(r);
-    const cl = clientName(r);
-    const ph = clientPhone(r);
-
-    const heightByTime = durMin * PX_PER_MIN;
-    const heightByText = estimateContentMin(svc, cl, ph);
+    const startM = clockMinFromDate(start, workBounds);
+    let endM = clockMinFromDate(end, workBounds);
+    if (endM < startM) endM += END_OF_DAY_MIN;
+    const durMin = Math.max(1, endM - startM);
+    const heightByTime = map
+      ? map.rangePx(startM, endM)
+      : durMin * (32 / 30);
+    const useStick = durMin <= COMPACT_MAX_MIN;
 
     return {
       r,
       tStart: startM,
       tEnd: endM,
-      top: topMin * PX_PER_MIN,
-      height: Math.max(MIN_EVENT_H, heightByTime, heightByText),
+      durMin,
+      useStick,
+      heightByTime,
+      top: map ? map.minuteToPx(startM) - originPx : 0,
+      height: Math.max(MIN_EVENT_H, heightByTime),
     };
   });
 
-  // раскладка по "дорожкам" при пересечениях
+  items.sort((a, b) => a.tStart - b.tStart || a.tEnd - b.tEnd);
+
   const lanes = [];
   items.forEach((it) => {
     let lane = 0;
@@ -122,20 +123,41 @@ const layoutForBarber = (
     }
     it.lane = lane;
     it.lanes = lanes.length;
+    if (it.lanes > 1) it.useStick = true;
   });
 
-  const GAP = 6; // расстояние между пересекающимися карточками
+  const GAP = 6;
   items.forEach((it) => {
-    const widthPct = (100 - (it.lanes - 1) * GAP) / it.lanes;
     const { bg, border, shadow } = colorByStatus(it.r.status);
+    it.colors = { bg, border, shadow };
+
+    if (it.useStick) {
+      const chipH = Math.min(
+        STICK_CHIP_H,
+        Math.max(STICK_MIN_H, it.heightByTime),
+      );
+      it.style = {
+        top: `${it.top}px`,
+        height: `${chipH}px`,
+        left: `${4 + it.lane * (STICK_CHIP_W + STICK_LANE_GAP)}px`,
+        width: `${STICK_CHIP_W}px`,
+        zIndex: 4 + it.lane,
+        "--stick-accent": border,
+        "--stick-bg": bg,
+      };
+      return;
+    }
+
+    const widthPct = (100 - (it.lanes - 1) * GAP) / it.lanes;
     it.style = {
       top: `${it.top}px`,
-      height: `${it.height - 4}px`,
+      height: `${Math.max(MIN_EVENT_H, it.heightByTime - 4)}px`,
       left: `calc(${it.lane * (widthPct + GAP)}%)`,
       width: `${widthPct}%`,
       background: bg,
       borderColor: border,
       boxShadow: shadow,
+      zIndex: 2 + it.lane,
     };
   });
 
@@ -146,7 +168,9 @@ const RecordaCalendar = ({
   barbers,
   fltBarber,
   recordsByBarber,
-  timesAll,
+  calendarGridSlots = [],
+  gutterBlocks = [],
+  busyGutterBlocks,
   calendarHeight,
   busySlots,
   loading,
@@ -155,22 +179,32 @@ const RecordaCalendar = ({
   clientName,
   clientPhone,
   COL_HEADER_H,
-  SLOT_PX,
-  SLOT_MIN: slotMinProp = SLOT_MIN,
+  PX_PER_MIN,
+  workBounds,
   onRecordClick,
   onSlotClick,
   isToday,
+  getRecordPrice,
 }) => {
+  const startMin = workBounds?.startMin ?? 9 * 60;
+  const endMin = workBounds?.endMin ?? 21 * 60;
+
   const visibleBarbers = useMemo(
     () =>
       barbers.filter(
-        (b) => !fltBarber || String(b.id) === String(fltBarber)
+        (b) => !fltBarber || String(b.id) === String(fltBarber),
       ),
-    [barbers, fltBarber]
+    [barbers, fltBarber],
   );
 
-  // Линия текущего времени
   const [nowLineTop, setNowLineTop] = useState(null);
+
+  const pxPerMin = PX_PER_MIN ?? 32 / 30;
+
+  const minuteMapper = useMemo(
+    () => buildMinuteToPxMapper(calendarGridSlots, workBounds),
+    [calendarGridSlots, workBounds],
+  );
 
   useEffect(() => {
     if (!isToday) {
@@ -180,37 +214,32 @@ const RecordaCalendar = ({
 
     const updateNowLine = () => {
       const now = new Date();
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      
-      // Проверяем, что время в рабочем диапазоне
-      if (nowMins < OPEN_HOUR * 60 || nowMins > CLOSE_HOUR * 60) {
+      const nowMins = clockMinFromDate(now, { startMin, endMin });
+
+      if (nowMins < startMin || nowMins > endMin) {
         setNowLineTop(null);
         return;
       }
-      
-      const topMin = nowMins - OPEN_HOUR * 60;
-      setNowLineTop(topMin * PX_PER_MIN);
+
+      setNowLineTop(minuteMapper.minuteToPx(nowMins) - minuteMapper.originPx);
     };
 
     updateNowLine();
-    const timer = setInterval(updateNowLine, 60_000); // обновляем каждую минуту
+    const timer = setInterval(updateNowLine, 60_000);
     return () => clearInterval(timer);
-  }, [isToday]);
+  }, [isToday, minuteMapper, startMin, endMin]);
 
-  const slotTimes = useMemo(
-    () => timesAll.slice(0, -1),
-    [timesAll],
-  );
-
-  const isBarberBusyAtSlot = (barberId, slotIndex) => {
+  const isBarberBusyAtSlot = (barberId, slot) => {
     const list = recordsByBarber.get(String(barberId)) || [];
-    const slotStart = OPEN_HOUR * 60 + slotIndex * slotMinProp;
-    const slotEnd = slotStart + slotMinProp;
+    const slotStart = slot.startMin;
+    const slotEnd = slotStart + slot.gridMin;
+    const bounds = { startMin, endMin };
     return list.some((r) => {
+      if (!isScheduleBlocking(r.status)) return false;
       const s = new Date(r.start_at);
       const e = new Date(r.end_at);
-      const rs = s.getHours() * 60 + s.getMinutes();
-      const re = e.getHours() * 60 + e.getMinutes();
+      const rs = clockMinFromDate(s, bounds);
+      const re = clockMinFromDate(e, bounds);
       return rs < slotEnd && slotStart < re;
     });
   };
@@ -231,29 +260,24 @@ const RecordaCalendar = ({
               className="barberrecorda__timeHeader"
               style={{ height: COL_HEADER_H }}
             />
-            {slotTimes.map((t, i) => (
+            {gutterBlocks.map((block, i) => (
               <div
-                key={t}
+                key={`gutter-${block.startMin}`}
                 className={`barberrecorda__timeCell ${
-                  busySlots.has(i) ? "is-busy" : ""
-                }`}
-                style={{ height: SLOT_PX }}
+                  busyGutterBlocks?.has(i) ? "is-busy" : ""
+                } ${block.label ? "" : "barberrecorda__timeCell--tick"} ${
+                  block.isMidHour ? "barberrecorda__timeCell--mid" : ""
+                } ${block.isSubdivided ? "barberrecorda__timeCell--sub" : ""}`}
+                style={{ height: block.heightPx }}
               >
-                <span>{t}</span>
+                {block.label ? <span>{block.label}</span> : null}
               </div>
             ))}
           </aside>
 
           {visibleBarbers.map((b) => {
             const list = recordsByBarber.get(String(b.id)) || [];
-            const layout = layoutForBarber(
-              list,
-              COL_HEADER_H,
-              toTime,
-              serviceNamesFromRecord,
-              clientName,
-              clientPhone
-            );
+            const layout = layoutForBarber(list, minuteMapper, workBounds);
 
             return (
               <section key={b.id} className="barberrecorda__calCol">
@@ -269,7 +293,6 @@ const RecordaCalendar = ({
                     </span>
                     <span className="barberrecorda__name">{b.name}</span>
                   </div>
-                  {/* Счётчик записей у мастера */}
                   <span className="barberrecorda__colCount">
                     {list.length}
                   </span>
@@ -279,11 +302,13 @@ const RecordaCalendar = ({
                   className="barberrecorda__gridLines"
                   style={{ top: COL_HEADER_H }}
                 >
-                  {timesAll.slice(0, -1).map((_, i) => (
+                  {calendarGridSlots.map((slot) => (
                     <div
-                      key={i}
-                      className="barberrecorda__gridLine"
-                      style={{ height: SLOT_PX }}
+                      key={`line-${b.id}-${slot.startMin}`}
+                      className={`barberrecorda__gridLine ${
+                        slot.label ? "barberrecorda__gridLine--labeled" : ""
+                      } ${slot.isMidHour ? "barberrecorda__gridLine--mid" : ""}`}
+                      style={{ height: slot.heightPx }}
                     />
                   ))}
                 </div>
@@ -293,18 +318,19 @@ const RecordaCalendar = ({
                   style={{ height: calendarHeight - COL_HEADER_H }}
                 >
                   <div className="barberrecorda__slotLayer" aria-hidden="true">
-                    {slotTimes.map((t, i) => {
-                      const busy = isBarberBusyAtSlot(b.id, i);
+                    {calendarGridSlots.map((slot, i) => {
+                      const busy = isBarberBusyAtSlot(b.id, slot);
+                      const startTime = formatWorkSlotTime(slot.startMin);
                       return (
                         <button
-                          key={`${b.id}-${t}`}
+                          key={`${b.id}-${slot.startMin}`}
                           type="button"
                           className={`barberrecorda__slotHit ${
                             busy ? "is-busy" : ""
                           }`}
                           style={{
-                            top: i * SLOT_PX,
-                            height: SLOT_PX,
+                            top: slot.topPx,
+                            height: slot.heightPx,
                           }}
                           disabled={busy}
                           tabIndex={-1}
@@ -312,7 +338,7 @@ const RecordaCalendar = ({
                           onClick={() =>
                             onSlotClick?.({
                               barberId: String(b.id),
-                              startTime: t,
+                              startTime,
                             })
                           }
                         />
@@ -320,9 +346,8 @@ const RecordaCalendar = ({
                     })}
                   </div>
 
-                  {/* Линия текущего времени */}
                   {nowLineTop !== null && (
-                    <div 
+                    <div
                       className="barberrecorda__nowLine"
                       style={{ top: nowLineTop }}
                     />
@@ -339,14 +364,66 @@ const RecordaCalendar = ({
                     const svc = serviceNamesFromRecord(r);
                     const cl = clientName(r);
                     const phone = clientPhone(r);
+                    const hasClient = cl && cl !== "—";
+                    const priceValue = getRecordPrice?.(r) ?? 0;
+                    const priceLabel =
+                      Number.isFinite(priceValue) && priceValue > 0
+                        ? fmtMoney(priceValue)
+                        : null;
+                    const tip = `${toTime(r.start_at)}–${toTime(r.end_at)} · ${svc}${
+                      cl && cl !== "—" ? ` · ${cl}` : ""
+                    }${phone ? ` · ${phone}` : ""}${
+                      priceLabel ? ` · ${priceLabel}` : ""
+                    }`;
+
+                    if (it.useStick) {
+                      const { border } = it.colors;
+                      const timeEnd = toTime(r.end_at);
+                      const timeStart = toTime(r.start_at);
+                      const timeLabel =
+                        timeEnd && timeEnd !== timeStart
+                          ? `${timeStart}–${timeEnd}`
+                          : timeStart;
+
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className={`barberrecorda__eventStick barberrecorda__eventStick--${r.status}`}
+                          style={it.style}
+                          onClick={() => onRecordClick(r)}
+                          title={tip}
+                        >
+                          <span
+                            className="barberrecorda__eventStickAccent"
+                            style={{ background: border }}
+                            aria-hidden="true"
+                          />
+                          <span className="barberrecorda__eventStickMain">
+                            <span className="barberrecorda__eventStickTime">
+                              {timeLabel}
+                            </span>
+                          </span>
+                          {priceLabel ? (
+                            <span className="barberrecorda__eventStickPrice">
+                              {priceLabel}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    }
 
                     return (
                       <article
                         key={r.id}
-                        className="barberrecorda__event"
+                        className={`barberrecorda__event ${
+                          r.status === DELETED_STATUS
+                            ? "barberrecorda__event--deleted"
+                            : ""
+                        }`}
                         style={it.style}
                         onClick={() => onRecordClick(r)}
-                        title={`${svc}${cl ? ` · ${cl}` : ""}`}
+                        title={tip}
                       >
                         <div className="barberrecorda__eventHeader">
                           <div className="barberrecorda__eventTime">
@@ -358,21 +435,24 @@ const RecordaCalendar = ({
                             className={`barberrecorda__badge barberrecorda__badge--${r.status}`}
                             title={STATUS_LABELS[r.status] || r.status}
                           >
-                            <span className="barberrecorda__badgeFull">{STATUS_LABELS[r.status] || r.status}</span>
-                            <span className="barberrecorda__badgeShort">{STATUS_LABELS_SHORT[r.status] || r.status}</span>
+                            <span className="barberrecorda__badgeFull">
+                              {STATUS_LABELS[r.status] || r.status}
+                            </span>
+                            <span className="barberrecorda__badgeShort">
+                              {STATUS_LABELS_SHORT[r.status] || r.status}
+                            </span>
                           </span>
                         </div>
-                        <div className="barberrecorda__eventSvc">
-                          {svc}
-                        </div>
-                        <div className="barberrecorda__eventClient">
-                          {cl}
-                        </div>
-                        {phone && (
-                          <div className="barberrecorda__eventPhone">
-                            {phone}
-                          </div>
-                        )}
+                        <div className="barberrecorda__eventSvc">{svc}</div>
+                        {hasClient ? (
+                          <div className="barberrecorda__eventClient">{cl}</div>
+                        ) : null}
+                        {phone ? (
+                          <div className="barberrecorda__eventPhone">{phone}</div>
+                        ) : null}
+                        {priceLabel ? (
+                          <div className="barberrecorda__eventPrice">{priceLabel}</div>
+                        ) : null}
                       </article>
                     );
                   })}

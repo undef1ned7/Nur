@@ -15,6 +15,7 @@ import {
   FaFilter,
   FaInstagram,
   FaLayerGroup,
+  FaMoneyBillWave,
   FaPlay,
   FaPlus,
   FaSyncAlt,
@@ -45,8 +46,11 @@ import {
   leadSourceMeta,
 } from "../../../../utils/consultingLeadSources";
 import { useUser } from "../../../../store/slices/userSlice";
+import { shouldIsolateConsultingByOwner } from "../../../../utils/consultingFunnelAccess";
 import useConsultingList from "../common/useConsultingList";
 import useCounters from "../common/useCounters";
+import useConsultingRegions from "../common/useConsultingRegions";
+import RegionFilter from "../common/RegionFilter";
 import {
   ListState,
   Pagination,
@@ -55,6 +59,7 @@ import {
 } from "../common/ListControls";
 import { employeeName, fmtDateTime, plural } from "../common/listUtils";
 import { useConsultingRealtime } from "../common/useConsultingRealtime";
+import LeadPaymentModal from "../Funnel/LeadPaymentModal";
 import AssignLeadModal from "./modals/AssignLeadModal";
 import CreateLeadModal from "./modals/CreateLeadModal";
 import DeferLeadModal from "./modals/DeferLeadModal";
@@ -100,19 +105,32 @@ const queueToStatus = (queue) => {
 export default function LeadsInbox({ employees, empById, isManager, alert }) {
   const { profile } = useUser();
   const myId = profile?.id ? String(profile.id) : "";
+  const isolateByOwner = shouldIsolateConsultingByOwner(profile);
+  const regionCtl = useConsultingRegions(profile);
+  const fixedRegion = regionCtl.fixedRegionCode;
+
+  const mapParams = useCallback(
+    (p) => {
+      const { queue, region, ...rest } = p;
+      const status = queueToStatus(queue);
+      const base = status ? { ...rest, status } : rest;
+      const effRegion = fixedRegion || region;
+      if (effRegion) base.region = effRegion;
+      if (isolateByOwner && myId) {
+        return { ...base, owner: myId };
+      }
+      return base;
+    },
+    [isolateByOwner, myId, fixedRegion],
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [assignFor, setAssignFor] = useState(null);
   const [deferFor, setDeferFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
+  const [payFor, setPayFor] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const mapParams = useCallback((p) => {
-    const { queue, ...rest } = p;
-    const status = queueToStatus(queue);
-    return status ? { ...rest, status } : rest;
-  }, []);
 
   const list = useConsultingList({
     fetcher: listInboundLeads,
@@ -120,6 +138,7 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
       queue: "all",
       owner: "",
       source: "",
+      region: "",
       date_from: "",
       date_to: "",
       overdue: "",
@@ -153,11 +172,20 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
     () => ({
       owner: filters.owner || undefined,
       source: filters.source || undefined,
+      region: fixedRegion || filters.region || undefined,
       date_from: filters.date_from || undefined,
       date_to: filters.date_to || undefined,
       search: list.search || undefined,
     }),
-    [filters.owner, filters.source, filters.date_from, filters.date_to, list.search],
+    [
+      filters.owner,
+      filters.source,
+      filters.region,
+      fixedRegion,
+      filters.date_from,
+      filters.date_to,
+      list.search,
+    ],
   );
 
   const { data: counters, reload: reloadCounters } = useCounters(
@@ -196,6 +224,7 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
   const filterCount = [
     filters.owner,
     filters.source,
+    !fixedRegion && filters.region,
     filters.date_from,
     filters.date_to,
     filters.overdue,
@@ -286,6 +315,17 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
             <span className="leads__chipBadge">{filterCount}</span>
           )}
         </button>
+
+        {!fixedRegion && (
+          <RegionFilter
+            regions={regionCtl.regions}
+            scopedRegions={regionCtl.scopedRegions}
+            value={filters.region}
+            onChange={(code) => setFilter("region", code)}
+            allowAll={regionCtl.allowAllRegions}
+            size="sm"
+          />
+        )}
 
         {isManager && (
           <button
@@ -432,7 +472,22 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
               l.lead &&
               consultingChatPath(l.lead, l.source || "whatsapp");
             const funnelPath = l.lead && consultingFunnelLeadPath(l.lead);
-            const msg = l.message ? String(l.message) : "";
+            // Текст обращения/комментарий — под разными именами у inbound,
+            // Lead из воронки (`description`) и интеграций (`last_message`).
+            const msg = String(
+              l.message ||
+                l.comment ||
+                l.description ||
+                l.text ||
+                l.note ||
+                l.last_message?.text ||
+                (typeof l.last_message === "string" ? l.last_message : "") ||
+                "",
+            ).trim();
+            const regionCode = l.region_code || l.region || "";
+            const regionLabel =
+              l.region_label ||
+              (regionCode ? regionCtl.regionLabel(regionCode) : "");
 
             return (
               <li
@@ -440,6 +495,7 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                 className={`leads__card${overdue ? " is-overdue" : ""}${
                   busy ? " is-busy" : ""
                 }`}
+                style={{ "--lead-accent": src.color || "#cbd5e1" }}
               >
                 <div className="leads__cardMain">
                   <span
@@ -460,9 +516,16 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                         </span>
                       </div>
                       <div className="leads__cardMeta">
+                        {regionLabel && (
+                          <span
+                            className="leads__regionTag"
+                            title={`Регион: ${regionLabel}`}
+                          >
+                            {regionLabel}
+                          </span>
+                        )}
                         <span
                           className={`leads__sourceTag leads__sourceTag--${src.value || "manual"}`}
-                          style={{ color: src.color }}
                         >
                           <SourceIcon source={src.value} /> {src.label}
                         </span>
@@ -474,10 +537,13 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                       </div>
                     </div>
 
-                    <p className="leads__msg" title={msg || undefined}>
+                    <p
+                      className={`leads__msg${msg ? "" : " leads__msg--empty"}`}
+                      title={msg || undefined}
+                    >
                       {msg
                         ? msg.slice(0, 160) + (msg.length > 160 ? "…" : "")
-                        : "Нет текста сообщения"}
+                        : "Комментарий не оставлен"}
                     </p>
 
                     <div className="leads__cardFoot">
@@ -528,6 +594,17 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                     >
                       <FaLayerGroup aria-hidden />
                     </Link>
+                  )}
+                  {!closed && l.lead && (
+                    <button
+                      type="button"
+                      className="leads__btn leads__btn--sm leads__btn--sale"
+                      onClick={() => setPayFor(l)}
+                      title="Оформить продажу по лиду"
+                      disabled={busy}
+                    >
+                      <FaMoneyBillWave aria-hidden /> Продажа
+                    </button>
                   )}
                   {!closed && (
                     <button
@@ -648,6 +725,18 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
             reloadAll();
           }}
           onError={(m) => alert(m, true)}
+        />
+      )}
+
+      {payFor && (
+        <LeadPaymentModal
+          lead={{ ...payFor, id: payFor.lead }}
+          onClose={() => setPayFor(null)}
+          onSuccess={() => {
+            setPayFor(null);
+            reloadAll();
+            alert("Продажа по лиду оформлена.");
+          }}
         />
       )}
 

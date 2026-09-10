@@ -2,7 +2,7 @@
  * Консалтинг: продажи — список с серверной пагинацией/фильтрами и
  * отмена/возврат вместо удаления (ТЗ №8).
  *
- * Контракт: docs/consulting/backend/08-sale-cancel.md.
+ * Контракт: docs/consulting/backend-money-tenant/02-sale-cancel.md.
  *
  * Почему не удаление: продажа тянет за собой абонентский график, начисление
  * зарплаты, приход в кассе и цифры аналитики. Удаление записи оставляет всё это
@@ -50,6 +50,14 @@ export const REFUND_MODES = [
  */
 export const listConsultingSales = (params = {}, config) =>
   cGet("List Consulting Sales Error", URL_SALES, params, config);
+
+/**
+ * POST /consalting/sales/
+ * Сервер вызывает create_sale_side_effects (абонентка, касса, зарплата).
+ * @param {Object} payload - client, services, tariff, payment_mode, amount?, ...
+ */
+export const createConsultingSaleApi = (payload) =>
+  cPost("Create Consulting Sale Error", URL_SALES, payload);
 
 /** Одна продажа со всеми последствиями (абонентка, начисление, касса). */
 export const getConsultingSale = (id, config) =>

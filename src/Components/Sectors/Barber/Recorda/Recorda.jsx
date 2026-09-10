@@ -1,13 +1,49 @@
 // Recorda.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
+import { getAppointmentsSummarySafe } from "../../../../api/barberAppointments";
+import { useUser } from "../../../../store/slices/userSlice";
+import { getCompany } from "../../../../store/creators/userCreators";
+import { useDispatch } from "react-redux";
 import "./Recorda.scss";
+
+import {
+  fetchMastersAvailability,
+  readWorkScheduleSettings,
+  resolveRecordaWorkBounds,
+  expandBoundsToFitRecords,
+  buildTimeSlotLabels,
+  buildAdaptiveCalendarGridSlots,
+  clockMinFromDate,
+} from "./components/recordaWorkHours";
 
 import {
   RecordaHeader,
   RecordaCalendar,
+  RecordaDayList,
+  RecordaDaySummary,
   RecordaModal,
+  RecordaDeletedView,
+  RecordaWorkSchedulePanel,
 } from "./components";
+import {
+  DELETED_STATUS,
+  isScheduleBlocking,
+  matchesStatusFilter,
+  RECORDA_VIEW,
+  RECORDA_LAYOUT,
+  readRecordaLayoutPreference,
+  writeRecordaLayoutPreference,
+  clientNameOfRecord,
+  clientPhoneOfRecord,
+  formatGroupedServiceNames,
+  computeDayExpectedSummary,
+  formatDaySummaryDate,
+  fmtMoney,
+  pluralRecordsLabel,
+  appointmentExpectedPrice,
+  normalizeAppointmentsSummary,
+} from "./components/RecordaUtils";
 
 /* ===== utils ===== */
 const pad = (n) => String(n).padStart(2, "0");
@@ -34,26 +70,49 @@ const toTime = (iso) => {
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
+const fetchAllAppointments = async () => {
+  const all = [];
+  let page = 1;
+  const pageSize = 500;
+
+  while (page <= 50) {
+    const { data } = await api.get("/barbershop/appointments/", {
+      params: { page_size: pageSize, page },
+    });
+    const batch = asArray(data);
+    all.push(...batch);
+    if (!data?.next || batch.length < pageSize) break;
+    page += 1;
+  }
+
+  return all;
+};
+
 const ts = (iso) => new Date(iso).getTime();
 
 /* ===== размеры тайм-линии ===== */
 const SLOT_MIN = 30;
 const SLOT_PX = 32;
+const PX_PER_MIN = SLOT_PX / SLOT_MIN;
 const COL_HEADER_H = 60;
 const SAFE_PAD = 150;
-
-const OPEN_HOUR = 9;
-const CLOSE_HOUR = 21;
 
 /* статусы, которые можно автоматически завершать */
 const AUTO_COMPLETE_SOURCE = new Set(["booked", "confirmed"]);
 const AUTO_COMPLETE_TARGET = "completed";
 
 const Recorda = () => {
+  const dispatch = useDispatch();
+  const { profile, company } = useUser();
+  const isOwnerOrAdmin =
+    profile?.role === "owner" || profile?.role === "admin";
+
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [barbers, setBarbers] = useState([]);
   const [services, setServices] = useState([]);
+  const [serviceCategories, setServiceCategories] = useState([]);
+  const [mastersAvailability, setMastersAvailability] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -66,6 +125,11 @@ const Recorda = () => {
   const [fltDate, setFltDate] = useState(todayStr());
   const [fltBarber, setFltBarber] = useState("");
   const [fltStatus, setFltStatus] = useState("");
+  const [pageView, setPageView] = useState(RECORDA_VIEW.SCHEDULE);
+  const [dayLayout, setDayLayout] = useState(readRecordaLayoutPreference);
+  const [workScheduleOpen, setWorkScheduleOpen] = useState(false);
+  const [scheduleRevision, setScheduleRevision] = useState(0);
+  const [apiSummary, setApiSummary] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
@@ -97,7 +161,7 @@ const Recorda = () => {
     try {
       setLoading(true);
       setPageError("");
-      const [cl, em, sv, ap] = await Promise.all([
+      const [cl, em, sv, ap, cat] = await Promise.all([
         api.get("/barbershop/clients/", {
           params: { page_size: 1000, ordering: "full_name" },
         }),
@@ -107,8 +171,9 @@ const Recorda = () => {
         api.get("/barbershop/services/", {
           params: { page_size: 1000, is_active: true, ordering: "service_name" },
         }),
-        api.get("/barbershop/appointments/", {
-          params: { page_size: 1000 },
+        fetchAllAppointments(),
+        api.get("/barbershop/service-categories/", {
+          params: { page_size: 1000, ordering: "name" },
         }),
       ]);
 
@@ -143,10 +208,17 @@ const Recorda = () => {
           : [],
       }));
 
+      const cats = asArray(cat.data).map((c) => ({
+        id: c.id,
+        name: c.name ?? "",
+        active: c.is_active !== false,
+      }));
+
       setClients(cls);
       setBarbers(emps);
       setServices(svcs);
-      setAppointments(asArray(ap.data));
+      setServiceCategories(cats);
+      setAppointments(Array.isArray(ap) ? ap : asArray(ap));
     } catch (e) {
       const msg =
         e?.response?.data?.detail ||
@@ -167,59 +239,223 @@ const Recorda = () => {
     return () => window.removeEventListener("barber:booking-confirmed", handler);
   }, []);
 
+  const fetchSummary = useCallback(async () => {
+    const isDeletedViewNow = pageView === RECORDA_VIEW.DELETED;
+
+    if (isDeletedViewNow && !isOwnerOrAdmin) {
+      setApiSummary(null);
+      return;
+    }
+
+    try {
+      const params = isDeletedViewNow
+        ? { scope: "deleted" }
+        : { date: fltDate };
+
+      if (fltBarber) params.barber = fltBarber;
+      if (!isDeletedViewNow && fltStatus) params.status = fltStatus;
+
+      const data = await getAppointmentsSummarySafe(params);
+      const normalized = normalizeAppointmentsSummary(data, {
+        dateLabel: formatDaySummaryDate(fltDate, fltDate === todayStr()),
+      });
+      setApiSummary(normalized);
+    } catch {
+      setApiSummary(null);
+    }
+  }, [
+    pageView,
+    fltDate,
+    fltBarber,
+    fltStatus,
+    isOwnerOrAdmin,
+  ]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary, appointments]);
+
+  useEffect(() => {
+    const handler = () => setScheduleRevision((v) => v + 1);
+    window.addEventListener("barber:work-schedule-changed", handler);
+    return () =>
+      window.removeEventListener("barber:work-schedule-changed", handler);
+  }, []);
+
+  const settingsWorkBounds = useMemo(
+    () => readWorkScheduleSettings(company),
+    [company, scheduleRevision],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const slug = company?.slug;
+    if (!slug || !fltDate) {
+      setMastersAvailability(null);
+      return undefined;
+    }
+
+    fetchMastersAvailability(slug, fltDate, fltBarber || null).then((data) => {
+      if (!cancelled) setMastersAvailability(data);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [company?.slug, fltDate, fltBarber]);
+
+  const isDeletedView = pageView === RECORDA_VIEW.DELETED;
+
   /* записи за выбранный день */
   // NOTE: Client-side filtering is a temporary solution
   // TODO: Backend should support ?date=YYYY-MM-DD&status= params for appointments
   const dayRecords = useMemo(() => {
     let records = appointments.filter((r) => toDate(r.start_at) === fltDate);
-    
-    // Фильтр по статусу
+
+    records = records.filter((r) => r.status !== DELETED_STATUS);
+
     if (fltStatus) {
-      records = records.filter((r) => r.status === fltStatus);
+      records = records.filter((r) => matchesStatusFilter(r.status, fltStatus));
     }
-    
+
     return records;
   }, [appointments, fltDate, fltStatus]);
 
-  /* временная шкала для календаря */
-  const timesAll = useMemo(() => {
-    const arr = [];
-    for (let m = OPEN_HOUR * 60; m <= CLOSE_HOUR * 60; m += SLOT_MIN) {
-      arr.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+  const deletedRecords = useMemo(() => {
+    let records = appointments.filter((r) => r.status === DELETED_STATUS);
+
+    if (fltBarber) {
+      records = records.filter((r) => String(r.barber) === String(fltBarber));
     }
-    return arr;
-  }, []);
+
+    return records.sort((a, b) => ts(b.start_at) - ts(a.start_at));
+  }, [appointments, fltBarber]);
+
+  const deletedCount = useMemo(
+    () => appointments.filter((r) => r.status === DELETED_STATUS).length,
+    [appointments]
+  );
+
+  const headerRecordsCount = isDeletedView ? deletedRecords.length : dayRecords.length;
+
+  const calendarDayRecords = useMemo(() => {
+    if (!fltBarber) return dayRecords;
+    return dayRecords.filter((r) => String(r.barber) === String(fltBarber));
+  }, [dayRecords, fltBarber]);
+
+  const bookingWorkBounds = useMemo(
+    () =>
+      resolveRecordaWorkBounds({
+        availability: mastersAvailability,
+        barberId: fltBarber || null,
+        settingsBounds: settingsWorkBounds,
+      }),
+    [mastersAvailability, fltBarber, settingsWorkBounds],
+  );
+
+  const workBounds = useMemo(
+    () => expandBoundsToFitRecords(bookingWorkBounds, calendarDayRecords),
+    [bookingWorkBounds, calendarDayRecords],
+  );
+
+  const daySummary = useMemo(() => {
+    const fallback = computeDayExpectedSummary({
+      records: calendarDayRecords,
+      services,
+      dateLabel: formatDaySummaryDate(fltDate, isToday),
+    });
+
+    if (apiSummary?.fromApi && apiSummary.scope === "day") {
+      return {
+        dateLabel: fallback.dateLabel,
+        count: apiSummary.count,
+        expectedTotal: apiSummary.expectedTotal,
+      };
+    }
+
+    return fallback;
+  }, [apiSummary, calendarDayRecords, services, fltDate, isToday]);
+
+  const deletedSummary = useMemo(() => {
+    const fallback = {
+      count: deletedRecords.length,
+      expectedTotal: deletedRecords.reduce(
+        (sum, r) => sum + appointmentExpectedPrice(r, services),
+        0,
+      ),
+    };
+
+    if (apiSummary?.fromApi && apiSummary.scope === "deleted") {
+      return {
+        count: apiSummary.count,
+        expectedTotal: apiSummary.expectedTotal,
+      };
+    }
+
+    return fallback;
+  }, [apiSummary, deletedRecords, services]);
+
+  /* сетка: 30 мин, с 10-мин делением только в блоках с «короткими» записями */
+  const { calendarGridSlots, gutterBlocks, calendarBodyHeight } = useMemo(() => {
+    const { slots, gutterBlocks: blocks, totalHeightPx } =
+      buildAdaptiveCalendarGridSlots(
+        workBounds.startMin,
+        workBounds.endMin,
+        dayRecords,
+        workBounds,
+        { slotMin: SLOT_MIN, slotPx: SLOT_PX },
+      );
+    return {
+      calendarGridSlots: slots,
+      gutterBlocks: blocks,
+      calendarBodyHeight: totalHeightPx,
+    };
+  }, [workBounds, dayRecords]);
 
   const calendarHeight = useMemo(
-    () => (timesAll.length - 1) * SLOT_PX + COL_HEADER_H + SAFE_PAD,
-    [timesAll]
+    () => calendarBodyHeight + COL_HEADER_H + SAFE_PAD,
+    [calendarBodyHeight],
   );
 
-  const timeBounds = useMemo(
-    () => ({ startH: OPEN_HOUR, endH: CLOSE_HOUR }),
-    []
-  );
+  const totalGridSlots = calendarGridSlots.length;
 
-  const totalSlots =
-    (timeBounds.endH - timeBounds.startH) * (60 / SLOT_MIN);
-
-  /* подсветка "занятых" слотов в левой колонке */
+  /* подсветка занятых интервалов в колонке времени */
   const busySlots = useMemo(() => {
     const set = new Set();
-    for (let i = 0; i < totalSlots; i++) {
-      const slotStart = timeBounds.startH * 60 + i * SLOT_MIN;
-      const slotEnd = slotStart + SLOT_MIN;
+    const bounds = workBounds;
+    calendarGridSlots.forEach((slot, i) => {
+      const slotStart = slot.startMin;
+      const slotEnd = slotStart + slot.gridMin;
       const busy = dayRecords.some((r) => {
+        if (!isScheduleBlocking(r.status)) return false;
         const s = new Date(r.start_at);
         const e = new Date(r.end_at);
-        const rs = s.getHours() * 60 + s.getMinutes();
-        const re = e.getHours() * 60 + e.getMinutes();
+        const rs = clockMinFromDate(s, bounds);
+        const re = clockMinFromDate(e, bounds);
         return rs < slotEnd && slotStart < re;
       });
       if (busy) set.add(i);
-    }
+    });
     return set;
-  }, [dayRecords, timeBounds, totalSlots]);
+  }, [dayRecords, workBounds, calendarGridSlots]);
+
+  const busyGutterBlocks = useMemo(() => {
+    const set = new Set();
+    const bounds = workBounds;
+    gutterBlocks.forEach((block, i) => {
+      const blockEnd = block.startMin + block.blockMin;
+      const busy = dayRecords.some((r) => {
+        if (!isScheduleBlocking(r.status)) return false;
+        const s = new Date(r.start_at);
+        const e = new Date(r.end_at);
+        const rs = clockMinFromDate(s, bounds);
+        const re = clockMinFromDate(e, bounds);
+        return rs < blockEnd && block.startMin < re;
+      });
+      if (busy) set.add(i);
+    });
+    return set;
+  }, [dayRecords, workBounds, gutterBlocks]);
 
   /* группировка записей по мастерам */
   const recordsByBarber = useMemo(() => {
@@ -239,33 +475,31 @@ const Recorda = () => {
 
   const serviceNamesFromRecord = (r) => {
     if (Array.isArray(r.services_names) && r.services_names.length) {
-      return r.services_names.join(", ");
+      return formatGroupedServiceNames(r.services_names);
     }
     if (Array.isArray(r.services_public) && r.services_public.length) {
-      const names = r.services_public.map((s) => s?.name || s?.title || "").filter(Boolean);
-      if (names.length) return names.join(", ");
+      const names = r.services_public
+        .map((s) => s?.name || s?.title || "")
+        .filter(Boolean);
+      if (names.length) return formatGroupedServiceNames(names);
     }
     if (Array.isArray(r.services) && r.services.length) {
-      const names = r.services.map((item) => {
-        if (typeof item === "object" && item !== null) {
-          return item?.name ?? item?.title ?? item?.service?.name ?? "";
-        }
-        return services.find((s) => String(s.id) === String(item))?.name || "";
-      }).filter(Boolean);
-      if (names.length) return names.join(", ");
+      const names = r.services
+        .map((item) => {
+          if (typeof item === "object" && item !== null) {
+            return item?.name ?? item?.title ?? item?.service?.name ?? "";
+          }
+          return services.find((s) => String(s.id) === String(item))?.name || "";
+        })
+        .filter(Boolean);
+      if (names.length) return formatGroupedServiceNames(names);
     }
     return r.service_name || "—";
   };
 
-  const clientName = (r) =>
-    r.client_name ||
-    clients.find((c) => String(c.id) === String(r.client))?.name ||
-    "—";
+  const clientName = (r) => clientNameOfRecord(r, clients) || "—";
 
-  const clientPhone = (r) =>
-    r.client_phone ||
-    clients.find((c) => String(c.id) === String(r.client))?.phone ||
-    "";
+  const clientPhone = (r) => clientPhoneOfRecord(r, clients);
 
   const handleOpenNew = () => {
     setSlotDraft(null);
@@ -303,6 +537,26 @@ const Recorda = () => {
     setSlotDraft(null);
   };
 
+  const handleOpenDeletedView = () => {
+    setPageView(RECORDA_VIEW.DELETED);
+    setFltStatus("");
+  };
+
+  const handleBackToSchedule = () => {
+    setPageView(RECORDA_VIEW.SCHEDULE);
+  };
+
+  const handleDayLayoutChange = (layout) => {
+    setDayLayout(layout);
+    writeRecordaLayoutPreference(layout);
+  };
+
+  useEffect(() => {
+    if (!isOwnerOrAdmin && isDeletedView) {
+      setPageView(RECORDA_VIEW.SCHEDULE);
+    }
+  }, [isOwnerOrAdmin, isDeletedView]);
+
   /* ===== авто-завершение записей после конца времени ===== */
   useEffect(() => {
     const checkAndAutoComplete = async () => {
@@ -339,12 +593,27 @@ const Recorda = () => {
 
   return (
     <div className="barberrecorda">
+      {!isDeletedView ? (
+        <RecordaDaySummary
+          dateLabel={daySummary.dateLabel}
+          count={daySummary.count}
+          expectedTotal={daySummary.expectedTotal}
+          records={calendarDayRecords}
+          services={services}
+          clients={clients}
+          dayLayout={dayLayout}
+          onDayLayoutChange={handleDayLayoutChange}
+        />
+      ) : null}
+
       <RecordaHeader
+        viewMode={pageView}
         fltDate={fltDate}
         fltBarber={fltBarber}
         fltStatus={fltStatus}
         barbers={barbers}
-        recordsCount={dayRecords.length}
+        recordsCount={headerRecordsCount}
+        deletedCount={deletedCount}
         onDateChange={setFltDate}
         onBarberChange={setFltBarber}
         onStatusChange={setFltStatus}
@@ -354,6 +623,25 @@ const Recorda = () => {
         isToday={isToday}
         onAddClick={handleOpenNew}
         onWalkInClick={handleOpenWalkIn}
+        onOpenDeletedView={handleOpenDeletedView}
+        onBackToSchedule={handleBackToSchedule}
+        canViewDeleted={isOwnerOrAdmin}
+        workBounds={workBounds}
+        onOpenWorkSchedule={() => setWorkScheduleOpen(true)}
+      />
+
+      <RecordaWorkSchedulePanel
+        open={workScheduleOpen && !isDeletedView}
+        onClose={() => setWorkScheduleOpen(false)}
+        company={company}
+        workBounds={workBounds}
+        canEdit={isOwnerOrAdmin}
+        onSaved={async (result) => {
+          setScheduleRevision((v) => v + 1);
+          if (result?.savedToApi) {
+            await dispatch(getCompany());
+          }
+        }}
       />
 
       {pageError && (
@@ -362,25 +650,71 @@ const Recorda = () => {
         </div>
       )}
 
-      <RecordaCalendar
-        barbers={barbers}
-        fltBarber={fltBarber}
-        recordsByBarber={recordsByBarber}
-        timesAll={timesAll}
-        calendarHeight={calendarHeight}
-        busySlots={busySlots}
-        loading={loading}
-        toTime={toTime}
-        serviceNamesFromRecord={serviceNamesFromRecord}
-        clientName={clientName}
-        clientPhone={clientPhone}
-        COL_HEADER_H={COL_HEADER_H}
-        SLOT_PX={SLOT_PX}
-        SLOT_MIN={SLOT_MIN}
-        onRecordClick={handleOpenExisting}
-        onSlotClick={handleOpenSlot}
-        isToday={isToday}
-      />
+      {isDeletedView ? (
+        <div className="barberrecorda__daySummary barberrecorda__daySummary--deleted">
+          <span className="barberrecorda__daySummaryLead">Удалённые</span>
+          <span className="barberrecorda__daySummaryItem">
+            <strong>{deletedSummary.count}</strong>{" "}
+            {pluralRecordsLabel(deletedSummary.count)}
+          </span>
+          {deletedSummary.count > 0 ? (
+            <span className="barberrecorda__daySummaryItem barberrecorda__daySummaryItem--money">
+              на сумму <strong>{fmtMoney(deletedSummary.expectedTotal)}</strong>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isDeletedView ? (
+        <RecordaDeletedView
+          records={deletedRecords}
+          loading={loading}
+          barbers={barbers}
+          onRecordClick={handleOpenExisting}
+          serviceNamesFromRecord={serviceNamesFromRecord}
+          clientName={clientName}
+          clientPhone={clientPhone}
+          toTime={toTime}
+        />
+      ) : dayLayout === RECORDA_LAYOUT.LIST ? (
+        <RecordaDayList
+          records={calendarDayRecords}
+          loading={loading}
+          barbers={barbers}
+          showBarberColumn={!fltBarber}
+          dayTotal={daySummary.expectedTotal}
+          dayCount={daySummary.count}
+          onRecordClick={handleOpenExisting}
+          serviceNamesFromRecord={serviceNamesFromRecord}
+          clientName={clientName}
+          clientPhone={clientPhone}
+          toTime={toTime}
+          getRecordPrice={(record) => appointmentExpectedPrice(record, services)}
+        />
+      ) : (
+        <RecordaCalendar
+          barbers={barbers}
+          fltBarber={fltBarber}
+          recordsByBarber={recordsByBarber}
+          calendarGridSlots={calendarGridSlots}
+          gutterBlocks={gutterBlocks}
+          busyGutterBlocks={busyGutterBlocks}
+          calendarHeight={calendarHeight}
+          busySlots={busySlots}
+          loading={loading}
+          toTime={toTime}
+          serviceNamesFromRecord={serviceNamesFromRecord}
+          clientName={clientName}
+          clientPhone={clientPhone}
+          COL_HEADER_H={COL_HEADER_H}
+          PX_PER_MIN={PX_PER_MIN}
+          workBounds={workBounds}
+          onRecordClick={handleOpenExisting}
+          onSlotClick={handleOpenSlot}
+          isToday={isToday}
+          getRecordPrice={(record) => appointmentExpectedPrice(record, services)}
+        />
+      )}
 
       {modalOpen && (
         <RecordaModal
@@ -392,11 +726,13 @@ const Recorda = () => {
           clients={clients}
           barbers={barbers}
           services={services}
+          serviceCategoryList={serviceCategories}
           appointments={appointments}
           defaultDate={fltDate || todayStr()}
-          onReload={fetchAll}
-          onClientsChange={setClients}
-        />
+        workBounds={bookingWorkBounds}
+        onReload={fetchAll}
+        onClientsChange={setClients}
+      />
       )}
     </div>
   );

@@ -404,6 +404,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         <h2 className="header__title">{title}</h2>
       </div>
       <div className="header__right">
+        {/* Слот для действий конкретной страницы (портал из компонента страницы). */}
+        <div id="header-actions-slot" className="header__actionsSlot" />
         {isBuildingRoute && (
           <div className="header__project">
             <div className="header__project-label">ЖК</div>
