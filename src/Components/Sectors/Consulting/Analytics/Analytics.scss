@@ -621,6 +621,27 @@
   font-weight: 700;
 }
 
+.consulting-analytics__tag {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &--debt {
+    background: #ffedd5;
+    color: #c2410c;
+  }
+
+  &--installment {
+    background: #ede9fe;
+    color: #6d28d9;
+  }
+}
+
 .consulting-analytics__detailTableWrap {
   width: 100%;
   overflow-x: auto;

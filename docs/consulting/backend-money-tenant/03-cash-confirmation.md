@@ -81,7 +81,8 @@ class CashConfirmationSettings(models.Model):
 
     company = models.OneToOneField(Company, on_delete=models.CASCADE,
                                    related_name="cash_confirmation")
-    mode = models.CharField(max_length=16, choices=Mode.choices, default=Mode.CASH_ONLY)
+    # Дефолт — OFF: см. 26-cash-confirmation-default-off.md. Раньше был CASH_ONLY.
+    mode = models.CharField(max_length=16, choices=Mode.choices, default=Mode.OFF)
     skip_for_cashier = models.BooleanField(default=True)   # кассир не подтверждает сам себя
     overdue_hours = models.PositiveIntegerField(default=24)
 ```

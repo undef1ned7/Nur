@@ -1,3 +1,50 @@
+.kassa__center {
+  text-align: center;
+  color: var(--muted, #64748b);
+  padding: 24px 0;
+}
+
+/* ── Настройки подтверждения кассы ─────────────────────────────── */
+.kassaSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 620px;
+  padding: 16px 4px;
+
+  &__lead {
+    margin: 0;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  &__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13.5px;
+
+    input {
+      margin-top: 3px;
+      flex: none;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    em {
+      color: #64748b;
+      font-style: normal;
+      font-size: 12px;
+    }
+  }
+}
+
 /* Доп. стили для кассы склада */
 .warehouse-kassa {
   .kassa-header__create-btn.warehouse-kassa__btn--expense {

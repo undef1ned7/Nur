@@ -34,11 +34,23 @@ export function getUserRegionCodes(profile) {
     .filter(Boolean);
 }
 
-/** Код региона воронки (region_code / region). */
-export function resolveFunnelRegionCode(funnel) {
+/**
+ * Код региона воронки (region_code / region).
+ *
+ * Бэкенд пока не проставляет `region_code` на самой сущности `Funnel`
+ * (проверено на проде 11.09.2026 — см.
+ * docs/consulting/backend-money-tenant/15-regional-routing-integration.md §0):
+ * у региональных воронок вроде «Бишкек»/«Ош» это поле приходит пустым, хотя у
+ * лидов внутри `region_code` заполнен верно. Поэтому принимаем опциональный
+ * `fallbackMap` (funnel_id → region_code), собранный на фронте из
+ * `GET /consalting/regional-funnel-routing/` (см. `useConsultingRegions`), и
+ * используем его, когда прямого поля нет.
+ */
+export function resolveFunnelRegionCode(funnel, fallbackMap) {
   const raw = funnel?.region_code ?? funnel?.region ?? null;
-  if (raw == null || raw === "") return null;
-  return String(raw).trim().toLowerCase();
+  if (raw != null && raw !== "") return String(raw).trim().toLowerCase();
+  const fromFallback = fallbackMap?.get?.(String(funnel?.id));
+  return fromFallback ? String(fromFallback).trim().toLowerCase() : null;
 }
 
 /** Регион в зоне ответственности пользователя. Manager — любой регион. */
@@ -128,14 +140,17 @@ export function resolveProfileUserIds(profile) {
 }
 
 /**
- * Создание собственных воронок. Owner/admin/rop — всегда; обычный сотрудник —
- * по праву `can_create_funnel`. Воронка сотрудника привязывается бэкендом к
- * региональной воронке его региона (см.
- * docs/consulting/backend-money-tenant/17-employee-region-subfunnels.md).
+ * Создание собственных воронок. Owner/admin/rop — всегда; руководитель
+ * региона — всегда, в свою региональную воронку (бэкенд сам подставляет
+ * `parent_funnel`, см. docs/consulting/backend-money-tenant/17-employee-region-subfunnels.md
+ * §17.3/§17.4.3 — это не зависит от чекбокса `can_create_funnel`, тот флаг
+ * только для обычных сотрудников); обычный сотрудник — по праву
+ * `can_create_funnel`.
  */
 export function canCreateConsultingFunnel(profile) {
   if (!profile) return false;
   if (isConsultingFunnelManager(profile)) return true;
+  if (isConsultingRegionalSupervisor(profile)) return true;
   return isPermissionEnabled(profile.can_create_funnel);
 }
 
@@ -214,8 +229,15 @@ export function getEmployeeRoleFunnelId(profile, funnels) {
   return match?.id || null;
 }
 
-/** Воронки, видимые текущему пользователю. */
-export function filterFunnelsForUser(funnels, profile) {
+/**
+ * Воронки, видимые текущему пользователю.
+ * @param {Array} funnels
+ * @param {Object} profile
+ * @param {Map<string,string>} [funnelRegionFallback] — funnel_id → region_code,
+ *   см. `resolveFunnelRegionCode`. Нужен, пока бэкенд не отдаёт `region_code`
+ *   на самой воронке (только у лидов внутри неё).
+ */
+export function filterFunnelsForUser(funnels, profile, funnelRegionFallback) {
   const list = Array.isArray(funnels) ? funnels : [];
   if (!canViewConsultingFunnel(profile)) return [];
   if (isConsultingFunnelManager(profile)) return list;
@@ -225,7 +247,7 @@ export function filterFunnelsForUser(funnels, profile) {
     const codes = new Set(getUserRegionCodes(profile));
     const grantIds = getFunnelGrantMaps(profile).viewIds;
     return list.filter((f) => {
-      const rc = resolveFunnelRegionCode(f);
+      const rc = resolveFunnelRegionCode(f, funnelRegionFallback);
       if (rc && codes.has(rc)) return true;
       return grantIds.has(String(f.id));
     });
@@ -252,14 +274,17 @@ export function filterFunnelsForUser(funnels, profile) {
   return list.filter((f) => allowed.has(String(f.id)));
 }
 
-/** Управление лидами в конкретной воронке. */
-export function canManageLeadsInFunnel(profile, funnel) {
+/**
+ * Управление лидами в конкретной воронке.
+ * @param {Map<string,string>} [funnelRegionFallback] см. `filterFunnelsForUser`.
+ */
+export function canManageLeadsInFunnel(profile, funnel, funnelRegionFallback) {
   if (!profile || !funnel) return false;
   if (isConsultingFunnelManager(profile)) return true;
 
   // Руководитель региона управляет лидами воронок своего региона.
   if (isConsultingRegionalSupervisor(profile)) {
-    const rc = resolveFunnelRegionCode(funnel);
+    const rc = resolveFunnelRegionCode(funnel, funnelRegionFallback);
     if (rc && getUserRegionCodes(profile).includes(rc)) return true;
   }
 
@@ -305,6 +330,39 @@ export function canManageStagesInFunnel(profile, funnel) {
 export function canEditFunnelMeta(profile, funnel) {
   if (!isConsultingFunnelManager(profile)) return false;
   return !isProtectedFunnel(funnel);
+}
+
+/**
+ * Основную/системную воронку не может удалить никто — на неё завязана вся
+ * маршрутизация входящих (см. docs/consulting/backend-money-tenant/06-regional-funnels-routing.md).
+ * Ролевые воронки раньше входили сюда же (`isProtectedFunnel`), но теперь
+ * удаляемы владельцем/админом — см. `canDeleteFunnel` и
+ * docs/consulting/backend-money-tenant/21-funnel-delete.md §7.
+ */
+function isUndeletableFunnel(funnel) {
+  if (!funnel) return false;
+  if (funnel.is_static === true) return true;
+  return isMainFunnel(funnel);
+}
+
+/**
+ * Удаление воронки:
+ * - owner/admin/rop — любую, кроме основной/системной (включая ролевые —
+ *   см. docs/consulting/backend-money-tenant/21-funnel-delete.md §7. У этой
+ *   воронки на ней держится доступ сотрудников с этой ролью — фронт
+ *   показывает предупреждение перед удалением, см. Funnel.jsx `onDeleteFunnel`);
+ * - сотрудник — только СВОЮ подворонку (owner_user === он сам), не ролевую
+ *   и не основную.
+ * Открытых лидов внутри фронт не проверяет — это делает бэкенд (`409`),
+ * см. docs/consulting/backend-money-tenant/17-employee-region-subfunnels.md §17.7.
+ */
+export function canDeleteFunnel(profile, funnel) {
+  if (!profile || !funnel || isUndeletableFunnel(funnel)) return false;
+  if (isConsultingFunnelManager(profile)) return true;
+  if (isRoleFunnel(funnel)) return false;
+  const ownerUserId = getFunnelOwnerUserId(funnel);
+  if (!ownerUserId) return false;
+  return resolveProfileUserIds(profile).includes(String(ownerUserId));
 }
 
 /**

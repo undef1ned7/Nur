@@ -16,8 +16,10 @@ import {
   YAxis,
 } from "recharts";
 import {
+  AlertTriangle,
   Banknote,
   Clock,
+  CreditCard,
   FileText,
   LayoutDashboard,
   MessageSquare,
@@ -25,10 +27,13 @@ import {
   ShoppingBag,
   TrendingDown,
   TrendingUp,
+  UserX,
   Users,
+  Wallet,
 } from "lucide-react";
 import {
   getAnalyticsDashboard,
+  getAnalyticsDebts,
   getAnalyticsManagers,
   getAnalyticsMessenger,
   getAnalyticsSources,
@@ -46,6 +51,12 @@ const TABS = [
     label: "Обзор",
     hint: "Главные показатели",
     icon: LayoutDashboard,
+  },
+  {
+    value: "debts",
+    label: "Долги",
+    hint: "Просрочка и абонплата в долг",
+    icon: AlertTriangle,
   },
   {
     value: "messenger",
@@ -186,6 +197,36 @@ const errText = (e, fallback) => {
 
 const isNotReady = (e) => e?.status === 404 || e?.status === 501;
 
+const daysLabel = (v) => {
+  if (v == null || v === "") return "—";
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return "—";
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  let word = "дней";
+  if (mod100 < 11 || mod100 > 14) {
+    if (mod10 === 1) word = "день";
+    else if (mod10 >= 2 && mod10 <= 4) word = "дня";
+  }
+  return `${n} ${word}`;
+};
+
+/** Дней между `dueIso` и сегодня (для случаев, когда бэк не прислал days_overdue). */
+const daysSince = (dueIso) => {
+  if (!dueIso) return null;
+  const due = new Date(`${String(dueIso).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - due.getTime()) / 86400000);
+  return diff > 0 ? diff : 0;
+};
+
+const DEBT_MODE_LABEL = {
+  debt: "В долг",
+  installment: "Рассрочка",
+};
+
 /* ===================== UI atoms ===================== */
 
 const Delta = ({ percent, invert = false }) => {
@@ -291,6 +332,7 @@ export default function ConsultingAnalytics() {
   const [error, setError] = useState("");
 
   const [dashboard, setDashboard] = useState(null);
+  const [debts, setDebts] = useState(null);
   const [messenger, setMessenger] = useState(null);
   const [sources, setSources] = useState(null);
   const [managers, setManagers] = useState(null);
@@ -328,6 +370,9 @@ export default function ConsultingAnalytics() {
       if (tab === "overview") {
         const data = await getAnalyticsDashboard(periodParams);
         setDashboard(data);
+      } else if (tab === "debts") {
+        const data = await getAnalyticsDebts(periodParams);
+        setDebts(data);
       } else if (tab === "messenger") {
         const data = await getAnalyticsMessenger(periodParams);
         setMessenger(data);
@@ -342,6 +387,7 @@ export default function ConsultingAnalytics() {
       if (isNotReady(e)) {
         setNotReady(true);
         if (tab === "overview") setDashboard(null);
+        if (tab === "debts") setDebts(null);
         if (tab === "messenger") setMessenger(null);
         if (tab === "sources") setSources(null);
         if (tab === "managers") setManagers(null);
@@ -463,6 +509,42 @@ export default function ConsultingAnalytics() {
     }));
   }, [sources]);
 
+  const debtKpis = debts?.kpis || {};
+
+  const debtAging = useMemo(() => {
+    const rows = Array.isArray(debts?.aging) ? debts.aging : [];
+    return rows.map((r) => ({
+      bucket: r.bucket_label || r.bucket || "—",
+      amount: Number(r.amount) || 0,
+      count: Number(r.count) || 0,
+    }));
+  }, [debts]);
+
+  const overdueSubscriptions = useMemo(() => {
+    const rows = Array.isArray(debts?.overdue_subscriptions)
+      ? debts.overdue_subscriptions
+      : [];
+    return rows.map((r) => ({
+      ...r,
+      days_overdue: r.days_overdue ?? daysSince(r.due_date),
+    }));
+  }, [debts]);
+
+  const debtSubscriptions = useMemo(() => {
+    const rows = Array.isArray(debts?.debt_subscriptions)
+      ? debts.debt_subscriptions
+      : [];
+    return rows.map((r) => ({
+      ...r,
+      days_overdue: r.days_overdue ?? daysSince(r.due_date),
+    }));
+  }, [debts]);
+
+  const topDebtors = useMemo(
+    () => (Array.isArray(debts?.top_debtors) ? debts.top_debtors : []),
+    [debts],
+  );
+
   const managersList = useMemo(() => {
     const rows = Array.isArray(managers?.managers)
       ? managers.managers
@@ -485,6 +567,7 @@ export default function ConsultingAnalytics() {
 
   const hasTabData =
     (tab === "overview" && dashboard) ||
+    (tab === "debts" && debts) ||
     (tab === "messenger" && messenger) ||
     (tab === "sources" && sources) ||
     (tab === "managers" && (managers || dashboard));
@@ -841,6 +924,290 @@ export default function ConsultingAnalytics() {
               </div>
             ) : (
               <Empty title="Нет продаж" />
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {!notReady && tab === "debts" && debts && (
+        <div className={`${BEM}__body${loading ? " is-loading" : ""}`}>
+          <SectionLabel>Долги по абонентской плате</SectionLabel>
+          <div className={`${BEM}__kpis`}>
+            <KpiCard
+              label="Клиентов с долгом"
+              value={num(kpiValue(debtKpis.debtors_count))}
+              percent={kpiMeta(debtKpis.debtors_count).percent}
+              invertDelta
+              description="Уникальных клиентов с непогашенным долгом"
+              icon={UserX}
+              tone="danger"
+            />
+            <KpiCard
+              label="Общая сумма долга"
+              value={money(kpiValue(debtKpis.total_debt))}
+              percent={kpiMeta(debtKpis.total_debt).percent}
+              invertDelta
+              description="Просрочка + абонплата, оформленная в долг/рассрочку"
+              icon={Wallet}
+              tone="danger"
+            />
+            <KpiCard
+              label="Просрочено по абонплате"
+              value={money(kpiValue(debtKpis.overdue_amount))}
+              percent={kpiMeta(debtKpis.overdue_amount).percent}
+              invertDelta
+              description={`Платежей: ${num(kpiValue(debtKpis.overdue_count))}`}
+              icon={Clock}
+              tone="warning"
+            />
+            <KpiCard
+              label="Оформлено в долг/рассрочку"
+              value={money(kpiValue(debtKpis.debt_mode_amount))}
+              percent={kpiMeta(debtKpis.debt_mode_amount).percent}
+              invertDelta
+              description={`Подписок: ${num(kpiValue(debtKpis.debt_mode_count))}`}
+              icon={CreditCard}
+              tone="warning"
+            />
+          </div>
+
+          <div className={`${BEM}__funnelStats`}>
+            <div className={`${BEM}__funnelItem`}>
+              <span>Просрочка до 30 дней</span>
+              <b>{money(kpiValue(debtKpis.bucket_0_30))}</b>
+            </div>
+            <div className={`${BEM}__funnelItem ${BEM}__funnelItem--work`}>
+              <span>31–60 дней</span>
+              <b>{money(kpiValue(debtKpis.bucket_31_60))}</b>
+            </div>
+            <div className={`${BEM}__funnelItem ${BEM}__funnelItem--risk`}>
+              <span>61–90 дней</span>
+              <b>{money(kpiValue(debtKpis.bucket_61_90))}</b>
+            </div>
+            <div className={`${BEM}__funnelItem ${BEM}__funnelItem--bad`}>
+              <span>Критично, 90+ дней</span>
+              <b>{money(kpiValue(debtKpis.bucket_90_plus))}</b>
+            </div>
+          </div>
+
+          <div className={`${BEM}__chartsRow`}>
+            <SectionCard
+              title="Просрочка по давности"
+              subtitle="Сумма непогашенных платежей по срокам"
+            >
+              <div className={`${BEM}__chartWrap`}>
+                {debtAging.some((d) => d.amount > 0) ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={debtAging}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => money(v)}
+                        width={72}
+                      />
+                      <Tooltip
+                        formatter={(value, name, item) => [
+                          money(value),
+                          `Сумма (${num(item?.payload?.count)} шт.)`,
+                        ]}
+                      />
+                      <Bar
+                        dataKey="amount"
+                        name="Долг"
+                        fill="#ef4444"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty title="Просрочек нет" />
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard
+              title="Топ должников"
+              subtitle="Кто должен больше всего прямо сейчас"
+            >
+              {topDebtors.length ? (
+                <ul className={`${BEM}__rankList`}>
+                  {topDebtors.slice(0, 8).map((d, i) => (
+                    <li
+                      key={d.client_id ?? `debtor-${i}`}
+                      className={`${BEM}__rankRow`}
+                    >
+                      <span className={`${BEM}__rankIndex`}>{i + 1}</span>
+                      <div className={`${BEM}__rankMain`}>
+                        <div className={`${BEM}__rankTitle`} title={d.client_name}>
+                          {d.client_name || "Без имени"}
+                        </div>
+                        <div className={`${BEM}__rankSub`}>
+                          {d.phone || "—"}
+                          {d.max_days_overdue
+                            ? ` · Просрочка ${daysLabel(d.max_days_overdue)}`
+                            : ""}
+                        </div>
+                      </div>
+                      <div className={`${BEM}__rankMeta`}>
+                        {d.client_id ? (
+                          <Link
+                            className={`${BEM}__linkBtn`}
+                            to={`/crm/consulting/client/${d.client_id}`}
+                          >
+                            {money(d.total_debt)}
+                          </Link>
+                        ) : (
+                          <b>{money(d.total_debt)}</b>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Empty title="Должников нет" />
+              )}
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Просроченная абонентская плата"
+            subtitle="Не платят дольше обычного периода — стоит напомнить"
+            full
+          >
+            {overdueSubscriptions.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Клиент</th>
+                      <th>Услуга / тариф</th>
+                      <th>Сумма</th>
+                      <th>Платёж от</th>
+                      <th>Просрочка</th>
+                      <th>Ответственный</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overdueSubscriptions.map((row, i) => (
+                      <tr key={row.payment_id || `${row.client_id}-${i}`}>
+                        <td>
+                          <div className={`${BEM}__personCell`}>
+                            <b>{row.client_name || "Без имени"}</b>
+                            <span>{row.phone || "—"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          {row.service_display || "—"}
+                          {row.tariff_display ? ` · ${row.tariff_display}` : ""}
+                        </td>
+                        <td>{money(row.amount)}</td>
+                        <td>{formatDateRu(row.due_date)}</td>
+                        <td>
+                          <span className={`${BEM}__waitBadge`}>
+                            {daysLabel(row.days_overdue)}
+                          </span>
+                        </td>
+                        <td>{row.owner || "—"}</td>
+                        <td>
+                          {row.client_id ? (
+                            <Link
+                              className={`${BEM}__linkBtn`}
+                              to={`/crm/consulting/client/${row.client_id}`}
+                            >
+                              Открыть
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Просроченных платежей нет">
+                Все абонентские платежи внесены вовремя
+              </Empty>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Абонплата, оформленная в долг/рассрочку"
+            subtitle="Подписка подключена, но оплата взята не сразу"
+            full
+          >
+            {debtSubscriptions.length ? (
+              <div className={`${BEM}__detailTableWrap`}>
+                <table className={`${BEM}__detailTable`}>
+                  <thead>
+                    <tr>
+                      <th>Клиент</th>
+                      <th>Услуга</th>
+                      <th>Способ</th>
+                      <th>Срок</th>
+                      <th>Оплачено</th>
+                      <th>Осталось</th>
+                      <th>Оформлено</th>
+                      <th>Ответственный</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {debtSubscriptions.map((row, i) => (
+                      <tr key={row.subscription_id || `${row.client_id}-${i}`}>
+                        <td>
+                          <div className={`${BEM}__personCell`}>
+                            <b>{row.client_name || "Без имени"}</b>
+                            <span>{row.phone || "—"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          {row.service_display || "—"}
+                          {row.tariff_display ? ` · ${row.tariff_display}` : ""}
+                        </td>
+                        <td>
+                          <span
+                            className={`${BEM}__tag ${BEM}__tag--${row.payment_mode}`}
+                          >
+                            {DEBT_MODE_LABEL[row.payment_mode] || row.payment_mode || "—"}
+                          </span>
+                        </td>
+                        <td>
+                          {row.debt_months ? `${num(row.debt_months)} мес.` : "—"}
+                        </td>
+                        <td>{money(row.amount_paid)}</td>
+                        <td>
+                          <b>{money(row.amount_remaining)}</b>
+                        </td>
+                        <td>{formatDateRu(row.start_date)}</td>
+                        <td>{row.owner || "—"}</td>
+                        <td>
+                          {row.client_id ? (
+                            <Link
+                              className={`${BEM}__linkBtn`}
+                              to={`/crm/consulting/client/${row.client_id}`}
+                            >
+                              Открыть
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty title="Таких подписок нет">
+                Все подписки оформлены с оплатой наличными или переводом
+              </Empty>
             )}
           </SectionCard>
         </div>

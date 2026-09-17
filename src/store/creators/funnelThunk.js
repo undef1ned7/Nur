@@ -322,7 +322,11 @@ export const archiveLead = createAsyncThunk(
   },
 );
 
-/** Архивные (завершённые) лиды для просмотра. */
+/**
+ * Архивные лиды для просмотра (и won, и lost — архив не ограничен победами).
+ * Фолбэк-фильтр раньше слал `status: "won"` и терял проигранные лиды в
+ * архиве — убрано, `is_archived: true` уже достаточно сужает выборку.
+ */
 export const getArchivedLeads = createAsyncThunk(
   "funnel/getArchivedLeads",
   async (_, { rejectWithValue }) => {
@@ -332,9 +336,47 @@ export const getArchivedLeads = createAsyncThunk(
     } catch (e) {
       if (e?.response?.status === 404 || e?.response?.status === 501) {
         const { data } = await api.get(`${BASE}/leads/`, {
-          params: { is_archived: true, status: "won" },
+          params: { is_archived: true },
         });
         return Array.isArray(data) ? data : data.results || [];
+      }
+      return rejectWithValue(e.response?.data || e.message);
+    }
+  },
+);
+
+/**
+ * Восстановить лид из архива: снимает `is_archived`, сбрасывает `status`
+ * в «в работе» и возвращает лид на активную стадию воронки — карточка
+ * сразу снова доступна на доске, а не «застревает» на завершающей стадии
+ * won/lost. Целевая стадия опциональна: без неё бэк подставляет первую
+ * не терминальную стадию воронки (тот же принцип, что у `target_stage: null`
+ * в `transferLeadToFunnel`).
+ * POST /consalting/leads/{id}/restore/ { stage?: uuid }
+ */
+export const restoreLead = createAsyncThunk(
+  "funnel/restoreLead",
+  async ({ id, stage } = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `${BASE}/leads/${id}/restore/`,
+        stage ? { stage } : {},
+      );
+      return data;
+    } catch (e) {
+      if (e?.response?.status === 404 || e?.response?.status === 501) {
+        try {
+          const { data } = await api.patch(`${BASE}/leads/${id}/`, {
+            is_archived: false,
+            status: "in_progress",
+            ...(stage ? { stage } : {}),
+          });
+          return data;
+        } catch (fallbackErr) {
+          return rejectWithValue(
+            fallbackErr.response?.data || fallbackErr.message,
+          );
+        }
       }
       return rejectWithValue(e.response?.data || e.message);
     }

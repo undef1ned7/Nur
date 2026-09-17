@@ -73,16 +73,26 @@ export const deleteLeadAdSpend = (id) =>
   cDelete("Delete Lead Ad Spend Error", `${URL}${id}/`);
 
 /**
- * Пакетное сохранение всей таблицы.
- * PUT /consalting/lead-ad-spend/bulk/  ← { items: [{ id?, date, impressions, leads, spend, note? }] }
- * Бэкенд делает upsert по (company, date): строки с id обновляет, без id —
- * создаёт, отсутствующие в payload — удаляет (полная замена набора).
+ * Пакетное сохранение таблицы за период.
+ * PUT /consalting/lead-ad-spend/bulk/
+ *   ← { items: [{ id?, date, impressions, leads, spend, note? }], date_from?, date_to? }
+ * Бэкенд делает upsert по (company, date) СТРОГО внутри [date_from, date_to]:
+ * строки с id обновляет, без id — создаёт, отсутствующие в payload, но
+ * попадающие в диапазон — удаляет. Строки вне диапазона не трогает — иначе
+ * при открытой модалке с фильтром по месяцу сохранение стирало бы данные
+ * всех остальных месяцев (полная замена без диапазона — как было раньше).
+ * Без date_from/date_to — обратная совместимость, старое поведение (полная
+ * замена всей таблицы компании); фронт всегда передаёт диапазон текущего
+ * фильтра, см. docs/consulting/backend/08-lead-ad-spend.md §8.4.1.
+ * @param {Array} items
+ * @param {{ date_from?: string, date_to?: string }} [range]
  * @returns {{ results: Array }}
  */
-export const bulkSaveLeadAdSpend = async (items) => {
-  const data = await cPut("Bulk Save Lead Ad Spend Error", `${URL}bulk/`, {
-    items,
-  });
+export const bulkSaveLeadAdSpend = async (items, range = {}) => {
+  const body = { items };
+  if (range.date_from) body.date_from = range.date_from;
+  if (range.date_to) body.date_to = range.date_to;
+  const data = await cPut("Bulk Save Lead Ad Spend Error", `${URL}bulk/`, body);
   const rows = Array.isArray(data?.results)
     ? data.results
     : Array.isArray(data)

@@ -3,18 +3,26 @@ import { useDispatch } from "react-redux";
 import {
   FaCheck,
   FaCheckDouble,
+  FaEdit,
   FaExclamationCircle,
+  FaFileAlt,
+  FaImage,
   FaInstagram,
   FaLink,
+  FaMicrophone,
   FaPaperclip,
   FaPaperPlane,
   FaTelegram,
   FaTimes,
+  FaTrash,
+  FaVideo,
   FaWhatsapp,
 } from "react-icons/fa";
 import {
   CHAT_MEDIA_ACCEPT,
   CHAT_MEDIA_MAX_BYTES,
+  deleteWazzupMessage,
+  editWazzupMessage,
   listLeadMessages,
   listWazzupAccounts,
   markLeadChatRead,
@@ -36,11 +44,13 @@ import { useWazzupChatSocket } from "../../../../hooks/useWazzupChatSocket";
 import { markLeadNotificationsReadAsync } from "../../../../store/creators/notificationCreators";
 import ChatMessageMedia from "./ChatMessageMedia";
 import {
+  applyChatMessageEdit,
   applyChatMessageStatus,
   confirmOptimisticMessage,
   markMessageError,
   mergeChatMessages,
   reconcilePendingMessage,
+  removeChatMessage,
   sortChatMessages,
   takePendingForAck,
   upsertChatMessage,
@@ -150,6 +160,36 @@ function formatFileSize(bytes) {
   return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+const RECORDING_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+  "audio/mp4",
+];
+
+/** Первый поддерживаемый браузером формат записи (иначе — дефолт MediaRecorder). */
+function pickRecorderMimeType() {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
+    return "";
+  }
+  return RECORDING_MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+function extForMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.includes("ogg")) return "ogg";
+  if (m.includes("mp4")) return "m4a";
+  return "webm";
+}
+
+function fmtRecordTime(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
 /**
  * WhatsApp-чат лида (контракт async Wazzup — docs/consulting/wazzup-chat-async.md):
  *  — своё исходящее рисуем из send_message_ack / REST (по сокету себе не приходит)
@@ -176,11 +216,18 @@ export default function LeadMessengerPanel({
   const [showMediaLink, setShowMediaLink] = useState(false);
   const [mediaFile, setMediaFile] = useState(null);
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordBusy, setRecordBusy] = useState(false);
   const [messagesById, setMessagesById] = useState(() => new Map());
   const messages = useMemo(
     () => sortChatMessages(messagesById),
     [messagesById],
   );
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const bottomRef = useRef(null);
   const bodyRef = useRef(null);
@@ -189,6 +236,12 @@ export default function LeadMessengerPanel({
   const fileInputRef = useRef(null);
   const markReadTimerRef = useRef(null);
   const deliveryWatchdogsRef = useRef(new Map());
+  const mediaRecorderRef = useRef(null);
+  const recordChunksRef = useRef([]);
+  const recordStreamRef = useRef(null);
+  const recordTimerRef = useRef(null);
+  const recordSendRef = useRef(true);
+  const submitRef = useRef(null);
   const historySyncInFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const leadRef = useRef(lead);
@@ -229,6 +282,17 @@ export default function LeadMessengerPanel({
       }
       deliveryWatchdogs.forEach((timer) => clearTimeout(timer));
       deliveryWatchdogs.clear();
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+      const rec = mediaRecorderRef.current;
+      if (rec && rec.state !== "inactive") {
+        recordSendRef.current = false;
+        try {
+          rec.stop();
+        } catch {
+          /* noop */
+        }
+      }
     };
   }, []);
 
@@ -249,6 +313,101 @@ export default function LeadMessengerPanel({
     },
     [],
   );
+
+  const stopRecordStream = () => {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    recordStreamRef.current?.getTracks().forEach((t) => t.stop());
+    recordStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    recordChunksRef.current = [];
+  };
+
+  /** Запись голосового: MediaRecorder → File → тот же путь отправки, что у обычных файлов. */
+  const startRecording = async () => {
+    if (recording || sending || recordBusy) return;
+    if (
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      onErrorRef.current?.(
+        "Запись голосовых сообщений не поддерживается в этом браузере.",
+      );
+      return;
+    }
+    setRecordBusy(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      recordStreamRef.current = stream;
+      const mimeType = pickRecorderMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      recordChunksRef.current = [];
+      recordSendRef.current = true;
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) recordChunksRef.current.push(ev.data);
+      };
+      // submitRef, а не submit() напрямую: recorder переживает несколько
+      // рендеров, обычный submit из замыкания старта записи устареет.
+      recorder.onstop = () => {
+        const chunks = recordChunksRef.current;
+        const shouldSend = recordSendRef.current;
+        stopRecordStream();
+        setRecording(false);
+        setRecordSeconds(0);
+        if (!shouldSend || !chunks.length) return;
+        const blobType = mimeType || chunks[0]?.type || "audio/webm";
+        const blob = new Blob(chunks, { type: blobType });
+        const file = new File(
+          [blob],
+          `voice-${Date.now()}.${extForMime(blobType)}`,
+          { type: blobType },
+        );
+        submitRef.current?.(null, file);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordSeconds((s) => s + 1);
+      }, 1000);
+    } catch {
+      onErrorRef.current?.(
+        "Нет доступа к микрофону. Разрешите доступ в браузере и попробуйте снова.",
+      );
+      stopRecordStream();
+      setRecording(false);
+    } finally {
+      setRecordBusy(false);
+    }
+  };
+
+  const finishRecording = () => {
+    const rec = mediaRecorderRef.current;
+    if (!rec || rec.state === "inactive") return;
+    recordSendRef.current = true;
+    rec.stop();
+  };
+
+  const cancelRecording = () => {
+    const rec = mediaRecorderRef.current;
+    recordSendRef.current = false;
+    if (rec && rec.state !== "inactive") {
+      rec.stop();
+    } else {
+      stopRecordStream();
+      setRecording(false);
+      setRecordSeconds(0);
+    }
+  };
 
   const preferredType = String(lead?.source || "")
     .trim()
@@ -611,7 +770,9 @@ export default function LeadMessengerPanel({
         if (!sendRequestsRef.current.length) setSending(false);
         return;
       }
-      if (!confirmed.media_type && taken?.mediaType) {
+      // Локально известный тип (из File.type при отправке) надёжнее угадывания
+      // по расширению URL — иначе, например, голосовое .webm определится как video.
+      if (taken?.mediaType) {
         confirmed.media_type = taken.mediaType;
       }
       if (data.message_id) confirmed.message_id = String(data.message_id);
@@ -628,13 +789,75 @@ export default function LeadMessengerPanel({
     [scheduleDeliveryWatchdog, maybeScrollForMessage, takeSendRequest],
   );
 
+  const onEdited = useCallback((data) => {
+    setMessagesById((prev) => applyChatMessageEdit(prev, data));
+  }, []);
+
+  const onDeleted = useCallback((data) => {
+    setMessagesById((prev) => removeChatMessage(prev, data));
+  }, []);
+
   const { isConnected: wsConnected, sendMessage: sendViaWs } =
     useWazzupChatSocket({
       enabled: !!lead?.id,
       onNewMessage,
       onStatus,
       onSendAck,
+      onEdited,
+      onDeleted,
     });
+
+  const startEditMessage = useCallback((m) => {
+    setEditingId(String(m.id));
+    setEditingText(m.text || "");
+  }, []);
+
+  const cancelEditMessage = useCallback(() => {
+    setEditingId(null);
+    setEditingText("");
+  }, []);
+
+  const saveEditMessage = useCallback(async () => {
+    if (!editingId || editSaving) return;
+    const text = editingText.trim();
+    if (!text) return;
+    setEditSaving(true);
+    try {
+      const updated = await editWazzupMessage(editingId, text);
+      // Автору правка по сокету не приходит (тот же контракт, что у
+      // send_message) — применяем локально сразу, WS донесёт остальным.
+      setMessagesById((prev) =>
+        applyChatMessageEdit(prev, { id: editingId, text: updated?.text ?? text }),
+      );
+      setEditingId(null);
+      setEditingText("");
+    } catch (e) {
+      onErrorRef.current?.(
+        e?.detail || "Не удалось изменить сообщение.",
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  }, [editingId, editingText, editSaving]);
+
+  const deleteMessage = useCallback(async (m) => {
+    if (!m?.id || deletingId) return;
+    if (!window.confirm("Удалить сообщение? Оно исчезнет и у получателя в WhatsApp."))
+      return;
+    const id = String(m.id);
+    setDeletingId(id);
+    try {
+      await deleteWazzupMessage(id);
+      setMessagesById((prev) => removeChatMessage(prev, { id }));
+      if (editingId === id) cancelEditMessage();
+    } catch (e) {
+      onErrorRef.current?.(
+        e?.detail || "Не удалось удалить сообщение.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }, [deletingId, editingId, cancelEditMessage]);
 
   // Реконнект сокета: догрузить историю REST (§6), upsert по id
   const wsEverConnectedRef = useRef(false);
@@ -686,11 +909,11 @@ export default function LeadMessengerPanel({
     }, 15000);
   };
 
-  const submit = async (e) => {
+  const submit = async (e, fileOverride) => {
     e?.preventDefault?.();
     const text = message.trim();
     const link = mediaUrl.trim();
-    const file = mediaFile;
+    const file = fileOverride || mediaFile;
 
     if (!text && !link && !file) return;
 
@@ -756,8 +979,11 @@ export default function LeadMessengerPanel({
             "Сервер не вернул id сообщения. Обновите историю чата.",
         };
       }
-      if (!confirmed.media_type && (extras.mediaType || mediaType)) {
-        confirmed.media_type = extras.mediaType || mediaType;
+      // Приоритет — локально известному типу (из File.type), а не угадыванию
+      // по расширению URL (иначе, например, голосовое .webm станет video).
+      const knownMediaType = extras.mediaType || mediaType;
+      if (knownMediaType) {
+        confirmed.media_type = knownMediaType;
       }
       if (raw?.message_id) confirmed.message_id = String(raw.message_id);
       setMessagesById((prev) =>
@@ -802,6 +1028,7 @@ export default function LeadMessengerPanel({
               lead_id: lead.id,
               message: text,
               file,
+              media_type: mediaType,
             });
             confirmFromServer(data?.data || data, { mediaType });
             setSending(false);
@@ -838,6 +1065,8 @@ export default function LeadMessengerPanel({
           message: text,
           content_uri: media || undefined,
           media_url: media || undefined,
+          media_type: media ? mediaType : undefined,
+          content_type: file?.type || undefined,
         });
         confirmFromServer(data?.data || data, {
           mediaUrl: media,
@@ -861,6 +1090,8 @@ export default function LeadMessengerPanel({
       text: text || (media || blobUrl ? " " : ""),
       media_url: media || undefined,
       content_uri: media || undefined,
+      media_type: media || blobUrl ? mediaType : undefined,
+      content_type: file?.type || undefined,
       account_id: accountId || undefined,
     });
     if (!ok) {
@@ -874,6 +1105,10 @@ export default function LeadMessengerPanel({
     setSending(false);
     finishPendingTimeout(tempId, blobUrl);
   };
+
+  useEffect(() => {
+    submitRef.current = submit;
+  });
 
   const onComposerKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -981,6 +1216,14 @@ export default function LeadMessengerPanel({
         ) : (
           messages.map((m) => {
             const text = bubbleText(m);
+            const isEditing = editingId === String(m.id);
+            // Редактировать/удалить можно только реально отправленное своё
+            // сообщение — не «в процессе» (optimistic) и не с ошибкой отправки.
+            const canModify =
+              m.direction === "out" &&
+              !m.optimistic &&
+              m.status !== "error" &&
+              !readOnly;
             return (
               <div
                 key={m.id}
@@ -988,16 +1231,81 @@ export default function LeadMessengerPanel({
                   m.optimistic ? " funnel__chatBubble--optimistic" : ""
                 }`}
               >
-                {!!text && <div className="funnel__chatText">{text}</div>}
-                {!!m.media_url && (
-                  <ChatMessageMedia
-                    url={m.media_url}
-                    mediaType={m.media_type}
-                  />
+                {isEditing ? (
+                  <div className="funnel__chatEditForm">
+                    <textarea
+                      className="funnel__chatEditInput"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          saveEditMessage();
+                        }
+                        if (e.key === "Escape") cancelEditMessage();
+                      }}
+                      autoFocus
+                      rows={2}
+                    />
+                    <div className="funnel__chatEditActions">
+                      <button
+                        type="button"
+                        className="funnel__btn funnel__btn--sm"
+                        onClick={cancelEditMessage}
+                        disabled={editSaving}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        className="funnel__btn funnel__btn--sm funnel__btn--primary"
+                        onClick={saveEditMessage}
+                        disabled={editSaving || !editingText.trim()}
+                      >
+                        {editSaving ? "Сохранение…" : "Сохранить"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {!!text && <div className="funnel__chatText">{text}</div>}
+                    {!!m.media_url && (
+                      <ChatMessageMedia
+                        url={m.media_url}
+                        mediaType={m.media_type}
+                      />
+                    )}
+                  </>
                 )}
                 <div className="funnel__chatMeta">
-                  <span>{fmtTime(m.created_at)}</span>
+                  <span>
+                    {fmtTime(m.created_at)}
+                    {m.edited ? " · изменено" : ""}
+                  </span>
                   {m.direction === "out" && <StatusTicks status={m.status} />}
+                  {canModify && !isEditing && (
+                    <span className="funnel__chatMsgActions">
+                      <button
+                        type="button"
+                        className="funnel__chatMsgActionBtn"
+                        title="Редактировать"
+                        aria-label="Редактировать сообщение"
+                        onClick={() => startEditMessage(m)}
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        type="button"
+                        className="funnel__chatMsgActionBtn"
+                        title="Удалить"
+                        aria-label="Удалить сообщение"
+                        disabled={deletingId === String(m.id)}
+                        onClick={() => deleteMessage(m)}
+                      >
+                        <FaTrash />
+                      </button>
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -1023,6 +1331,17 @@ export default function LeadMessengerPanel({
           />
           {mediaFile && (
             <div className="funnel__chatAttach">
+              <span className="funnel__chatAttachIcon" aria-hidden>
+                {selectedMediaType === "image" ? (
+                  <FaImage />
+                ) : selectedMediaType === "video" ? (
+                  <FaVideo />
+                ) : selectedMediaType === "voice" ? (
+                  <FaMicrophone />
+                ) : (
+                  <FaFileAlt />
+                )}
+              </span>
               <span className="funnel__chatAttachName" title={mediaFile.name}>
                 {mediaTypeLabel(selectedMediaType) || "Файл"} {mediaFile.name}
                 <span className="funnel__chatAttachSize">
@@ -1049,48 +1368,89 @@ export default function LeadMessengerPanel({
               placeholder="Публичная ссылка на файл"
             />
           )}
-          <div className="funnel__chatComposerRow">
-            <button
-              type="button"
-              className="funnel__btn funnel__btn--icon"
-              onClick={() => fileInputRef.current?.click()}
-              title="Прикрепить файл"
-              disabled={sending}
-            >
-              <FaPaperclip />
-            </button>
-            <button
-              type="button"
-              className={`funnel__btn funnel__btn--icon${showMediaLink ? " is-active" : ""}`}
-              onClick={() => {
-                setShowMediaLink((v) => !v);
-                if (!showMediaLink) clearMediaFile();
-              }}
-              title="Ссылка на файл"
-              disabled={sending}
-            >
-              <FaLink />
-            </button>
-            <textarea
-              className="funnel__input funnel__chatInput"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={onComposerKeyDown}
-              placeholder="Сообщение"
-              autoComplete="off"
-              rows={1}
-            />
-            <button
-              type="submit"
-              className="funnel__btn funnel__btn--primary funnel__btn--icon"
-              disabled={
-                sending || (!message.trim() && !mediaUrl.trim() && !mediaFile)
-              }
-              title="Отправить"
-            >
-              <FaPaperPlane />
-            </button>
-          </div>
+          {recording ? (
+            <div className="funnel__chatRecording">
+              <span className="funnel__chatRecordingDot" aria-hidden />
+              <span className="funnel__chatRecordingTime">
+                {fmtRecordTime(recordSeconds)}
+              </span>
+              <span className="funnel__chatRecordingHint">
+                Запись голосового сообщения…
+              </span>
+              <button
+                type="button"
+                className="funnel__btn funnel__btn--icon funnel__chatRecordingCancel"
+                onClick={cancelRecording}
+                title="Отменить запись"
+                aria-label="Отменить запись"
+              >
+                <FaTrash />
+              </button>
+              <button
+                type="button"
+                className="funnel__btn funnel__btn--primary funnel__btn--icon"
+                onClick={finishRecording}
+                title="Отправить голосовое"
+                aria-label="Отправить голосовое"
+              >
+                <FaPaperPlane />
+              </button>
+            </div>
+          ) : (
+            <div className="funnel__chatComposerRow">
+              <button
+                type="button"
+                className="funnel__btn funnel__btn--icon"
+                onClick={() => fileInputRef.current?.click()}
+                title="Прикрепить файл"
+                disabled={sending}
+              >
+                <FaPaperclip />
+              </button>
+              <button
+                type="button"
+                className={`funnel__btn funnel__btn--icon${showMediaLink ? " is-active" : ""}`}
+                onClick={() => {
+                  setShowMediaLink((v) => !v);
+                  if (!showMediaLink) clearMediaFile();
+                }}
+                title="Ссылка на файл"
+                disabled={sending}
+              >
+                <FaLink />
+              </button>
+              <textarea
+                className="funnel__input funnel__chatInput"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={onComposerKeyDown}
+                placeholder="Сообщение"
+                autoComplete="off"
+                rows={1}
+              />
+              {message.trim() || mediaUrl.trim() || mediaFile ? (
+                <button
+                  type="submit"
+                  className="funnel__btn funnel__btn--primary funnel__btn--icon"
+                  disabled={sending}
+                  title="Отправить"
+                >
+                  <FaPaperPlane />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="funnel__btn funnel__btn--icon"
+                  onClick={startRecording}
+                  disabled={sending || recordBusy}
+                  title="Голосовое сообщение"
+                  aria-label="Записать голосовое сообщение"
+                >
+                  <FaMicrophone />
+                </button>
+              )}
+            </div>
+          )}
         </form>
       )}
     </div>

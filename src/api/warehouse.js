@@ -269,6 +269,47 @@ export const rejectCashRequest = async (requestId, body = {}) => {
   }
 };
 
+/**
+ * Настройки подтверждения кассы склада.
+ * GET/PATCH /api/warehouse/cash/confirmation-settings/
+ * По умолчанию (нет строки на сервере) — ВЫКЛЮЧЕНО: документы с оплатой
+ * наличными проводятся сразу (POSTED), без CASH_PENDING.
+ * См. docs/warehouse/cash-confirmation-toggle.md.
+ * @returns {{ enabled: boolean }}
+ */
+export const getCashConfirmationSettings = async (config = {}) => {
+  try {
+    const response = await api.get("warehouse/cash/confirmation-settings/", {
+      signal: config.signal,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      return Promise.reject({ ...error.response.data, status: error.response.status });
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Включить/выключить подтверждение кассы склада. owner/admin.
+ * PATCH /api/warehouse/cash/confirmation-settings/  { "enabled": boolean }
+ */
+export const updateCashConfirmationSettings = async (payload) => {
+  try {
+    const response = await api.patch(
+      "warehouse/cash/confirmation-settings/",
+      payload,
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      return Promise.reject({ ...error.response.data, status: error.response.status });
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== ТИПОВЫЕ СПИСКИ ДОКУМЕНТОВ ====================
 
 /**
@@ -3134,6 +3175,8 @@ export default {
   listCashRequests,
   approveCashRequest,
   rejectCashRequest,
+  getCashConfirmationSettings,
+  updateCashConfirmationSettings,
   // Типовые списки документов
   listSaleDocuments,
   createSaleDocument,

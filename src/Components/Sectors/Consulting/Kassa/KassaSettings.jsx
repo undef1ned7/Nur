@@ -5,6 +5,7 @@ import {
 } from "../../../../api/consultingCashbox";
 import {
   CASH_CONFIRM_MODE_OPTIONS,
+  DEFAULT_CASH_CONFIRM_MODE,
   normalizeCashConfirmMode,
 } from "../../../../utils/consultingMoney";
 import { useAlert } from "../../../../hooks/useDialog";
@@ -13,11 +14,19 @@ import { useAlert } from "../../../../hooks/useDialog";
  * Настройки подтверждения поступлений в кассе (ТЗ №9, owner/admin).
  *
  * Контракт: docs/consulting/backend-money-tenant/03-cash-confirmation.md §9.4,
- * docs/consulting/backend-money-tenant/09-frontend-contract.md.
+ * docs/consulting/backend-money-tenant/09-frontend-contract.md,
+ * docs/consulting/backend-money-tenant/26-cash-confirmation-default-off.md.
+ *
+ * По умолчанию заявки на подтверждение ВЫКЛЮЧЕНЫ (mode="off") — деньги сразу
+ * идут в остаток кассы. Компания включает подтверждение сама, если это нужно.
  *
  * Пока эндпоинт не готов (404/501) — панель показывает заглушку, не ломая кассу.
  */
-const DEFAULTS = { mode: "cash_only", skip_for_cashier: true, overdue_hours: 24 };
+const DEFAULTS = {
+  mode: DEFAULT_CASH_CONFIRM_MODE,
+  skip_for_cashier: true,
+  overdue_hours: 24,
+};
 
 export default function KassaSettings() {
   const alert = useAlert();
@@ -88,7 +97,8 @@ export default function KassaSettings() {
       <div className="kassa__alert">
         Настройки подтверждения кассы ещё не подключены на сервере
         (<code>GET /consalting/cashbox/confirmation-settings/</code>). Пока
-        действует режим по умолчанию: заявка создаётся только для наличных.
+        действует режим по умолчанию: подтверждение выключено, деньги сразу
+        идут в остаток кассы.
       </div>
     );
   }

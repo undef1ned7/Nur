@@ -50,6 +50,12 @@ const userSlice = createSlice({
   name: "user",
   initialState,
   reducers: {
+    // Тихое обновление профиля (без флага loading) — используется при
+    // возврате на вкладку, чтобы не мигать глобальными спиннерами,
+    // завязанными на state.user.loading.
+    setProfile: (state, action) => {
+      state.profile = action.payload;
+    },
     logoutUser: (state) => {
       state.currentUser = null;
       state.isAuthenticated = false;
@@ -233,6 +239,22 @@ const userSlice = createSlice({
   },
 });
 
-export const { logoutUser } = userSlice.actions;
+export const { logoutUser, setProfile } = userSlice.actions;
 export const useUser = () => useSelector((state) => state.user);
+
+/**
+ * Тихий рефетч профиля (роль / права могли поменять на бэке уже после
+ * логина) — без state.loading, чтобы не задеть спинners в других
+ * компонентах, завязанных на useUser().loading. Ошибки проглатываются:
+ * сессия не должна рваться из-за фонового обновления.
+ */
+export const refreshProfileSilently = () => async (dispatch) => {
+  try {
+    const { data } = await api.get("/users/profile/");
+    dispatch(setProfile(data));
+  } catch {
+    /* фон — не блокируем и не ломаем текущую сессию */
+  }
+};
+
 export default userSlice.reducer;

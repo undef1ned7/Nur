@@ -74,9 +74,9 @@
 
 | mode | Поведение |
 |------|-----------|
+| off | Сразу CashOperation + side-effects (**default**, см. [26-cash-confirmation-default-off.md](./26-cash-confirmation-default-off.md)) |
+| cash_only | Заявка только для наличных |
 | always | Всегда заявка, Sale = pending_confirmation |
-| cash_only | Заявка только для наличных (default) |
-| off | Сразу CashOperation + side-effects |
 
 ---
 

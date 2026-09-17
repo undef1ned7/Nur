@@ -106,6 +106,21 @@ class EmployeePermissions(models.Model):   # там же, где can_view_funnel
 
 ## 17.3. Право `can_create_funnel`
 
+> **Обновлено 12.09.2026 — исправлен фронтовый баг, не новый контракт.**
+> Матрица ниже (в т.ч. строка `supervisor`) уже была описана верно, но
+> `canCreateConsultingFunnel()` в `src/utils/consultingFunnelAccess.js` не
+> проверяла `isConsultingRegionalSupervisor(profile)` — в отличие от всех
+> соседних функций доступа в этом же файле (`canAccessConsultingLeadInbox`,
+> `canManageConsultingEmployees`, `canViewAllConsultingSales`, все уже несут
+> ветку supervisor). Из-за этого кнопка «+ Воронка» была скрыта от
+> руководителя региона, если ему **вручную** не выставили чекбокс
+> `can_create_funnel` в модалке «Доступы» — хотя по контракту §17.4.3 бэкенд
+> и так пускает supervisor без этого флага (`permission_check: supervisor →
+> OK`). Починено на фронте — доступ к созданию воронки для supervisor
+> теперь **не зависит** от чекбокса `can_create_funnel`, роль сама даёт
+> право. Бэку менять нечего — просто держитесь уже описанной матрицы ниже
+> и не требуйте `can_create_funnel=true` от supervisor.
+
 - Хранится в тех же правах сотрудника, что `can_view_funnel`,
   `can_manage_funnel_leads` (эндпоинт `PATCH /consalting/employees/{id}/`,
   сериализатор карточки сотрудника, ответ `GET /users/profile/`).
@@ -308,6 +323,9 @@ class EmployeePermissions(models.Model):   # там же, где can_view_funnel
 - [ ] Новая подворонка сразу имеет 3 системные стадии.
 - [ ] Автор сразу видит свою воронку на доске и может добавлять стадии/лиды
       (есть `FunnelGrant`).
+- [ ] Руководитель региона (`role=supervisor`) видит кнопку «+ Воронка» и
+      создаёт воронку в свой регион **без** выданного чекбокса
+      `can_create_funnel` — фронт исправлен 12.09.2026, см. §17.3.
 
 ### Отображение у руководителя
 - [ ] Владелец открывает вкладку «Ош» → под ней ряд подворонок: «Регион

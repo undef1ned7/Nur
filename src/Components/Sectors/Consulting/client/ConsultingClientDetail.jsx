@@ -12,9 +12,13 @@ import {
   paySubscriptionPayment,
   isPayableSubscriptionStatus,
   normalizeSubscriptionPaymentStatus,
+  extendSubscriptionSchedule,
+  updateSubscriptionAmount,
 } from "../../../../api/consultingSubscriptions";
 import {
   getClientTenantAccount,
+  linkClientTenant,
+  lookupTenantAccountByEmail,
   provisionClientTenant,
 } from "../../../../api/consultingTenant";
 import { createConsultingSaleApi } from "../../../../api/consultingSales";
@@ -71,11 +75,19 @@ export default function ConsultingClientDetail() {
   const [bulkCount, setBulkCount] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
+  // Продление графика / изменение цены абонентки — модалка «Управлять графиком».
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [provisionBusy, setProvisionBusy] = useState(false);
   // Сектор создаваемого CRM-аккаунта. По умолчанию — «Маркет»
   // (см. docs/consulting/backend-money-tenant/11-provision-market-sector.md).
   const [sectors, setSectors] = useState([]);
   const [provisionSector, setProvisionSector] = useState("");
+  // Существующий NurCRM-аккаунт с тем же email — детект до провижна, чтобы
+  // не заводить дубль и не гонять владельца в platform-admin. См.
+  // docs/consulting/backend-money-tenant/23-tenant-account-auto-link.md.
+  const [existingAccount, setExistingAccount] = useState(null);
+  const [existingAccountChecked, setExistingAccountChecked] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   const reload = useCallback(
     async ({ withSpinner = true } = {}) => {
@@ -150,6 +162,53 @@ export default function ConsultingClientDetail() {
     };
   }, []);
 
+  // Автодетект уже существующего NurCRM-аккаунта по email клиента — пока у
+  // клиента ещё нет своего провизионированного аккаунта. Срабатывает сам,
+  // без действий пользователя (кнопка «Создать / повторить аккаунт» ниже
+  // не должна быть единственным способом узнать про дубль).
+  const email = client?.email;
+  const hasOwnAccount =
+    !!tenantAccount?.nur_company_id || client?.provision_status === "created";
+  useEffect(() => {
+    setExistingAccount(null);
+    setExistingAccountChecked(false);
+    if (!isConsultingCashV2() || !email || hasOwnAccount) return undefined;
+    let cancelled = false;
+    lookupTenantAccountByEmail(email)
+      .then((res) => {
+        if (!cancelled) setExistingAccount(res?.match || null);
+      })
+      .catch(() => {
+        /* эндпоинт может быть ещё не готов на бэке — тихо молчим,
+           кнопка «Создать аккаунт» остаётся рабочим фолбэком */
+      })
+      .finally(() => {
+        if (!cancelled) setExistingAccountChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [email, hasOwnAccount]);
+
+  const linkExistingAccount = async () => {
+    if (!existingAccount?.nur_company_id || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const result = await linkClientTenant(
+        id,
+        existingAccount.nur_company_id,
+      );
+      setTenantAccount(result);
+      setExistingAccount(null);
+      alert("Клиент привязан к существующему аккаунту NurCRM.");
+      await reload({ withSpinner: false });
+    } catch (e) {
+      alert(e?.detail || "Не удалось привязать аккаунт.", true);
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   const chartData = useMemo(() => {
     if (subscriptions.length) {
       return subscriptions.map((row, i) => {
@@ -222,6 +281,29 @@ export default function ConsultingClientDetail() {
     [payableRows.length],
   );
 
+  // Уникальные подписки клиента (для «Управлять графиком») — берём последнюю
+  // известную цену/период/статус по каждому subscription_id среди строк
+  // графика (сортировка по периоду уже применена в flattenSubscriptionPayments,
+  // поэтому последнее вхождение — самая свежая строка этой подписки).
+  const subscriptionOptions = useMemo(() => {
+    if (!isConsultingCashV2()) return [];
+    const byId = new Map();
+    subscriptions.forEach((row) => {
+      if (!row.subscription_id) return;
+      byId.set(row.subscription_id, {
+        subscription_id: row.subscription_id,
+        subscription_amount: row.subscription_amount,
+        subscription_period: row.subscription_period,
+        subscription_status: row.subscription_status,
+        service_display: row.service_display,
+        tariff_display: row.tariff_display,
+      });
+    });
+    return Array.from(byId.values()).filter(
+      (s) => s.subscription_status !== "canceled",
+    );
+  }, [subscriptions]);
+
   const handleBulkPay = useCallback(
     async ({ count, payment_mode, note }) => {
       const targets = payableRows.slice(0, count);
@@ -279,6 +361,23 @@ export default function ConsultingClientDetail() {
       }
     },
     [payableRows, dispatch, id, reload, alert],
+  );
+
+  const handleExtendSchedule = useCallback(
+    async (subscriptionId, payload) => {
+      await extendSubscriptionSchedule(subscriptionId, payload);
+      await reload({ withSpinner: false });
+      alert(`График продлён на ${payload.periods} период(ов).`);
+    },
+    [reload, alert],
+  );
+
+  const handleUpdateSubscriptionPrice = useCallback(
+    async (subscriptionId, payload) => {
+      await updateSubscriptionAmount(subscriptionId, payload);
+      await reload({ withSpinner: false });
+    },
+    [reload],
   );
 
   const handlePaySubmit = useCallback(
@@ -379,7 +478,14 @@ export default function ConsultingClientDetail() {
       }
       await reload({ withSpinner: false });
     } catch (e) {
-      alert(e?.detail || "Не удалось создать аккаунт.", true);
+      // Бэк может вернуть найденный дубль прямо в теле ошибки
+      // (existing_company) — тогда рисуем ту же кнопку «Привязать», что и
+      // от проактивного lookup, вместо голого текста ошибки.
+      if (e?.existing_company?.nur_company_id) {
+        setExistingAccount(e.existing_company);
+      } else {
+        alert(e?.detail || "Не удалось создать аккаунт.", true);
+      }
     } finally {
       setProvisionBusy(false);
     }
@@ -421,7 +527,7 @@ export default function ConsultingClientDetail() {
 
   const showTenantBlock =
     isConsultingCashV2() &&
-    (tenantAccount || client?.provision_status);
+    (tenantAccount || client?.provision_status || existingAccount);
 
   return (
     <ConsultingShell
@@ -479,6 +585,39 @@ export default function ConsultingClientDetail() {
                 </div>
               )}
             </dl>
+
+            {!hasOwnAccount && email && !existingAccountChecked && (
+              <p className="clientDetail__hint">
+                Проверяем, нет ли уже аккаунта NurCRM с этим email…
+              </p>
+            )}
+
+            {!!existingAccount && !hasOwnAccount && (
+              <div className="clientDetail__tenantDuplicate">
+                <p>
+                  У этого email уже есть аккаунт NurCRM —{" "}
+                  <strong>
+                    {existingAccount.company_name || "без названия"}
+                  </strong>
+                  {existingAccount.sector?.name
+                    ? ` (сектор «${existingAccount.sector.name}»)`
+                    : ""}
+                  {existingAccount.end_date
+                    ? `, доступ до ${formatDateDDMMYYYY(existingAccount.end_date)}`
+                    : ""}
+                  . Новый создавать не нужно — привяжите этот, и клиент
+                  продолжит пользоваться своим логином.
+                </p>
+                <button
+                  type="button"
+                  className="clientDetail__btn clientDetail__btn--primary"
+                  disabled={linkBusy}
+                  onClick={linkExistingAccount}
+                >
+                  {linkBusy ? "…" : "Привязать существующий аккаунт"}
+                </button>
+              </div>
+            )}
             {tenantAccount?.provision_error && (
               <p className="clientDetail__error clientDetail__error--inline">
                 {tenantAccount.provision_error}
@@ -529,13 +668,32 @@ export default function ConsultingClientDetail() {
 
         <div className="clientDetail__grid">
           <div className="clientDetail__card">
-            <h2 className="clientDetail__cardTitle">Абонентские платежи</h2>
+            <div className="clientDetail__cardHead">
+              <h2 className="clientDetail__cardTitle">Абонентские платежи</h2>
+              {!!subscriptionOptions.length && (
+                <button
+                  type="button"
+                  className="clientDetail__btn"
+                  onClick={() => setScheduleModalOpen(true)}
+                >
+                  Управлять графиком
+                </button>
+              )}
+            </div>
             {isConsultingCashV2() && (
               <p className="clientDetail__muted clientDetail__muted--spaced">
                 Оплата создаёт заявку в кассе; доступ CRM продлевается после
                 подтверждения кассиром.
               </p>
             )}
+            {isConsultingCashV2() &&
+              !!chartData.length &&
+              !payableRows.length && (
+                <p className="clientDetail__hint">
+                  Все показанные периоды оплачены — нажмите «Управлять
+                  графиком», чтобы продлить абонентку на следующие месяцы.
+                </p>
+              )}
             {payableRows.length >= 2 && (
               <div className="clientDetail__bulkPay">
                 <span className="clientDetail__bulkPayLabel">
@@ -702,6 +860,15 @@ export default function ConsultingClientDetail() {
             onClose={() => setAddSaleOpen(false)}
             onSubmit={handleAddSale}
             onError={(msg) => alert(msg, true)}
+          />
+        )}
+
+        {scheduleModalOpen && (
+          <SubscriptionScheduleModal
+            subscriptions={subscriptionOptions}
+            onClose={() => setScheduleModalOpen(false)}
+            onExtend={handleExtendSchedule}
+            onUpdatePrice={handleUpdateSubscriptionPrice}
           />
         )}
       </div>
@@ -1191,6 +1358,216 @@ function AddSaleModal({ clientName, onClose, onSubmit, onError }) {
               {saving ? "Оформляем…" : "Оформить"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const EXTEND_PRESETS = [3, 6, 12];
+
+/**
+ * «Управлять графиком» — продление горизонта абонентки и изменение цены
+ * будущих периодов. Обе операции независимы и относятся к выбранной
+ * подписке (если у клиента их несколько — например, разные услуги).
+ */
+function SubscriptionScheduleModal({
+  subscriptions,
+  onClose,
+  onExtend,
+  onUpdatePrice,
+}) {
+  const [subId, setSubId] = useState(
+    () => subscriptions[0]?.subscription_id ?? "",
+  );
+  const sub = subscriptions.find(
+    (s) => String(s.subscription_id) === String(subId),
+  );
+
+  const [periods, setPeriods] = useState(12);
+  const [extendBusy, setExtendBusy] = useState(false);
+  const [extendErr, setExtendErr] = useState("");
+
+  const [price, setPrice] = useState(() => String(sub?.subscription_amount ?? ""));
+  const [priceBusy, setPriceBusy] = useState(false);
+  const [priceErr, setPriceErr] = useState("");
+  const [priceOk, setPriceOk] = useState(false);
+
+  const selectSub = (nextId) => {
+    setSubId(nextId);
+    const s = subscriptions.find(
+      (x) => String(x.subscription_id) === String(nextId),
+    );
+    setPrice(String(s?.subscription_amount ?? ""));
+    setPriceOk(false);
+    setPriceErr("");
+    setExtendErr("");
+  };
+
+  const submitExtend = async () => {
+    if (!sub || extendBusy) return;
+    setExtendErr("");
+    setExtendBusy(true);
+    try {
+      await onExtend(sub.subscription_id, { periods });
+    } catch (e) {
+      setExtendErr(
+        (typeof e === "string" ? e : e?.detail) ||
+          "Не удалось продлить график.",
+      );
+    } finally {
+      setExtendBusy(false);
+    }
+  };
+
+  const submitPrice = async () => {
+    if (!sub || priceBusy) return;
+    const amount = Number(price);
+    if (!(amount > 0)) {
+      setPriceErr("Введите сумму больше нуля.");
+      return;
+    }
+    setPriceErr("");
+    setPriceOk(false);
+    setPriceBusy(true);
+    try {
+      await onUpdatePrice(sub.subscription_id, { amount });
+      setPriceOk(true);
+    } catch (e) {
+      setPriceErr(
+        (typeof e === "string" ? e : e?.detail) || "Не удалось изменить цену.",
+      );
+    } finally {
+      setPriceBusy(false);
+    }
+  };
+
+  return (
+    <div className="clientDetail__overlay" onClick={onClose}>
+      <div
+        className="clientDetail__modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Управление графиком абонентки"
+      >
+        <div className="clientDetail__modalHead">
+          <h3 className="clientDetail__modalTitle">Управление графиком</h3>
+          <button
+            type="button"
+            className="clientDetail__modalClose"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="clientDetail__modalForm">
+          {subscriptions.length > 1 && (
+            <label className="clientDetail__modalField">
+              <span>Подписка</span>
+              <select
+                value={subId}
+                onChange={(e) => selectSub(e.target.value)}
+              >
+                {subscriptions.map((s) => (
+                  <option key={s.subscription_id} value={s.subscription_id}>
+                    {s.service_display ||
+                      s.tariff_display ||
+                      `#${s.subscription_id}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {!sub ? (
+            <p className="clientDetail__hint">
+              Нет активной подписки для изменения.
+            </p>
+          ) : (
+            <>
+              <div className="clientDetail__scheduleSection">
+                <h4 className="clientDetail__scheduleSectionTitle">
+                  Продлить график
+                </h4>
+                <p className="clientDetail__hint">
+                  Добавит плановые периоды сразу после последнего в графике —
+                  по текущей цене {money(sub.subscription_amount)}
+                  {sub.subscription_period === "year" ? " / год" : " / мес."}
+                </p>
+                <div className="clientDetail__scheduleChips">
+                  {EXTEND_PRESETS.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={
+                        "clientDetail__btn" +
+                        (periods === n ? " clientDetail__btn--primary" : "")
+                      }
+                      onClick={() => setPeriods(n)}
+                      disabled={extendBusy}
+                    >
+                      {n} мес.
+                    </button>
+                  ))}
+                </div>
+                {!!extendErr && (
+                  <p className="clientDetail__error clientDetail__error--inline">
+                    {extendErr}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="clientDetail__btn clientDetail__btn--primary"
+                  onClick={submitExtend}
+                  disabled={extendBusy}
+                >
+                  {extendBusy ? "…" : `Продлить на ${periods} мес.`}
+                </button>
+              </div>
+
+              <div className="clientDetail__scheduleSection">
+                <h4 className="clientDetail__scheduleSectionTitle">
+                  Изменить цену
+                </h4>
+                <p className="clientDetail__hint">
+                  Применится только к будущим (ещё не оплаченным) периодам —
+                  уже оплаченные останутся с прежней суммой.
+                </p>
+                <label className="clientDetail__modalField">
+                  <span>Новая сумма, с</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => {
+                      setPrice(e.target.value);
+                      setPriceOk(false);
+                    }}
+                    disabled={priceBusy}
+                  />
+                </label>
+                {!!priceErr && (
+                  <p className="clientDetail__error clientDetail__error--inline">
+                    {priceErr}
+                  </p>
+                )}
+                {priceOk && (
+                  <p className="clientDetail__hint">Цена обновлена.</p>
+                )}
+                <button
+                  type="button"
+                  className="clientDetail__btn clientDetail__btn--primary"
+                  onClick={submitPrice}
+                  disabled={priceBusy}
+                >
+                  {priceBusy ? "…" : "Сохранить цену"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

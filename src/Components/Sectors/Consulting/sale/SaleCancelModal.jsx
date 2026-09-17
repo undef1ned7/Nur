@@ -15,6 +15,9 @@ import {
   refundConsultingSale,
 } from "../../../../api/consultingSales";
 import { fmtMoney, num } from "../common/listUtils";
+// Используется и со страницы «Продажи», и со страницы «Лиды» — тянем свои
+// стили сами, чтобы не зависеть от того, загрузил ли их родитель.
+import "./sale.scss";
 
 const LEAD_ACTIONS = [
   { value: "return_to_work", label: "Вернуть лид в работу" },

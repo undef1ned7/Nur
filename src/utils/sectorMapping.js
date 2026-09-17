@@ -33,3 +33,6 @@ export const mapSectorNameToSlug = (sectorName) => {
 
 export const isBuildingSector = (sectorName) =>
   mapSectorNameToSlug(sectorName) === "building";
+
+export const isMarketSector = (sectorName) =>
+  mapSectorNameToSlug(sectorName) === "market";

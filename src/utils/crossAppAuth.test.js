@@ -2,12 +2,16 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   canHandoffToBuildingApp,
   tryRedirectToBuildingApp,
+  canHandoffToMarketApp,
+  tryRedirectToMarketApp,
   buildAuthRedirectUrl,
   resolveBuildingAppPath,
+  resolveMarketAppPath,
 } from "./crossAppAuth";
 
 vi.mock("./appUrls", () => ({
   getBuildingAppPath: (path) => `https://stroy.nurcrm.kg${path}`,
+  getMarketAppPath: (path) => `https://market.nurcrm.kg${path}`,
 }));
 
 describe("crossAppAuth", () => {
@@ -125,5 +129,65 @@ describe("crossAppAuth", () => {
     ).toBe("redirected");
     expect(hrefValue).toContain("accessToken=token");
     expect(hrefValue).toContain("sector=building");
+  });
+
+  it("resolveMarketAppPath maps crm market routes", () => {
+    expect(resolveMarketAppPath("/crm/market/sell")).toBe("/market/sell");
+    expect(resolveMarketAppPath("/login")).toBe("/market");
+  });
+
+  it("canHandoffToMarketApp requires sector, subscription and token", () => {
+    expect(
+      canHandoffToMarketApp({
+        sector: { name: "Магазин" },
+        end_date: future(),
+      }),
+    ).toBe(false);
+
+    localStorage.setItem("accessToken", "token");
+    expect(
+      canHandoffToMarketApp({
+        sector: { name: "Магазин" },
+        end_date: future(),
+      }),
+    ).toBe(true);
+
+    expect(
+      canHandoffToMarketApp({
+        sector: { name: "Магазин" },
+        end_date: past(),
+      }),
+    ).toBe(false);
+
+    expect(
+      canHandoffToMarketApp({
+        sector: { name: "Строительная компания" },
+        end_date: future(),
+      }),
+    ).toBe(false);
+  });
+
+  it("tryRedirectToMarketApp returns expired for inactive subscription", () => {
+    localStorage.setItem("accessToken", "token");
+    expect(
+      tryRedirectToMarketApp({
+        sector: { name: "Магазин" },
+        end_date: past(),
+      }),
+    ).toBe("expired");
+    expect(hrefValue).toBe("http://localhost/");
+  });
+
+  it("tryRedirectToMarketApp redirects for active market company", () => {
+    localStorage.setItem("accessToken", "token");
+    localStorage.setItem("refreshToken", "refresh");
+    expect(
+      tryRedirectToMarketApp({
+        sector: { name: "Магазин" },
+        end_date: future(),
+      }),
+    ).toBe("redirected");
+    expect(hrefValue).toContain("accessToken=token");
+    expect(hrefValue).toContain("sector=market");
   });
 });

@@ -177,7 +177,7 @@ export const setupWazzupWebhook = async (id, payload = {}) => {
  * POST /consalting/wazzup-accounts/{id}/send-message/
  * Отправка ответа клиенту из карточки лида воронки.
  * @param {string} accountId
- * @param {{ lead_id: string, message?: string, media_url?: string, content_uri?: string }} payload
+ * @param {{ lead_id: string, message?: string, media_url?: string, content_uri?: string, media_type?: string, content_type?: string }} payload
  */
 export const sendWazzupMessage = async (accountId, payload) => {
   try {
@@ -190,6 +190,16 @@ export const sendWazzupMessage = async (accountId, payload) => {
     if (media) {
       body.media_url = media;
       body.content_uri = media;
+    }
+    // Явный тип — иначе бэк/Wazzup угадывает по расширению URL и может
+    // не распознать голосовое (.webm) как voice/ptt для WhatsApp.
+    if (payload?.media_type) {
+      body.media_type = payload.media_type;
+      body.type = payload.media_type;
+    }
+    if (payload?.content_type) {
+      body.content_type = payload.content_type;
+      body.mimetype = payload.content_type;
     }
     const { data } = await api.post(
       `${BASE}/wazzup-accounts/${accountId}/send-message/`,
@@ -321,7 +331,7 @@ export const uploadConsultingChatMedia = async (file, opts = {}) => {
 /**
  * Запасной путь: multipart send-message (file + lead_id) без отдельного upload.
  * @param {string} accountId
- * @param {{ lead_id: string, message?: string, file: File }} payload
+ * @param {{ lead_id: string, message?: string, file: File, media_type?: string }} payload
  */
 export const sendWazzupMessageWithFile = async (accountId, payload) => {
   if (!accountId || !payload?.lead_id || !payload?.file) {
@@ -338,6 +348,17 @@ export const sendWazzupMessageWithFile = async (accountId, payload) => {
   if (msg) {
     fd.append("message", msg);
     fd.append("text", msg);
+  }
+  // Явный тип — иначе бэк/Wazzup угадывает по расширению URL и может
+  // не распознать голосовое (.webm) как voice/ptt для WhatsApp.
+  const mediaType = payload.media_type || resolveMediaTypeFromFile(payload.file);
+  if (mediaType) {
+    fd.append("media_type", mediaType);
+    fd.append("type", mediaType);
+  }
+  if (payload.file.type) {
+    fd.append("content_type", payload.file.type);
+    fd.append("mimetype", payload.file.type);
   }
   fd.append("file", payload.file, payload.file.name || "upload.bin");
   try {
@@ -398,6 +419,27 @@ export function normalizeMessageStatus(raw, { isOut = false } = {}) {
 export function mediaTypeLabel(mediaType) {
   const key = String(mediaType || "").toLowerCase();
   return MEDIA_LABELS[key] || (key ? MEDIA_LABELS.file : "");
+}
+
+/** Расширения медиафайлов, которые бэкенд раньше писал в text вместо подписи. */
+const MEDIA_FILENAME_RE =
+  /\.(oga|ogg|opus|mp3|m4a|aac|wav|amr|mp4|mov|webm|m4v|avi|mkv|jpe?g|png|gif|webp|bmp|heic|heif|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|csv)$/i;
+
+/** Старые сообщения: text = системное имя файла (UUID.ext) вместо подписи — это не подпись. */
+function isMediaFileNameText(text, mediaUrl) {
+  if (!text) return false;
+  if (MEDIA_FILENAME_RE.test(text)) return true;
+  if (mediaUrl) {
+    try {
+      const base = decodeURIComponent(
+        String(mediaUrl).split("/").pop().split("?")[0].split("#")[0],
+      );
+      if (base && text === base) return true;
+    } catch {
+      /* noop */
+    }
+  }
+  return false;
 }
 
 /**
@@ -511,9 +553,13 @@ export function normalizeChatMessage(raw, fallback = {}) {
     resolveMediaType(fallback, fallback.media_url || "") ||
     "";
 
-  let text = String(m.text ?? m.message ?? m.body ?? fallback.text ?? "");
+  let text = String(m.text ?? m.message ?? m.body ?? fallback.text ?? "").trim();
+  // Старые сообщения: text = системное имя файла вместо подписи — это не подпись
+  if (text && isMediaFileNameText(text, media_url)) {
+    text = "";
+  }
   // Фоллбэк для списков: пустой текст + медиа → плейсхолдер
-  if (!text.trim() && media_type) {
+  if (!text && media_type) {
     text = mediaTypeLabel(media_type);
   }
   const stableId = m.id ?? fallback.id ?? "";
@@ -597,6 +643,38 @@ export const listLeadMessages = async (leadId) => {
   }
 
   return { messages: [], path: null, notReady: sawNotReady };
+};
+
+/**
+ * Редактирование текста исходящего сообщения WhatsApp.
+ * PATCH /consalting/wazzup-messages/{id}/ { text }
+ * `id` — внутренний UUID сообщения или его `message_id` (бэк принимает оба).
+ * @param {string} id
+ * @param {string} text
+ */
+export const editWazzupMessage = async (id, text) => {
+  try {
+    const { data } = await api.patch(`${BASE}/wazzup-messages/${id}/`, {
+      text,
+    });
+    return data;
+  } catch (error) {
+    return reject("Edit Wazzup Message Error")(error);
+  }
+};
+
+/**
+ * Удаление сообщения WhatsApp (у себя и у получателя).
+ * DELETE /consalting/wazzup-messages/{id}/
+ * @param {string} id
+ */
+export const deleteWazzupMessage = async (id) => {
+  try {
+    const { data } = await api.delete(`${BASE}/wazzup-messages/${id}/`);
+    return data;
+  } catch (error) {
+    return reject("Delete Wazzup Message Error")(error);
+  }
 };
 
 /** Нормализация телефона для сравнения chat_id ↔ lead.phone */
@@ -771,17 +849,20 @@ export function normalizeChatThread(raw, channel) {
       r.text ||
       "",
   ).trim();
+  const lastMediaUrl =
+    lastObj?.content_uri ||
+    lastObj?.media_url ||
+    r.last_content_uri ||
+    r.content_uri ||
+    "";
+  // Старые сообщения: text = системное имя файла вместо подписи — это не preview-текст
+  if (lastText && isMediaFileNameText(lastText, lastMediaUrl)) {
+    lastText = "";
+  }
   // Пустой preview + медиа → плейсхолдер (голос/фото/…), как в нормализации сообщений
   if (!lastText) {
     const mediaSrc = lastObj || r;
-    const mt = resolveMediaType(
-      mediaSrc,
-      mediaSrc?.content_uri ||
-        mediaSrc?.media_url ||
-        r.last_content_uri ||
-        r.content_uri ||
-        "",
-    );
+    const mt = resolveMediaType(mediaSrc, lastMediaUrl);
     if (mt) lastText = mediaTypeLabel(mt);
   }
   const lastAt =

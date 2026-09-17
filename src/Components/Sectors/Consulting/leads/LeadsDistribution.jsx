@@ -186,6 +186,41 @@ export default function LeadsDistribution({ roles, employees, funnels = [], aler
         : [...prev, String(id)],
     );
 
+  // Сотрудник, попавший в получатели двух и более регионов по общей роли
+  // (assign_role_ids не фильтруется по consulting_region_codes на бэке) —
+  // реально получит лиды из чужого региона через round-robin. Считаем
+  // пересечения, чтобы предупредить админа прямо в форме настроек.
+  const regionRecipientsByCode = useMemo(() => {
+    const map = new Map();
+    for (const region of CONSULTING_REGIONS) {
+      const rule = regionalRules.find((r) => r.region_code === region.code);
+      const roleIdsForRegion = rule?.assign_role_ids || [];
+      map.set(
+        region.code,
+        employees.filter((e) =>
+          roleIdsForRegion.includes(String(e.custom_role)),
+        ),
+      );
+    }
+    return map;
+  }, [regionalRules, employees]);
+
+  const crossRegionEmployeeIds = useMemo(() => {
+    const seenIn = new Map(); // employeeId -> Set(regionCode)
+    for (const [code, list] of regionRecipientsByCode) {
+      for (const e of list) {
+        const id = String(e.id);
+        if (!seenIn.has(id)) seenIn.set(id, new Set());
+        seenIn.get(id).add(code);
+      }
+    }
+    const overlapping = new Set();
+    for (const [id, codes] of seenIn) {
+      if (codes.size > 1) overlapping.add(id);
+    }
+    return overlapping;
+  }, [regionRecipientsByCode]);
+
   const recipients = useMemo(() => {
     if (!roleIds.length) return [];
     const set = new Set(roleIds.map(String));
@@ -498,8 +533,10 @@ export default function LeadsDistribution({ roles, employees, funnels = [], aler
         const rule =
           regionalRules.find((r) => r.region_code === region.code) ||
           emptyRegionalRules().find((r) => r.region_code === region.code);
-        const regionRecipients = employees.filter((e) =>
-          (rule.assign_role_ids || []).includes(String(e.custom_role)),
+        const regionRecipients =
+          regionRecipientsByCode.get(region.code) || [];
+        const overlapping = regionRecipients.filter((e) =>
+          crossRegionEmployeeIds.has(String(e.id)),
         );
         return (
           <div key={region.code} className="leads__settingsCard">
@@ -567,6 +604,29 @@ export default function LeadsDistribution({ roles, employees, funnels = [], aler
                 ? regionRecipients.map((e) => employeeName(e)).join(", ")
                 : "не выбраны"}
             </p>
+            {overlapping.length > 0 && (
+              <p
+                className="leads__warning"
+                role="alert"
+                style={{
+                  color: "#b45309",
+                  background: "#fffbeb",
+                  border: "1px solid #f59e0b",
+                  borderRadius: 6,
+                  padding: "8px 10px",
+                  marginTop: 6,
+                }}
+              >
+                ⚠ Пересечение с другим регионом: {overlapping
+                  .map((e) => employeeName(e))
+                  .join(", ")}
+                {" "}— эти сотрудники состоят в роли, выбранной сразу в
+                нескольких региональных правилах, и будут получать лиды из
+                чужого региона по round-robin. Заведите для каждого региона
+                отдельную роль-получателя (например «Продавец Бишкек» /
+                «Продавец Ош»), чтобы разделить пулы.
+              </p>
+            )}
           </div>
         );
       })}

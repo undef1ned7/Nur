@@ -26,6 +26,19 @@ const DEFAULT_BUILDING_APP_URL = "https://stroy.nurcrm.kg";
 
 const BUILDING_APP_URL_STORAGE_KEY = "buildingAppUrl";
 
+const MARKET_APP_BY_HOST = {
+  "stage.nurcrm.kg": "https://market.nurcrm.kg",
+  "www.stage.nurcrm.kg": "https://market.nurcrm.kg",
+  "app.nurcrm.kg": "https://market.nurcrm.kg",
+  "www.app.nurcrm.kg": "https://market.nurcrm.kg",
+  "nurcrm.kg": "https://market.nurcrm.kg",
+  "www.nurcrm.kg": "https://market.nurcrm.kg",
+};
+
+const DEFAULT_MARKET_APP_URL = "https://market.nurcrm.kg";
+
+const MARKET_APP_URL_STORAGE_KEY = "marketAppUrl";
+
 const getCurrentHostname = () =>
   typeof window !== "undefined" ? window.location.hostname : "";
 
@@ -37,6 +50,19 @@ const getMappedBuildingAppUrl = () => {
 const clearStoredBuildingAppUrl = () => {
   try {
     sessionStorage.removeItem(BUILDING_APP_URL_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+const getMappedMarketAppUrl = () => {
+  const hostname = getCurrentHostname();
+  return hostname ? MARKET_APP_BY_HOST[hostname] || null : null;
+};
+
+const clearStoredMarketAppUrl = () => {
+  try {
+    sessionStorage.removeItem(MARKET_APP_URL_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -133,4 +159,88 @@ export const getResolvedBuildingAppUrl = () => {
 export const getBuildingAppPath = (path = "/building/projects") => {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${getResolvedBuildingAppUrl()}${normalizedPath}`;
+};
+
+export const getMarketAppUrl = () => {
+  const fromEnv = trimTrailingSlash(import.meta.env.VITE_MARKET_APP_URL);
+  const mapped = getMappedMarketAppUrl();
+
+  // На stage/prod всегда market.nurcrm.kg; localhost из env/сборки игнорируем
+  if (mapped) {
+    if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
+    return mapped;
+  }
+
+  if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
+  if (fromEnv) return fromEnv;
+
+  return DEFAULT_MARKET_APP_URL;
+};
+
+export const captureMarketAppUrlFromSearch = () => {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get(MARKET_APP_URL_STORAGE_KEY);
+  if (!fromUrl) return null;
+
+  const normalized = trimTrailingSlash(fromUrl);
+
+  // Не сохраняем localhost, если мы уже на stage/prod
+  if (getMappedMarketAppUrl() && isLocalhostUrl(normalized)) {
+    clearStoredMarketAppUrl();
+    params.delete(MARKET_APP_URL_STORAGE_KEY);
+    const search = params.toString();
+    const cleanUrl =
+      window.location.pathname +
+      (search ? `?${search}` : "") +
+      window.location.hash;
+    window.history.replaceState({}, "", cleanUrl);
+    return null;
+  }
+
+  try {
+    sessionStorage.setItem(MARKET_APP_URL_STORAGE_KEY, normalized);
+  } catch {
+    // sessionStorage may be unavailable in private mode
+  }
+
+  params.delete(MARKET_APP_URL_STORAGE_KEY);
+  const search = params.toString();
+  const cleanUrl =
+    window.location.pathname +
+    (search ? `?${search}` : "") +
+    window.location.hash;
+  window.history.replaceState({}, "", cleanUrl);
+
+  return normalized;
+};
+
+export const getResolvedMarketAppUrl = () => {
+  const mapped = getMappedMarketAppUrl();
+
+  try {
+    const stored = sessionStorage.getItem(MARKET_APP_URL_STORAGE_KEY);
+    if (stored) {
+      const normalized = trimTrailingSlash(stored);
+
+      // Старый local market мог записать localhost в sessionStorage —
+      // на stage/prod это нельзя использовать.
+      if (mapped && isLocalhostUrl(normalized)) {
+        clearStoredMarketAppUrl();
+        return mapped;
+      }
+
+      if (!isLocalhostUrl(normalized) || !mapped) {
+        return normalized;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return getMarketAppUrl();
+};
+
+export const getMarketAppPath = (path = "/market") => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${getResolvedMarketAppUrl()}${normalizedPath}`;
 };

@@ -106,6 +106,14 @@ function dispatchFrame(msg) {
       }
       if (type === "message_status") {
         handlers.onStatus?.(data, msg);
+        return;
+      }
+      if (type === "message_edited") {
+        handlers.onEdited?.(data, msg);
+        return;
+      }
+      if (type === "message_deleted") {
+        handlers.onDeleted?.(data, msg);
       }
     } catch {
       /* isolate subscriber errors */
@@ -281,6 +289,16 @@ export function sendWazzupChatMessage(payload) {
   // Дубль media_url — совместимость со старым бэком
   if (media) {
     frame.media_url = media;
+  }
+  // Явный тип — иначе бэк/Wazzup угадывает по расширению URL и может
+  // не распознать голосовое (.webm) как voice/ptt для WhatsApp.
+  if (payload.media_type) {
+    frame.media_type = payload.media_type;
+    frame.type = payload.media_type;
+  }
+  if (payload.content_type) {
+    frame.content_type = payload.content_type;
+    frame.mimetype = payload.content_type;
   }
   try {
     ws.send(JSON.stringify(frame));

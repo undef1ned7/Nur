@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import {
   addCashFlows,
   getCashBoxes,
+  getCashConfirmationSettings,
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { useDispatch } from "react-redux";
@@ -10,11 +11,18 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { useAlert } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
+/**
+ * Подтверждение кассовых операций выключено по умолчанию (см.
+ * docs/kassa/cash-confirmation-toggle.md): пока компания не включит его в
+ * настройках кассы, любая новая операция сразу получает status="approved",
+ * независимо от роли автора. Раньше это решалось жёстко: owner → approved,
+ * остальные → pending.
+ */
 const AddCashFlowsModal = ({ onClose }) => {
   const alert = useAlert();
   const dispatch = useDispatch();
   const { profile } = useUser();
-  const { list: cashBoxes } = useCash();
+  const { list: cashBoxes, confirmation } = useCash();
   const [newCashbox, setNewCashbox] = useState({
     name: "",
     amount: 0,
@@ -25,6 +33,7 @@ const AddCashFlowsModal = ({ onClose }) => {
 
   useEffect(() => {
     dispatch(getCashBoxes());
+    if (!confirmation.loaded) dispatch(getCashConfirmationSettings());
   }, []);
 
   // Автоматически выбираем первую кассу по индексу
@@ -40,7 +49,13 @@ const AddCashFlowsModal = ({ onClose }) => {
 
   const handleAddCashbox = async () => {
     try {
-      const response = await dispatch(addCashFlows({ ...newCashbox, status: profile.role === 'owner' ? 'approved' : 'pending' }))
+      const needsConfirmation = confirmation.enabled && profile?.role !== "owner";
+      const response = await dispatch(
+        addCashFlows({
+          ...newCashbox,
+          status: needsConfirmation ? "pending" : "approved",
+        }),
+      )
       if (response.error) {
         const errorMessage = validateResErrors(response.payload, "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.")
         alert(errorMessage, true)

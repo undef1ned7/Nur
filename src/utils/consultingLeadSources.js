@@ -19,17 +19,46 @@ export const CRM_CHAT_CHANNELS = ["whatsapp", "telegram", "instagram"];
 
 const BY_VALUE = Object.fromEntries(LEAD_SOURCES.map((s) => [s.value, s]));
 
+/**
+ * Бэкенд отдаёт `source` в разных написаниях для одного канала
+ * (например «Ватсап», «GreenAPI (whatsapp)», «green-api» — не только
+ * канонический "whatsapp"). Точное сравнение по ключу теряет иконку/цвет
+ * для таких записей, хотя это тот же канал. Приводим известные варианты
+ * к каноническому значению для отображения.
+ */
+function normalizeSourceKey(source) {
+  const key = String(source || "").trim().toLowerCase();
+  if (!key) return "";
+  if (
+    key.includes("whatsapp") ||
+    key.includes("ватсап") ||
+    key.includes("вотсап") ||
+    key.includes("green-api") ||
+    key.includes("greenapi") ||
+    key === "wa"
+  ) {
+    return "whatsapp";
+  }
+  if (key.includes("telegram") || key.includes("телеграм")) return "telegram";
+  if (
+    key.includes("instagram") ||
+    key.includes("инстаграм") ||
+    key.includes("инста")
+  ) {
+    return "instagram";
+  }
+  if (key === "manual" || key.includes("вручную") || key.includes("ручн")) {
+    return "manual";
+  }
+  return key;
+}
+
 export function leadSourceMeta(source) {
-  const key = String(source || "")
-    .trim()
-    .toLowerCase();
+  const raw = String(source || "").trim();
+  const key = normalizeSourceKey(raw);
   if (BY_VALUE[key]) return BY_VALUE[key];
-  if (!key) return { value: "", label: "—", color: "#64748b" };
-  return {
-    value: key,
-    label: key.charAt(0).toUpperCase() + key.slice(1),
-    color: "#64748b",
-  };
+  if (!raw) return { value: "", label: "—", color: "#64748b" };
+  return { value: key || raw.toLowerCase(), label: raw, color: "#64748b" };
 }
 
 export function leadSourceLabel(source) {

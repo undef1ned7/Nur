@@ -8,6 +8,9 @@ const initialState = {
   cashFlows: [],
   loading: false,
   error: null,
+  // Подтверждение кассовых операций (легаси общий модуль construction/*).
+  // По умолчанию выключено — см. docs/kassa/cash-confirmation-toggle.md.
+  confirmation: { enabled: false, loaded: false },
 };
 
 export const getCashBoxes = createAsyncThunk(
@@ -81,6 +84,43 @@ export const bulkUpdateCashFlowsStatus = createAsyncThunk(
   }
 );
 
+/**
+ * Настройка подтверждения кассовых операций (легаси общий модуль,
+ * используется Barber/Building/Pilorama/School/logistics и не-owner ролями).
+ * По умолчанию (нет строки на сервере) — ВЫКЛЮЧЕНО: новая операция сразу
+ * получает status="approved" независимо от роли автора.
+ * GET/PATCH /construction/cash-confirmation-settings/
+ * См. docs/kassa/cash-confirmation-toggle.md.
+ */
+export const getCashConfirmationSettings = createAsyncThunk(
+  "cash/getConfirmationSettings",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(
+        "/construction/cash-confirmation-settings/"
+      );
+      return Boolean(data?.enabled);
+    } catch (e) {
+      return handleThunkError(e, rejectWithValue);
+    }
+  }
+);
+
+export const updateCashConfirmationSettings = createAsyncThunk(
+  "cash/updateConfirmationSettings",
+  async (enabled, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(
+        "/construction/cash-confirmation-settings/",
+        { enabled }
+      );
+      return Boolean(data?.enabled ?? enabled);
+    } catch (e) {
+      return handleThunkError(e, rejectWithValue);
+    }
+  }
+);
+
 const cashSlice = createSlice({
   name: "cash",
   initialState,
@@ -138,6 +178,16 @@ const cashSlice = createSlice({
       .addCase(getCashFlows.rejected, (state, { payload }) => {
         state.loading = false;
         state.error = payload;
+      })
+      .addCase(getCashConfirmationSettings.fulfilled, (state, { payload }) => {
+        state.confirmation = { enabled: payload, loaded: true };
+      })
+      .addCase(getCashConfirmationSettings.rejected, (state) => {
+        // Эндпоинт ещё не готов на бэке / компания без настроек — дефолт off.
+        state.confirmation = { enabled: false, loaded: true };
+      })
+      .addCase(updateCashConfirmationSettings.fulfilled, (state, { payload }) => {
+        state.confirmation = { enabled: payload, loaded: true };
       });
   },
 });

@@ -100,8 +100,8 @@ const normalizeEmployee = (e = {}) => {
     e.commission_percent !== undefined && e.commission_percent !== null
       ? Number(e.commission_percent)
       : e.commission !== undefined && e.commission !== null
-      ? Number(e.commission)
-      : 0;
+        ? Number(e.commission)
+        : 0;
   return {
     id: e.id,
     email: e.email ?? "",
@@ -113,10 +113,12 @@ const normalizeEmployee = (e = {}) => {
     consulting_region_codes: Array.isArray(e.consulting_region_codes)
       ? e.consulting_region_codes.map((x) => String(x).trim().toLowerCase())
       : Array.isArray(e.consulting_regions)
-      ? e.consulting_regions.map((r) =>
-          String(r?.code ?? r).trim().toLowerCase(),
-        )
-      : [],
+        ? e.consulting_regions.map((r) =>
+            String(r?.code ?? r)
+              .trim()
+              .toLowerCase(),
+          )
+        : [],
     commission_percent: Number.isFinite(pct) ? pct : 0,
   };
 };
@@ -148,8 +150,8 @@ function RegionChecklist({ regions, value, onChange, disabled }) {
   if (!regions.length) {
     return (
       <p className="Schoolteachers__hint">
-        Список регионов пуст. Сначала настройте региональные воронки
-        (Лиды → Распределение), затем назначайте руководителя.
+        Список регионов пуст. Сначала настройте региональные воронки (Лиды →
+        Распределение), затем назначайте руководителя.
       </p>
     );
   }
@@ -421,7 +423,7 @@ function ConsultingSchoolTeachers() {
       });
       // Подстраховка: фильтруем на клиенте, если сервер вернул лишнее
       const rows = asArray(data).filter(
-        (x) => String(x?.user || "") === String(employeeId)
+        (x) => String(x?.user || "") === String(employeeId),
       );
       setSItems(rows);
       const serverCount = typeof data?.count === "number" ? data.count : null;
@@ -473,8 +475,8 @@ function ConsultingSchoolTeachers() {
       [x.title, x.note, x.date, x.time].some((v) =>
         String(v || "")
           .toLowerCase()
-          .includes(t)
-      )
+          .includes(t),
+      ),
     );
   }, [bAll, bQ]);
 
@@ -488,7 +490,7 @@ function ConsultingSchoolTeachers() {
     return sItems.filter((x) =>
       [x.description, x.percent, x.amount]
         .map((v) => String(v || ""))
-        .some((v) => v.toLowerCase().includes(t))
+        .some((v) => v.toLowerCase().includes(t)),
     );
   }, [sItems, sQ]);
 
@@ -505,7 +507,7 @@ function ConsultingSchoolTeachers() {
         toYMDhm(x.created_at),
       ]
         .map((v) => String(v || ""))
-        .some((v) => v.toLowerCase().includes(t))
+        .some((v) => v.toLowerCase().includes(t)),
     );
   }, [slItems, slQ]);
 
@@ -581,11 +583,7 @@ function ConsultingSchoolTeachers() {
       });
       await fetchEmployees();
       const savedEmployeeId = String(accessModalEmployee.id);
-      const profileIds = [
-        profile?.id,
-        profile?.employee_id,
-        profile?.employee,
-      ]
+      const profileIds = [profile?.id, profile?.employee_id, profile?.employee]
         .filter(Boolean)
         .map(String);
       if (profileIds.includes(savedEmployeeId)) {
@@ -660,7 +658,7 @@ function ConsultingSchoolTeachers() {
 
   const roleChoiceKeys = useMemo(
     () => new Set(roleOptions.map((o) => o.key)),
-    [roleOptions]
+    [roleOptions],
   );
 
   /* ===== filters ===== */
@@ -676,7 +674,7 @@ function ConsultingSchoolTeachers() {
         e.commission_percent != null ? `${e.commission_percent}%` : "",
       ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t))
+        .some((v) => String(v).toLowerCase().includes(t)),
     );
   }, [employees, q]);
 
@@ -698,7 +696,7 @@ function ConsultingSchoolTeachers() {
     return dedup.filter((r) =>
       String(r.name || "")
         .toLowerCase()
-        .includes(t)
+        .includes(t),
     );
   }, [roles, q]);
 
@@ -708,7 +706,7 @@ function ConsultingSchoolTeachers() {
     return roles.some((r) =>
       excludeId && r.id === excludeId
         ? false
-        : cleanSpaces(r.name).toLowerCase() === key
+        : cleanSpaces(r.name).toLowerCase() === key,
     );
   };
   const isEmailDuplicate = (email, excludeId = null) => {
@@ -720,7 +718,7 @@ function ConsultingSchoolTeachers() {
         ? false
         : String(e.email || "")
             .trim()
-            .toLowerCase() === key
+            .toLowerCase() === key,
     );
   };
 
@@ -825,7 +823,7 @@ function ConsultingSchoolTeachers() {
             return next;
           });
         }
-      }
+      },
     );
   };
 
@@ -857,7 +855,11 @@ function ConsultingSchoolTeachers() {
       return setEmpErr("Имя и Фамилия: 2–60 символов (буквы, пробел, ' -).");
     if (!isRegionalSupervisor && !roleChoiceKeys.has(roleChoice))
       return setEmpErr("Выберите доступную роль.");
-    if (isRegionalSupervisor && employeeRegionOptions.length > 1 && !forcedRegion)
+    if (
+      isRegionalSupervisor &&
+      employeeRegionOptions.length > 1 &&
+      !forcedRegion
+    )
       return setEmpErr("Выберите регион сотрудника.");
     // owner/admin создаёт руководителя региона — нужен хотя бы один регион.
     const isSupervisorChoice =
@@ -868,9 +870,7 @@ function ConsultingSchoolTeachers() {
       return setEmpErr("Процент должен быть числом от 0 до 100.");
 
     const commissionValue = Number(pctParsed.toFixed(2));
-    const accessDefaults = getNewEmployeeAccessDefaults(
-      company?.sector?.name,
-    );
+    const accessDefaults = getNewEmployeeAccessDefaults(company?.sector?.name);
     const payload = {
       email,
       first_name,
@@ -971,7 +971,7 @@ function ConsultingSchoolTeachers() {
       return setEmpEditErr("Другой сотрудник уже использует этот e-mail.");
     if (!isHumanName(first_name) || !isHumanName(last_name))
       return setEmpEditErr(
-        "Имя и Фамилия: 2–60 символов (буквы, пробел, ' -)."
+        "Имя и Фамилия: 2–60 символов (буквы, пробел, ' -).",
       );
     if (!roleChoiceKeys.has(roleChoice))
       return setEmpEditErr("Выберите доступную роль.");
@@ -1041,7 +1041,7 @@ function ConsultingSchoolTeachers() {
             return next;
           });
         }
-      }
+      },
     );
   };
 
@@ -1116,158 +1116,72 @@ function ConsultingSchoolTeachers() {
       }
     >
       <div className="Schoolteachers Schoolteachers--embedded">
-      {loading && <div className="Schoolteachers__alert">Загрузка…</div>}
-      {!!error && <div className="Schoolteachers__alert">{error}</div>}
-      {!!pageNotice && (
-        <div className="Schoolteachers__notice">{pageNotice}</div>
-      )}
+        {loading && <div className="Schoolteachers__alert">Загрузка…</div>}
+        {!!error && <div className="Schoolteachers__alert">{error}</div>}
+        {!!pageNotice && (
+          <div className="Schoolteachers__notice">{pageNotice}</div>
+        )}
 
-      {!loading && tab === "rating" && (
-        <EmployeesRating
-          onOpenEmployee={(row) => {
-            const found = employees.find(
-              (e) => String(e.id) === String(row.user),
-            );
-            if (found) setCardEmployee(found);
-          }}
-        />
-      )}
+        {!loading && tab === "rating" && (
+          <EmployeesRating
+            onOpenEmployee={(row) => {
+              const found = employees.find(
+                (e) => String(e.id) === String(row.user),
+              );
+              if (found) setCardEmployee(found);
+            }}
+          />
+        )}
 
-      {/* ===== ROLES TAB ===== */}
-      {!loading && tab === "roles" && (
-        <div className="Schoolteachers__list">
-          {SYSTEM_ROLES.map((code) => (
-            <div className="Schoolteachers__card" key={`sys:${code}`}>
-              <div className="Schoolteachers__cardLeft">
-                <div className="Schoolteachers__avatar" aria-hidden>
-                  {ruLabelSys(code).charAt(0)}
-                </div>
-                <div>
-                  <p className="Schoolteachers__name">{ruLabelSys(code)}</p>
-                  <div className="Schoolteachers__meta">
-                    <span>Системная роль</span>
-                  </div>
-                </div>
-              </div>
-              <div className="Schoolteachers__rowActions">
-                <button
-                  type="button"
-                  className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                  disabled
-                  title="Системные роли нельзя изменять"
-                >
-                  <FaEdit /> Изменить
-                </button>
-                <button
-                  type="button"
-                  className="Schoolteachers__btn Schoolteachers__btn--danger"
-                  disabled
-                  title="Системные роли нельзя удалять"
-                >
-                  <FaTrash /> Удалить
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filteredRoles.map((r) => (
-            <div className="Schoolteachers__card" key={r.id}>
-              <div className="Schoolteachers__cardLeft">
-                <div className="Schoolteachers__avatar" aria-hidden>
-                  {(r.name || "•").trim().charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="Schoolteachers__name">
-                    {r.name || "Без названия"}
-                  </p>
-                  <div className="Schoolteachers__meta">
-                    <span>Пользовательская роль</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="Schoolteachers__rowActions">
-                <button
-                  type="button"
-                  className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                  onClick={() => openRoleEdit(r)}
-                  title="Изменить"
-                >
-                  <FaEdit /> Изменить
-                </button>
-                <button
-                  type="button"
-                  className="Schoolteachers__btn Schoolteachers__btn--danger"
-                  onClick={() => removeRole(r)}
-                  disabled={roleDeletingIds.has(r.id)}
-                  title="Удалить"
-                >
-                  <FaTrash />{" "}
-                  {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filteredRoles.length === 0 && roles.length > 0 && (
-            <div className="Schoolteachers__alert">
-              Роли по запросу не найдены.
-            </div>
-          )}
-          {!loading && roles.length === 0 && (
-            <div className="Schoolteachers__alert">
-              Пока нет пользовательских ролей.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== EMPLOYEES TAB ===== */}
-      {!loading && tab === "employees" && (
-        <div className="Schoolteachers__list">
-          {filteredEmployees.map((u) => {
-            const initial =
-              (fullName(u) || u.email || "•").trim().charAt(0).toUpperCase() ||
-              "•";
-            const roleLabel = u.role
-              ? ruLabelSys(u.role)
-              : roles.length
-              ? roleById.get(u.custom_role)?.name || u.role_display || "—"
-              : u.role_display || "—";
-
-            const deleting = empDeletingIds.has(u.id);
-            const pct =
-              u.commission_percent != null ? `${u.commission_percent}%` : "—%";
-            const regionText =
-              String(u.role).toLowerCase() === "supervisor" &&
-              u.consulting_region_codes?.length
-                ? u.consulting_region_codes
-                    .map((c) => regionCtl.regionLabel(c))
-                    .join(", ")
-                : "";
-
-            return (
-              <div key={u.id} className="Schoolteachers__card">
+        {/* ===== ROLES TAB ===== */}
+        {!loading && tab === "roles" && (
+          <div className="Schoolteachers__list">
+            {SYSTEM_ROLES.map((code) => (
+              <div className="Schoolteachers__card" key={`sys:${code}`}>
                 <div className="Schoolteachers__cardLeft">
                   <div className="Schoolteachers__avatar" aria-hidden>
-                    {initial}
+                    {ruLabelSys(code).charAt(0)}
+                  </div>
+                  <div>
+                    <p className="Schoolteachers__name">{ruLabelSys(code)}</p>
+                    <div className="Schoolteachers__meta">
+                      <span>Системная роль</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="Schoolteachers__rowActions">
+                  <button
+                    type="button"
+                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                    disabled
+                    title="Системные роли нельзя изменять"
+                  >
+                    <FaEdit /> Изменить
+                  </button>
+                  <button
+                    type="button"
+                    className="Schoolteachers__btn Schoolteachers__btn--danger"
+                    disabled
+                    title="Системные роли нельзя удалять"
+                  >
+                    <FaTrash /> Удалить
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {filteredRoles.map((r) => (
+              <div className="Schoolteachers__card" key={r.id}>
+                <div className="Schoolteachers__cardLeft">
+                  <div className="Schoolteachers__avatar" aria-hidden>
+                    {(r.name || "•").trim().charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="Schoolteachers__name">
-                      {fullName(u) || "Без имени"}
+                      {r.name || "Без названия"}
                     </p>
                     <div className="Schoolteachers__meta">
-                      <span>{u.email || "—"}</span>
-                      <span>•</span>
-                      <span>{roleLabel}</span>
-                      {regionText ? (
-                        <>
-                          <span>•</span>
-                          <span>Регионы: {regionText}</span>
-                        </>
-                      ) : null}
-                      <span>•</span>
-                      <span>Комиссия: {pct}</span>
+                      <span>Пользовательская роль</span>
                     </div>
                   </div>
                 </div>
@@ -1275,319 +1189,654 @@ function ConsultingSchoolTeachers() {
                 <div className="Schoolteachers__rowActions">
                   <button
                     type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--primary"
-                    onClick={() => setCardEmployee(u)}
-                    title="Карточка сотрудника: показатели, КПД, финансы"
-                  >
-                    <FaChartLine /> Карточка
-                  </button>
-                  <button
-                    type="button"
                     className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => openHistory(u)}
-                    title="История сотрудника"
-                  >
-                    История
-                  </button>
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => openAccessModal(u)}
-                    title="Доступы сотрудника"
-                  >
-                    <FaLock /> Доступы
-                  </button>
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => openEmpEdit(u)}
-                    title="Изменить сотрудника"
+                    onClick={() => openRoleEdit(r)}
+                    title="Изменить"
                   >
                     <FaEdit /> Изменить
                   </button>
                   <button
                     type="button"
                     className="Schoolteachers__btn Schoolteachers__btn--danger"
-                    onClick={() => removeEmployee(u)}
-                    disabled={deleting}
-                    title="Удалить сотрудника"
+                    onClick={() => removeRole(r)}
+                    disabled={roleDeletingIds.has(r.id)}
+                    title="Удалить"
                   >
-                    <FaTrash /> {deleting ? "Удаление…" : "Удалить"}
+                    <FaTrash />{" "}
+                    {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
                   </button>
                 </div>
               </div>
-            );
-          })}
+            ))}
 
-          {filteredEmployees.length === 0 && employees.length > 0 && (
-            <div className="Schoolteachers__alert">
-              Сотрудники по запросу не найдены.
-            </div>
-          )}
-          {!loading && employees.length === 0 && (
-            <div className="Schoolteachers__alert">Пока нет сотрудников.</div>
-          )}
-        </div>
-      )}
-
-      {/* ===== MODALS ===== */}
-      {/* Role: Create */}
-      {roleCreateOpen && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
-        >
-          <div
-            className="Schoolteachers__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">Новая роль</h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {!!roleCreateErr && (
-              <div className="Schoolteachers__alert" role="alert">
-                {roleCreateErr}
+            {filteredRoles.length === 0 && roles.length > 0 && (
+              <div className="Schoolteachers__alert">
+                Роли по запросу не найдены.
               </div>
             )}
-
-            <form
-              className="Schoolteachers__form"
-              onSubmit={submitRoleCreate}
-              noValidate
-            >
-              <div className="Schoolteachers__formGrid">
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Название роли <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Например: Контент-менеджер"
-                    value={roleCreateName}
-                    onChange={(e) => setRoleCreateName(e.target.value)}
-                    maxLength={40}
-                    required
-                  />
-                </div>
+            {!loading && roles.length === 0 && (
+              <div className="Schoolteachers__alert">
+                Пока нет пользовательских ролей.
               </div>
-
-              <div className="Schoolteachers__formActions">
-                <span className="Schoolteachers__actionsSpacer" />
-                <div className="Schoolteachers__actionsRight">
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => setRoleCreateOpen(false)}
-                    disabled={roleCreateSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="Schoolteachers__btn Schoolteachers__btn--primary"
-                    disabled={roleCreateSaving}
-                  >
-                    {roleCreateSaving ? "Сохранение…" : "Создать роль"}
-                  </button>
-                </div>
-              </div>
-            </form>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Role: Edit */}
-      {roleEditOpen && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !roleEditSaving && setRoleEditOpen(false)}
-        >
-          <div
-            className="Schoolteachers__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">Изменить роль</h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={() => !roleEditSaving && setRoleEditOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
+        {/* ===== EMPLOYEES TAB ===== */}
+        {!loading && tab === "employees" && (
+          <div className="Schoolteachers__list">
+            {filteredEmployees.map((u) => {
+              const initial =
+                (fullName(u) || u.email || "•")
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase() || "•";
+              const roleLabel = u.role
+                ? ruLabelSys(u.role)
+                : roles.length
+                  ? roleById.get(u.custom_role)?.name || u.role_display || "—"
+                  : u.role_display || "—";
 
-            {!!roleEditErr && (
-              <div className="Schoolteachers__alert" role="alert">
-                {roleEditErr}
+              const deleting = empDeletingIds.has(u.id);
+              const pct =
+                u.commission_percent != null
+                  ? `${u.commission_percent}%`
+                  : "—%";
+              const regionText =
+                String(u.role).toLowerCase() === "supervisor" &&
+                u.consulting_region_codes?.length
+                  ? u.consulting_region_codes
+                      .map((c) => regionCtl.regionLabel(c))
+                      .join(", ")
+                  : "";
+
+              return (
+                <div key={u.id} className="Schoolteachers__card">
+                  <div className="Schoolteachers__cardLeft">
+                    <div className="Schoolteachers__avatar" aria-hidden>
+                      {initial}
+                    </div>
+                    <div>
+                      <p className="Schoolteachers__name">
+                        {fullName(u) || "Без имени"}
+                      </p>
+                      <div className="Schoolteachers__meta">
+                        <span>{u.email || "—"}</span>
+                        <span>•</span>
+                        <span>{roleLabel}</span>
+                        {regionText ? (
+                          <>
+                            <span>•</span>
+                            <span>Регионы: {regionText}</span>
+                          </>
+                        ) : null}
+                        <span>•</span>
+                        <span>Комиссия: {pct}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="Schoolteachers__rowActions">
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--primary"
+                      onClick={() => setCardEmployee(u)}
+                      title="Карточка сотрудника: показатели, КПД, финансы"
+                    >
+                      <FaChartLine /> Карточка
+                    </button>
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => openHistory(u)}
+                      title="История сотрудника"
+                    >
+                      История
+                    </button>
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => openAccessModal(u)}
+                      title="Доступы сотрудника"
+                    >
+                      <FaLock /> Доступы
+                    </button>
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => openEmpEdit(u)}
+                      title="Изменить сотрудника"
+                    >
+                      <FaEdit /> Изменить
+                    </button>
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--danger"
+                      onClick={() => removeEmployee(u)}
+                      disabled={deleting}
+                      title="Удалить сотрудника"
+                    >
+                      <FaTrash /> {deleting ? "Удаление…" : "Удалить"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredEmployees.length === 0 && employees.length > 0 && (
+              <div className="Schoolteachers__alert">
+                Сотрудники по запросу не найдены.
               </div>
             )}
-
-            <form
-              className="Schoolteachers__form"
-              onSubmit={submitRoleEdit}
-              noValidate
-            >
-              <div className="Schoolteachers__formGrid">
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Название роли <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Название роли"
-                    value={roleEditName}
-                    onChange={(e) => setRoleEditName(e.target.value)}
-                    maxLength={40}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="Schoolteachers__formActions">
-                <span className="Schoolteachers__actionsSpacer" />
-                <div className="Schoolteachers__actionsRight">
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => setRoleEditOpen(false)}
-                    disabled={roleEditSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="Schoolteachers__btn Schoolteachers__btn--primary"
-                    disabled={roleEditSaving}
-                  >
-                    {roleEditSaving ? "Сохранение…" : "Сохранить изменения"}
-                  </button>
-                </div>
-              </div>
-            </form>
+            {!loading && employees.length === 0 && (
+              <div className="Schoolteachers__alert">Пока нет сотрудников.</div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Employee: Create */}
-      {empCreateOpen && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !empSaving && setEmpCreateOpen(false)}
-        >
+        {/* ===== MODALS ===== */}
+        {/* Role: Create */}
+        {roleCreateOpen && (
           <div
-            className="Schoolteachers__modal"
-            onClick={(e) => e.stopPropagation()}
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
           >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">Новый сотрудник</h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={() => !empSaving && setEmpCreateOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {!!empErr && (
-              <div className="Schoolteachers__alert" role="alert">
-                {empErr}
-              </div>
-            )}
-
-            <form
-              className="Schoolteachers__form"
-              onSubmit={submitEmployeeCreate}
-              noValidate
+            <div
+              className="Schoolteachers__modal"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="Schoolteachers__formGrid">
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Email <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    className="Schoolteachers__input"
-                    placeholder="user@mail.com"
-                    value={empForm.email}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    maxLength={254}
-                    required
-                  />
-                </div>
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">Новая роль</h3>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn"
+                  onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Имя <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Алия"
-                    value={empForm.first_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
-                    }
-                    maxLength={60}
-                    required
-                  />
+              {!!roleCreateErr && (
+                <div className="Schoolteachers__alert" role="alert">
+                  {roleCreateErr}
                 </div>
+              )}
 
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Фамилия <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Жумалиева"
-                    value={empForm.last_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
-                    }
-                    maxLength={60}
-                    required
-                  />
-                </div>
-
-                {isRegionalSupervisor ? (
+              <form
+                className="Schoolteachers__form"
+                onSubmit={submitRoleCreate}
+                noValidate
+              >
+                <div className="Schoolteachers__formGrid">
                   <div className="Schoolteachers__field Schoolteachers__field--full">
-                    <label className="Schoolteachers__label">Роль</label>
+                    <label className="Schoolteachers__label">
+                      Название роли{" "}
+                      <span className="Schoolteachers__req">*</span>
+                    </label>
                     <input
                       className="Schoolteachers__input"
-                      value="Продавец"
-                      disabled
-                      readOnly
+                      placeholder="Например: Контент-менеджер"
+                      value={roleCreateName}
+                      onChange={(e) => setRoleCreateName(e.target.value)}
+                      maxLength={40}
+                      required
                     />
                   </div>
-                ) : (
+                </div>
+
+                <div className="Schoolteachers__formActions">
+                  <span className="Schoolteachers__actionsSpacer" />
+                  <div className="Schoolteachers__actionsRight">
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => setRoleCreateOpen(false)}
+                      disabled={roleCreateSaving}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="Schoolteachers__btn Schoolteachers__btn--primary"
+                      disabled={roleCreateSaving}
+                    >
+                      {roleCreateSaving ? "Сохранение…" : "Создать роль"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Role: Edit */}
+        {roleEditOpen && (
+          <div
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !roleEditSaving && setRoleEditOpen(false)}
+          >
+            <div
+              className="Schoolteachers__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">Изменить роль</h3>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn"
+                  onClick={() => !roleEditSaving && setRoleEditOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {!!roleEditErr && (
+                <div className="Schoolteachers__alert" role="alert">
+                  {roleEditErr}
+                </div>
+              )}
+
+              <form
+                className="Schoolteachers__form"
+                onSubmit={submitRoleEdit}
+                noValidate
+              >
+                <div className="Schoolteachers__formGrid">
+                  <div className="Schoolteachers__field Schoolteachers__field--full">
+                    <label className="Schoolteachers__label">
+                      Название роли{" "}
+                      <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      className="Schoolteachers__input"
+                      placeholder="Название роли"
+                      value={roleEditName}
+                      onChange={(e) => setRoleEditName(e.target.value)}
+                      maxLength={40}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="Schoolteachers__formActions">
+                  <span className="Schoolteachers__actionsSpacer" />
+                  <div className="Schoolteachers__actionsRight">
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => setRoleEditOpen(false)}
+                      disabled={roleEditSaving}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="Schoolteachers__btn Schoolteachers__btn--primary"
+                      disabled={roleEditSaving}
+                    >
+                      {roleEditSaving ? "Сохранение…" : "Сохранить изменения"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Employee: Create */}
+        {empCreateOpen && (
+          <div
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !empSaving && setEmpCreateOpen(false)}
+          >
+            <div
+              className="Schoolteachers__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">Новый сотрудник</h3>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn"
+                  onClick={() => !empSaving && setEmpCreateOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {!!empErr && (
+                <div className="Schoolteachers__alert" role="alert">
+                  {empErr}
+                </div>
+              )}
+
+              <form
+                className="Schoolteachers__form"
+                onSubmit={submitEmployeeCreate}
+                noValidate
+              >
+                <div className="Schoolteachers__formGrid">
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Email <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="Schoolteachers__input"
+                      placeholder="user@mail.com"
+                      value={empForm.email}
+                      onChange={(e) =>
+                        setEmpForm((p) => ({ ...p, email: e.target.value }))
+                      }
+                      maxLength={254}
+                      required
+                    />
+                  </div>
+
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Имя <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      className="Schoolteachers__input"
+                      placeholder="Алия"
+                      value={empForm.first_name}
+                      onChange={(e) =>
+                        setEmpForm((p) => ({
+                          ...p,
+                          first_name: e.target.value,
+                        }))
+                      }
+                      maxLength={60}
+                      required
+                    />
+                  </div>
+
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Фамилия <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      className="Schoolteachers__input"
+                      placeholder="Жумалиева"
+                      value={empForm.last_name}
+                      onChange={(e) =>
+                        setEmpForm((p) => ({ ...p, last_name: e.target.value }))
+                      }
+                      maxLength={60}
+                      required
+                    />
+                  </div>
+
+                  {isRegionalSupervisor ? (
+                    <div className="Schoolteachers__field Schoolteachers__field--full">
+                      <label className="Schoolteachers__label">Роль</label>
+                      <input
+                        className="Schoolteachers__input"
+                        value="Продавец"
+                        disabled
+                        readOnly
+                      />
+                    </div>
+                  ) : (
+                    <div className="Schoolteachers__field Schoolteachers__field--full">
+                      <label className="Schoolteachers__label">
+                        Роль <span className="Schoolteachers__req">*</span>
+                      </label>
+                      <select
+                        className="Schoolteachers__input"
+                        value={empForm.roleChoice}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            roleChoice: e.target.value,
+                          }))
+                        }
+                        required
+                      >
+                        <option value="">Выберите роль</option>
+                        {roleOptions.map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* owner/admin создаёт руководителя региона — мультивыбор регионов */}
+                  {!isRegionalSupervisor &&
+                    empForm.roleChoice === "sys:supervisor" && (
+                      <div className="Schoolteachers__field Schoolteachers__field--full">
+                        <label className="Schoolteachers__label">
+                          Регионы руководителя{" "}
+                          <span className="Schoolteachers__req">*</span>
+                        </label>
+                        <RegionChecklist
+                          regions={regionCtl.regions}
+                          value={empForm.region_codes}
+                          onChange={(region_codes) =>
+                            setEmpForm((p) => ({ ...p, region_codes }))
+                          }
+                          disabled={empSaving}
+                        />
+                        <p className="Schoolteachers__hint">
+                          Руководитель увидит лиды, воронки и сотрудников только
+                          выбранных регионов и сможет заводить в них продавцов.
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Регион (руководитель заводит сотрудника в свой регион) */}
+                  {employeeRegionOptions.length > 0 &&
+                    (isRegionalSupervisor || regionCtl.isManager) &&
+                    empForm.roleChoice !== "sys:supervisor" && (
+                      <div className="Schoolteachers__field Schoolteachers__field--full">
+                        <label className="Schoolteachers__label">
+                          Регион
+                          {isRegionalSupervisor &&
+                          employeeRegionOptions.length > 1 ? (
+                            <span className="Schoolteachers__req">*</span>
+                          ) : null}
+                        </label>
+                        {isRegionalSupervisor &&
+                        employeeRegionOptions.length === 1 ? (
+                          <input
+                            className="Schoolteachers__input"
+                            value={employeeRegionOptions[0].label}
+                            disabled
+                            readOnly
+                          />
+                        ) : (
+                          <select
+                            className="Schoolteachers__input"
+                            value={empForm.region_code}
+                            onChange={(e) =>
+                              setEmpForm((p) => ({
+                                ...p,
+                                region_code: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">
+                              {isRegionalSupervisor
+                                ? "Выберите регион"
+                                : "Без региона"}
+                            </option>
+                            {employeeRegionOptions.map((r) => (
+                              <option key={r.code} value={r.code}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+
+                  {/* % от продажи */}
+                  <div className="Schoolteachers__field Schoolteachers__field--full">
+                    <label className="Schoolteachers__label">
+                      Процент от продажи (%){" "}
+                      <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      className="Schoolteachers__input"
+                      placeholder="Напр.: 20"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={empForm.commission_percent}
+                      onChange={(e) =>
+                        setEmpForm((p) => ({
+                          ...p,
+                          commission_percent: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="Schoolteachers__formActions">
+                  <span className="Schoolteachers__actionsSpacer" />
+                  <div className="Schoolteachers__actionsRight">
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => setEmpCreateOpen(false)}
+                      disabled={empSaving}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="Schoolteachers__btn Schoolteachers__btn--primary"
+                      disabled={empSaving}
+                    >
+                      {empSaving ? "Сохранение…" : "Создать сотрудника"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Employee: Edit */}
+        {empEditOpen && (
+          <div
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !empEditSaving && setEmpEditOpen(false)}
+          >
+            <div
+              className="Schoolteachers__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">
+                  Изменить сотрудника
+                </h3>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn"
+                  onClick={() => !empEditSaving && setEmpEditOpen(false)}
+                  aria-label="Закрыть"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {!!empEditErr && (
+                <div className="Schoolteachers__alert" role="alert">
+                  {empEditErr}
+                </div>
+              )}
+
+              <form
+                className="Schoolteachers__form"
+                onSubmit={submitEmployeeEdit}
+                noValidate
+              >
+                <div className="Schoolteachers__formGrid">
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Email <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="Schoolteachers__input"
+                      placeholder="user@mail.com"
+                      value={empEditForm.email}
+                      onChange={(e) =>
+                        setEmpEditForm((p) => ({ ...p, email: e.target.value }))
+                      }
+                      maxLength={254}
+                      required
+                    />
+                  </div>
+
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Имя <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      className="Schoolteachers__input"
+                      placeholder="Имя"
+                      value={empEditForm.first_name}
+                      onChange={(e) =>
+                        setEmpEditForm((p) => ({
+                          ...p,
+                          first_name: e.target.value,
+                        }))
+                      }
+                      maxLength={60}
+                      required
+                    />
+                  </div>
+
+                  <div className="Schoolteachers__field">
+                    <label className="Schoolteachers__label">
+                      Фамилия <span className="Schoolteachers__req">*</span>
+                    </label>
+                    <input
+                      className="Schoolteachers__input"
+                      placeholder="Фамилия"
+                      value={empEditForm.last_name}
+                      onChange={(e) =>
+                        setEmpEditForm((p) => ({
+                          ...p,
+                          last_name: e.target.value,
+                        }))
+                      }
+                      maxLength={60}
+                      required
+                    />
+                  </div>
+
                   <div className="Schoolteachers__field Schoolteachers__field--full">
                     <label className="Schoolteachers__label">
                       Роль <span className="Schoolteachers__req">*</span>
                     </label>
                     <select
                       className="Schoolteachers__input"
-                      value={empForm.roleChoice}
+                      value={empEditForm.roleChoice}
                       onChange={(e) =>
-                        setEmpForm((p) => ({ ...p, roleChoice: e.target.value }))
+                        setEmpEditForm((p) => ({
+                          ...p,
+                          roleChoice: e.target.value,
+                        }))
                       }
                       required
                     >
@@ -1599,11 +1848,8 @@ function ConsultingSchoolTeachers() {
                       ))}
                     </select>
                   </div>
-                )}
 
-                {/* owner/admin создаёт руководителя региона — мультивыбор регионов */}
-                {!isRegionalSupervisor &&
-                  empForm.roleChoice === "sys:supervisor" && (
+                  {empEditForm.roleChoice === "sys:supervisor" && (
                     <div className="Schoolteachers__field Schoolteachers__field--full">
                       <label className="Schoolteachers__label">
                         Регионы руководителя{" "}
@@ -1611,577 +1857,356 @@ function ConsultingSchoolTeachers() {
                       </label>
                       <RegionChecklist
                         regions={regionCtl.regions}
-                        value={empForm.region_codes}
+                        value={empEditForm.region_codes}
                         onChange={(region_codes) =>
-                          setEmpForm((p) => ({ ...p, region_codes }))
+                          setEmpEditForm((p) => ({ ...p, region_codes }))
                         }
-                        disabled={empSaving}
+                        disabled={empEditSaving}
                       />
                       <p className="Schoolteachers__hint">
                         Руководитель увидит лиды, воронки и сотрудников только
-                        выбранных регионов и сможет заводить в них продавцов.
+                        выбранных регионов.
                       </p>
                     </div>
                   )}
 
-                {/* Регион (руководитель заводит сотрудника в свой регион) */}
-                {employeeRegionOptions.length > 0 &&
-                  (isRegionalSupervisor || regionCtl.isManager) &&
-                  empForm.roleChoice !== "sys:supervisor" && (
-                    <div className="Schoolteachers__field Schoolteachers__field--full">
-                      <label className="Schoolteachers__label">
-                        Регион
-                        {isRegionalSupervisor &&
-                        employeeRegionOptions.length > 1 ? (
-                          <span className="Schoolteachers__req">*</span>
-                        ) : null}
-                      </label>
-                      {isRegionalSupervisor &&
-                      employeeRegionOptions.length === 1 ? (
-                        <input
-                          className="Schoolteachers__input"
-                          value={employeeRegionOptions[0].label}
-                          disabled
-                          readOnly
-                        />
-                      ) : (
-                        <select
-                          className="Schoolteachers__input"
-                          value={empForm.region_code}
-                          onChange={(e) =>
-                            setEmpForm((p) => ({
-                              ...p,
-                              region_code: e.target.value,
-                            }))
-                          }
-                        >
-                          <option value="">
-                            {isRegionalSupervisor
-                              ? "Выберите регион"
-                              : "Без региона"}
-                          </option>
-                          {employeeRegionOptions.map((r) => (
-                            <option key={r.code} value={r.code}>
-                              {r.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-
-                {/* % от продажи */}
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Процент от продажи (%){" "}
-                    <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    className="Schoolteachers__input"
-                    placeholder="Напр.: 20"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    value={empForm.commission_percent}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({
-                        ...p,
-                        commission_percent: e.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="Schoolteachers__formActions">
-                <span className="Schoolteachers__actionsSpacer" />
-                <div className="Schoolteachers__actionsRight">
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => setEmpCreateOpen(false)}
-                    disabled={empSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="Schoolteachers__btn Schoolteachers__btn--primary"
-                    disabled={empSaving}
-                  >
-                    {empSaving ? "Сохранение…" : "Создать сотрудника"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Employee: Edit */}
-      {empEditOpen && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !empEditSaving && setEmpEditOpen(false)}
-        >
-          <div
-            className="Schoolteachers__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">
-                Изменить сотрудника
-              </h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={() => !empEditSaving && setEmpEditOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {!!empEditErr && (
-              <div className="Schoolteachers__alert" role="alert">
-                {empEditErr}
-              </div>
-            )}
-
-            <form
-              className="Schoolteachers__form"
-              onSubmit={submitEmployeeEdit}
-              noValidate
-            >
-              <div className="Schoolteachers__formGrid">
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Email <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    className="Schoolteachers__input"
-                    placeholder="user@mail.com"
-                    value={empEditForm.email}
-                    onChange={(e) =>
-                      setEmpEditForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    maxLength={254}
-                    required
-                  />
-                </div>
-
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Имя <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Имя"
-                    value={empEditForm.first_name}
-                    onChange={(e) =>
-                      setEmpEditForm((p) => ({
-                        ...p,
-                        first_name: e.target.value,
-                      }))
-                    }
-                    maxLength={60}
-                    required
-                  />
-                </div>
-
-                <div className="Schoolteachers__field">
-                  <label className="Schoolteachers__label">
-                    Фамилия <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    className="Schoolteachers__input"
-                    placeholder="Фамилия"
-                    value={empEditForm.last_name}
-                    onChange={(e) =>
-                      setEmpEditForm((p) => ({
-                        ...p,
-                        last_name: e.target.value,
-                      }))
-                    }
-                    maxLength={60}
-                    required
-                  />
-                </div>
-
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Роль <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <select
-                    className="Schoolteachers__input"
-                    value={empEditForm.roleChoice}
-                    onChange={(e) =>
-                      setEmpEditForm((p) => ({
-                        ...p,
-                        roleChoice: e.target.value,
-                      }))
-                    }
-                    required
-                  >
-                    <option value="">Выберите роль</option>
-                    {roleOptions.map((o) => (
-                      <option key={o.key} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {empEditForm.roleChoice === "sys:supervisor" && (
+                  {/* % от продажи */}
                   <div className="Schoolteachers__field Schoolteachers__field--full">
                     <label className="Schoolteachers__label">
-                      Регионы руководителя{" "}
+                      Процент от продажи (%){" "}
                       <span className="Schoolteachers__req">*</span>
                     </label>
-                    <RegionChecklist
-                      regions={regionCtl.regions}
-                      value={empEditForm.region_codes}
-                      onChange={(region_codes) =>
-                        setEmpEditForm((p) => ({ ...p, region_codes }))
+                    <input
+                      type="number"
+                      className="Schoolteachers__input"
+                      placeholder="Напр.: 20"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={empEditForm.commission_percent}
+                      onChange={(e) =>
+                        setEmpEditForm((p) => ({
+                          ...p,
+                          commission_percent: e.target.value,
+                        }))
                       }
-                      disabled={empEditSaving}
+                      required
                     />
-                    <p className="Schoolteachers__hint">
-                      Руководитель увидит лиды, воронки и сотрудников только
-                      выбранных регионов.
-                    </p>
                   </div>
-                )}
-
-                {/* % от продажи */}
-                <div className="Schoolteachers__field Schoolteachers__field--full">
-                  <label className="Schoolteachers__label">
-                    Процент от продажи (%){" "}
-                    <span className="Schoolteachers__req">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    className="Schoolteachers__input"
-                    placeholder="Напр.: 20"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    value={empEditForm.commission_percent}
-                    onChange={(e) =>
-                      setEmpEditForm((p) => ({
-                        ...p,
-                        commission_percent: e.target.value,
-                      }))
-                    }
-                    required
-                  />
                 </div>
-              </div>
 
-              <div className="Schoolteachers__formActions">
-                <span className="Schoolteachers__actionsSpacer" />
-                <div className="Schoolteachers__actionsRight">
-                  <button
-                    type="button"
-                    className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                    onClick={() => setEmpEditOpen(false)}
-                    disabled={empEditSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="Schoolteachers__btn Schoolteachers__btn--primary"
-                    disabled={empEditSaving}
-                  >
-                    {empEditSaving ? "Сохранение…" : "Сохранить изменения"}
-                  </button>
+                <div className="Schoolteachers__formActions">
+                  <span className="Schoolteachers__actionsSpacer" />
+                  <div className="Schoolteachers__actionsRight">
+                    <button
+                      type="button"
+                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                      onClick={() => setEmpEditOpen(false)}
+                      disabled={empEditSaving}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="Schoolteachers__btn Schoolteachers__btn--primary"
+                      disabled={empEditSaving}
+                    >
+                      {empEditSaving ? "Сохранение…" : "Сохранить изменения"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ====== История сотрудника: модалка с вкладками ====== */}
-      {histOpen && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={closeHistory}
-        >
+        {/* ====== История сотрудника: модалка с вкладками ====== */}
+        {histOpen && (
           <div
-            className="Schoolteachers__modal"
-            onClick={(e) => e.stopPropagation()}
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={closeHistory}
           >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">
-                История: {histEmp.name}
-              </h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={closeHistory}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="Schoolteachers__tabs Schoolteachers__tabs--history">
-              <button
-                type="button"
-                className={`Schoolteachers__tab ${
-                  histTab === "bookings" ? "is-active" : ""
-                }`}
-                onClick={() => setHistTab("bookings")}
-              >
-                Брони
-              </button>
-              <button
-                type="button"
-                className={`Schoolteachers__tab ${
-                  histTab === "salary" ? "is-active" : ""
-                }`}
-                onClick={() => setHistTab("salary")}
-              >
-                Зарплата
-              </button>
-              {/* НОВОЕ: вкладка Продажи */}
-              <button
-                type="button"
-                className={`Schoolteachers__tab ${
-                  histTab === "sales" ? "is-active" : ""
-                }`}
-                onClick={() => setHistTab("sales")}
-              >
-                Продажи
-              </button>
-            </div>
-
-            {/* Брони */}
-            {histTab === "bookings" && (
-              <>
-                {!!bErr && <div className="Schoolteachers__alert">{bErr}</div>}
-
-                <div
-                  className="Schoolteachers__search"
-                  style={{ marginTop: 8 }}
+            <div
+              className="Schoolteachers__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">
+                  История: {histEmp.name}
+                </h3>
+                <button
+                  type="button"
+                  className="Schoolteachers__iconBtn"
+                  onClick={closeHistory}
+                  aria-label="Закрыть"
                 >
-                  <FaSearch
-                    className="Schoolteachers__searchIcon"
-                    aria-hidden
-                  />
-                  <input
-                    className="Schoolteachers__searchInput"
-                    placeholder="Поиск по броням…"
-                    value={bQ}
-                    onChange={(e) => {
-                      setBQ(e.target.value);
-                      setBPage(1);
-                    }}
-                  />
-                </div>
+                  <FaTimes />
+                </button>
+              </div>
 
-                <div className="Schoolteachers__historyList" aria-live="polite">
-                  {bLoading ? (
-                    <div className="Schoolteachers__alert">Загрузка…</div>
-                  ) : bRows.length === 0 ? (
-                    <div className="Schoolteachers__alert">Нет данных.</div>
-                  ) : (
-                    bRows.map((it) => (
-                      <article key={it.id} className="Schoolteachers__card">
-                        <div>
-                          <p className="Schoolteachers__name">
-                            <b>
-                              {it.date || "—"} • {toHM(it.time) || "--:--"}
-                            </b>{" "}
-                            — {it.title || "—"}
-                          </p>
-                          {it.note && (
-                            <div className="Schoolteachers__meta">
-                              <span>{it.note}</span>
-                            </div>
-                          )}
-                        </div>
-                      </article>
-                    ))
+              <div className="Schoolteachers__tabs Schoolteachers__tabs--history">
+                <button
+                  type="button"
+                  className={`Schoolteachers__tab ${
+                    histTab === "bookings" ? "is-active" : ""
+                  }`}
+                  onClick={() => setHistTab("bookings")}
+                >
+                  Брони
+                </button>
+                <button
+                  type="button"
+                  className={`Schoolteachers__tab ${
+                    histTab === "salary" ? "is-active" : ""
+                  }`}
+                  onClick={() => setHistTab("salary")}
+                >
+                  Зарплата
+                </button>
+                {/* НОВОЕ: вкладка Продажи */}
+                <button
+                  type="button"
+                  className={`Schoolteachers__tab ${
+                    histTab === "sales" ? "is-active" : ""
+                  }`}
+                  onClick={() => setHistTab("sales")}
+                >
+                  Продажи
+                </button>
+              </div>
+
+              {/* Брони */}
+              {histTab === "bookings" && (
+                <>
+                  {!!bErr && (
+                    <div className="Schoolteachers__alert">{bErr}</div>
                   )}
-                </div>
 
-                {bFiltered.length > B_PER_PAGE && (
-                  <div className="Schoolteachers__pager">
-                    <button
-                      type="button"
-                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                      onClick={() => setBPage((p) => Math.max(1, p - 1))}
-                      disabled={bSafe === 1}
-                    >
-                      <FaChevronLeft /> Пред
-                    </button>
-                    <span className="Schoolteachers__page">
-                      Стр. {bSafe} из {bTotal}
-                    </span>
-                    <button
-                      type="button"
-                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                      onClick={() => setBPage((p) => Math.min(bTotal, p + 1))}
-                      disabled={bSafe === bTotal}
-                    >
-                      След <FaChevronRight />
-                    </button>
+                  <div
+                    className="Schoolteachers__search"
+                    style={{ marginTop: 8 }}
+                  >
+                    <FaSearch
+                      className="Schoolteachers__searchIcon"
+                      aria-hidden
+                    />
+                    <input
+                      className="Schoolteachers__searchInput"
+                      placeholder="Поиск по броням…"
+                      value={bQ}
+                      onChange={(e) => {
+                        setBQ(e.target.value);
+                        setBPage(1);
+                      }}
+                    />
                   </div>
-                )}
-              </>
-            )}
 
-            {/* Зарплата */}
-            {histTab === "salary" && (
-              <>
-                {!!sErr && <div className="Schoolteachers__alert">{sErr}</div>}
-
-                <div
-                  className="Schoolteachers__search"
-                  style={{ marginTop: 8 }}
-                >
-                  <FaSearch
-                    className="Schoolteachers__searchIcon"
-                    aria-hidden
-                  />
-                  <input
-                    className="Schoolteachers__searchInput"
-                    placeholder="Поиск по начислениям…"
-                    value={sQ}
-                    onChange={(e) => setSQ(e.target.value)}
-                  />
-                </div>
-
-                <div className="Schoolteachers__historyList" aria-live="polite">
-                  {sLoading ? (
-                    <div className="Schoolteachers__alert">Загрузка…</div>
-                  ) : sFiltered.length === 0 ? (
-                    <div className="Schoolteachers__alert">Нет данных.</div>
-                  ) : (
-                    sFiltered.map((it) => (
-                      <article
-                        key={it.id || `${it.user}-${it.amount}-${it.percent}`}
-                        className="Schoolteachers__card"
-                      >
-                        <div>
-                          <p className="Schoolteachers__name">
-                            Сумма: <b>{money(it.amount)}</b> • Процент:{" "}
-                            <b>{String(it.percent || "")}</b>
-                          </p>
-                          {it.description && (
-                            <div className="Schoolteachers__meta">
-                              <span>{it.description}</span>
-                            </div>
-                          )}
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-
-                {sCount > S_PER_PAGE && (
-                  <div className="Schoolteachers__pager">
-                    <button
-                      type="button"
-                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                      onClick={() =>
-                        fetchSalaries(Math.max(1, sPage - 1), histEmp.id)
-                      }
-                      disabled={sPage <= 1}
-                    >
-                      <FaChevronLeft /> Пред
-                    </button>
-                    <span className="Schoolteachers__page">
-                      Стр. {sPage} из{" "}
-                      {Math.max(1, Math.ceil(sCount / S_PER_PAGE))}
-                    </span>
-                    <button
-                      type="button"
-                      className="Schoolteachers__btn Schoolteachers__btn--secondary"
-                      onClick={() =>
-                        fetchSalaries(
-                          Math.min(
-                            Math.max(1, Math.ceil(sCount / S_PER_PAGE)),
-                            sPage + 1
-                          ),
-                          histEmp.id
-                        )
-                      }
-                      disabled={
-                        sPage >= Math.max(1, Math.ceil(sCount / S_PER_PAGE))
-                      }
-                    >
-                      След <FaChevronRight />
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* НОВОЕ: Продажи */}
-            {histTab === "sales" && (
-              <>
-                {!!slErr && (
-                  <div className="Schoolteachers__alert">{slErr}</div>
-                )}
-
-                <div
-                  className="Schoolteachers__search"
-                  style={{ marginTop: 8 }}
-                >
-                  <FaSearch
-                    className="Schoolteachers__searchIcon"
-                    aria-hidden
-                  />
-                  <input
-                    className="Schoolteachers__searchInput"
-                    placeholder="Поиск по продажам…"
-                    value={slQ}
-                    onChange={(e) => setSlQ(e.target.value)}
-                  />
-                </div>
-
-                <div className="Schoolteachers__historyList" aria-live="polite">
-                  {slLoading ? (
-                    <div className="Schoolteachers__alert">Загрузка…</div>
-                  ) : slFiltered.length === 0 ? (
-                    <div className="Schoolteachers__alert">Нет данных.</div>
-                  ) : (
-                    slFiltered.map((it) => (
-                      <article key={it.id} className="Schoolteachers__card">
-                        <div>
-                          <p className="Schoolteachers__name">
-                            <b>{toYMDhm(it.created_at) || "—"}</b> —{" "}
-                            {it.service_display || "—"} •{" "}
-                            {money(it.service_price)} сом
-                          </p>
-                          {/* <h1>{console.log(it)}</h1> */}
-                          <div className="Schoolteachers__meta">
-                            <span>Клиент: {it.client_display || "—"}</span>
-                            {it.description ? (
-                              <>
-                                <span>•</span>
-                                <span>{it.description}</span>
-                              </>
-                            ) : null}
+                  <div
+                    className="Schoolteachers__historyList"
+                    aria-live="polite"
+                  >
+                    {bLoading ? (
+                      <div className="Schoolteachers__alert">Загрузка…</div>
+                    ) : bRows.length === 0 ? (
+                      <div className="Schoolteachers__alert">Нет данных.</div>
+                    ) : (
+                      bRows.map((it) => (
+                        <article key={it.id} className="Schoolteachers__card">
+                          <div>
+                            <p className="Schoolteachers__name">
+                              <b>
+                                {it.date || "—"} • {toHM(it.time) || "--:--"}
+                              </b>{" "}
+                              — {it.title || "—"}
+                            </p>
+                            {it.note && (
+                              <div className="Schoolteachers__meta">
+                                <span>{it.note}</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
 
-                {/* Если нужна пагинация в Продажах — раскомментируйте блок ниже
+                  {bFiltered.length > B_PER_PAGE && (
+                    <div className="Schoolteachers__pager">
+                      <button
+                        type="button"
+                        className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                        onClick={() => setBPage((p) => Math.max(1, p - 1))}
+                        disabled={bSafe === 1}
+                      >
+                        <FaChevronLeft /> Пред
+                      </button>
+                      <span className="Schoolteachers__page">
+                        Стр. {bSafe} из {bTotal}
+                      </span>
+                      <button
+                        type="button"
+                        className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                        onClick={() => setBPage((p) => Math.min(bTotal, p + 1))}
+                        disabled={bSafe === bTotal}
+                      >
+                        След <FaChevronRight />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Зарплата */}
+              {histTab === "salary" && (
+                <>
+                  {!!sErr && (
+                    <div className="Schoolteachers__alert">{sErr}</div>
+                  )}
+
+                  <div
+                    className="Schoolteachers__search"
+                    style={{ marginTop: 8 }}
+                  >
+                    <FaSearch
+                      className="Schoolteachers__searchIcon"
+                      aria-hidden
+                    />
+                    <input
+                      className="Schoolteachers__searchInput"
+                      placeholder="Поиск по начислениям…"
+                      value={sQ}
+                      onChange={(e) => setSQ(e.target.value)}
+                    />
+                  </div>
+
+                  <div
+                    className="Schoolteachers__historyList"
+                    aria-live="polite"
+                  >
+                    {sLoading ? (
+                      <div className="Schoolteachers__alert">Загрузка…</div>
+                    ) : sFiltered.length === 0 ? (
+                      <div className="Schoolteachers__alert">Нет данных.</div>
+                    ) : (
+                      sFiltered.map((it) => (
+                        <article
+                          key={it.id || `${it.user}-${it.amount}-${it.percent}`}
+                          className="Schoolteachers__card"
+                        >
+                          <div>
+                            <p className="Schoolteachers__name">
+                              Сумма: <b>{money(it.amount)}</b> • Процент:{" "}
+                              <b>{String(it.percent || "")}</b>
+                            </p>
+                            {it.description && (
+                              <div className="Schoolteachers__meta">
+                                <span>{it.description}</span>
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+
+                  {sCount > S_PER_PAGE && (
+                    <div className="Schoolteachers__pager">
+                      <button
+                        type="button"
+                        className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                        onClick={() =>
+                          fetchSalaries(Math.max(1, sPage - 1), histEmp.id)
+                        }
+                        disabled={sPage <= 1}
+                      >
+                        <FaChevronLeft /> Пред
+                      </button>
+                      <span className="Schoolteachers__page">
+                        Стр. {sPage} из{" "}
+                        {Math.max(1, Math.ceil(sCount / S_PER_PAGE))}
+                      </span>
+                      <button
+                        type="button"
+                        className="Schoolteachers__btn Schoolteachers__btn--secondary"
+                        onClick={() =>
+                          fetchSalaries(
+                            Math.min(
+                              Math.max(1, Math.ceil(sCount / S_PER_PAGE)),
+                              sPage + 1,
+                            ),
+                            histEmp.id,
+                          )
+                        }
+                        disabled={
+                          sPage >= Math.max(1, Math.ceil(sCount / S_PER_PAGE))
+                        }
+                      >
+                        След <FaChevronRight />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* НОВОЕ: Продажи */}
+              {histTab === "sales" && (
+                <>
+                  {!!slErr && (
+                    <div className="Schoolteachers__alert">{slErr}</div>
+                  )}
+
+                  <div
+                    className="Schoolteachers__search"
+                    style={{ marginTop: 8 }}
+                  >
+                    <FaSearch
+                      className="Schoolteachers__searchIcon"
+                      aria-hidden
+                    />
+                    <input
+                      className="Schoolteachers__searchInput"
+                      placeholder="Поиск по продажам…"
+                      value={slQ}
+                      onChange={(e) => setSlQ(e.target.value)}
+                    />
+                  </div>
+
+                  <div
+                    className="Schoolteachers__historyList"
+                    aria-live="polite"
+                  >
+                    {slLoading ? (
+                      <div className="Schoolteachers__alert">Загрузка…</div>
+                    ) : slFiltered.length === 0 ? (
+                      <div className="Schoolteachers__alert">Нет данных.</div>
+                    ) : (
+                      slFiltered.map((it) => (
+                        <article key={it.id} className="Schoolteachers__card">
+                          <div>
+                            <p className="Schoolteachers__name">
+                              <b>{toYMDhm(it.created_at) || "—"}</b> —{" "}
+                              {it.service_display || "—"} •{" "}
+                              {money(it.service_price)} сом
+                            </p>
+                            {/* <h1>{console.log(it)}</h1> */}
+                            <div className="Schoolteachers__meta">
+                              <span>Клиент: {it.client_display || "—"}</span>
+                              {it.description ? (
+                                <>
+                                  <span>•</span>
+                                  <span>{it.description}</span>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Если нужна пагинация в Продажах — раскомментируйте блок ниже
                 {slCount > SL_PER_PAGE && (
                   <div className="Schoolteachers__pager">
                     <button
@@ -2218,83 +2243,90 @@ function ConsultingSchoolTeachers() {
                     </button>
                   </div>
                 )} */}
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {openLogin && (
-        <div
-          className="Schoolteachers__modalOverlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setOpenLogin(false)}
-        >
+        {openLogin && (
           <div
-            className="Schoolteachers__modal Schoolteachers__modal--narrow"
-            onClick={(e) => e.stopPropagation()}
+            className="Schoolteachers__modalOverlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setOpenLogin(false)}
           >
-            <div className="Schoolteachers__modalHeader">
-              <h3 className="Schoolteachers__modalTitle">Данные для входа</h3>
-              <button
-                type="button"
-                className="Schoolteachers__iconBtn"
-                onClick={() => setOpenLogin(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="Schoolteachers__credentials">
-              <p className="Schoolteachers__credRow">
-                <b>Логин: {employData?.email}</b>
+            <div
+              className="Schoolteachers__modal Schoolteachers__modal--narrow"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="Schoolteachers__modalHeader">
+                <h3 className="Schoolteachers__modalTitle">Данные для входа</h3>
                 <button
                   type="button"
-                  className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
-                  onClick={() => copyToClipboard(employData?.email || "", "email")}
-                  aria-label="Скопировать логин"
-                  title={copied === "email" ? "Скопировано!" : "Скопировать"}
+                  className="Schoolteachers__iconBtn"
+                  onClick={() => setOpenLogin(false)}
+                  aria-label="Закрыть"
                 >
-                  {copied === "email" ? <FaCheck /> : <FaCopy />}
+                  <FaTimes />
                 </button>
-              </p>
-              <p className="Schoolteachers__credRow">
-                <b>Пароль: {employData?.generated_password}</b>
-                <button
-                  type="button"
-                  className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
-                  onClick={() =>
-                    copyToClipboard(employData?.generated_password || "", "password")
-                  }
-                  aria-label="Скопировать пароль"
-                  title={copied === "password" ? "Скопировано!" : "Скопировать"}
-                >
-                  {copied === "password" ? <FaCheck /> : <FaCopy />}
-                </button>
-              </p>
-              <p className="Schoolteachers__credHint">
-                Сохраните пароль — повторно он не отображается.
-              </p>
+              </div>
+              <div className="Schoolteachers__credentials">
+                <p className="Schoolteachers__credRow">
+                  <b>Логин: {employData?.email}</b>
+                  <button
+                    type="button"
+                    className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
+                    onClick={() =>
+                      copyToClipboard(employData?.email || "", "email")
+                    }
+                    aria-label="Скопировать логин"
+                    title={copied === "email" ? "Скопировано!" : "Скопировать"}
+                  >
+                    {copied === "email" ? <FaCheck /> : <FaCopy />}
+                  </button>
+                </p>
+                <p className="Schoolteachers__credRow">
+                  <b>Пароль: {employData?.generated_password}</b>
+                  <button
+                    type="button"
+                    className="Schoolteachers__iconBtn Schoolteachers__copyBtn"
+                    onClick={() =>
+                      copyToClipboard(
+                        employData?.generated_password || "",
+                        "password",
+                      )
+                    }
+                    aria-label="Скопировать пароль"
+                    title={
+                      copied === "password" ? "Скопировано!" : "Скопировать"
+                    }
+                  >
+                    {copied === "password" ? <FaCheck /> : <FaCopy />}
+                  </button>
+                </p>
+                <p className="Schoolteachers__credHint">
+                  Сохраните пароль — повторно он не отображается.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <EmployeeAccessModal
-        accessModalOpen={accessModalOpen}
-        setAccessModalOpen={setAccessModalOpen}
-        accessModalEmployee={accessModalEmployee}
-        accessModalAccesses={accessModalAccesses}
-        handleSaveEmployeeAccesses={handleSaveEmployeeAccesses}
-        profile={profile}
-        tariff={tariff}
-        company={company}
-        empSaving={empSaving}
-        funnels={accessFunnels}
-        funnelGrants={funnelGrantsDraft}
-        onFunnelGrantsChange={setFunnelGrantsDraft}
-      />
+        <EmployeeAccessModal
+          accessModalOpen={accessModalOpen}
+          setAccessModalOpen={setAccessModalOpen}
+          accessModalEmployee={accessModalEmployee}
+          accessModalAccesses={accessModalAccesses}
+          handleSaveEmployeeAccesses={handleSaveEmployeeAccesses}
+          profile={profile}
+          tariff={tariff}
+          company={company}
+          empSaving={empSaving}
+          funnels={accessFunnels}
+          funnelGrants={funnelGrantsDraft}
+          onFunnelGrantsChange={setFunnelGrantsDraft}
+        />
       </div>
     </ConsultingShell>
   );

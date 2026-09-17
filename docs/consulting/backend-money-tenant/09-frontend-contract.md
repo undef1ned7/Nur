@@ -30,6 +30,7 @@
 | # | Точка | Было в спеке / на проде | **Канон (фронт)** |
 |---|---|---|---|
 | 1 | Режим подтверждения кассы | `always \| cash_only \| off` (спека) / `required \| off` (прод) | **`required \| cash_only \| off`**. `always`→`required`, `auto`→`off` — только вход, наружу не отдавать |
+| 1b | Дефолт режима подтверждения | `cash_only` (было) | **`off`** — см. [26](./26-cash-confirmation-default-off.md). Заявки по умолчанию выключены, компания включает сама |
 | 2 | Запись `confirmation-settings` | `PUT` (спека) / `POST` (прод) | **`POST`** основной, `PUT` — принимать как алиас |
 | 3 | Статус снятой заявки при отмене продажи | `rejected` (прод) | **`canceled`** (отдельный статус, без `reject_reason`) |
 | 4 | Переход в «Внедрение» | `funnel.is_onboarding=true` (прод) | **`funnel.next_funnel` + `funnel.is_final`** (цепочка воронок, [03-funnel-hierarchy](../backend/03-funnel-hierarchy.md)) |
@@ -156,18 +157,20 @@ POST /consalting/cashbox/confirmation-settings/   { "mode", "skip_for_cashier", 
 { "mode": "cash_only", "skip_for_cashier": true, "overdue_hours": 24 }
 ```
 
-- `mode` (канон §9.0 п.1): **`required | cash_only | off`**.
+- `mode` (канон §9.0 п.1 и п.1b): **`required | cash_only | off`**.
+  - `off` — сразу `CashOperation` + сайд-эффекты, без кассира (**default**,
+    см. [26-cash-confirmation-default-off.md](./26-cash-confirmation-default-off.md)).
+  - `cash_only` — заявка только если `payment_method="cash"`.
   - `required` — заявка на любую продажу и любой абонентский платёж.
-  - `cash_only` — заявка только если `payment_method="cash"` (**default**).
-  - `off` — сразу `CashOperation` + сайд-эффекты, без кассира.
 - `skip_for_cashier` (default `true`) — если продажу оформил сам кассир, заявка
   не создаётся.
 - `overdue_hours` (default `24`) — заявка старше попадает в напоминание
   руководителю; в списке `is_overdue=true`.
 - Запись: фронт шлёт **`POST`**, при `404/405` повторяет `PUT` — принимать оба.
 - Пока эндпоинта нет (`404/501`) — фронт показывает заглушку и работает в
-  режиме `cash_only`. UI: вкладка **Касса → Настройки**
-  (`Kassa/KassaSettings.jsx`).
+  режиме `off` (заявки не создаются). UI: вкладка **Касса → Настройки**
+  (`Kassa/KassaSettings.jsx`). Вкладка **Касса → Запросы** скрыта, пока
+  `mode="off"` и нет ни одной заявки в `pending` (см. [26](./26-cash-confirmation-default-off.md)).
 
 ---
 
@@ -578,6 +581,7 @@ VITE_CONSULTING_CASH_V2=true   # default; false — legacy fallback-пути (н
 
 - [ ] Все enum-значения из §9.2 / §9.4 / §9.5 отдаются в каноничной форме (не `scheduled`, не `outcome`, не `rejected` для снятых заявок).
 - [ ] `POST /consalting/cashbox/confirmation-settings/` возвращает `200` (не `405`); `mode ∈ {required,cash_only,off}`.
+- [ ] Новая компания без сохранённых настроек кассы получает `mode="off"` (см. [26](./26-cash-confirmation-default-off.md)), а не `cash_only`.
 - [ ] `POST /consalting/sales/` создаёт `Subscription` + `CashRequest` + начисление (не только запись `Sale`).
 - [ ] Годовой тариф: 1 платёж в год в графике и матрице, не 12.
 - [ ] Отмена продажи с выплаченной зарплатой → `SalaryAdjustment(deduction)`, не молчаливый флаг.

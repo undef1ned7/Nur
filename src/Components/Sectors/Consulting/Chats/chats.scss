@@ -324,6 +324,50 @@
       min-width: 0;
     }
   }
+  &__tabs {
+    display: flex;
+    gap: 6px;
+    margin: 0 12px 6px;
+    flex-shrink: 0;
+  }
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    background: #f0f2f5;
+    color: var(--crm-muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+    &:hover {
+      background: #e7eaed;
+    }
+    &.is-active {
+      background: #0f172a;
+      color: #fff;
+    }
+  }
+  &__tabCount {
+    background: rgba(255, 255, 255, 0.24);
+    color: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    display: inline-grid;
+    place-items: center;
+  }
+  &__tab:not(.is-active) &__tabCount {
+    background: #25d366;
+    color: #fff;
+  }
   &__list {
     flex: 1;
     overflow: auto;

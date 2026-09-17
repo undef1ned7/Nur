@@ -7,6 +7,7 @@ import {
   getConsultingCashbox,
   listConsultingCashboxes,
   listCashOperations,
+  getCashConfirmationSettings,
 } from "../../../../api/consultingCashbox";
 import { isConsultingCashV2 } from "../../../../utils/consultingMoney";
 import ConsultingReports from "./Reports/Reports";
@@ -46,11 +47,16 @@ export default function ConsultingCafeKassa() {
   const [tab, setTab] = useState("list"); // list | requests | reports | detail
   const [selectedId, setSelectedId] = useState(null);
   const [employees, setEmployees] = useState([]);
+  // Заявки на подтверждение выключены по умолчанию (mode="off") — тогда
+  // вкладка «Запросы» не нужна, пока в компании её явно не включили в
+  // настройках или пока не остались старые неподтверждённые заявки.
+  const [confirmMode, setConfirmMode] = useState(null);
 
   // Счётчик неподтверждённых заявок висит на вкладке: пока приход не
   // подтверждён, деньги не входят в остаток кассы — это нельзя пропустить.
   const { data: requestCounters } = useCounters(getCashRequestCounters, null);
   const pendingCount = Number(requestCounters?.pending) || 0;
+  const requestsTabVisible = confirmMode !== "off" || pendingCount > 0;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,6 +66,22 @@ export default function ConsultingCafeKassa() {
       .catch(() => {});
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getCashConfirmationSettings({ signal: controller.signal })
+      .then((data) => setConfirmMode(data?.mode || "off"))
+      .catch((e) => {
+        if (e?.name === "CanceledError" || e?.name === "AbortError") return;
+        setConfirmMode("off");
+      });
+    return () => controller.abort();
+  }, []);
+
+  // Если заявки выключили, пока пользователь был на вкладке «Запросы» —
+  // не оставлять его на скрытой вкладке (без setState в эффекте: считаем
+  // эффективный таб прямо при рендере).
+  const effectiveTab = tab === "requests" && !requestsTabVisible ? "list" : tab;
 
   const openDetail = (id) => {
     setSelectedId(id);
@@ -71,40 +93,44 @@ export default function ConsultingCafeKassa() {
   };
 
   const KASSA_NAV = useMemo(
-    () => [
-      {
-        value: "list",
-        label: "Касса",
-        hint: "Список касс отделов",
-        icon: FaCashRegister,
-      },
-      {
-        value: "requests",
-        label: "Запросы",
-        hint:
-          pendingCount > 0
-            ? `Ожидают подтверждения: ${pendingCount}`
-            : "Подтверждения поступлений",
-        icon: FaInbox,
-      },
-      {
-        value: "reports",
-        label: "Отчёты",
-        hint: "Аналитика по кассам",
-        icon: FaChartBar,
-      },
-      {
-        value: "settings",
-        label: "Настройки",
-        hint: "Режим подтверждения поступлений",
-        icon: FaCog,
-      },
-    ],
-    [pendingCount],
+    () =>
+      [
+        {
+          value: "list",
+          label: "Касса",
+          hint: "Список касс отделов",
+          icon: FaCashRegister,
+        },
+        requestsTabVisible && {
+          value: "requests",
+          label: "Запросы",
+          hint:
+            pendingCount > 0
+              ? `Ожидают подтверждения: ${pendingCount}`
+              : "Подтверждения поступлений",
+          icon: FaInbox,
+        },
+        {
+          value: "reports",
+          label: "Отчёты",
+          hint: "Аналитика по кассам",
+          icon: FaChartBar,
+        },
+        {
+          value: "settings",
+          label: "Настройки",
+          hint:
+            confirmMode === "off"
+              ? "Подтверждение поступлений выключено"
+              : "Режим подтверждения поступлений",
+          icon: FaCog,
+        },
+      ].filter(Boolean),
+    [pendingCount, requestsTabVisible, confirmMode],
   );
 
   // Детали кассы — не отдельный раздел навигации, а drill-down из «Кассы».
-  const navValue = tab === "detail" ? "list" : tab;
+  const navValue = effectiveTab === "detail" ? "list" : effectiveTab;
   const onNavChange = (value) => {
     setSelectedId(null);
     setTab(value);
@@ -119,7 +145,7 @@ export default function ConsultingCafeKassa() {
       navValue={navValue}
       onNavChange={onNavChange}
       headerActions={
-        tab === "detail" ? (
+        effectiveTab === "detail" ? (
           <button
             type="button"
             className="cShell__btn"
@@ -131,23 +157,23 @@ export default function ConsultingCafeKassa() {
       }
     >
       <div className="kassa kassa--embedded">
-        {tab === "list" && <CashboxList onOpenDetail={openDetail} />}
+        {effectiveTab === "list" && <CashboxList onOpenDetail={openDetail} />}
 
-        {tab === "requests" && <CashRequests employees={employees} />}
+        {effectiveTab === "requests" && <CashRequests employees={employees} />}
 
-        {tab === "reports" && (
+        {effectiveTab === "reports" && (
           <div style={{ marginTop: 8 }}>
             <ConsultingReports />
           </div>
         )}
 
-        {tab === "settings" && (
+        {effectiveTab === "settings" && (
           <div style={{ marginTop: 8 }}>
             <KassaSettings />
           </div>
         )}
 
-        {tab === "detail" && selectedId && (
+        {effectiveTab === "detail" && selectedId && (
           <CashboxDetailView id={selectedId} onBack={backToList} />
         )}
       </div>

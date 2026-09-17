@@ -411,6 +411,14 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
         SECTOR_ACCESS_TYPES["Барбершоп"] || [],
       );
     }
+    if (normalizedSectorName === "Консалтинг") {
+      // Лиды/воронка/чаты — рабочий процесс консалтинга, а не доп. услуга;
+      // без этих прав на "Старте" некому было выдать доступ к лидам вовсе.
+      return mergeAccessTypesWithoutDuplicates(
+        basicAccess,
+        SECTOR_ACCESS_TYPES["Консалтинг"] || [],
+      );
+    }
     return basicAccess;
   }
 
@@ -472,6 +480,10 @@ const ACCESS_LABEL_ALIASES = {
   can_view_cashbox: ["Касса", "Аналитика"],
   can_view_barber_clients: ["Клиенты Барбершопа", "Клиенты"],
   can_view_employees: ["Сотрудники"],
+  // "Чаты"/"Воронка продаж" — один и тот же can_view_funnel; какая подпись
+  // реально рендерится, зависит от порядка пунктов меню (см. consultingMenu.js),
+  // а employeeAccessLabels.js исторически шлёт другую. Алиас на оба варианта.
+  can_view_funnel: ["Чаты", "Воронка продаж"],
 };
 
 const isEmployeeAccessEnabled = (employeeAccesses, accessType) => {
@@ -603,6 +615,10 @@ const AccessList = ({
           );
         } else if (isBarberLikeConfig) {
           // Барбершоп / Услуги / Стоматология — те же секторные права, что в меню
+          sectorItems = sectorConfig.filter(passesHideRules);
+        } else if (configKey === "consulting") {
+          // Лиды/воронка/чаты — рабочий процесс консалтинга, а не доп. услуга;
+          // без этого на "Старте" некому выдать доступ к лидам вовсе.
           sectorItems = sectorConfig.filter(passesHideRules);
         }
         // Остальные секторы на «Старт» — без секторных чекбоксов (как раньше)

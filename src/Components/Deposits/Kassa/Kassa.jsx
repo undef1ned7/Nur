@@ -6,7 +6,7 @@ import {
   useLocation,
   useSearchParams,
 } from "react-router-dom";
-import { Search, Plus, Table2, LayoutGrid } from "lucide-react";
+import { Search, Plus, Table2, LayoutGrid, Settings as SettingsIcon } from "lucide-react";
 import api from "../../../api";
 import Reports from "./Reports/Reports";
 import "./kassa.scss";
@@ -15,6 +15,7 @@ import useResize from "../../../hooks/useResize";
 import { useAlert } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import { mapLimited } from "../../Sectors/cafe/utils/mapLimited";
+import CashConfirmationSettingsModal from "./CashConfirmationSettingsModal/CashConfirmationSettingsModal";
 
 /* Base path */
 const BASE = "/crm/kassa";
@@ -86,12 +87,14 @@ const getInitialViewMode = () => {
 
 const CashboxList = () => {
   const alert = useAlert();
-  const { company } = useUser();
+  const { company, profile } = useUser();
+  const isOwner = profile?.role === "owner";
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState("");
   const [checked, setChecked] = useState(false);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
@@ -158,17 +161,33 @@ const CashboxList = () => {
     <div className="kassa-page">
       <HeaderTabs
         rightAction={
-          <button
-            className="kassa-header__create-btn"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus size={16} />
-            {company?.subscription_plan?.name === "Старт"
-              ? "Создать кассу"
-              : "Создать кассу для прочих расходов"}
-          </button>
+          <>
+            {isOwner && (
+              <button
+                className="kassa-header__create-btn kassa__btn--secondary"
+                onClick={() => setSettingsOpen(true)}
+                title="Настройки подтверждения кассы"
+              >
+                <SettingsIcon size={16} />
+                Настройки
+              </button>
+            )}
+            <button
+              className="kassa-header__create-btn"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus size={16} />
+              {company?.subscription_plan?.name === "Старт"
+                ? "Создать кассу"
+                : "Создать кассу для прочих расходов"}
+            </button>
+          </>
         }
       />
+
+      {settingsOpen && (
+        <CashConfirmationSettingsModal onClose={() => setSettingsOpen(false)} />
+      )}
 
       <div className="kassa-search-section">
         <div className="kassa-search">

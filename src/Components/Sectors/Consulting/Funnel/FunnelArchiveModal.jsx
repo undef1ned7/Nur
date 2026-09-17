@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { getArchivedLeads } from "../../../../store/creators/funnelThunk";
+import {
+  getArchivedLeads,
+  restoreLead,
+} from "../../../../store/creators/funnelThunk";
 import { getFunnelDisplayName } from "../../../../utils/consultingFunnelDefaults";
 import {
   filterFunnelsForUser,
@@ -26,13 +29,17 @@ function groupLabel(lead, funnels) {
 export default function FunnelArchiveModal({
   funnels = [],
   profile,
+  funnelRegionFallback,
   onClose,
   onOpenLead,
+  onRestored,
 }) {
   const dispatch = useDispatch();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [restoringId, setRestoringId] = useState(null);
+  const [restoreErr, setRestoreErr] = useState("");
   const isManager = isConsultingFunnelManager(profile);
   const isolateByOwner = shouldIsolateConsultingByOwner(profile);
   const myUserId = resolveCurrentUserId(profile);
@@ -57,8 +64,8 @@ export default function FunnelArchiveModal({
   }, [dispatch]);
 
   const visibleFunnels = useMemo(
-    () => filterFunnelsForUser(funnels, profile),
-    [funnels, profile],
+    () => filterFunnelsForUser(funnels, profile, funnelRegionFallback),
+    [funnels, profile, funnelRegionFallback],
   );
 
   const visibleFunnelIds = useMemo(
@@ -78,6 +85,24 @@ export default function FunnelArchiveModal({
     }
     return list;
   }, [rows, isManager, visibleFunnelIds, isolateByOwner, myUserId]);
+
+  const handleRestore = async (lead) => {
+    if (restoringId) return;
+    setRestoreErr("");
+    setRestoringId(lead.id);
+    try {
+      await dispatch(restoreLead({ id: lead.id })).unwrap();
+      setRows((prev) => prev.filter((r) => r.id !== lead.id));
+      onRestored?.(lead.funnel || lead.funnel_id);
+    } catch (e) {
+      setRestoreErr(
+        (typeof e === "string" ? e : e?.detail) ||
+          "Не удалось восстановить лид.",
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -115,6 +140,7 @@ export default function FunnelArchiveModal({
         <div className="funnel__archiveBody">
           {loading && <div className="funnel__placeholder funnel__placeholder--sm">Загрузка…</div>}
           {!!err && <div className="funnel__error">{err}</div>}
+          {!!restoreErr && <div className="funnel__error">{restoreErr}</div>}
 
           {!loading && !err && !groups.length && (
             <div className="funnel__placeholder funnel__placeholder--sm">
@@ -136,6 +162,7 @@ export default function FunnelArchiveModal({
                           <th>Сумма</th>
                           <th>Ответственный</th>
                           <th>Дата</th>
+                          <th aria-label="Действия" />
                         </tr>
                       </thead>
                       <tbody>
@@ -163,6 +190,19 @@ export default function FunnelArchiveModal({
                                       lead.updated_at,
                                   ).toLocaleDateString()
                                 : "—"}
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                className="funnel__btn funnel__btn--sm"
+                                disabled={restoringId === lead.id}
+                                onClick={() => handleRestore(lead)}
+                                title="Вернуть лид в воронку, в работу"
+                              >
+                                {restoringId === lead.id
+                                  ? "…"
+                                  : "↺ Восстановить"}
+                              </button>
                             </td>
                           </tr>
                         ))}

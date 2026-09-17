@@ -200,6 +200,7 @@ export default function ConsultingLeads() {
           <LeadsInbox
             employees={employees}
             empById={empById}
+            funnels={funnels}
             isManager={isManager}
             alert={alert}
           />
