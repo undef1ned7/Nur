@@ -183,6 +183,11 @@ export default function useConsultingList({
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
   const [raw, setRaw] = useState(null);
+  // До первого успешного ответа count === 0 → totalPages временно "1".
+  // Эффект самокоррекции ниже не должен дёргать назад на страницу 1 из-за
+  // этого временного нуля — иначе переход на 2+ страницу гасится раньше,
+  // чем успевает прийти реальный count (снаружи выглядит как "next не работает").
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notReady, setNotReady] = useState(false);
@@ -229,6 +234,7 @@ export default function useConsultingList({
         setCount(countOf(data, rows));
         setRaw(data);
         setNotReady(false);
+        hasLoadedRef.current = true;
       } catch (e) {
         if (cancelled || generation !== generationRef.current) return;
         if (e?.name === "CanceledError" || e?.name === "AbortError") return;
@@ -261,8 +267,13 @@ export default function useConsultingList({
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   // Страница «уехала» за пределы выдачи (удалили последнюю запись) — вернуться.
+  // hasLoadedRef ждёт первого реального ответа: до него count===0 и
+  // totalPages временно "1", чего достаточно, чтобы этот эффект откатил
+  // переход на страницу 2+ ещё до того, как придёт настоящий count.
   useEffect(() => {
-    if (!loading && state.page > totalPages) setPage(totalPages);
+    if (hasLoadedRef.current && !loading && state.page > totalPages) {
+      setPage(totalPages);
+    }
   }, [loading, state.page, totalPages, setPage]);
 
   const filterValues = useMemo(() => {

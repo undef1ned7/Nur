@@ -16,6 +16,8 @@ import {
   listLeadAdSpend,
 } from "../../../../../api/consultingLeadFinance";
 import { downloadFinanceTemplate } from "../financeTemplate";
+import { PeriodFilter } from "../../common/ListControls";
+import { periodRange } from "../../common/listUtils";
 
 const NUM_FMT = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
 const money = (v) => NUM_FMT.format(Math.round((Number(v) || 0) * 100) / 100);
@@ -58,6 +60,9 @@ const isEmptyRow = (r) =>
   !r.date && !r.impressions && !r.leads && !r.spend && !r.note;
 
 export default function LeadFinanceModal({ onClose, alert }) {
+  // Фильтр периода — по умолчанию текущий месяц, а не «всё подряд»: таблица
+  // копится ежедневно, без фильтра список быстро становится нечитаемым.
+  const [period, setPeriod] = useState(() => periodRange("month"));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,16 +76,33 @@ export default function LeadFinanceModal({ onClose, alert }) {
     };
   }, []);
 
+  // Дефолтная дата новой пустой строки — сегодня, если он входит в
+  // выбранный период, иначе конец периода (иначе строка «потеряется» при
+  // сохранении: bulk теперь скопирован диапазоном фильтра, см. save()).
+  const defaultNewRowDate = () => {
+    const today = todayISO();
+    if (
+      (!period.date_from || today >= period.date_from) &&
+      (!period.date_to || today <= period.date_to)
+    ) {
+      return today;
+    }
+    return period.date_to || today;
+  };
+
   useEffect(() => {
     const controller = new AbortController();
-    listLeadAdSpend({}, { signal: controller.signal })
+    listLeadAdSpend(
+      { date_from: period.date_from, date_to: period.date_to },
+      { signal: controller.signal },
+    )
       .then(({ results }) => {
         if (!mounted.current) return;
         const mapped = results.map(toRow);
         // Всегда оставляем 3 пустые строки в хвосте под ввод.
         setRows([
           ...mapped,
-          blankRow(mapped.length ? "" : todayISO()),
+          blankRow(mapped.length ? "" : defaultNewRowDate()),
           blankRow(),
           blankRow(),
         ]);
@@ -90,11 +112,12 @@ export default function LeadFinanceModal({ onClose, alert }) {
         if (!mounted.current || e?.name === "CanceledError") return;
         if (e?.status === 404 || e?.status === 501) setUnavailable(true);
         else if (e?.detail) alert?.(e.detail, true);
-        setRows([blankRow(todayISO()), blankRow(), blankRow()]);
+        setRows([blankRow(defaultNewRowDate()), blankRow(), blankRow()]);
         setLoading(false);
       });
     return () => controller.abort();
-  }, [alert]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- period объект новый на каждый рендер, сравниваем по значениям ниже
+  }, [period.date_from, period.date_to, alert]);
 
   const setCell = (key, field, value) => {
     setRows((prev) =>
@@ -140,6 +163,21 @@ export default function LeadFinanceModal({ onClose, alert }) {
       }
       seen.add(r.date);
     }
+    // Сохранение теперь заменяет строки только внутри выбранного периода
+    // (см. save() ниже) — дата вне периода потерялась бы молча, поэтому
+    // просим сначала расширить фильтр.
+    const outOfRange = filled.find(
+      (r) =>
+        (period.date_from && r.date < period.date_from) ||
+        (period.date_to && r.date > period.date_to),
+    );
+    if (outOfRange) {
+      alert?.(
+        `Дата ${outOfRange.date} вне выбранного периода. Расширьте период или исправьте дату.`,
+        true,
+      );
+      return;
+    }
 
     const items = filled.map((r) => ({
       ...(r.id ? { id: r.id } : {}),
@@ -152,7 +190,10 @@ export default function LeadFinanceModal({ onClose, alert }) {
 
     setSaving(true);
     try {
-      const { results } = await bulkSaveLeadAdSpend(items);
+      const { results } = await bulkSaveLeadAdSpend(items, {
+        date_from: period.date_from,
+        date_to: period.date_to,
+      });
       if (!mounted.current) return;
       const mapped = results.map(toRow);
       setRows([...mapped, blankRow(), blankRow(), blankRow()]);
@@ -197,6 +238,15 @@ export default function LeadFinanceModal({ onClose, alert }) {
           затрат. «Стоимость лида» считается автоматически. Данные сохраняются
           на сервере.
         </p>
+
+        <PeriodFilter
+          dateFrom={period.date_from}
+          dateTo={period.date_to}
+          onChange={(next) => {
+            setLoading(true);
+            setPeriod(next);
+          }}
+        />
 
         {unavailable && (
           <div className="leads__warn">

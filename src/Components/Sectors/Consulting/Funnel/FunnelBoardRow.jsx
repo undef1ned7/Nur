@@ -17,6 +17,7 @@ import {
   canManageStagesInFunnel,
   canEditFunnelMeta,
   canEditFunnelSettings,
+  canDeleteFunnel,
 } from "../../../../utils/consultingFunnelAccess";
 import {
   canDragLead,
@@ -53,7 +54,7 @@ const fmtMoneyShort = (v) => {
 };
 
 /* ─── LeadCard ─────────────────────────────────────────────────── */
-function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads, onTransfer, canDrag = true, completed = false, unreadCount = 0 }) {
+function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, claimBusy, canManageLeads, onTransfer, canDrag = true, completed = false, unreadCount = 0, selectable = false, selected = false, onToggleSelect }) {
   const inPool = !lead.owner;
   return (
     <article
@@ -65,6 +66,7 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
         !canDrag    ? "funnel__card--readonly"   : "",
         completed   ? "funnel__card--completed"  : "",
         unreadCount > 0 ? "funnel__card--unread" : "",
+        selected    ? "funnel__card--selected"   : "",
       ].filter(Boolean).join(" ")}
       draggable={canDrag}
       onDragStart={canDrag ? onDragStart : undefined}
@@ -72,6 +74,16 @@ function LeadCard({ lead, dragging, onDragStart, onDragEnd, onClick, onClaim, cl
       onClick={onClick}
     >
       <div className="funnel__cardTop">
+        {selectable && (
+          <input
+            type="checkbox"
+            className="funnel__cardCheck"
+            checked={selected}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => onToggleSelect?.(lead.id)}
+            aria-label="Выбрать лид"
+          />
+        )}
         <div className="funnel__cardTitle" title={lead.title}>{lead.title || "Без названия"}</div>
         <div className="funnel__cardTopRight">
           {unreadCount > 0 && (
@@ -136,6 +148,8 @@ function Column({
   visibleLimit,
   onShowMore,
   unreadByLeadId,
+  selectedIds,
+  onToggleSelect,
 }) {
   const stageColor = stage?.color || "#cbd5e1";
   const totalFiltered = leads.length;
@@ -233,6 +247,9 @@ function Column({
               Number(unreadByLeadId?.[String(lead.id)]) ||
               0
             }
+            selectable={canManageLeads && !!onToggleSelect}
+            selected={!!selectedIds?.has(String(lead.id))}
+            onToggleSelect={onToggleSelect}
           />
         ))}
         {!totalFiltered && (
@@ -261,7 +278,7 @@ function Column({
 
 /* ─── FunnelBoardRow ────────────────────────────────────────────── */
 export default function FunnelBoardRow({
-  funnel, board, profile, isManager,
+  funnel, board, profile,
   matchLead, hasFilters, filterRevision,
   currentUserId: currentUserIdProp,
   dragState, onDragStart, onDragEnd, onDropStage,
@@ -275,6 +292,8 @@ export default function FunnelBoardRow({
   // single = одна воронка на весь экран (переключение вкладками сверху):
   // без сворачивания и без карточки-обёртки, доска тянется на всю высоту.
   single = false,
+  // Массовые действия (передача лидов сотруднику) — см. Funnel.jsx.
+  selectedIds, onToggleSelect,
 }) {
   const dispatch = useDispatch();
   const [dragOverStage, setDragOverStage] = useState(null);
@@ -312,6 +331,7 @@ export default function FunnelBoardRow({
   const canManageStages = canManageStagesInFunnel(profile, funnel);
   const canEditMeta     = canEditFunnelMeta(profile, funnel);
   const canEditSettings = canEditFunnelSettings(profile);
+  const canDelete       = canDeleteFunnel(profile, funnel);
   const tag             = funnelProtectionLabel(funnel);
   const currentUserId   = currentUserIdProp || resolveCurrentUserId(profile);
 
@@ -521,7 +541,7 @@ export default function FunnelBoardRow({
               {canEditMeta ? "Изменить" : "Настройки"}
             </button>
           )}
-          {isManager && canEditMeta && (
+          {canDelete && (
             <button type="button" className="funnel__btn funnel__btn--sm funnel__btn--danger"
               onClick={() => onDeleteFunnel?.(funnel)}>Удалить</button>
           )}
@@ -579,6 +599,8 @@ export default function FunnelBoardRow({
               visibleLimit={colLimit(colKey)}
               onShowMore={() => showMoreCol(colKey)}
               unreadByLeadId={unreadByLeadId}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
             );
           })}
@@ -610,6 +632,8 @@ export default function FunnelBoardRow({
               visibleLimit={colLimit("unassigned")}
               onShowMore={() => showMoreCol("unassigned")}
               unreadByLeadId={unreadByLeadId}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           )}
         </div>

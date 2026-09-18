@@ -16,6 +16,7 @@ import {
   Tag,
   Download,
   ArrowRightLeft,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
@@ -648,13 +649,104 @@ const CashRequestsInbox = () => {
   );
 };
 
+/* ──────────────────────────────── Настройки подтверждения кассы ──────────────────────────────── */
+/**
+ * По умолчанию (нет настроек на сервере) подтверждение ВЫКЛЮЧЕНО: документы
+ * с оплатой наличными проводятся сразу, без CASH_PENDING/inbox.
+ * Контракт: docs/warehouse/cash-confirmation-toggle.md.
+ */
+const CashConfirmationSettings = ({ onChange }) => {
+  const alert = useAlert();
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notReady, setNotReady] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    warehouseAPI
+      .getCashConfirmationSettings({ signal: controller.signal })
+      .then((data) => setEnabled(Boolean(data?.enabled)))
+      .catch((e) => {
+        if (e?.name === "CanceledError" || e?.name === "AbortError") return;
+        if (e?.status === 404 || e?.status === 501) setNotReady(true);
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
+
+  const toggle = async (next) => {
+    setSaving(true);
+    try {
+      const saved = await warehouseAPI.updateCashConfirmationSettings({
+        enabled: next,
+      });
+      const value = Boolean(saved?.enabled ?? next);
+      setEnabled(value);
+      onChange?.(value);
+      alert(
+        value
+          ? "Подтверждение кассы включено — наличные продажи будут ждать решения."
+          : "Подтверждение кассы выключено — наличные продажи проводятся сразу.",
+      );
+    } catch (e) {
+      if (e?.status === 404 || e?.status === 501) {
+        setNotReady(true);
+        alert("Раздел ещё не подключён на сервере", true);
+      } else {
+        alert(e?.detail || e?.message || "Не удалось сохранить настройку", true);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="kassa__center">Загрузка…</div>;
+
+  if (notReady) {
+    return (
+      <div className="kassa__alert">
+        Настройки подтверждения кассы ещё не подключены на сервере
+        (<code>GET /warehouse/cash/confirmation-settings/</code>). Пока
+        действует режим по умолчанию: подтверждение выключено, документы с
+        оплатой наличными проводятся сразу.
+      </div>
+    );
+  }
+
+  return (
+    <div className="kassaSettings">
+      <p className="kassaSettings__lead">
+        Определяет, должна ли наличная продажа/закупка ждать решения кассы
+        перед проведением. Пока запрос не подтверждён, документ висит в
+        «Запросах» и деньги не входят в остаток кассы.
+      </p>
+      <label className="kassaSettings__check">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={saving}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        <span>
+          Требовать подтверждение наличных операций
+          <em>
+            Выключено по умолчанию — наличные документы проводятся сразу,
+            без очереди на подтверждение.
+          </em>
+        </span>
+      </label>
+    </div>
+  );
+};
+
 /* ──────────────────────────────── Список касс ──────────────────────────────── */
 const CashRegisterList = () => {
   const navigate = useNavigate();
   const alert = useAlert();
   const { profile, company } = useUser();
   const isOwner = profile?.role === "owner";
-  const [tab, setTab] = useState("registers"); // "registers" | "requests" | "partner_incass"
+  const [tab, setTab] = useState("registers"); // "registers" | "requests" | "partner_incass" | "settings"
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -664,6 +756,41 @@ const CashRegisterList = () => {
   const [location, setLocation] = useState("");
 
   const [totalsById, setTotalsById] = useState({});
+
+  // Подтверждение выключено по умолчанию (см. CashConfirmationSettings) —
+  // тогда вкладку «Запросы» незачем показывать, если в ней и так пусто.
+  const [confirmEnabled, setConfirmEnabled] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    warehouseAPI
+      .getCashConfirmationSettings({ signal: controller.signal })
+      .then((data) => setConfirmEnabled(Boolean(data?.enabled)))
+      .catch((e) => {
+        if (e?.name === "CanceledError" || e?.name === "AbortError") return;
+        setConfirmEnabled(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    warehouseAPI
+      .listCashRequests({ status: "PENDING", page_size: 1 })
+      .then((data) => {
+        if (!cancelled) setPendingCount(Number(data?.count) || asArray(data).length);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
+
+  const requestsTabVisible = confirmEnabled !== false || pendingCount > 0;
+  const effectiveTab = tab === "requests" && !requestsTabVisible ? "registers" : tab;
 
   const load = useCallback(async () => {
     try {
@@ -778,35 +905,49 @@ const CashRegisterList = () => {
             <button
               type="button"
               className={`kassa-header__nav-tab ${
-                tab === "registers" ? "kassa-header__nav-tab--active" : ""
+                effectiveTab === "registers" ? "kassa-header__nav-tab--active" : ""
               }`}
               onClick={() => setTab("registers")}
             >
               Кассы
             </button>
+            {requestsTabVisible && (
+              <button
+                type="button"
+                className={`kassa-header__nav-tab flex gap-2 items-center ${
+                  effectiveTab === "requests" ? "kassa-header__nav-tab--active" : ""
+                }`}
+                onClick={() => setTab("requests")}
+              >
+                <Inbox size={16} />
+                Запросы
+              </button>
+            )}
             <button
               type="button"
               className={`kassa-header__nav-tab flex gap-2 items-center ${
-                tab === "requests" ? "kassa-header__nav-tab--active" : ""
-              }`}
-              onClick={() => setTab("requests")}
-            >
-              <Inbox size={16} />
-              Запросы
-            </button>
-            <button
-              type="button"
-              className={`kassa-header__nav-tab flex gap-2 items-center ${
-                tab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
+                effectiveTab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
               }`}
               onClick={() => setTab("partner_incass")}
             >
               <ArrowRightLeft size={16} />
               Инкассация партнёров
             </button>
+            {isOwner && (
+              <button
+                type="button"
+                className={`kassa-header__nav-tab flex gap-2 items-center ${
+                  effectiveTab === "settings" ? "kassa-header__nav-tab--active" : ""
+                }`}
+                onClick={() => setTab("settings")}
+              >
+                <SettingsIcon size={16} />
+                Настройки
+              </button>
+            )}
           </nav>
           <div className="kassa-header__right">
-            {tab === "registers" && rows.length === 0 && (
+            {effectiveTab === "registers" && rows.length === 0 && (
               <button
                 className="kassa-header__create-btn"
                 onClick={() => setCreateOpen(true)}
@@ -819,10 +960,12 @@ const CashRegisterList = () => {
         </div>
       </div>
 
-      {tab === "requests" ? (
+      {effectiveTab === "requests" ? (
         <CashRequestsInbox />
-      ) : tab === "partner_incass" ? (
+      ) : effectiveTab === "partner_incass" ? (
         <PartnerCashIncassationPanel />
+      ) : effectiveTab === "settings" ? (
+        <CashConfirmationSettings onChange={setConfirmEnabled} />
       ) : (
         <>
           <div className="kassa-search-section">

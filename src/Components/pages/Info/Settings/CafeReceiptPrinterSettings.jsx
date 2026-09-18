@@ -12,6 +12,8 @@ import {
   printViaWiFiSimple,
   setActivePrinterByKey,
   setPrinterPaperMm,
+  isCafeGraphicPrintEnabled,
+  setCafeGraphicPrint,
   CAFE_PAPER_MM_OPTIONS,
 } from "../../../Sectors/cafe/Orders/OrdersPrintService";
 
@@ -23,6 +25,7 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
   const [usbKey, setUsbKey] = useState("");
   const [bridgeUrl, setBridgeUrl] = useState("");
   const [paperMm, setPaperMm] = useState(80);
+  const [graphicPrint, setGraphicPrint] = useState(false);
 
   const [loadingUsb, setLoadingUsb] = useState(false);
   const [authorized, setAuthorized] = useState([]);
@@ -62,8 +65,17 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
 
     const url = localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
     setBridgeUrl(url);
+    setGraphicPrint(isCafeGraphicPrintEnabled());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const toggleGraphicPrint = useCallback(
+    (checked) => {
+      setGraphicPrint(checked);
+      setCafeGraphicPrint(checked);
+    },
+    []
+  );
 
   useEffect(() => {
     if (device !== "usb") return;
@@ -346,6 +358,23 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
         <p className="settings__mutedText" style={{ marginTop: 8 }}>
           Настройка только для этого принтера. Чем меньше мм — тем меньше символов в строке
           (например 58 мм ≈32, 80 мм ≈48).
+        </p>
+      </div>
+
+      <div className="settings__form-group">
+        <label className="settings__label" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={graphicPrint}
+            onChange={(e) => toggleGraphicPrint(e.target.checked)}
+          />
+          Графическая печать чека (как в Маркете)
+        </label>
+        <p className="settings__mutedText" style={{ marginTop: 8 }}>
+          Чек рисуется картинкой (моноширинный шрифт на растре) вместо построчного ESC/POS-текста —
+          выравнивание сумм ровнее, кириллица не зависит от кодовой страницы принтера. Работает и для
+          USB, и для Wi‑Fi (через printer-bridge). Если чек печатается «иероглифами» или обрезан —
+          выключите и используйте обычный текстовый режим.
         </p>
       </div>
 

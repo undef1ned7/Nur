@@ -133,6 +133,12 @@ export default function ChatsInbox() {
   const [notReady, setNotReady] = useState(false);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState("all");
+  const [tabChannel, setTabChannel] = useState(channel);
+  if (channel !== tabChannel) {
+    setTabChannel(channel);
+    setTab("all");
+  }
   const [notice, setNotice] = useState("");
   const [apiLead, setApiLead] = useState(null);
   const [leadLoading, setLeadLoading] = useState(false);
@@ -400,14 +406,23 @@ export default function ChatsInbox() {
     }
   }, [dispatch, lead, channel]);
 
+  const unreadCount = useMemo(
+    () => threads.reduce((n, t) => n + (Number(t.unread_count) > 0 ? 1 : 0), 0),
+    [threads],
+  );
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return threads;
-    return threads.filter((t) => {
+    let rows = threads;
+    if (tab === "unread") {
+      rows = rows.filter((t) => Number(t.unread_count) > 0);
+    }
+    if (!s) return rows;
+    return rows.filter((t) => {
       const hay = `${t.full_name} ${t.phone} ${t.last_message}`.toLowerCase();
       return hay.includes(s);
     });
-  }, [threads, q]);
+  }, [threads, q, tab]);
 
   const openChat = (thread) => {
     const id = thread.lead_id || thread.id;
@@ -529,6 +544,32 @@ export default function ChatsInbox() {
             />
           </div>
 
+          <div className="crmInbox__tabs" role="tablist" aria-label="Фильтр чатов">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "all"}
+              className={`crmInbox__tab${tab === "all" ? " is-active" : ""}`}
+              onClick={() => setTab("all")}
+            >
+              Все
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "unread"}
+              className={`crmInbox__tab${tab === "unread" ? " is-active" : ""}`}
+              onClick={() => setTab("unread")}
+            >
+              Непрочитанные
+              {unreadCount > 0 && (
+                <span className="crmInbox__tabCount">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+
           {notReady && (
             <div className="crmInbox__emptyHint">
               Диалоги появятся после входящих сообщений.
@@ -586,7 +627,9 @@ export default function ChatsInbox() {
               })
             ) : (
               <div className="crmInbox__emptyHint">
-                Пока нет чатов в {meta.title}
+                {tab === "unread"
+                  ? "Нет непрочитанных чатов"
+                  : `Пока нет чатов в ${meta.title}`}
               </div>
             )}
           </div>

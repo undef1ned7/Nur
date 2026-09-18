@@ -80,7 +80,7 @@ export default function LeadTransferModal({
       onClick={() => !saving && onClose()}
     >
       <div className="funnel__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="funnel__modalHeader">
+        <div className="funnel__modalHead">
           <h3 className="funnel__modalTitle">Передать в другую воронку</h3>
           <button
             type="button"

@@ -34,3 +34,35 @@ export const provisionClientTenant = (clientId, payload = {}) =>
     `${BASE}/clients/${clientId}/provision-tenant/`,
     payload,
   );
+
+/**
+ * Поиск уже существующего NurCRM-аккаунта по email клиента — до провижна,
+ * чтобы не пытаться завести дубль и не отправлять в platform-admin вручную.
+ * GET /consalting/tenant-accounts/lookup/?email=…
+ * @param {string} email
+ * @returns {Promise<{ match: null | {
+ *   nur_company_id: number, company_name: string, owner_email: string,
+ *   sector?: { id: number, name: string }, end_date?: string|null,
+ * } }>}
+ * Контракт: docs/consulting/backend-money-tenant/23-tenant-account-auto-link.md
+ */
+export const lookupTenantAccountByEmail = (email, config) =>
+  cGet(
+    "Lookup Tenant Account Error",
+    `${BASE}/tenant-accounts/lookup/`,
+    { email },
+    config,
+  );
+
+/**
+ * Привязка клиента к УЖЕ существующему NurCRM-аккаунту (вместо создания
+ * нового через provision-tenant). Пароль/учётка не создаются заново —
+ * владелец аккаунта продолжает логиниться, чем логинился.
+ * POST /consalting/clients/{id}/link-tenant/  { nur_company_id }
+ */
+export const linkClientTenant = (clientId, nurCompanyId) =>
+  cPost(
+    "Link Client Tenant Error",
+    `${BASE}/clients/${clientId}/link-tenant/`,
+    { nur_company_id: nurCompanyId },
+  );

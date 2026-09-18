@@ -16,6 +16,8 @@ import {
  *   onNewMessage?: Function,
  *   onStatus?: Function,
  *   onSendAck?: Function,
+ *   onEdited?: Function,
+ *   onDeleted?: Function,
  * }} opts
  */
 export function useWazzupChatSocket({
@@ -23,13 +25,21 @@ export function useWazzupChatSocket({
   onNewMessage,
   onStatus,
   onSendAck,
+  onEdited,
+  onDeleted,
 } = {}) {
   const [isConnected, setIsConnected] = useState(false);
-  const handlersRef = useRef({ onNewMessage, onStatus, onSendAck });
+  const handlersRef = useRef({
+    onNewMessage,
+    onStatus,
+    onSendAck,
+    onEdited,
+    onDeleted,
+  });
 
   useEffect(() => {
-    handlersRef.current = { onNewMessage, onStatus, onSendAck };
-  }, [onNewMessage, onStatus, onSendAck]);
+    handlersRef.current = { onNewMessage, onStatus, onSendAck, onEdited, onDeleted };
+  }, [onNewMessage, onStatus, onSendAck, onEdited, onDeleted]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -40,6 +50,8 @@ export function useWazzupChatSocket({
       onNewMessage: (data, msg) => handlersRef.current.onNewMessage?.(data, msg),
       onStatus: (data, msg) => handlersRef.current.onStatus?.(data, msg),
       onSendAck: (msg) => handlersRef.current.onSendAck?.(msg),
+      onEdited: (data, msg) => handlersRef.current.onEdited?.(data, msg),
+      onDeleted: (data, msg) => handlersRef.current.onDeleted?.(data, msg),
     });
 
     return () => {

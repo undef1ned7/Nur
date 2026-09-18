@@ -53,6 +53,7 @@ import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
   canCreateConsultingFunnel,
+  canDeleteFunnel,
   canManageLeadsInFunnel,
   canViewConsultingFunnel,
   filterFunnelsForUser,
@@ -109,6 +110,10 @@ import LeadMessengerPanel from "./LeadMessengerPanel";
 import { Link, useSearchParams } from "react-router-dom";
 import FunnelBoardRow from "./FunnelBoardRow";
 import LeadTransferModal from "./LeadTransferModal";
+import BulkAssignLeadsModal from "./BulkAssignLeadsModal";
+import BulkMoveStageModal from "./BulkMoveStageModal";
+import BulkMoveFunnelModal from "./BulkMoveFunnelModal";
+import { plural } from "../common/listUtils";
 import FunnelEmployeesPicker from "./FunnelEmployeesPicker";
 import FunnelArchiveModal from "./FunnelArchiveModal";
 import {
@@ -287,6 +292,11 @@ export default function ConsultingFunnel() {
   const isManager = isConsultingFunnelManager(profile);
   const canCreateFunnel = canCreateConsultingFunnel(profile);
   const isolateByOwner = shouldIsolateConsultingByOwner(profile);
+  // owner/admin/rop и руководитель региона видят весь регион, не только
+  // свои лиды (shouldIsolateConsultingByOwner уже это учитывает) — scope
+  // «Мои/Все/Пул» должен раскрываться по этому флагу, а не только для
+  // isManager, иначе руководитель региона видит доску как рядовой продавец.
+  const canBroadenScope = !isolateByOwner;
   const [searchParams, setSearchParams] = useSearchParams();
   const leadFromUrl = searchParams.get("lead");
   const tabFromUrl = searchParams.get("tab");
@@ -299,6 +309,32 @@ export default function ConsultingFunnel() {
   // supervisor с одним регионом — фильтр зафиксирован на его регионе.
   const regionFilter = regionCtl.fixedRegionCode || regionFilterRaw;
 
+  // Ролевые воронки — рабочие доски отделов, владельцу/админу для
+  // повседневной работы не нужны (захламляют верхний ряд вкладок). Скрыты по
+  // умолчанию, но включаются переключателем — например, чтобы удалить
+  // воронку упразднённой роли (см. 21-funnel-delete.md §7).
+  const [showRoleFunnels, setShowRoleFunnels] = useState(() => {
+    try {
+      return localStorage.getItem("consulting_funnel_show_roles_v1") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleShowRoleFunnels = () => {
+    setShowRoleFunnels((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(
+          "consulting_funnel_show_roles_v1",
+          next ? "1" : "0",
+        );
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   // Регион текущего сотрудника — к нему бэкенд привяжет созданную им воронку.
   const myRegionCode = useMemo(
     () => getUserRegionCodes(profile)[0] || "",
@@ -306,15 +342,41 @@ export default function ConsultingFunnel() {
   );
   const myRegionLabel = myRegionCode ? regionCtl.regionLabel(myRegionCode) : "";
 
+  // Бэкенд пока не проставляет region_code на самой воронке (только на лидах
+  // внутри) — см. docs/consulting/backend-money-tenant/15-regional-routing-
+  // integration.md §0. Пока не пофикшено, резолвим регион воронки через
+  // funnel_id из справочника /regional-funnel-routing/ (regionCtl.regions).
+  const funnelRegionFallback = useMemo(() => {
+    const map = new Map();
+    (regionCtl.regions || []).forEach((r) => {
+      if (r.funnel_id) map.set(String(r.funnel_id), r.code);
+    });
+    return map;
+  }, [regionCtl.regions]);
+
   const visibleFunnels = useMemo(() => {
-    const base = filterFunnelsForUser(funnels, profile);
+    let base = filterFunnelsForUser(funnels, profile, funnelRegionFallback);
+    // Ролевые воронки — рабочие доски сотрудников этой роли, не владельца;
+    // прячем их из верхнего ряда вкладок владельцу/админу по умолчанию (см.
+    // showRoleFunnels выше). Для самих сотрудников этой роли ничего не
+    // меняем — isRoleFunnel(f) есть только у их основной рабочей воронки.
+    if (isManager && !showRoleFunnels) {
+      base = base.filter((f) => !isRoleFunnel(f));
+    }
     if (!regionFilter) return base;
     return base.filter((f) => {
-      const rc = resolveFunnelRegionCode(f);
+      const rc = resolveFunnelRegionCode(f, funnelRegionFallback);
       // воронки без региона (главная, «Внедрение») показываем всегда
       return !rc || rc === regionFilter;
     });
-  }, [funnels, profile, regionFilter]);
+  }, [
+    funnels,
+    profile,
+    regionFilter,
+    funnelRegionFallback,
+    isManager,
+    showRoleFunnels,
+  ]);
 
   const visibleFunnelIdsKey = useMemo(
     () =>
@@ -347,9 +409,9 @@ export default function ConsultingFunnel() {
   });
 
   // Продавец видит только свои лиды — без «Все» и без пула чужих заявок.
-  const effectiveOwnerScope = isManager ? ownerScope : "mine";
+  const effectiveOwnerScope = canBroadenScope ? ownerScope : "mine";
 
-  if (!isManager && ownerScope !== "mine") {
+  if (!canBroadenScope && ownerScope !== "mine") {
     setOwnerScope("mine");
     try {
       localStorage.setItem("consulting_funnel_scope_v1", "mine");
@@ -370,6 +432,26 @@ export default function ConsultingFunnel() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
   const [unreadByLeadId, setUnreadByLeadId] = useState({});
+
+  // Массовая передача лидов сотруднику (см.
+  // docs/consulting/backend-money-tenant/22-bulk-lead-transfer.md).
+  const [selectedLeadIds, setSelectedLeadIds] = useState(() => new Set());
+  const toggleLeadSelect = useCallback((leadId) => {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      const key = String(leadId);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+  const clearLeadSelection = useCallback(
+    () => setSelectedLeadIds(new Set()),
+    [],
+  );
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const [bulkFunnelOpen, setBulkFunnelOpen] = useState(false);
   // Активная воронка (одна на весь экран, переключение вкладками сверху).
   const [activeFunnelId, setActiveFunnelId] = useState(() => {
     try {
@@ -465,24 +547,34 @@ export default function ConsultingFunnel() {
   };
 
   const onDeleteFunnel = (funnel) => {
-    if (!funnel || isProtectedFunnel(funnel)) return;
-    confirm(
-      `Удалить воронку «${getFunnelDisplayName(funnel)}»? Это действие необратимо.`,
-      async (result) => {
-        if (!result) return;
-        try {
-          await dispatch(deleteFunnel(funnel.id)).unwrap();
-          setBoardsMap((prev) => {
-            const next = { ...prev };
-            delete next[funnel.id];
-            return next;
-          });
-          setNotice("Воронка удалена.");
-        } catch (e) {
-          setNotice(errToText(e, "Не удалось удалить воронку."));
-        }
-      },
-    );
+    if (!funnel || !canDeleteFunnel(profile, funnel)) return;
+    const name = getFunnelDisplayName(funnel);
+    const warning = isRoleFunnel(funnel)
+      ? `Удалить воронку роли «${name}»? Это действие необратимо. ` +
+        `Все сотрудники с этой ролью потеряют доступ к своей рабочей доске — ` +
+        `сначала переведите роль сотрудников на другую роль или перенесите их лиды.`
+      : `Удалить воронку «${name}»? Это действие необратимо.`;
+    confirm(warning, async (result) => {
+      if (!result) return;
+      try {
+        await dispatch(deleteFunnel(funnel.id)).unwrap();
+        setBoardsMap((prev) => {
+          const next = { ...prev };
+          delete next[funnel.id];
+          return next;
+        });
+        setNotice("Воронка удалена.");
+      } catch (e) {
+        // 409 от бэка (есть незакрытые лиды) приходит с понятным detail —
+        // errToText уже вытаскивает его, спец-обработка не нужна.
+        setNotice(
+          errToText(
+            e,
+            "Не удалось удалить воронку. Возможно, в ней остались незакрытые лиды — перенесите или закройте их и попробуйте снова.",
+          ),
+        );
+      }
+    });
   };
 
   const { userId: wsUserId, isManager: wsIsManager } = useFunnelBoardWebSocket({
@@ -660,6 +752,21 @@ export default function ConsultingFunnel() {
     );
   }, [sortedFunnels, topFunnels, activeFunnelId, funnelFromUrl]);
 
+  // Выбор для массовых действий — только в рамках одной открытой доски.
+  useEffect(() => {
+    clearLeadSelection();
+  }, [activeFunnel?.id, clearLeadSelection]);
+
+  // Стадии активной воронки — для массового перевода на стадию.
+  const activeFunnelStages = useMemo(() => {
+    if (Array.isArray(activeFunnel?.stages) && activeFunnel.stages.length) {
+      return activeFunnel.stages;
+    }
+    return (boardsMap[activeFunnel?.id]?.columns || [])
+      .map((c) => c.stage)
+      .filter(Boolean);
+  }, [activeFunnel, boardsMap]);
+
   // Корневая (региональная) воронка активной вкладки и её подворонки сотрудников.
   const activeTopFunnel = useMemo(
     () =>
@@ -762,7 +869,7 @@ export default function ConsultingFunnel() {
   const persistOwnerScope = useCallback(
     (next) => {
       // Сотруднику нельзя включать «Все»
-      const scoped = !isManager && next === "all" ? "mine" : next;
+      const scoped = !canBroadenScope && next === "all" ? "mine" : next;
       setOwnerScope(scoped);
       try {
         localStorage.setItem("consulting_funnel_scope_v1", scoped);
@@ -770,7 +877,7 @@ export default function ConsultingFunnel() {
         /* ignore */
       }
     },
-    [isManager],
+    [canBroadenScope],
   );
 
   // Предикат фильтрации без учёта среза «мои/все/пул»: нужен и для доски,
@@ -787,7 +894,8 @@ export default function ConsultingFunnel() {
           0;
         if (unread <= 0) return false;
       }
-      if (isManager && ownerFilter && lead.owner !== ownerFilter) return false;
+      if (canBroadenScope && ownerFilter && lead.owner !== ownerFilter)
+        return false;
       if (gradeFilter && lead.score_grade !== gradeFilter) return false;
       if (q) {
         const hay = [lead.title, lead.full_name, lead.phone, lead.email]
@@ -805,7 +913,7 @@ export default function ConsultingFunnel() {
     unreadByLeadId,
     ownerFilter,
     gradeFilter,
-    isManager,
+    canBroadenScope,
   ]);
 
   const inScope = useCallback(
@@ -824,6 +932,29 @@ export default function ConsultingFunnel() {
     () => (lead) => inScope(lead, effectiveOwnerScope) && matchLeadBase(lead),
     [inScope, effectiveOwnerScope, matchLeadBase],
   );
+
+  // Короткая сводка в шапке выбранной доски. Считаем по тому же предикату,
+  // который применяется к карточкам, поэтому показатели не расходятся с UI.
+  const activeFunnelMetrics = useMemo(() => {
+    const board = activeFunnel ? boardsMap[activeFunnel.id] : null;
+    const leads = [
+      ...(board?.columns || []).flatMap((column) => column.leads || []),
+      ...(board?.unassigned || []),
+    ].filter(matchLead);
+    const value = leads.reduce(
+      (total, lead) => total + (Number(lead.estimated_value) || 0),
+      0,
+    );
+    const needsReply = leads.reduce((total, lead) => {
+      const unread =
+        Number(unreadByLeadId[lead.id]) ||
+        Number(unreadByLeadId[String(lead.id)]) ||
+        0;
+      return total + (unread > 0 ? 1 : 0);
+    }, 0);
+
+    return { count: leads.length, value, needsReply };
+  }, [activeFunnel, boardsMap, matchLead, unreadByLeadId]);
 
   /**
    * Счётчики на переключателе «Мои / Все / Пул» (ТЗ №4).
@@ -849,7 +980,7 @@ export default function ConsultingFunnel() {
 
   const hasFilters = !!(
     query.trim() ||
-    (isManager && ownerFilter) ||
+    (canBroadenScope && ownerFilter) ||
     riskOnly ||
     needsReplyOnly ||
     gradeFilter ||
@@ -926,7 +1057,12 @@ export default function ConsultingFunnel() {
   const onDropToStage = async (funnelId, leadId, stageId) => {
     const board = boardsMap[funnelId];
     const funnel = visibleFunnels.find((f) => f.id === funnelId);
-    if (!board || !funnel || !canManageLeadsInFunnel(profile, funnel)) return;
+    if (
+      !board ||
+      !funnel ||
+      !canManageLeadsInFunnel(profile, funnel, funnelRegionFallback)
+    )
+      return;
 
     const lead = [
       ...(board.columns || []).flatMap((c) => c.leads || []),
@@ -1178,7 +1314,11 @@ export default function ConsultingFunnel() {
   const activeLeadFunnel = visibleFunnels.find(
     (f) => f.id === activeLeadModalFunnelId,
   );
-  const activeLeadCanManage = canManageLeadsInFunnel(profile, activeLeadFunnel);
+  const activeLeadCanManage = canManageLeadsInFunnel(
+    profile,
+    activeLeadFunnel,
+    funnelRegionFallback,
+  );
 
   const stageFormBoard = stageFormFunnelId
     ? boardsMap[stageFormFunnelId]
@@ -1221,9 +1361,11 @@ export default function ConsultingFunnel() {
       {!!error && <div className="funnel__error">{errToText(error)}</div>}
       {!!notice && <div className="funnel__notice">{notice}</div>}
 
+      {/* Панель фильтров и поиска.  */}
+
       {visibleFunnels.length > 0 && (
         <div className="funnel__toolbar">
-          {isManager ? (
+          {canBroadenScope ? (
             <div className="funnel__scope" role="group" aria-label="Чьи лиды">
               {[
                 { id: "mine", label: "Мои" },
@@ -1258,9 +1400,7 @@ export default function ConsultingFunnel() {
             </div>
           ) : (
             <p className="funnel__scopeHint">
-              {isolateByOwner
-                ? "Показаны только лиды, где вы ответственный"
-                : "Мои лиды"}
+              Показаны только лиды, где вы ответственный
             </p>
           )}
 
@@ -1298,7 +1438,7 @@ export default function ConsultingFunnel() {
               />
             )}
 
-          {isManager && owners.length > 1 && (
+          {canBroadenScope && owners.length > 1 && (
             <select
               className="funnel__select funnel__select--sm"
               value={ownerFilter}
@@ -1349,6 +1489,19 @@ export default function ConsultingFunnel() {
             Нужен ответ
           </button>
 
+          {isManager && (
+            <button
+              type="button"
+              className={`funnel__chipBtn${
+                showRoleFunnels ? " funnel__chipBtn--active" : ""
+              }`}
+              onClick={toggleShowRoleFunnels}
+              title="Рабочие воронки ролей сотрудников — скрыты по умолчанию"
+            >
+              Ролевые воронки
+            </button>
+          )}
+
           {hasFilters && (
             <button className="funnel__chipBtn" onClick={resetFilters}>
               Сбросить
@@ -1370,9 +1523,12 @@ export default function ConsultingFunnel() {
           <div className="funnel__ftabs" role="tablist" aria-label="Воронки">
             {topFunnels.map((f) => {
               const fb = boardsMap[f.id];
-              const count = fb?.funnel?.leads_count;
-              const kids =
-                funnelTree.childrenByParent.get(String(f.id)) || [];
+              // funnel.leads_count на бэке бывает не синхронизирован с
+              // реальным числом карточек (проверено 12.09.2026: у «Основной
+              // воронки» leads_count:3 при totals.count:43 в одном ответе) —
+              // totals.count всегда честный, берём его.
+              const count = fb?.totals?.count ?? fb?.funnel?.leads_count;
+              const kids = funnelTree.childrenByParent.get(String(f.id)) || [];
               const kidsCount = sumChildLeadCounts(kids, boardsMap);
               const isActive =
                 activeTopFunnel && String(activeTopFunnel.id) === String(f.id);
@@ -1458,15 +1614,23 @@ export default function ConsultingFunnel() {
               >
                 <span className="funnel__subtabDot funnel__subtabDot--region" />
                 Регион целиком
-                {boardsMap[activeTopFunnel.id]?.funnel?.leads_count != null && (
-                  <span className="funnel__subtabCount">
-                    {boardsMap[activeTopFunnel.id].funnel.leads_count}
-                  </span>
-                )}
+                {(() => {
+                  const regionBoard = boardsMap[activeTopFunnel.id];
+                  const regionCount =
+                    regionBoard?.totals?.count ??
+                    regionBoard?.funnel?.leads_count;
+                  return (
+                    regionCount != null && (
+                      <span className="funnel__subtabCount">{regionCount}</span>
+                    )
+                  );
+                })()}
               </button>
               {activeSubFunnels.map((c) => {
                 const ownerName = getFunnelOwnerUserName(c);
-                const cCount = boardsMap[c.id]?.funnel?.leads_count;
+                const cBoard = boardsMap[c.id];
+                const cCount =
+                  cBoard?.totals?.count ?? cBoard?.funnel?.leads_count;
                 const cActive =
                   activeFunnel && String(activeFunnel.id) === String(c.id);
                 return (
@@ -1547,10 +1711,95 @@ export default function ConsultingFunnel() {
                 onDeleteStage={onDeleteStage}
                 allowedTransitions={allowedTransitions}
                 onRefreshBoard={() => refreshBoard(activeFunnel.id)}
+                selectedIds={selectedLeadIds}
+                onToggleSelect={toggleLeadSelect}
               />
             )}
           </div>
         </>
+      )}
+
+      {selectedLeadIds.size > 0 && (
+        <div className="funnel__bulkBar">
+          <span className="funnel__bulkBarCount">
+            Выбрано {selectedLeadIds.size} {plural.leads(selectedLeadIds.size)}
+          </span>
+          <button
+            type="button"
+            className="funnel__btn funnel__btn--sm funnel__btn--primary"
+            onClick={() => setBulkAssignOpen(true)}
+          >
+            Передать сотруднику
+          </button>
+          <button
+            type="button"
+            className="funnel__btn funnel__btn--sm"
+            onClick={() => setBulkStageOpen(true)}
+            disabled={!activeFunnelStages.length}
+          >
+            На стадию
+          </button>
+          <button
+            type="button"
+            className="funnel__btn funnel__btn--sm"
+            onClick={() => setBulkFunnelOpen(true)}
+          >
+            В другую воронку
+          </button>
+          <button
+            type="button"
+            className="funnel__btn funnel__btn--sm"
+            onClick={clearLeadSelection}
+          >
+            Снять выбор
+          </button>
+        </div>
+      )}
+
+      {bulkAssignOpen && (
+        <BulkAssignLeadsModal
+          leadIds={[...selectedLeadIds]}
+          sourceFunnelId={activeFunnel?.id}
+          funnels={funnels}
+          profile={profile}
+          onClose={() => setBulkAssignOpen(false)}
+          onDone={({ movedFunnelIds, keepOpenOnError }) => {
+            (movedFunnelIds || []).forEach((id) => refreshBoard(id));
+            if (keepOpenOnError) return;
+            setBulkAssignOpen(false);
+            clearLeadSelection();
+          }}
+        />
+      )}
+
+      {bulkStageOpen && (
+        <BulkMoveStageModal
+          leadIds={[...selectedLeadIds]}
+          funnelId={activeFunnel?.id}
+          stages={activeFunnelStages}
+          onClose={() => setBulkStageOpen(false)}
+          onDone={({ movedFunnelIds, keepOpenOnError }) => {
+            (movedFunnelIds || []).forEach((id) => refreshBoard(id));
+            if (keepOpenOnError) return;
+            setBulkStageOpen(false);
+            clearLeadSelection();
+          }}
+        />
+      )}
+
+      {bulkFunnelOpen && (
+        <BulkMoveFunnelModal
+          leadIds={[...selectedLeadIds]}
+          sourceFunnelId={activeFunnel?.id}
+          funnels={visibleFunnels}
+          onClose={() => setBulkFunnelOpen(false)}
+          onDone={({ movedFunnelIds, keepOpenOnError }) => {
+            (movedFunnelIds || []).forEach((id) => refreshBoard(id));
+            if (keepOpenOnError) return;
+            setBulkFunnelOpen(false);
+            clearLeadSelection();
+          }}
+        />
       )}
 
       {funnelFormOpen && (
@@ -1560,6 +1809,7 @@ export default function ConsultingFunnel() {
           employees={owners}
           isManager={isManager}
           employeeRegionLabel={myRegionLabel}
+          funnelRegionFallback={funnelRegionFallback}
           onClose={() => {
             setFunnelFormOpen(false);
             dispatch(getFunnels());
@@ -1575,6 +1825,7 @@ export default function ConsultingFunnel() {
           employees={owners}
           isManager={isManager}
           employeeRegionLabel={myRegionLabel}
+          funnelRegionFallback={funnelRegionFallback}
           onClose={() => {
             setFunnelEditTarget(null);
             refreshBoard(funnelEditTarget.id);
@@ -1659,10 +1910,15 @@ export default function ConsultingFunnel() {
         <FunnelArchiveModal
           funnels={funnels}
           profile={profile}
+          funnelRegionFallback={funnelRegionFallback}
           onClose={() => setArchiveOpen(false)}
           onOpenLead={(funnelId, leadId) => {
             setArchiveOpen(false);
             openLeadModal(funnelId, leadId);
+          }}
+          onRestored={(funnelId) => {
+            setNotice("Лид восстановлен из архива и снова в работе.");
+            if (funnelId) refreshBoard(funnelId);
           }}
         />
       )}
@@ -1984,6 +2240,7 @@ function FunnelForm({
   employees = [],
   isManager = false,
   employeeRegionLabel = "",
+  funnelRegionFallback,
   onClose,
 }) {
   const dispatch = useDispatch();
@@ -2005,13 +2262,13 @@ function FunnelForm({
     () =>
       funnels.filter(
         (f) =>
-          resolveFunnelRegionCode(f) &&
+          resolveFunnelRegionCode(f, funnelRegionFallback) &&
           !getFunnelParentId(f) &&
           !isMainFunnel(f) &&
           !isRoleFunnel(f) &&
           String(f.id) !== String(existing?.id),
       ),
-    [funnels, existing?.id],
+    [funnels, existing?.id, funnelRegionFallback],
   );
   const [parentFunnel, setParentFunnel] = useState(
     existing ? getFunnelParentId(existing) || "" : "",
@@ -2582,6 +2839,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
     full_name: "",
     phone: "",
     email: "",
+    address: "",
     source: "",
     estimated_value: "",
     probability: "",
@@ -2657,6 +2915,7 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
+      address: form.address.trim(),
       source: form.source.trim(),
       description: form.description.trim(),
       estimated_value:
@@ -2853,6 +3112,15 @@ function LeadCreateForm({ funnelId, funnel, stages, initialStageId, onClose }) {
                 onChange={set("estimated_value")}
               />
             </div>
+          </div>
+          <div className="funnel__field">
+            <label className="funnel__label">Адрес</label>
+            <input
+              className="funnel__input"
+              value={form.address}
+              onChange={set("address")}
+              placeholder="Город, улица, дом…"
+            />
           </div>
           <div className="funnel__grid2">
             {FUNNEL_V2 && (
@@ -3282,7 +3550,7 @@ function LeadDetail({
               </button>
             </>
           )}
-          {onCompleted && !lead.is_archived && canTouch && (
+          {(onCompleted || closed) && !lead.is_archived && canTouch && (
             <button
               className="funnel__btn funnel__btn--secondary"
               onClick={onArchive}

@@ -131,52 +131,95 @@ export const createInboundLead = (payload) =>
  * Ошибки не пробрасываем: создание самого inbound-лида уже прошло.
  *
  * @param {Object} inbound - объект из ответа createInboundLead
+ * @param {Object} [overrides] - поля карточки воронки, заданные вручную в окне
+ *   «Новый лид» на странице «Лиды»: { funnel, stage, title, email, address,
+ *   estimated_value, probability, description, source, service, urgency,
+ *   participant_ids }. Пустые / незаданные значения заменяются дефолтами.
  * @returns {Promise<string|null>} id карточки воронки или null
  */
-export async function ensureFunnelLeadForInbound(inbound) {
+export async function ensureFunnelLeadForInbound(inbound, overrides = {}) {
   if (!inbound?.id || inbound.lead) return inbound?.lead || null;
 
   try {
-    const funnelsRes = await cGet("List Funnels Error", `${BASE}/funnels/`);
-    const funnels = Array.isArray(funnelsRes)
-      ? funnelsRes
-      : funnelsRes?.results || [];
-    const main =
-      funnels.find((f) => isMainFunnel(f) && f.is_active !== false) ||
-      funnels.find((f) => isMainFunnel(f)) ||
-      null;
-    if (!main?.id) return null;
+    let funnelId = overrides.funnel || null;
+    if (!funnelId) {
+      const funnelsRes = await cGet("List Funnels Error", `${BASE}/funnels/`);
+      const funnels = Array.isArray(funnelsRes)
+        ? funnelsRes
+        : funnelsRes?.results || [];
+      const main =
+        funnels.find((f) => isMainFunnel(f) && f.is_active !== false) ||
+        funnels.find((f) => isMainFunnel(f)) ||
+        null;
+      funnelId = main?.id || null;
+    }
+    if (!funnelId) return null;
 
-    const stagesRes = await cGet(
-      "List Funnel Stages Error",
-      `${BASE}/funnel-stages/`,
-      { funnel: main.id },
-    );
-    const stages = Array.isArray(stagesRes)
-      ? stagesRes
-      : stagesRes?.results || [];
-    const firstStage =
-      stages.find((s) => s.system_key === "intake") ||
-      stages
-        .slice()
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0] ||
-      null;
+    let stageId = overrides.stage || null;
+    if (!stageId) {
+      const stagesRes = await cGet(
+        "List Funnel Stages Error",
+        `${BASE}/funnel-stages/`,
+        { funnel: funnelId },
+      );
+      const stages = Array.isArray(stagesRes)
+        ? stagesRes
+        : stagesRes?.results || [];
+      const firstStage =
+        stages.find((s) => s.system_key === "intake") ||
+        stages
+          .slice()
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0] ||
+        null;
+      stageId = firstStage?.id || null;
+    }
 
     const fullName = String(inbound.full_name || "").trim();
     const phone = String(inbound.phone || "").trim();
-    const lead = await cPost("Create Funnel Lead Error", `${BASE}/leads/`, {
-      funnel: main.id,
-      stage: firstStage?.id || null,
-      title: fullName || phone || "Новый лид",
+    const description =
+      overrides.description != null
+        ? String(overrides.description).trim()
+        : String(inbound.message || "").trim();
+
+    const payload = {
+      funnel: funnelId,
+      stage: stageId,
+      title:
+        String(overrides.title || "").trim() ||
+        fullName ||
+        phone ||
+        "Новый лид",
       full_name: fullName,
       phone,
-      source: inbound.source || "manual",
-      description: String(inbound.message || "").trim(),
-      estimated_value: 0,
-      probability: 0,
-    });
+      email: String(overrides.email || "").trim(),
+      address: String(overrides.address || "").trim(),
+      source: overrides.source || inbound.source || "manual",
+      description,
+      estimated_value: Number(overrides.estimated_value) || 0,
+      probability: Number(overrides.probability) || 0,
+    };
+    if (overrides.service) payload.service = overrides.service;
+    if (overrides.urgency) payload.urgency = overrides.urgency;
+
+    const lead = await cPost(
+      "Create Funnel Lead Error",
+      `${BASE}/leads/`,
+      payload,
+    );
 
     if (lead?.id) {
+      const participantIds = (overrides.participant_ids || []).filter(Boolean);
+      if (participantIds.length) {
+        try {
+          await cPost(
+            "Set Lead Participants Error",
+            `${BASE}/leads/${lead.id}/participants/`,
+            { participant_ids: participantIds },
+          );
+        } catch {
+          /* участники не критичны для появления карточки */
+        }
+      }
       try {
         await cPatch("Link Inbound Lead Error", `${URL_LEADS}${inbound.id}/`, {
           lead: lead.id,

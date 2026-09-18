@@ -1,20 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { getCompany } from "../../../store/creators/userCreators";
-import { getProfile, useUser } from "../../../store/slices/userSlice";
+import {
+  getProfile,
+  refreshProfileSilently,
+  useUser,
+} from "../../../store/slices/userSlice";
 import {
   isAllowedPathWithoutToken,
   shouldRedirectToCrm,
   clearTokens,
 } from "../../../utils/authUtils";
-import { tryRedirectToBuildingApp, shouldSkipBuildingRedirect, clearSkipBuildingRedirectParam } from "../../../utils/crossAppAuth";
-import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
+import {
+  tryRedirectToBuildingApp,
+  shouldSkipBuildingRedirect,
+  clearSkipBuildingRedirectParam,
+  tryRedirectToMarketApp,
+  shouldSkipMarketRedirect,
+  clearSkipMarketRedirectParam,
+} from "../../../utils/crossAppAuth";
+import { captureBuildingAppUrlFromSearch, captureMarketAppUrlFromSearch } from "../../../utils/appUrls";
 import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import {
   DEFAULT_AUTHENTICATED_PATH,
   DEFAULT_UNAUTHENTICATED_PATH,
 } from "../../../constants/routes";
 import Loading from "../../common/Loading/Loading";
+
+/** Не чаще раза в этот интервал — иначе каждое переключение вкладок бьёт по API. */
+const PROFILE_REFRESH_MIN_INTERVAL_MS = 30_000;
 
 /**
  * Компонент для проверки аутентификации при загрузке приложения
@@ -27,9 +41,11 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
   const dispatch = useDispatch();
   const { accessToken } = useUser();
   const { profile, loading } = useUser();
+  const lastProfileRefreshRef = useRef(0);
 
   const getProfileFunc = useCallback(async () => {
     await dispatch(getProfile()).unwrap();
+    lastProfileRefreshRef.current = Date.now();
   }, [dispatch]);
   useEffect(() => {
     if (loading) return;
@@ -71,6 +87,7 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
       }
 
       captureBuildingAppUrlFromSearch();
+      captureMarketAppUrlFromSearch();
 
       const token = localStorage.getItem("accessToken");
       if (!token) {
@@ -91,16 +108,20 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
       try {
         await getProfileFunc();
 
-        if (shouldSkipBuildingRedirect()) {
-          clearSkipBuildingRedirectParam();
-        } else {
+        const skipBuilding = shouldSkipBuildingRedirect();
+        const skipMarket = shouldSkipMarketRedirect();
+        if (skipBuilding) clearSkipBuildingRedirectParam();
+        if (skipMarket) clearSkipMarketRedirectParam();
+
+        if (!skipBuilding && !skipMarket) {
           const company = await dispatch(getCompany()).unwrap();
           const subscription = getCompanySubscriptionStatus(company);
           const wantsAppEntry =
             shouldRedirectToCrm(currentPath) ||
-            currentPath.startsWith("/crm/building");
+            currentPath.startsWith("/crm/building") ||
+            currentPath.startsWith("/crm/market");
 
-          // Истёкшая подписка: не пускаем в CRM/building, оставляем на лендинге
+          // Истёкшая подписка: не пускаем в CRM/building/market, оставляем на лендинге
           if (
             wantsAppEntry &&
             !subscription.ok &&
@@ -115,8 +136,13 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
           }
 
           if (wantsAppEntry) {
-            const handoff = tryRedirectToBuildingApp(company, currentPath);
-            if (handoff === "redirected") {
+            const buildingHandoff = tryRedirectToBuildingApp(company, currentPath);
+            if (buildingHandoff === "redirected") {
+              return;
+            }
+
+            const marketHandoff = tryRedirectToMarketApp(company, currentPath);
+            if (marketHandoff === "redirected") {
               return;
             }
           }
@@ -159,6 +185,30 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
       dispatch(getCompany());
     }
   }, [accessToken, dispatch]);
+
+  // Роль/права могут поменять на бэке, пока вкладка открыта (см.
+  // docs — жалоба «после смены роли на owner доступ не появился без
+  // перезахода»). Профиль грузится один раз при старте (checkTokenValidity
+  // выше), поэтому при возврате на вкладку тихо подтягиваем актуальный —
+  // без state.loading, чтобы не мигать спиннерами в других компонентах.
+  useEffect(() => {
+    const maybeRefresh = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!localStorage.getItem("accessToken")) return;
+      const now = Date.now();
+      if (now - lastProfileRefreshRef.current < PROFILE_REFRESH_MIN_INTERVAL_MS) {
+        return;
+      }
+      lastProfileRefreshRef.current = now;
+      dispatch(refreshProfileSilently());
+    };
+    document.addEventListener("visibilitychange", maybeRefresh);
+    window.addEventListener("focus", maybeRefresh);
+    return () => {
+      document.removeEventListener("visibilitychange", maybeRefresh);
+      window.removeEventListener("focus", maybeRefresh);
+    };
+  }, [dispatch]);
 
   if (isCheckingToken) {
     return <Loading />;

@@ -4,7 +4,7 @@
  * Контракт: docs/consulting/subscription-matrix.md,
  * docs/consulting/backend-money-tenant/01-subscription.md
  */
-import { BASE, cGet, cPost } from "./consultingHttp";
+import { BASE, cGet, cPatch, cPost } from "./consultingHttp";
 
 export const SUBSCRIPTION_PAYMENT_STATUS = {
   PLANNED: "planned",
@@ -81,6 +81,40 @@ export const paySubscriptionPayment = (paymentId, payload) =>
   );
 
 /**
+ * Продлить график абонентки на N периодов вперёд (месяцев — при
+ * `period="month"`, лет — при `period="year"`). Бэкенд дозаписывает строки
+ * `SubscriptionPayment` начиная сразу после последней существующей, не трогая
+ * уже созданные (в т.ч. оплаченные) периоды.
+ * POST /consalting/subscriptions/{id}/extend/
+ * @param {string|number} subscriptionId
+ * @param {{ periods?: number, amount?: number }} payload - periods >=1 (дефолт 12);
+ *   amount — опционально, если нужно продлить сразу по новой цене (иначе берётся
+ *   текущая Subscription.amount).
+ * Контракт: docs/consulting/backend-money-tenant/01-subscription.md §5.8.
+ */
+export const extendSubscriptionSchedule = (subscriptionId, payload = {}) =>
+  cPost(
+    "Extend Subscription Schedule Error",
+    `${BASE}/subscriptions/${subscriptionId}/extend/`,
+    payload,
+  );
+
+/**
+ * Изменить абонентскую цену. Уже оплаченные периоды не трогаются — новая
+ * сумма применяется только к будущим (`planned`/`overdue`) строкам графика.
+ * PATCH /consalting/subscriptions/{id}/
+ * @param {string|number} subscriptionId
+ * @param {{ amount: number }} payload
+ * Контракт: docs/consulting/backend-money-tenant/01-subscription.md §5.8.
+ */
+export const updateSubscriptionAmount = (subscriptionId, payload) =>
+  cPatch(
+    "Update Subscription Amount Error",
+    `${BASE}/subscriptions/${subscriptionId}/`,
+    payload,
+  );
+
+/**
  * Разворачивает payments из ответа subscriptions в плоский список для UI-календаря.
  * @param {object} data - ответ GET subscriptions (results или массив)
  * @returns {Array<object>}
@@ -100,6 +134,9 @@ export function flattenSubscriptionPayments(data) {
         ...p,
         status,
         subscription_id: sub.id,
+        subscription_amount: sub.amount,
+        subscription_period: sub.period,
+        subscription_status: sub.status,
         service_display: sub.service_display,
         tariff_display: sub.tariff_display,
         period: p.period_month || p.period,

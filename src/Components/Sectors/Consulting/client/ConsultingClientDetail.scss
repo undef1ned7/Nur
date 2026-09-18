@@ -316,6 +316,32 @@
     margin-top: 6px;
   }
 
+  &__scheduleSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #eef0f3;
+
+    &:first-child {
+      padding-top: 0;
+      border-top: none;
+    }
+  }
+
+  &__scheduleSectionTitle {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  &__scheduleChips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   &__tenant {
     margin-bottom: 16px;
   }
@@ -325,6 +351,12 @@
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 12px 20px;
     margin: 0 0 12px;
+
+    // Каждая пара dt/dd — свой грид-айтем; без min-width:0 длинный email
+    // не переносится и вылезает за колонку, наезжая на соседнюю ячейку.
+    > div {
+      min-width: 0;
+    }
 
     dt {
       font-size: 12px;
@@ -336,6 +368,7 @@
       margin: 0;
       font-weight: 600;
       font-size: 14px;
+      overflow-wrap: anywhere;
     }
   }
 
@@ -350,6 +383,27 @@
     align-items: flex-end;
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  &__tenantDuplicate {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    font-size: 13.5px;
+    line-height: 1.45;
+
+    p {
+      margin: 0;
+    }
+
+    button {
+      align-self: flex-start;
+    }
   }
 
   &__tenantField {

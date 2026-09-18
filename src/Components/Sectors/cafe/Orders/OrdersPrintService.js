@@ -1,4 +1,9 @@
 import api from "../../../../api";
+import {
+  renderReceiptLayoutToCanvas,
+  canvasToRasterBytes,
+  buildEscPosForRaster,
+} from "../../../pages/Sell/services/printService";
 
 const usbState = { dev: null, opening: null };
 
@@ -22,13 +27,15 @@ const LS_PRINTER_PAPER_MM = "cafe_printer_paper_mm";
  * Распространённые ширины термоленты (ESC/POS text).
  * charsPerLine — ориентир для Font A / узкой печати.
  */
+// dots — ширина растра для графической печати (~12 dot/символ, как у Market:
+// 576 dots / 48 chars); физическая ширина ленты печати уже отражена в charsPerLine.
 export const CAFE_PAPER_MM_OPTIONS = [
-  { mm: 38, label: "38 мм", charsPerLine: 24 },
-  { mm: 44, label: "44 мм", charsPerLine: 28 },
-  { mm: 58, label: "58 мм", charsPerLine: 32 },
-  { mm: 76, label: "76 мм", charsPerLine: 42 },
-  { mm: 80, label: "80 мм", charsPerLine: 48 },
-  { mm: 112, label: "112 мм", charsPerLine: 64 },
+  { mm: 38, label: "38 мм", charsPerLine: 24, dots: 288 },
+  { mm: 44, label: "44 мм", charsPerLine: 28, dots: 336 },
+  { mm: 58, label: "58 мм", charsPerLine: 32, dots: 384 },
+  { mm: 76, label: "76 мм", charsPerLine: 42, dots: 504 },
+  { mm: 80, label: "80 мм", charsPerLine: 48, dots: 576 },
+  { mm: 112, label: "112 мм", charsPerLine: 64, dots: 768 },
 ];
 
 const CAFE_PAPER_MM_SET = new Set(CAFE_PAPER_MM_OPTIONS.map((o) => o.mm));
@@ -42,6 +49,38 @@ export function charsPerLineForPaperMm(paperMm) {
   const mm = normalizePaperMm(paperMm);
   const preset = CAFE_PAPER_MM_OPTIONS.find((o) => o.mm === mm);
   return preset?.charsPerLine ?? 48;
+}
+
+export function dotsPerLineForPaperMm(paperMm) {
+  const mm = normalizePaperMm(paperMm);
+  const preset = CAFE_PAPER_MM_OPTIONS.find((o) => o.mm === mm);
+  return preset?.dots ?? 576;
+}
+
+/** Графическая печать чека (canvas → растр ESC/POS) в Cafe — опция, выкл. по умолчанию. */
+const CAFE_GRAPHIC_LS_KEY = "cafe_graphic_print";
+
+export function isCafeGraphicPrintEnabled() {
+  try {
+    return localStorage.getItem(CAFE_GRAPHIC_LS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setCafeGraphicPrint(enabled) {
+  try {
+    localStorage.setItem(CAFE_GRAPHIC_LS_KEY, enabled ? "1" : "0");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveCafeGraphicPrint(opts = {}) {
+  if (opts.graphic === true) return true;
+  if (opts.graphic === false) return false;
+  return isCafeGraphicPrintEnabled();
 }
 
 const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
@@ -538,6 +577,113 @@ function buildPrettyReceiptFromJSON(payload, opts = {}) {
   return chunks;
 }
 
+/**
+ * Layout строк чека кафе для графической печати (canvas → растр).
+ * Содержимое соответствует buildPrettyReceiptFromJSON, но в виде строк для canvas.
+ */
+function buildCafeReceiptLayout(payload, opts = {}) {
+  const width = Math.max(16, opts.width || 32);
+  const divider = "-".repeat(width);
+  const line = (text, extra = {}) => ({
+    text: String(text ?? ""),
+    align: "left",
+    bold: false,
+    scale: 1,
+    ...extra,
+  });
+
+  const company = String(payload.company ?? "КАССА").trim();
+  const docNo = String(payload.doc_no ?? "").trim();
+  const dt = String(payload.created_at ?? "").trim();
+  const cashier = String(payload.cashier_name ?? "").trim();
+  const waiter = String(payload.waiter_name ?? "").trim();
+
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const itemsSubtotal = items.reduce(
+    (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
+    0
+  );
+  const discount = financeToNum(payload.discount);
+  const subtotal =
+    payload.subtotal != null ? financeToNum(payload.subtotal) : itemsSubtotal;
+  const total =
+    payload.total != null
+      ? financeToNum(payload.total)
+      : Math.max(0, subtotal - discount);
+  const paidCash = financeToNum(payload.paid_cash);
+  const paidCard = financeToNum(payload.paid_card);
+  const payMethod = financeShortPayMethod(payload);
+
+  const lines = [];
+  lines.push(line(company, { align: "center", bold: true }));
+  if (docNo) lines.push(line(`ЧЕК: ${docNo}`, { align: "center" }));
+  lines.push(line(divider));
+  if (dt) lines.push(line(`Дата: ${dt}`));
+  if (cashier) lines.push(line(`Кассир: ${cashier}`));
+  if (waiter) lines.push(line(`Официант: ${waiter}`));
+  lines.push(line(""));
+
+  if ("menu_title" in payload) {
+    const name = String(payload.menu_title ?? "").trim() || "Позиция";
+    lines.push(line(name, { bold: true }));
+  }
+
+  for (const it of items) {
+    const name = String(it.name ?? "").trim() || "Позиция";
+    const qty = Number(it.qty || 0);
+    const price = Number(it.price || 0);
+    const sum = (Number.isFinite(qty) && qty > 0 ? qty : 1) * price;
+    const comment = String(it.comment ?? "").trim();
+    const qtyLine =
+      String(it.qty_display ?? "").trim() ||
+      `${Number.isFinite(qty) && qty > 0 ? qty : 1} x ${money(price)}`;
+
+    lines.push(line(name, { bold: true }));
+    if (comment) lines.push(line(`Комментарий: ${comment}`));
+    lines.push({ left: qtyLine, right: money(sum) });
+    lines.push(line(""));
+  }
+
+  lines.push(line(divider));
+  if (discount > 0) {
+    lines.push({ left: "СУММА:", right: money(subtotal), bold: true });
+    lines.push({ left: "СКИДКА:", right: `-${money(discount)}`, bold: true });
+  }
+  lines.push({ left: "ИТОГО:", right: money(total), bold: true, scale: 1.3 });
+
+  if (paidCash > 0) lines.push({ left: "НАЛИЧНЫЕ:", right: money(paidCash) });
+  if (paidCard > 0) lines.push({ left: "КАРТА:", right: money(paidCard) });
+  if (payMethod && payMethod !== "—" && paidCash <= 0 && paidCard <= 0) {
+    lines.push({ left: "ОПЛАТА:", right: payMethod });
+  }
+
+  return { lines, width };
+}
+
+/** Растровый ESC/POS чек кафе (canvas → GS v 0), без реза — рез добавляется отдельным хвостом. */
+function buildCafeReceiptGraphicChunks(payload, opts = {}) {
+  const paperMm = normalizePaperMm(
+    opts.paperMm ?? payload?.paper_mm ?? payload?.paperMm
+  );
+  const charsPerLine = charsPerLineForPaperMm(paperMm);
+  const dotsPerLine = dotsPerLineForPaperMm(paperMm);
+  const { lines } = buildCafeReceiptLayout(payload, { width: charsPerLine });
+  const canvas = renderReceiptLayoutToCanvas(lines, { dotsPerLine, charsPerLine });
+  const { raster, bytesPerLine, h } = canvasToRasterBytes(canvas);
+  const rasterEscPos = buildEscPosForRaster(raster, bytesPerLine, h, {
+    withCut: false,
+  });
+  return [rasterEscPos, ESC(0x1b, 0x64, 0x06), ESC(0x1d, 0x56, 0x00)];
+}
+
+/** Выбор текстового или графического builder'а по опции cafe_graphic_print. */
+function buildCafeReceiptChunks(payload, opts = {}) {
+  if (resolveCafeGraphicPrint(opts)) {
+    return buildCafeReceiptGraphicChunks(payload, opts);
+  }
+  return buildPrettyReceiptFromJSON(payload, opts);
+}
+
 function financeToNum(v) {
   if (v == null) return 0;
   const n = Number(String(v).replace(",", "."));
@@ -793,7 +939,7 @@ export async function printOrderReceiptJSONViaUSB(payload, opts = {}) {
   const paperMm = normalizePaperMm(
     opts.paperMm ?? getPrinterPaperMm(binding)
   );
-  const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
+  const parts = buildCafeReceiptChunks(payload, { paperMm, graphic: opts.graphic });
   await transferUsbEscPosParts(parts);
 }
 
@@ -817,7 +963,7 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload, opts = {}) 
   const paperMm = normalizePaperMm(
     opts.paperMm ?? getPrinterPaperMm(`usb/${key}`)
   );
-  const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
+  const parts = buildCafeReceiptChunks(payload, { paperMm, graphic: opts.graphic });
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await dev.transferOut(outEP, chunk);
@@ -918,7 +1064,7 @@ export async function printViaWiFiSimple(payload, ip, port = 9100, opts = {}) {
     const paperMm = normalizePaperMm(
       opts.paperMm ?? getPrinterPaperMm(binding)
     );
-    const parts = buildPrettyReceiptFromJSON(payload, { paperMm });
+    const parts = buildCafeReceiptChunks(payload, { paperMm, graphic: opts.graphic });
     const combinedData = combineDataParts(parts);
 
     // Preferred: local RAW-TCP bridge (prints without HTTP headers)

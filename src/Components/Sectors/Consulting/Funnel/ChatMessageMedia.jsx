@@ -1,5 +1,6 @@
 import { FaFileAlt, FaPaperclip } from "react-icons/fa";
 import { mediaTypeLabel } from "../../../../api/consultingWazzup";
+import VoiceMessagePlayer from "./VoiceMessagePlayer";
 
 /**
  * Рендер вложения в бабле чата (image / video / voice / document / file).
@@ -34,22 +35,26 @@ export default function ChatMessageMedia({ url, mediaType }) {
   if (type === "voice") {
     return (
       <div className="funnel__chatMedia funnel__chatMedia--voice">
-        <audio controls preload="metadata" src={url}>
-          <a href={url} target="_blank" rel="noreferrer">
-            {label}
-          </a>
-        </audio>
+        <VoiceMessagePlayer url={url} />
       </div>
     );
   }
 
   const Icon = type === "document" ? FaFileAlt : FaPaperclip;
-  const linkLabel =
+  const linkHint =
     type === "document"
-      ? "Документ"
+      ? "Документ · открыть"
       : type === "file"
-        ? "Вложение"
-        : "Файл / медиа";
+        ? "Вложение · открыть"
+        : "Файл / медиа · открыть";
+  const fileName = (() => {
+    try {
+      const clean = String(url).split("?")[0].split("#")[0];
+      return decodeURIComponent(clean.split("/").pop() || "") || label || "Файл";
+    } catch {
+      return label || "Файл";
+    }
+  })();
 
   return (
     <a
@@ -58,7 +63,13 @@ export default function ChatMessageMedia({ url, mediaType }) {
       target="_blank"
       rel="noreferrer"
     >
-      <Icon aria-hidden /> {linkLabel}
+      <span className="funnel__chatMediaFileIcon" aria-hidden>
+        <Icon />
+      </span>
+      <span className="funnel__chatMediaFileInfo">
+        <span className="funnel__chatMediaFileName">{fileName}</span>
+        <span className="funnel__chatMediaFileHint">{linkHint}</span>
+      </span>
     </a>
   );
 }

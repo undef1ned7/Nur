@@ -326,7 +326,7 @@ async function pdfBlobToCanvas(pdfBlob, targetWidth = 576) {
   await page.render({ canvasContext: ctx, viewport: scaled }).promise;
   return canvas;
 }
-function canvasToRasterBytes(canvas, threshold = 180) {
+export function canvasToRasterBytes(canvas, threshold = 180) {
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -358,7 +358,7 @@ function concatUint8Arrays(parts) {
   return out;
 }
 
-function buildEscPosForRaster(raster, bytesPerLine, h, opts = {}) {
+export function buildEscPosForRaster(raster, bytesPerLine, h, opts = {}) {
   const withCut = opts.withCut !== false;
   const xL = bytesPerLine & 0xff;
   const xH = (bytesPerLine >> 8) & 0xff;

@@ -8,6 +8,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  FaBan,
   FaCheck,
   FaClock,
   FaComments,
@@ -60,13 +61,18 @@ import {
 import { employeeName, fmtDateTime, plural } from "../common/listUtils";
 import { useConsultingRealtime } from "../common/useConsultingRealtime";
 import LeadPaymentModal from "../Funnel/LeadPaymentModal";
+import {
+  SALE_STATUS,
+  getConsultingSale,
+} from "../../../../api/consultingSales";
+import SaleCancelModal from "../sale/SaleCancelModal";
 import AssignLeadModal from "./modals/AssignLeadModal";
 import CreateLeadModal from "./modals/CreateLeadModal";
 import DeferLeadModal from "./modals/DeferLeadModal";
 import RejectLeadModal from "./modals/RejectLeadModal";
 
 const SourceIcon = ({ source }) => {
-  const s = String(source || "").toLowerCase();
+  const s = leadSourceMeta(source).value;
   if (s === "instagram") return <FaInstagram aria-hidden />;
   if (s === "telegram") return <FaTelegram aria-hidden />;
   if (s === "whatsapp") return <FaWhatsapp aria-hidden />;
@@ -102,7 +108,13 @@ const queueToStatus = (queue) => {
   return tab.statuses.length ? tab.statuses.join(",") : "";
 };
 
-export default function LeadsInbox({ employees, empById, isManager, alert }) {
+export default function LeadsInbox({
+  employees,
+  empById,
+  funnels = [],
+  isManager,
+  alert,
+}) {
   const { profile } = useUser();
   const myId = profile?.id ? String(profile.id) : "";
   const isolateByOwner = shouldIsolateConsultingByOwner(profile);
@@ -129,6 +141,8 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
   const [deferFor, setDeferFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
   const [payFor, setPayFor] = useState(null);
+  const [cancelSaleFor, setCancelSaleFor] = useState(null);
+  const [saleLoadingId, setSaleLoadingId] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -244,6 +258,38 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
       }
     },
     [alert, reloadAll],
+  );
+
+  const openCancelSale = useCallback(
+    async (lead) => {
+      const raw = lead.sale;
+      const saleId = raw && typeof raw === "object" ? raw.id : raw;
+      if (!saleId) return;
+      // В списке лидов продажа может прийти «тонкой» (только id) — тогда
+      // сначала догружаем карточку продажи, иначе модалке нечего показать.
+      if (raw && typeof raw === "object" && raw.total != null) {
+        if (raw.status === SALE_STATUS.CANCELED) {
+          alert("Продажа по этому лиду уже отменена.", true);
+          return;
+        }
+        setCancelSaleFor(raw);
+        return;
+      }
+      setSaleLoadingId(lead.id);
+      try {
+        const sale = await getConsultingSale(saleId);
+        if (sale?.status === SALE_STATUS.CANCELED) {
+          alert("Продажа по этому лиду уже отменена.", true);
+          return;
+        }
+        setCancelSaleFor(sale);
+      } catch (e) {
+        alert(e?.detail || "Не удалось загрузить продажу по лиду.", true);
+      } finally {
+        setSaleLoadingId(null);
+      }
+    },
+    [alert],
   );
 
   return (
@@ -468,6 +514,13 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
               l.status === LEAD_STATUS.CONVERTED ||
               l.status === LEAD_STATUS.REJECTED;
             const busy = busyId === l.id;
+            const saleStatus =
+              l.sale && typeof l.sale === "object" ? l.sale.status : null;
+            const saleCancelable =
+              l.status === LEAD_STATUS.CONVERTED &&
+              !!l.sale &&
+              saleStatus !== SALE_STATUS.CANCELED;
+            const saleLoading = saleLoadingId === l.id;
             const chatPath =
               l.lead &&
               consultingChatPath(l.lead, l.source || "whatsapp");
@@ -606,6 +659,18 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
                       <FaMoneyBillWave aria-hidden /> Продажа
                     </button>
                   )}
+                  {saleCancelable && (
+                    <button
+                      type="button"
+                      className="leads__btn leads__btn--sm leads__btn--danger"
+                      onClick={() => openCancelSale(l)}
+                      title="Отменить продажу, если оформили по ошибке"
+                      disabled={busy || saleLoading}
+                    >
+                      <FaBan aria-hidden />{" "}
+                      {saleLoading ? "…" : "Отменить продажу"}
+                    </button>
+                  )}
                   {!closed && (
                     <button
                       type="button"
@@ -694,6 +759,7 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
 
       {createOpen && (
         <CreateLeadModal
+          funnels={funnels}
           onClose={() => setCreateOpen(false)}
           onCreated={() => {
             setCreateOpen(false);
@@ -747,6 +813,19 @@ export default function LeadsInbox({ employees, empById, isManager, alert }) {
           onRejected={() => {
             setRejectFor(null);
             reloadAll();
+          }}
+          onError={(m) => alert(m, true)}
+        />
+      )}
+
+      {cancelSaleFor && (
+        <SaleCancelModal
+          sale={cancelSaleFor}
+          onClose={() => setCancelSaleFor(null)}
+          onDone={() => {
+            setCancelSaleFor(null);
+            reloadAll();
+            alert("Продажа отменена, последствия откачены.");
           }}
           onError={(m) => alert(m, true)}
         />

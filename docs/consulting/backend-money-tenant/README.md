@@ -32,7 +32,7 @@
 
 | # | Файл | Что делаем | Приоритет |
 |---|---|---|---|
-| 1 | [01-subscription.md](./01-subscription.md) | Абонентка, `create_sale_side_effects` | **1** |
+| 1 | [01-subscription.md](./01-subscription.md) | Абонентка, `create_sale_side_effects`; §5.8 — ручное продление графика + смена цены (обновлено 12.09.2026) | **1** |
 | 2 | [02-sale-cancel.md](./02-sale-cancel.md) | Отмена/возврат, атомарный откат | **3** |
 | 3 | [03-cash-confirmation.md](./03-cash-confirmation.md) | CashRequest → CashOperation | **4** |
 | 4 | [04-tenant-lifecycle.md](./04-tenant-lifecycle.md) | CRM-аккаунт + `end_date` | **4** |
@@ -50,6 +50,16 @@
 | 15 | [15-regional-routing-integration.md](./15-regional-routing-integration.md) | Стыковка реализованной региональной маршрутизации с фронтом: пути redistribute, `GET /regions/`, `scope`/`dry_run`, поля `region_code`, RBAC supervisor, стадии воронок | **6** |
 | 16 | [16-request-assigned-to.md](./16-request-assigned-to.md) | `ConsultingRequest.assigned_to`/`assigned_to_display`/`acceptance`, фильтр `?assigned_to=`, экшены `accept/` `decline/` (принять/отказаться от заявки), WS `consulting.request.assigned`/`.accepted`/`.declined` | **7** |
 | 17 | [17-employee-region-subfunnels.md](./17-employee-region-subfunnels.md) | Право `can_create_funnel`; `Funnel.parent_funnel`/`owner_user`/`funnel_kind="employee"`; воронка сотрудника автопривязывается к региональной воронке его региона; руководитель видит подворонки сотрудников во вкладке региона | **7** |
+| 18 | [18-analytics-debts.md](./18-analytics-debts.md) | Вкладка «Долги» в аналитике: просроченная абонплата (`SubscriptionPayment.status=overdue`) + абонплата, оформленная в долг/рассрочку (`Sale.payment_mode in (debt, installment)`); плюс анализ пробелов аналитики на будущее | **5** |
+| 19 | [19-assign-owner-region-scope.md](./19-assign-owner-region-scope.md) | Баг на проде: `assign_owner_within_region` назначает сейлза по общей роли без фильтра `consulting_region_codes` → входящие WhatsApp-лиды одного региона уходят сотруднику другого региона | **P0** |
+| 20 | [20-funnel-leads-count-stale.md](./20-funnel-leads-count-stale.md) | Баг на проде: `Funnel.leads_count` не пересчитывается — в одном ответе `board/` расходится с `totals.count` (3 vs 43 на «Основной воронке») | **P2** |
+| 21 | [21-funnel-delete.md](./21-funnel-delete.md) | `DELETE /consalting/funnels/{id}/`: право сотрудника удалять СВОЮ подворонку, право owner/admin/rop удалять ролевые воронки (§7), контракт `409` при незакрытых лидах | **P2** |
+| 22 | [22-bulk-lead-transfer.md](./22-bulk-lead-transfer.md) | Массовые действия с выбранными лидами с доски (чекбоксы + панель): передать сотруднику, §7.1 на стадию, §7.2 в другую воронку — переиспользует существующие `transfer`/`assign`/`move-stage`, новых эндпоинтов не требует | **P1** |
+| 23 | [23-tenant-account-auto-link.md](./23-tenant-account-auto-link.md) | Автоопределение существующего NurCRM-аккаунта по email клиента вместо ручной привязки в platform-admin — новые `GET /tenant-accounts/lookup/`, `POST /clients/{id}/link-tenant/` | **P1** |
+| 24 | [24-lead-address-field.md](./24-lead-address-field.md) | Новое поле `Lead.address` — добавлено в обе формы «Новый лид» (доска воронки и страница «Лиды») | **P2** |
+| 25 | [25-lead-archive-restore.md](./25-lead-archive-restore.md) | Восстановление лида из архива — новый `POST /leads/{id}/restore/`: снимает `is_archived`, сбрасывает статус, возвращает на активную стадию воронки | **P2** |
+| 26 | [26-cash-confirmation-default-off.md](./26-cash-confirmation-default-off.md) | Дефолт `CashConfirmationSettings.mode` меняется с `cash_only` на `off` — заявки на подтверждение по умолчанию выключены, компания включает сама; существующие строки не трогаем | **P1** |
+| 27 | [27-lead-sale-cancel-from-queue.md](./27-lead-sale-cancel-from-queue.md) | Кнопка «Отменить продажу» прямо на карточке лида в очереди `/crm/consulting/leads`: `InboundLead.sale` в ответе списка, синхронизация `register-payment` → `InboundLead.sale`/`status`, откат при отмене продажи | **P2** |
 
 **Смежные (вне папки):**
 

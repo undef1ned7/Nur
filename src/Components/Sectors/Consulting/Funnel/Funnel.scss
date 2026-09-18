@@ -54,8 +54,23 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 14px;
-    padding: 6px 4px 0;
+    gap: 18px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background:
+      radial-gradient(circle at 12% 0%, rgba(247, 215, 79, 0.2), transparent 34%),
+      var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  &__heading {
+    min-width: 0;
+  }
+  &__titleRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
   }
   &__eyebrow {
     margin: 0 0 4px;
@@ -82,12 +97,90 @@
     flex-wrap: wrap;
   }
   &__live {
-    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    font-size: 10.5px;
     font-weight: 700;
     color: #9ca3af;
     letter-spacing: 0.02em;
     &--on {
-      color: #16a34a;
+      color: #15803d;
+      background: #ecfdf3;
+    }
+  }
+  &__liveDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  &__summary {
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.78);
+  }
+  &__metric {
+    min-width: 102px;
+    padding: 8px 13px 7px;
+    border: 0;
+    border-right: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    font-family: inherit;
+    line-height: 1.2;
+
+    strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 15px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    &--action {
+      cursor: pointer;
+      transition: background 0.15s;
+      &:hover {
+        background: var(--surface-2);
+      }
+    }
+    &--alert strong {
+      color: #dc2626;
+    }
+  }
+  &__metricLabel {
+    display: block;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  &__refreshBtn {
+    width: 40px;
+    border: 0;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, transform 0.25s;
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: #edf0f6;
+      transform: rotate(90deg);
+    }
+    &:disabled {
+      cursor: wait;
+      opacity: 0.55;
     }
   }
   &__actions {
@@ -95,6 +188,49 @@
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
+  }
+
+  @media (max-width: 860px) {
+    &__header {
+      align-items: flex-start;
+    }
+    &__summary {
+      width: 100%;
+    }
+    &__metric {
+      flex: 1 1 0;
+    }
+    &__refreshBtn {
+      flex: 0 0 42px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    &__header {
+      padding: 12px;
+      gap: 12px;
+    }
+    &__title {
+      font-size: 20px;
+    }
+    &__subtitle {
+      font-size: 12px;
+    }
+    &__live {
+      padding: 3px 6px;
+      font-size: 9.5px;
+    }
+    &__metric {
+      min-width: 0;
+      padding: 8px 9px;
+      strong {
+        font-size: 13px;
+      }
+    }
+    &__metricLabel {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
 
   /* ---------------- controls ---------------- */
@@ -233,6 +369,25 @@
     background: var(--surface-2);
     border: 1px solid var(--border);
     flex: 0 0 auto;
+  }
+  &__bulkBar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.25);
+  }
+  &__bulkBarCount {
+    font-size: 13.5px;
+    font-weight: 600;
+    margin-right: auto;
   }
   &__scopeHint {
     margin: 0;
@@ -1202,6 +1357,18 @@
     justify-content: space-between;
     gap: 8px;
   }
+  &__cardCheck {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+  }
+  &__card--selected {
+    outline: 2px solid #2563eb;
+    outline-offset: -1px;
+    background: #eff6ff;
+  }
   &__cardTitle {
     font-weight: 700;
     font-size: 14px;
@@ -1983,8 +2150,12 @@
     }
   }
 
-  // direct-child modal errors (e.g. LeadDetail error above tabs)
-  &__modal > .funnel__error {
+  // direct-child modal errors/notices/hints (e.g. LeadDetail error above
+  // tabs, bulk-action modals' result summary above the form) — без формы
+  // вокруг у них нет отступа от скруглённых краёв модалки.
+  &__modal > .funnel__error,
+  &__modal > .funnel__notice,
+  &__modal > .funnel__hint {
     margin: 0 22px 14px;
   }
 
@@ -2274,12 +2445,16 @@
         display: block;
         max-width: min(100%, 280px);
         max-height: 320px;
-        border-radius: 8px;
+        border-radius: 10px;
         object-fit: cover;
+        box-shadow: 0 1px 2px rgba(11, 20, 26, 0.12);
+        transition: filter 0.15s ease;
       }
       &:hover {
         text-decoration: none;
-        opacity: 0.95;
+        img {
+          filter: brightness(0.96);
+        }
       }
     }
     &--video {
@@ -2288,25 +2463,141 @@
         display: block;
         max-width: min(100%, 280px);
         max-height: 320px;
-        border-radius: 8px;
+        border-radius: 10px;
         background: #000;
+        box-shadow: 0 1px 2px rgba(11, 20, 26, 0.12);
       }
     }
     &--voice {
       display: block;
       width: 100%;
-      min-width: 200px;
-      audio {
-        width: 100%;
-        max-width: 280px;
-        height: 36px;
-      }
+      min-width: 220px;
     }
     &--file {
-      padding: 6px 8px;
-      background: rgba(0, 0, 0, 0.04);
-      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.035);
+      border-radius: 12px;
+      min-width: 200px;
+      max-width: 280px;
+      &:hover {
+        text-decoration: none;
+        background: rgba(0, 0, 0, 0.06);
+      }
     }
+  }
+  &__chatMediaFileIcon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px rgba(11, 20, 26, 0.08);
+    display: grid;
+    place-items: center;
+    color: #128c7e;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  &__chatMediaFileInfo {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  &__chatMediaFileName {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111b21;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__chatMediaFileHint {
+    font-size: 11.5px;
+    color: #667781;
+  }
+
+  /* Голосовое сообщение — плеер в стиле WhatsApp (play + волна + бегунок) */
+  &__voicePlayer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 220px;
+    max-width: 280px;
+    padding: 2px 0;
+  }
+  &__voicePlayerBtn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #128c7e;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.15s ease;
+    svg {
+      position: relative;
+      left: 1px;
+    }
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+  &__voicePlayerBody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  &__voicePlayerTrack {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 26px;
+    padding: 4px 6px;
+    cursor: pointer;
+    touch-action: none;
+    &:focus-visible {
+      outline: 2px solid #53bdeb;
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+  }
+  &__voicePlayerBar {
+    flex: 1;
+    min-width: 2px;
+    max-width: 3px;
+    border-radius: 2px;
+    background: rgba(17, 27, 33, 0.22);
+    transition: background 0.1s ease;
+    &.is-played {
+      background: #53bdeb;
+    }
+  }
+  &__voicePlayerThumb {
+    position: absolute;
+    top: 50%;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #53bdeb;
+    box-shadow: 0 1px 3px rgba(11, 20, 26, 0.35);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  &__voicePlayerTime {
+    font-size: 11.5px;
+    color: #667781;
+    font-variant-numeric: tabular-nums;
+    padding-left: 6px;
   }
   &__chatMeta {
     display: flex;
@@ -2316,6 +2607,55 @@
     margin-top: 2px;
     font-size: 11px;
     color: #667781;
+  }
+  &__chatMsgActions {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+  }
+  &__chatMsgActionBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: #667781;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 11px;
+    transition: background 0.12s ease, color 0.12s ease;
+    &:hover:not(:disabled) {
+      background: rgba(0, 0, 0, 0.06);
+      color: #111b21;
+    }
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+  &__chatEditForm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 200px;
+  }
+  &__chatEditInput {
+    width: 100%;
+    resize: vertical;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #111b21;
+    background: #fff;
+  }
+  &__chatEditActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
   }
   &__chatTicks {
     display: inline-flex;
@@ -2344,6 +2684,7 @@
     padding: 8px 10px 10px;
     background: var(--chat-composer);
     border-top: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.6) inset;
     flex-shrink: 0;
   }
   &__chatFileInput {
@@ -2357,13 +2698,26 @@
   &__chatAttach {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 10px;
+    padding: 6px 8px;
     background: #fff;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid var(--chat-border);
+    box-shadow: 0 1px 2px rgba(11, 20, 26, 0.06);
     font-size: 13px;
     color: #111b21;
+    animation: funnelFade 120ms ease-out;
+  }
+  &__chatAttachIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--surface-2, #f0f2f5);
+    display: grid;
+    place-items: center;
+    color: #128c7e;
+    font-size: 14px;
+    flex-shrink: 0;
   }
   &__chatAttachName {
     flex: 1;
@@ -2380,6 +2734,47 @@
     display: flex;
     align-items: flex-end;
     gap: 6px;
+  }
+  &__chatRecording {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 6px 14px;
+    background: #fff;
+    border-radius: 26px;
+    border: 1px solid var(--chat-border);
+    box-shadow: 0 1px 2px rgba(11, 20, 26, 0.06);
+    animation: funnelFade 120ms ease-out;
+  }
+  &__chatRecordingDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e53935;
+    flex-shrink: 0;
+    animation: funnelRecordPulse 1.1s ease-in-out infinite;
+  }
+  &__chatRecordingTime {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 13.5px;
+    color: #111b21;
+    flex-shrink: 0;
+  }
+  &__chatRecordingHint {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #667781;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__chatRecordingCancel {
+    color: #e53935;
+    &:hover:not(:disabled) {
+      background: #fef2f2;
+    }
   }
   &__chatInput {
     flex: 1;
@@ -2425,6 +2820,17 @@
 @keyframes funnelFade {
   from {
     opacity: 0;
+  }
+}
+@keyframes funnelRecordPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
   }
 }
 @keyframes funnelPop {

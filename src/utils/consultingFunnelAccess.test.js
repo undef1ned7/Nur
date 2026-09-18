@@ -126,6 +126,13 @@ describe("consultingFunnelAccess — создание воронок сотру�
     expect(canCreateConsultingFunnel(null)).toBe(false);
   });
 
+  it("canCreateConsultingFunnel: руководитель региона — всегда, независимо от чекбокса", () => {
+    expect(canCreateConsultingFunnel(supOsh)).toBe(true);
+    expect(
+      canCreateConsultingFunnel({ ...supOsh, can_create_funnel: false }),
+    ).toBe(true);
+  });
+
   it("filterFunnelsForUser: автор видит свою подворонку по owner_user", () => {
     const sellerOsh = {
       ...seller,

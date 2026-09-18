@@ -85,6 +85,36 @@ describe("normalizeChatMessage media", () => {
       "out",
     );
   });
+
+  it("hides legacy filename-as-caption text and falls back to the placeholder", () => {
+    const msg = normalizeChatMessage({
+      text: "f11d0bb2-b401-4cff-8747-d0e7cce555a7.oga",
+      content_uri: "https://cdn.example/f11d0bb2-b401-4cff-8747-d0e7cce555a7.oga",
+      media_type: "voice",
+      is_incoming: true,
+    });
+    expect(msg.text).toBe(mediaTypeLabel("voice"));
+  });
+
+  it("hides caption text equal to the media_url basename even without an extension match", () => {
+    const msg = normalizeChatMessage({
+      text: "report-final",
+      content_uri: "https://cdn.example/report-final",
+      media_type: "document",
+      is_incoming: true,
+    });
+    expect(msg.text).toBe(mediaTypeLabel("document"));
+  });
+
+  it("keeps a real user caption next to media", () => {
+    const msg = normalizeChatMessage({
+      text: "Смотри видео",
+      content_uri: "https://cdn.example/a.mp4",
+      media_type: "video",
+      is_incoming: true,
+    });
+    expect(msg.text).toBe("Смотри видео");
+  });
 });
 
 describe("normalizeChatThread media preview", () => {
@@ -96,6 +126,22 @@ describe("normalizeChatThread media preview", () => {
           text: "",
           media_type: "voice",
           content_uri: "https://cdn.example/v.ogg",
+        },
+      },
+      "whatsapp",
+    );
+    expect(t.last_message).toBe(mediaTypeLabel("voice"));
+  });
+
+  it("replaces legacy filename-as-caption preview with the placeholder", () => {
+    const t = normalizeChatThread(
+      {
+        id: "1",
+        last_message: {
+          text: "f11d0bb2-b401-4cff-8747-d0e7cce555a7.oga",
+          media_type: "voice",
+          content_uri:
+            "https://cdn.example/f11d0bb2-b401-4cff-8747-d0e7cce555a7.oga",
         },
       },
       "whatsapp",

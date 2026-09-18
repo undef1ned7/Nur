@@ -333,6 +333,10 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         backendKey: "can_view_building_objects",
       },
     ],
+    // Держать синхронно с SECTOR_ACCESS_TYPES.Консалтинг в
+    // DepartmentDetails/AccessList.jsx — расхождение здесь означает, что
+    // сохранённое на бэке право не подсвечивается галочкой при повторном
+    // открытии модалки «Доступы» (сама выдача прав при этом работает).
     Консалтинг: [
       {
         value: "Клиенты",
@@ -358,9 +362,19 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
       { value: "Продажи", label: "Продажи", backendKey: "can_view_sale" },
       { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
       {
-        value: "Воронка продаж",
-        label: "Воронка продаж",
+        value: "Лиды",
+        label: "Лиды",
+        backendKey: "can_view_leads_inbox",
+      },
+      {
+        value: "Чаты",
+        label: "Чаты",
         backendKey: "can_view_funnel",
+      },
+      {
+        value: "Создание воронок",
+        label: "Создание воронок",
+        backendKey: "can_create_funnel",
       },
       {
         value: "Управление лидами воронки",
@@ -371,6 +385,21 @@ export function convertEmployeeAccessesToLabels(employee, sectorName) {
         value: "Управление стадиями воронки",
         label: "Управление стадиями воронки",
         backendKey: "can_manage_funnel_stages",
+      },
+      {
+        value: "Финансы лидов (рекламный отчёт)",
+        label: "Финансы лидов (рекламный отчёт)",
+        backendKey: "can_manage_lead_ad_spend",
+      },
+      {
+        value: "Все лиды воронки",
+        label: "Все лиды воронки",
+        backendKey: "can_view_all_funnel_leads",
+      },
+      {
+        value: "Все продажи компании",
+        label: "Все продажи компании",
+        backendKey: "can_view_all_sales",
       },
     ],
     Склад: [

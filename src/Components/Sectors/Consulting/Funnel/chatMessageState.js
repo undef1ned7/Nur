@@ -175,6 +175,44 @@ export function applyChatMessageStatus(byId, data) {
 }
 
 /**
+ * Ключ сообщения в Map по событию WS `message_edited`/`message_deleted`:
+ * сперва по внутреннему `id` (так же, как всё остальное состояние), при
+ * промахе — перебором по `message_id` (см. ТЗ: бэк даёт оба поля, но не
+ * гарантирует, что внутренний `id` в Map совпадёт буква в букву).
+ */
+function findChatMessageKey(byId, data) {
+  const id = data?.id != null ? String(data.id) : "";
+  if (id && byId.has(id)) return id;
+  const messageId = data?.message_id || data?.messageId;
+  if (!messageId) return id || null;
+  for (const [key, msg] of byId) {
+    if (msg?.message_id && String(msg.message_id) === String(messageId)) {
+      return key;
+    }
+  }
+  return id || null;
+}
+
+/** WS `message_edited` — обновляет только текст, остального (статус и т.д.) не трогает. */
+export function applyChatMessageEdit(byId, data) {
+  const key = findChatMessageKey(byId, data);
+  if (!key || !byId.has(key)) return byId;
+  const next = new Map(byId);
+  const prev = next.get(key);
+  next.set(key, { ...prev, text: data?.text ?? prev.text, edited: true });
+  return next;
+}
+
+/** WS `message_deleted` — убирает сообщение из треда. */
+export function removeChatMessage(byId, data) {
+  const key = findChatMessageKey(byId, data);
+  if (!key || !byId.has(key)) return byId;
+  const next = new Map(byId);
+  next.delete(key);
+  return next;
+}
+
+/**
  * Сливает свежую REST-историю и помечает конкретный pending, если сервер
  * по-прежнему не дал финального статуса.
  */

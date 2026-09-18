@@ -236,28 +236,61 @@ GET /consalting/inbound-leads/analytics/?date_from=&date_to=&owner=&source=
 
 **Ожидание:** ручное создание работает по той же политике, что webhook
 (см. [../backend-main-funnel-inbound.md](../backend-main-funnel-inbound.md) §2.1,
-§2.3) — параллельно с `InboundLead` создаётся `Lead` на **главной** воронке.
+§2.3) — параллельно с `InboundLead` создаётся `Lead`. По умолчанию — на
+**главной** воронке; но окно «Новый лид» теперь позволяет выбрать воронку,
+стадию и заполнить поля карточки (форма совпадает с созданием лида на доске
+`/crm/consulting/funnel`).
+
+### Расширенное тело запроса
+
+Форма шлёт `POST /consalting/inbound-leads/` с базовыми полями (`full_name`,
+`phone`, `source`, `message`, `external_id`) плюс необязательный блок для
+карточки воронки:
+
+| Поле | Тип | Назначение | Дефолт |
+|------|-----|------------|--------|
+| `funnel` | uuid | целевая воронка для параллельного `Lead` | воронка с `is_main=True` |
+| `stage` | uuid | стадия в этой воронке | первая системная (`intake` / `order=0`) |
+| `title` | str | название карточки | `full_name` → `phone` → «Новый лид» |
+| `email` | str | контактный email | `""` |
+| `estimated_value` | Decimal(12,2) ≥ 0 | оценочная сумма | `0` |
+| `probability` | int 0–100 | вероятность, % | `0` |
+| `service` | uuid | услуга (из `/consalting/services/`) | — |
+| `urgency` | `low`/`medium`/`high` | срочность (только при `VITE_FUNNEL_V2`) | `medium` |
+| `participant_ids` | uuid[] | сотрудники воронки (bulk-привязка к `Lead`) | `[]` |
+
+Валидация: `funnel` и `stage` должны принадлежать компании пользователя, `stage`
+— выбранной `funnel`; иначе `400` с русским `detail`. `service` вне видимости
+воронки роли — `400`. Неизвестные поля игнорировать (как DRF по умолчанию).
 
 ### Контракт
 
 `POST /consalting/inbound-leads/` при успешном создании `InboundLead`:
 
 ```text
-1. main = Funnel.objects.filter(company=…, is_main=True, is_active=True).first()
-2. IF main is None:
+1. funnel = payload.funnel (проверить company) OR
+            Funnel.objects.filter(company=…, is_main=True, is_active=True).first()
+2. IF funnel is None:
      - InboundLead создаётся, lead=null (как сейчас), лог WARNING
-3. stage = первая системная стадия main (system_key="intake" / order=0)
+3. stage = payload.stage (проверить funnel) OR первая системная стадия funnel
 4. Lead.objects.create(
-       funnel=main, stage=stage,
-       title=full_name or phone or "Новый лид",
-       full_name=…, phone=…, source=source ("manual"),
-       description=message, status="new", owner=null,
+       funnel=funnel, stage=stage,
+       title=payload.title or full_name or phone or "Новый лид",
+       full_name=…, phone=…, email=payload.email or "",
+       source=source ("manual"),
+       description=message,
+       estimated_value=payload.estimated_value or 0,
+       probability=payload.probability or 0,
+       urgency=payload.urgency or "medium",   # если модель поддерживает
+       service=payload.service or None,
+       status="new", owner=null,
    )
-5. InboundLead.lead = Lead; InboundLead.save()
-6. Запустить авто-распределение (§ раздачи в backend-main-funnel-inbound.md §3):
+5. IF participant_ids: Lead.participants.set(participant_ids)  # только своя компания
+6. InboundLead.lead = Lead; InboundLead.save()
+7. Запустить авто-распределение (§ раздачи в backend-main-funnel-inbound.md §3):
      round_robin/least_loaded → Lead.owner + InboundLead.owner + status=assigned
-     manual → owner=null (пул на main)
-7. WS: /ws/consalting/funnel/ → lead.created (payload с funnel = main id)
+     manual → owner=null (пул на выбранной воронке)
+8. WS: /ws/consalting/funnel/ → lead.created (payload с funnel = выбранная воронка)
      + персональный lead.assigned владельцу (если распределилось)
 ```
 
@@ -273,8 +306,10 @@ GET /consalting/inbound-leads/analytics/?date_from=&date_to=&owner=&source=
 ### Фронтовый фолбэк (снять после деплоя бэка)
 
 Пока контракт не задеплоен, фронт сам создаёт карточку:
-`ensureFunnelLeadForInbound()` в [`src/api/consultingLeads.js`](../../../src/api/consultingLeads.js)
-— ищет `is_main`-воронку, её стадию `intake`, делает `POST /consalting/leads/` и
+`ensureFunnelLeadForInbound(inbound, overrides)` в [`src/api/consultingLeads.js`](../../../src/api/consultingLeads.js)
+— берёт воронку и стадию из `overrides` (или ищет `is_main`-воронку и её стадию
+`intake`), делает `POST /consalting/leads/` с полями формы, при наличии
+`participant_ids` — `POST /consalting/leads/{id}/participants/`, затем
 `PATCH /consalting/inbound-leads/{id}/ { lead }`. Вызывается из
 [`CreateLeadModal.jsx`](../../../src/Components/Sectors/Consulting/leads/modals/CreateLeadModal.jsx).
 Когда бэк начнёт возвращать `lead` в ответе `POST /inbound-leads/`, фолбэк
@@ -282,13 +317,19 @@ GET /consalting/inbound-leads/analytics/?date_from=&date_to=&owner=&source=
 
 ### Чек-лист приёмки
 
-- [ ] `POST /consalting/inbound-leads/` с `source=manual` создаёт `Lead` на
-      воронке с `is_main=True`, стадия `intake`.
+- [ ] `POST /consalting/inbound-leads/` с `source=manual` без `funnel` создаёт
+      `Lead` на воронке с `is_main=True`, стадия `intake`.
+- [ ] Переданные `funnel` / `stage` используются вместо дефолтов; чужие или
+      несогласованные (`stage` не из `funnel`) → `400` с русским `detail`.
+- [ ] `title`, `email`, `estimated_value`, `probability`, `service`, `urgency`
+      попадают в созданный `Lead`.
+- [ ] `participant_ids` привязываются к `Lead` (только сотрудники своей компании).
 - [ ] `InboundLead.lead` в ответе `POST` заполнен id карточки.
-- [ ] Нет главной воронки → `InboundLead` создаётся, `lead=null`, WARNING в лог.
+- [ ] Нет целевой воронки → `InboundLead` создаётся, `lead=null`, WARNING в лог.
 - [ ] Авто-распределение отрабатывает так же, как для webhook-лида.
 - [ ] Повтор `POST` с тем же `external_id` не плодит вторую карточку.
-- [ ] WS `lead.created` уходит на `/ws/consalting/funnel/` с `funnel` = main id.
+- [ ] WS `lead.created` уходит на `/ws/consalting/funnel/` с `funnel` = выбранная
+      воронка.
 
 ## 1.6. Напоминания по отложенным
 

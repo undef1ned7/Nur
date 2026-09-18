@@ -84,27 +84,32 @@ export function cashboxTotals(row) {
 }
 
 /**
- * Режим подтверждения кассы. Канон (см. backend-money-tenant/09-frontend-contract.md):
- *   required  — каждая продажа/абонплата создаёт заявку кассиру;
+ * Режим подтверждения кассы. Канон (см. backend-money-tenant/09-frontend-contract.md
+ * и backend-money-tenant/26-cash-confirmation-default-off.md):
+ *   off       — деньги сразу в остаток, tenant создаётся без кассира (default);
  *   cash_only — заявка только для наличных, перевод проводится сразу;
- *   off       — деньги сразу в остаток, tenant создаётся без кассира.
+ *   required  — каждая продажа/абонплата создаёт заявку кассиру.
  * Легаси-алиасы: always → required, auto → off.
+ * По умолчанию (нет настроек на сервере / компания их ни разу не сохраняла)
+ * — заявки ВЫКЛЮЧЕНЫ (`off`). Раньше дефолтом был `cash_only`.
  */
-export const CASH_CONFIRM_MODES = ["required", "cash_only", "off"];
+export const CASH_CONFIRM_MODES = ["off", "cash_only", "required"];
+
+export const DEFAULT_CASH_CONFIRM_MODE = "off";
 
 export function normalizeCashConfirmMode(mode) {
   const m = String(mode || "").toLowerCase();
   if (m === "required" || m === "always") return "required";
   if (m === "cash_only") return "cash_only";
   if (m === "off" || m === "auto") return "off";
-  return "cash_only";
+  return DEFAULT_CASH_CONFIRM_MODE;
 }
 
 export const CASH_CONFIRM_MODE_OPTIONS = [
   {
-    value: "required",
-    label: "Кассир подтверждает вручную",
-    hint: "Каждая продажа и абонплата создаёт заявку в кассу.",
+    value: "off",
+    label: "Выключено (по умолчанию)",
+    hint: "Деньги сразу в остаток, без заявок и подтверждения кассиром.",
   },
   {
     value: "cash_only",
@@ -112,9 +117,9 @@ export const CASH_CONFIRM_MODE_OPTIONS = [
     hint: "Переводы проводятся сразу, наличные ждут подтверждения кассира.",
   },
   {
-    value: "off",
-    label: "Автоподтверждение",
-    hint: "Деньги сразу в остаток, CRM-аккаунт создаётся без кассира.",
+    value: "required",
+    label: "Кассир подтверждает вручную",
+    hint: "Каждая продажа и абонплата создаёт заявку в кассу.",
   },
 ];
 

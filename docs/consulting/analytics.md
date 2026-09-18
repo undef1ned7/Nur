@@ -12,6 +12,7 @@
 | Эндпоинт | Вкладка UI |
 |---|---|
 | `GET /api/consalting/analytics/dashboard/` | Обзор |
+| `GET /api/consalting/analytics/debts/` | Долги |
 | `GET /api/consalting/analytics/messenger/` | Мессенджер |
 | `GET /api/consalting/analytics/sources/` | Источники |
 | `GET /api/consalting/analytics/managers/` | Менеджеры |
@@ -51,6 +52,25 @@
 
 `percent` — рост в % к прошлому периоду той же длины (стрелки ↑/↓).
 Для `avg_response_minutes` **меньше = лучше**: рост красим негативно.
+
+---
+
+## 1a. Долги — `/analytics/debts/`
+
+**Фронт:** вкладка «Долги» в `Analytics.jsx`. Полный контракт и модель —
+[backend-money-tenant/18-analytics-debts.md](./backend-money-tenant/18-analytics-debts.md).
+
+Две категории долга по абонентской плате:
+
+1. **Просроченная абонплата** — `SubscriptionPayment.status = overdue`
+   (клиент долго не платит по действующей подписке).
+2. **Абонплата в долг/рассрочку** — подписка создана из продажи с
+   `payment_mode in (debt, installment)` (клиент подключился без оплаты
+   вперёд).
+
+Списки — **срез на сегодня**, не зависят от `date_from`/`date_to`. Период
+влияет только на `percent`/`diff` у KPI (сравнение с предыдущим периодом той
+же длины, как и в дашборде).
 
 ---
 

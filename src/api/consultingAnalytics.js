@@ -103,6 +103,22 @@ export const getAnalyticsManagers = async (params = {}) => {
 };
 
 /**
+ * Долги: просроченная абонплата + абонплата, оформленная в долг/рассрочку.
+ * GET /consalting/analytics/debts/
+ * Контракт: docs/consulting/backend-money-tenant/18-analytics-debts.md
+ */
+export const getAnalyticsDebts = async (params = {}) => {
+  try {
+    const { data } = await api.get(`${BASE}/debts/`, {
+      params: analyticsPeriodParams(params),
+    });
+    return data;
+  } catch (error) {
+    return reject("Analytics Debts Error")(error);
+  }
+};
+
+/**
  * Продажи (legacy).
  * GET /consalting/analytics/
  */

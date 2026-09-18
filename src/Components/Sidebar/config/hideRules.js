@@ -84,7 +84,6 @@ export const HIDE_RULES = [
   {
     when: { tariff: "Стандарт" },
     hide: {
-      labels: ["Филиалы"],
       toIncludes: ["/crm/debts"],
     },
   },

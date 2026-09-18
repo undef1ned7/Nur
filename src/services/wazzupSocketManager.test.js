@@ -78,6 +78,31 @@ describe("wazzupSocketManager", () => {
     release();
   });
 
+  it("includes media_type/content_type when provided (voice notes need an explicit type)", async () => {
+    const { acquireWazzupSocket, sendWazzupChatMessage } =
+      await import("./wazzupSocketManager");
+    const release = acquireWazzupSocket();
+    vi.runOnlyPendingTimers();
+    const socket = MockWebSocket.instances[0];
+    socket.readyState = MockWebSocket.OPEN;
+
+    sendWazzupChatMessage({
+      lead_id: "lead-1",
+      text: "",
+      content_uri: "https://cdn.example/voice.webm",
+      account_id: "account-1",
+      media_type: "voice",
+      content_type: "audio/webm",
+    });
+    const frame = JSON.parse(socket.sent[0]);
+    expect(frame.media_type).toBe("voice");
+    expect(frame.type).toBe("voice");
+    expect(frame.content_type).toBe("audio/webm");
+    expect(frame.mimetype).toBe("audio/webm");
+
+    release();
+  });
+
   it("dispatches ack, new_message and message_status to every subscriber", async () => {
     const {
       acquireWazzupSocket,
