@@ -6,10 +6,21 @@ const AUTH_PARAM_ACCESS = "accessToken";
 const AUTH_PARAM_REFRESH = "refreshToken";
 const AUTH_PARAM_SECTOR = "sector";
 
-export const buildAuthRedirectUrl = (targetUrl, tokens = {}) => {
+export const buildAuthRedirectUrl = (targetUrl, tokens = {}, options = {}) => {
   const url = new URL(targetUrl, window.location.origin);
   const access = tokens.access || tokens.accessToken;
   const refresh = tokens.refresh || tokens.refreshToken;
+
+  if (options.useHash) {
+    // hash не уходит в Referer/прокси-логи
+    const hashParams = new URLSearchParams();
+    if (access) hashParams.set(AUTH_PARAM_ACCESS, access);
+    if (refresh) hashParams.set(AUTH_PARAM_REFRESH, refresh);
+    if (tokens.sector) hashParams.set(AUTH_PARAM_SECTOR, tokens.sector);
+    const hash = hashParams.toString();
+    if (hash) url.hash = hash;
+    return url.toString();
+  }
 
   if (access) {
     url.searchParams.set(AUTH_PARAM_ACCESS, access);
@@ -83,11 +94,12 @@ export const tryRedirectToBuildingApp = (company, currentPath) => {
   return ok ? "redirected" : "skipped";
 };
 
+// В market-приложении CRM живёт под тем же /crm, что и в основном
 export const resolveMarketAppPath = (currentPath) => {
-  if (currentPath?.startsWith("/crm/market")) {
-    return currentPath.replace(/^\/crm/, "");
+  if (currentPath?.startsWith("/crm") && currentPath !== "/crm/logout") {
+    return currentPath;
   }
-  return "/market";
+  return "/crm";
 };
 
 /**
@@ -101,7 +113,7 @@ export const canHandoffToMarketApp = (company) => {
   return true;
 };
 
-export const redirectToMarketApp = (currentPath = "/market") => {
+export const redirectToMarketApp = (currentPath = "/crm") => {
   const targetPath = resolveMarketAppPath(currentPath);
   const tokens = {
     ...getStoredAuthTokens(),
@@ -116,6 +128,7 @@ export const redirectToMarketApp = (currentPath = "/market") => {
   window.location.href = buildAuthRedirectUrl(
     getMarketAppPath(targetPath),
     tokens,
+    { useHash: true },
   );
   return true;
 };

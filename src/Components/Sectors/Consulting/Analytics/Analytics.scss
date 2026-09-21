@@ -837,3 +837,26 @@
     background: var(--ca-primary-dark);
   }
 }
+
+@media (max-width: 420px) {
+  .consulting-analytics {
+    padding: 12px;
+  }
+
+  .consulting-analytics__funnelStats {
+    grid-template-columns: 1fr;
+  }
+
+  .consulting-analytics__range label {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .consulting-analytics-periodModal__actions {
+    flex-wrap: wrap;
+
+    > * {
+      flex: 1 1 auto;
+    }
+  }
+}

@@ -7,6 +7,9 @@ import {
 } from "../utils";
 import "./CounterpartyTable.scss";
 
+/** Пустая ячейка для нулевых/отсутствующих сумм — как в бумажной ведомости */
+const formatMoneyOrBlank = (value) => (value ? formatMoneyRu(value) : "");
+
 /**
  * Мемоизированный компонент строки таблицы
  */
@@ -20,47 +23,29 @@ const CounterpartyRow = React.memo(
         className="warehouse-table__row cursor-pointer"
         onClick={() => onCounterpartyClick(counterparty)}
       >
-        <td>{rowNumber}</td>
+        <td className="warehouse-table__num">{rowNumber}</td>
 
         <td className="warehouse-table__name">
           <span>{name}</span>
         </td>
 
-        <td
-          className="warehouse-table__money"
-          style={
-            metrics.openingDebit === null
-              ? { textAlign: "center" }
-              : { textAlign: "left" }
-          }
-        >
-          {metrics.openingDebit === null
-            ? "—"
-            : formatMoneyRu(metrics.openingDebit)}
-        </td>
-        <td
-          className="warehouse-table__money"
-          style={
-            metrics.openingCredit === null
-              ? { textAlign: "center" }
-              : { textAlign: "left" }
-          }
-        >
-          {metrics.openingCredit === null
-            ? "—"
-            : formatMoneyRu(metrics.openingCredit)}
+        <td className="warehouse-table__money">
+          {formatMoneyOrBlank(metrics.openingDebit)}
         </td>
         <td className="warehouse-table__money">
-          {formatMoneyRu(metrics.turnoverDebit)}
+          {formatMoneyOrBlank(metrics.openingCredit)}
         </td>
         <td className="warehouse-table__money">
-          {formatMoneyRu(metrics.turnoverCredit)}
+          {formatMoneyOrBlank(metrics.turnoverDebit)}
+        </td>
+        <td className="warehouse-table__money">
+          {formatMoneyOrBlank(metrics.turnoverCredit)}
         </td>
         <td className="warehouse-table__money warehouse-table__money--strong">
-          {formatMoneyRu(metrics.closingDebit)}
+          {formatMoneyOrBlank(metrics.closingDebit)}
         </td>
         <td className="warehouse-table__money warehouse-table__money--strong">
-          {formatMoneyRu(metrics.closingCredit)}
+          {formatMoneyOrBlank(metrics.closingCredit)}
         </td>
 
         {showAgentColumn && (
@@ -130,45 +115,27 @@ const CounterpartyTable = ({
     );
   }, [counterparties]);
 
-  const renderTotalsRow = (variant = "bottom") => (
-    <tr
-      className={`warehouse-table__total-row ${
-        variant === "top" ? "warehouse-table__total-row--top" : ""
-      }`}
-    >
+  const renderTotalsRow = () => (
+    <tr className="warehouse-table__total-row">
       <td></td>
       <td>Итого</td>
-      <td
-        className="warehouse-table__money"
-        style={
-          totals.hasOpeningDebit ? { textAlign: "right" } : { textAlign: "center" }
-        }
-      >
-        {totals.hasOpeningDebit ? formatMoneyRu(totals.openingDebit) : "—"}
+      <td className="warehouse-table__money">
+        {formatMoneyOrBlank(totals.openingDebit)}
       </td>
-      <td
-        className="warehouse-table__money"
-        style={
-          totals.hasOpeningCredit
-            ? { textAlign: "right" }
-            : { textAlign: "center" }
-        }
-      >
-        {totals.hasOpeningCredit
-          ? formatMoneyRu(totals.openingCredit)
-          : "—"}
+      <td className="warehouse-table__money">
+        {formatMoneyOrBlank(totals.openingCredit)}
       </td>
-      <td className="warehouse-table__money text-center">
-        {formatMoneyRu(totals.turnoverDebit)}
+      <td className="warehouse-table__money">
+        {formatMoneyOrBlank(totals.turnoverDebit)}
       </td>
-      <td className="warehouse-table__money text-center">
-        {formatMoneyRu(totals.turnoverCredit)}
+      <td className="warehouse-table__money">
+        {formatMoneyOrBlank(totals.turnoverCredit)}
       </td>
       <td className="warehouse-table__money warehouse-table__money--strong">
-        {formatMoneyRu(totals.closingDebit)}
+        {formatMoneyOrBlank(totals.closingDebit)}
       </td>
       <td className="warehouse-table__money warehouse-table__money--strong">
-        {formatMoneyRu(totals.closingCredit)}
+        {formatMoneyOrBlank(totals.closingCredit)}
       </td>
       {showAgentColumn && <td></td>}
     </tr>
@@ -213,54 +180,26 @@ const CounterpartyTable = ({
           <div className="text-sm text-slate-600">Загрузка...</div>
         </div>
       )}
-      <table className="warehouse-table w-full min-w-[1100px]">
+      <table className="warehouse-table warehouse-table--ledger w-full min-w-[1100px]">
         <thead>
           <tr>
             <th rowSpan={2}>№</th>
-            <th
-              rowSpan={2}
-              style={{
-                borderRight: "1px solid #e5e7eb",
-                borderLeft: "1px solid #e5e7eb",
-              }}
-            >
-              Субконто
-            </th>
-            <th
-              colSpan={2}
-              style={{
-                borderRight: "1px solid #e5e7eb",
-                borderLeft: "1px solid #e5e7eb",
-              }}
-            >
-              Сальдо на начало периода
-            </th>
-            <th colSpan={2} style={{ borderRight: "1px solid #e5e7eb" }}>
-              Оборот за период
-            </th>
-            <th colSpan={2} style={{ borderRight: "1px solid #e5e7eb" }}>
-              Сальдо на конец периода
-            </th>
+            <th rowSpan={2}>Субконто</th>
+            <th colSpan={2}>Сальдо на начало периода</th>
+            <th colSpan={2}>Оборот за период</th>
+            <th colSpan={2}>Сальдо на конец периода</th>
             {showAgentColumn && <th rowSpan={2}>Агент</th>}
           </tr>
           <tr>
-            <th
-              style={{
-                borderRight: "1px solid #e5e7eb",
-                borderLeft: "1px solid #e5e7eb",
-              }}
-            >
-              Дебет
-            </th>
-            <th style={{ borderRight: "1px solid #e5e7eb" }}>Кредит</th>
-            <th style={{ borderRight: "1px solid #e5e7eb" }}>Дебет</th>
-            <th style={{ borderRight: "1px solid #e5e7eb" }}>Кредит</th>
-            <th style={{ borderRight: "1px solid #e5e7eb" }}>Дебет</th>
-            <th style={{ borderRight: "1px solid #e5e7eb" }}>Кредит</th>
+            <th>Дебет</th>
+            <th>Кредит</th>
+            <th>Дебет</th>
+            <th>Кредит</th>
+            <th>Дебет</th>
+            <th>Кредит</th>
           </tr>
         </thead>
         <tbody>
-          {renderTotalsRow("top")}
           {counterpartiesData.map((data) => (
             <CounterpartyRow
               key={data.counterparty.id}
@@ -271,7 +210,7 @@ const CounterpartyTable = ({
             />
           ))}
         </tbody>
-        <tfoot>{renderTotalsRow("bottom")}</tfoot>
+        <tfoot>{renderTotalsRow()}</tfoot>
       </table>
     </div>
   );

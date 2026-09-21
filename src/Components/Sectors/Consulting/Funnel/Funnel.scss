@@ -3319,3 +3319,89 @@
     }
   }
 }
+
+/* Адаптив: страница воронки на планшетах и телефонах */
+@media (max-width: 860px) {
+  .funnel {
+    margin: 10px;
+    padding: 16px 14px 12px;
+    /* шапка и тулбар переносятся на несколько строк — фикс. высота
+       обрезала бы доску, поэтому даём странице расти */
+    height: auto;
+    min-height: calc(100dvh - 20px);
+    overflow: visible;
+
+    &__scope {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    &__bulkBar {
+      flex-wrap: wrap;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .funnel {
+    margin: 8px;
+    padding: 12px 10px 10px;
+    gap: 12px;
+
+    &__col {
+      flex-basis: min(300px, 86vw);
+      width: min(300px, 86vw);
+    }
+
+    &__board {
+      gap: 10px;
+      scroll-snap-type: x proximity;
+    }
+
+    &__col {
+      scroll-snap-align: start;
+    }
+
+    &__select,
+    &__select--sm,
+    &__select--inline {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    &__toolbar > * {
+      max-width: 100%;
+    }
+
+    &__overlay {
+      padding: 8px;
+    }
+
+    &__modal {
+      max-height: 96dvh;
+      border-radius: 16px;
+    }
+
+    &__modalHead {
+      padding: 14px 16px;
+    }
+
+    &__form {
+      padding: 16px 16px 18px;
+    }
+
+    &__chat {
+      min-height: 360px;
+      max-height: 70dvh;
+    }
+
+    &__chatBubble {
+      max-width: 88%;
+    }
+
+    &__voicePlayer,
+    &__chatEditForm {
+      min-width: 0;
+    }
+  }
+}

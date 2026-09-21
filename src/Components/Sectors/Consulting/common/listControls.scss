@@ -20,7 +20,7 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    min-width: 240px;
+    min-width: min(240px, 100%);
     flex: 0 1 320px;
   }
 
@@ -546,6 +546,40 @@
 
   &__muted {
     color: #94a3b8;
+  }
+}
+
+/* ------------------------------ адаптив ------------------------------ */
+@media (max-width: 640px) {
+  .cList {
+    &__toolbar {
+      gap: 8px;
+    }
+
+    &__toolbar > * {
+      max-width: 100%;
+    }
+
+    &__search {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    &__toolbarSpacer {
+      display: none;
+    }
+
+    &__periodDates {
+      flex-wrap: wrap;
+    }
+
+    &__pager {
+      justify-content: center;
+    }
+
+    &__stats {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
   }
 }
 

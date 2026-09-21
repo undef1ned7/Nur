@@ -457,7 +457,7 @@ export default function ConsultingReports() {
             placeholder="Фильтр месяца (напр. Июл)"
             value={queryMonth}
             onChange={(e) => setQueryMonth(e.target.value)}
-            style={{ minWidth: 160 }}
+            style={{ minWidth: 0, flex: "1 1 160px" }}
             title="Поиск по названию месяца"
           />
         </div>

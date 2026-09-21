@@ -419,6 +419,8 @@ bool canOpenCashier(Map<String, dynamic> profile) =>
 
 Часть функций скрывается при `company.subscription_plan.name == "Старт"` (production, warehouse и др.). Учитывайте и сектор, и тариф.
 
+Полная таблица правил скрытия меню по тарифу/сектору, лимиты, доп. услуги и API — см. [flutter-tariffs.md](./flutter-tariffs.md).
+
 ---
 
 ## 9. WebSocket

@@ -114,7 +114,7 @@ const Counterparties = () => {
 
   const counterparties = useMemo(
     () => filterCounterpartiesByTypeTab(rawCounterparties, typeTab),
-    [rawCounterparties, typeTab]
+    [rawCounterparties, typeTab],
   );
 
   // Список уникальных агентов с текущей страницы (для выбора в фильтре)
@@ -214,14 +214,14 @@ const Counterparties = () => {
     (counterparty) => {
       navigate(`/crm/warehouse/counterparties/${counterparty.id}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handlePageChange = useCallback(
     (newPage) => {
       handlePageChangeBase(newPage);
     },
-    [handlePageChangeBase]
+    [handlePageChangeBase],
   );
 
   const handleCreateCounterparty = useCallback(() => {
@@ -346,8 +346,8 @@ const Counterparties = () => {
               {agentFilter
                 ? "По выбранному агенту никого нет. Выберите «Все агенты» или другого агента."
                 : searchTerm.trim()
-                ? "Попробуйте изменить запрос или вкладку (Клиент / Поставщик)"
-                : "Добавьте контрагента кнопкой «Создать контрагента»"}
+                  ? "Попробуйте изменить запрос или вкладку (Клиент / Поставщик)"
+                  : "Добавьте контрагента кнопкой «Создать контрагента»"}
             </p>
           </div>
         ) : viewMode === VIEW_MODES.TABLE ? (
