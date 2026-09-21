@@ -7,7 +7,10 @@ import {
 } from "../../../store/creators/userCreators";
 import { logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
-import { tryRedirectToBuildingApp } from "../../../utils/crossAppAuth";
+import {
+  tryRedirectToBuildingApp,
+  tryRedirectToMarketApp,
+} from "../../../utils/crossAppAuth";
 import { getCompanySubscriptionStatus } from "../../../utils/companySubscription";
 import { captureBuildingAppUrlFromSearch } from "../../../utils/appUrls";
 import { clearTokens } from "../../../utils/authUtils";
@@ -202,6 +205,10 @@ const Login = () => {
       }
 
       if (tryRedirectToBuildingApp(company) === "redirected") {
+        return;
+      }
+
+      if (tryRedirectToMarketApp(company) === "redirected") {
         return;
       }
 

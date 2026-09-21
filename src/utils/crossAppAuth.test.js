@@ -132,8 +132,9 @@ describe("crossAppAuth", () => {
   });
 
   it("resolveMarketAppPath maps crm market routes", () => {
-    expect(resolveMarketAppPath("/crm/market/sell")).toBe("/market/sell");
-    expect(resolveMarketAppPath("/login")).toBe("/market");
+    expect(resolveMarketAppPath("/crm/market/sell")).toBe("/crm/market/sell");
+    expect(resolveMarketAppPath("/login")).toBe("/crm");
+    expect(resolveMarketAppPath("/crm/logout")).toBe("/crm");
   });
 
   it("canHandoffToMarketApp requires sector, subscription and token", () => {

@@ -646,3 +646,31 @@
     }
   }
 }
+
+@media (max-width: 640px) {
+  .salary {
+    &__overrideRow {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+
+      > :first-child {
+        grid-column: 1 / -1;
+      }
+    }
+
+    &__tierRow {
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    }
+
+    &__overridesHead {
+      flex-wrap: wrap;
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  .salary {
+    &__row2 {
+      grid-template-columns: 1fr;
+    }
+  }
+}

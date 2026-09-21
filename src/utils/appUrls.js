@@ -26,15 +26,6 @@ const DEFAULT_BUILDING_APP_URL = "https://stroy.nurcrm.kg";
 
 const BUILDING_APP_URL_STORAGE_KEY = "buildingAppUrl";
 
-const MARKET_APP_BY_HOST = {
-  "stage.nurcrm.kg": "https://market.nurcrm.kg",
-  "www.stage.nurcrm.kg": "https://market.nurcrm.kg",
-  "app.nurcrm.kg": "https://market.nurcrm.kg",
-  "www.app.nurcrm.kg": "https://market.nurcrm.kg",
-  "nurcrm.kg": "https://market.nurcrm.kg",
-  "www.nurcrm.kg": "https://market.nurcrm.kg",
-};
-
 const DEFAULT_MARKET_APP_URL = "https://market.nurcrm.kg";
 
 const MARKET_APP_URL_STORAGE_KEY = "marketAppUrl";
@@ -55,9 +46,13 @@ const clearStoredBuildingAppUrl = () => {
   }
 };
 
+// Единый домен market для stage и prod: любой не-localhost хост → market.nurcrm.kg
 const getMappedMarketAppUrl = () => {
   const hostname = getCurrentHostname();
-  return hostname ? MARKET_APP_BY_HOST[hostname] || null : null;
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") {
+    return null;
+  }
+  return DEFAULT_MARKET_APP_URL;
 };
 
 const clearStoredMarketAppUrl = () => {
@@ -165,11 +160,8 @@ export const getMarketAppUrl = () => {
   const fromEnv = trimTrailingSlash(import.meta.env.VITE_MARKET_APP_URL);
   const mapped = getMappedMarketAppUrl();
 
-  // На stage/prod всегда market.nurcrm.kg; localhost из env/сборки игнорируем
-  if (mapped) {
-    if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
-    return mapped;
-  }
+  // На stage/prod всегда market.nurcrm.kg, env не перебивает
+  if (mapped) return mapped;
 
   if (fromEnv && !isLocalhostUrl(fromEnv)) return fromEnv;
   if (fromEnv) return fromEnv;
@@ -229,9 +221,7 @@ export const getResolvedMarketAppUrl = () => {
         return mapped;
       }
 
-      if (!isLocalhostUrl(normalized) || !mapped) {
-        return normalized;
-      }
+      if (!mapped) return normalized;
     }
   } catch {
     // ignore
@@ -240,7 +230,7 @@ export const getResolvedMarketAppUrl = () => {
   return getMarketAppUrl();
 };
 
-export const getMarketAppPath = (path = "/market") => {
+export const getMarketAppPath = (path = "/crm") => {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${getResolvedMarketAppUrl()}${normalizedPath}`;
 };

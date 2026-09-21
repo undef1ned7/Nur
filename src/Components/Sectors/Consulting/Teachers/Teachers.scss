@@ -879,3 +879,28 @@
     }
   }
 }
+
+/* Доп. адаптация мобильных */
+@media (max-width: 640px) {
+  .Schoolteachers__tabs {
+    flex-wrap: wrap;
+  }
+  .Schoolteachers__modal {
+    padding: 16px 14px;
+    max-height: 94dvh;
+  }
+  .Schoolteachers__funnelGrantsTable {
+    overflow-x: auto;
+  }
+  .Schoolteachers__funnelGrantsHead,
+  .Schoolteachers__funnelGrantsRow {
+    min-width: 400px;
+  }
+  .teachers {
+    &__cardHead,
+    &__financeActions,
+    &__totalsRow {
+      flex-wrap: wrap;
+    }
+  }
+}

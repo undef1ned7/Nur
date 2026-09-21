@@ -20,9 +20,51 @@
   }
 }
 
+/*
+ * Вид "оборотно-сальдовой ведомости": сплошная сетка, компактные ячейки,
+ * суммы по правому краю, шапка по центру — как в бухгалтерских отчётах 1С.
+ */
+.warehouse-table--ledger {
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    border: 1px solid #cbd5e1;
+  }
+
+  thead th {
+    padding: 8px 10px;
+    background: #f8fafc;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  tbody td,
+  tfoot td {
+    padding: 6px 10px;
+  }
+
+  .warehouse-table__num {
+    text-align: center;
+    color: #64748b;
+    width: 1%;
+  }
+
+  .warehouse-table__name {
+    white-space: nowrap;
+  }
+
+  .warehouse-table__agent {
+    white-space: nowrap;
+  }
+}
+
 .warehouse-table {
   &__money {
-    text-align: left;
+    text-align: right;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
     padding: 12px 16px;
@@ -36,12 +78,7 @@
     td {
       font-weight: 600;
       background: #f8fafc;
-      border-top: 1px solid #e2e8f0;
+      border-top: 2px solid #94a3b8;
     }
-  }
-
-  &__total-row--top td {
-    border-top: none;
-    border-bottom: 1px solid #e2e8f0;
   }
 }

@@ -1034,3 +1034,38 @@
     font-size: 14px;
   }
 }
+
+/* Колонок меньше 7 — подписи дней недели больше не совпадают с сеткой */
+@media (max-width: 1200px) {
+  .bookings__weekdays {
+    display: none;
+  }
+  .bookings__calendar {
+    margin-top: 8px;
+  }
+}
+@media (max-width: 900px) {
+  .bookings__header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .bookings__month {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  .bookings__overlay {
+    padding: 8px;
+  }
+  .bookings__modal {
+    width: 100%;
+    max-height: 96dvh;
+  }
+  .bookings__monthLabel {
+    min-width: 0;
+    flex: 1;
+  }
+  .bookings__calendar {
+    grid-auto-rows: minmax(260px, auto);
+  }
+}

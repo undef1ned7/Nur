@@ -5,6 +5,7 @@
 | Документ | Описание |
 |---|---|
 | [flutter-authentication.md](./flutter-authentication.md) | **JWT, сессия, refresh, WebSocket, права, подписка** — полный гайд для Flutter |
+| [flutter-tariffs.md](./flutter-tariffs.md) | **Тарифы**: модель данных, API, правила скрытия меню по тарифу/сектору, лимиты, доп. услуги |
 | [../market_cashier_mobile_piece_sale.md](../market_cashier_mobile_piece_sale.md) | Логика кассы маркета (пачка / поштучно) |
 
 **Эталонная реализация на фронте:** `src/api/index.js`, `src/api/authInterceptors.js`, `src/Components/Auth/AuthGuard/AuthGuard.jsx`, `src/store/creators/userCreators.js`.

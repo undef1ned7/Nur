@@ -581,11 +581,13 @@ import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import Modal from "../../../common/Modal/Modal";
+import Pagination from "../Counterparties/components/Pagination";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const HostelClients = lazy(() => import("../../Hostel/Clients/Clients"));
 
 const STORAGE_KEY = "clients_view_mode";
+const PAGE_SIZE = 100;
 
 const getInitialViewMode = () => {
   if (typeof window === "undefined") return "table";
@@ -837,6 +839,21 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
           .includes(s),
     );
   }, [rows, debouncedSearch, activeTab]);
+
+  const [pageState, setPageState] = useState({ page: 1, key: "" });
+  const filterKey = `${activeTab}|${debouncedSearch}`;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // при смене вкладки/поиска — первая страница
+  const page = Math.min(
+    pageState.key === filterKey ? pageState.page : 1,
+    totalPages,
+  );
+  const setPage = (p) => setPageState({ page: p, key: filterKey });
+  const pageOffset = (page - 1) * PAGE_SIZE;
+  const pagedRows = useMemo(
+    () => filtered.slice(pageOffset, pageOffset + PAGE_SIZE),
+    [filtered, pageOffset],
+  );
 
   /* ===== переходы ТОЛЬКО абсолютные ===== */
   const openCard = (row) => navigate(`${CARD_BASE}${row.id}`, { state: row });
@@ -1184,13 +1201,13 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((c, index) => (
+                    pagedRows.map((c, index) => (
                       <tr
                         key={c.id}
                         className="clients-table__row"
                         onClick={() => openCard(c)}
                       >
-                        <td data-label="№">{index + 1}</td>
+                        <td data-label="№">{pageOffset + index + 1}</td>
                         <td data-label="ФИО" className="clients-table__name">
                           {c.full_name || c.fio || "—"}
                         </td>
@@ -1230,7 +1247,7 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
                 </div>
               ) : (
                 <div className="clients-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {filtered.map((c, index) => (
+                  {pagedRows.map((c, index) => (
                     <div
                       key={c.id}
                       className="clients-card"
@@ -1238,7 +1255,9 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
                     >
                       <div className="clients-card__field">
                         <span className="clients-card__label">№</span>
-                        <span className="clients-card__value">{index + 1}</span>
+                        <span className="clients-card__value">
+                          {pageOffset + index + 1}
+                        </span>
                       </div>
                       <div className="clients-card__field">
                         <span className="clients-card__label">ФИО</span>
@@ -1280,6 +1299,14 @@ export default function MarketClients({ forcedTab = null, hideTabs = false }) {
               )}
             </div>
           )}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            loading={loading}
+            hasNextPage={page < totalPages}
+            hasPrevPage={page > 1}
+            onPageChange={setPage}
+          />
         </div>
       </DataContainer>
 

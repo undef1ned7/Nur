@@ -628,3 +628,23 @@
     }
   }
 }
+
+@media (max-width: 560px) {
+  .clientreqs {
+    &__viewRow,
+    &__viewRow--full {
+      grid-template-columns: 1fr;
+      gap: 2px;
+    }
+
+    &__row {
+      flex-wrap: wrap;
+    }
+
+    &__actions {
+      > * {
+        flex: 1 1 auto;
+      }
+    }
+  }
+}

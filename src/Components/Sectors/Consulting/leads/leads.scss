@@ -1698,3 +1698,38 @@
     }
   }
 }
+
+@media (max-width: 640px) {
+  .leads {
+    &__filtersPanel {
+      padding: 12px;
+    }
+
+    &__filterField,
+    &__filterField--period {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    &__search {
+      width: 100%;
+    }
+
+    &__overlay {
+      padding: 8px;
+    }
+
+    &__modal {
+      padding: 16px 14px;
+      max-height: 94dvh;
+    }
+
+    &__formActions {
+      flex-wrap: wrap;
+
+      > * {
+        flex: 1 1 auto;
+      }
+    }
+  }
+}
