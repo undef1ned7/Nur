@@ -57,7 +57,7 @@ const PartnerCatalogPage = () => {
 
   const ownWarehouses = useSelector((state) => state.warehouse.list || []);
   const { searchTerm: productSearch, debouncedSearchTerm, setSearchTerm: setProductSearch } =
-    useSearch();
+    useSearch(`warehouse:partnerCatalog:${partnerId}:search`);
 
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");

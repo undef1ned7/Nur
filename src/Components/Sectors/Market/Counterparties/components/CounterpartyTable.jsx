@@ -4,6 +4,7 @@ import {
   getAgentDisplay,
   formatMoneyRu,
   getCounterpartyAnalyticsView,
+  getCounterpartiesLedgerTotals,
 } from "../utils";
 import "./CounterpartyTable.scss";
 
@@ -58,7 +59,8 @@ const CounterpartyRow = React.memo(
   },
   (prevProps, nextProps) => {
     return (
-      prevProps.counterparty.id === nextProps.counterparty.id &&
+      // Сравниваем объект целиком: при смене периода id тот же, а analytics новые
+      prevProps.counterparty === nextProps.counterparty &&
       prevProps.rowNumber === nextProps.rowNumber &&
       prevProps.showAgentColumn === nextProps.showAgentColumn
     );
@@ -76,6 +78,7 @@ const CounterpartyTable = ({
   onCounterpartyClick,
   getRowNumber,
   showAgentColumn = false,
+  totals: totalsProp,
 }) => {
   const colCount = 8 + (showAgentColumn ? 1 : 0);
   const counterpartiesData = useMemo(() => {
@@ -84,36 +87,12 @@ const CounterpartyTable = ({
       rowNumber: getRowNumber(index, counterparties.length),
     }));
   }, [counterparties, getRowNumber]);
-  const totals = useMemo(() => {
-    return counterparties.reduce(
-      (acc, counterparty) => {
-        const metrics = getCounterpartyAnalyticsView(counterparty);
-        if (metrics.openingDebit !== null) {
-          acc.openingDebit += metrics.openingDebit;
-          acc.hasOpeningDebit = true;
-        }
-        if (metrics.openingCredit !== null) {
-          acc.openingCredit += metrics.openingCredit;
-          acc.hasOpeningCredit = true;
-        }
-        acc.turnoverDebit += metrics.turnoverDebit;
-        acc.turnoverCredit += metrics.turnoverCredit;
-        acc.closingDebit += metrics.closingDebit;
-        acc.closingCredit += metrics.closingCredit;
-        return acc;
-      },
-      {
-        openingDebit: 0,
-        openingCredit: 0,
-        turnoverDebit: 0,
-        turnoverCredit: 0,
-        closingDebit: 0,
-        closingCredit: 0,
-        hasOpeningDebit: false,
-        hasOpeningCredit: false,
-      },
-    );
-  }, [counterparties]);
+  // Итоги по всему списку (а не по текущей странице) передаёт родитель
+  const pageTotals = useMemo(
+    () => (totalsProp ? null : getCounterpartiesLedgerTotals(counterparties)),
+    [totalsProp, counterparties],
+  );
+  const totals = totalsProp || pageTotals;
 
   const renderTotalsRow = () => (
     <tr className="warehouse-table__total-row">
@@ -216,33 +195,4 @@ const CounterpartyTable = ({
   );
 };
 
-const areEqual = (prevProps, nextProps) => {
-  if (
-    prevProps.loading !== nextProps.loading ||
-    prevProps.getRowNumber !== nextProps.getRowNumber ||
-    prevProps.showAgentColumn !== nextProps.showAgentColumn
-  ) {
-    return false;
-  }
-
-  if (prevProps.counterparties.length !== nextProps.counterparties.length) {
-    return false;
-  }
-
-  if (prevProps.counterparties === nextProps.counterparties) {
-    return true;
-  }
-
-  if (
-    prevProps.counterparties.length > 0 &&
-    nextProps.counterparties.length > 0
-  ) {
-    if (prevProps.counterparties[0]?.id !== nextProps.counterparties[0]?.id) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
-export default React.memo(CounterpartyTable, areEqual);
+export default React.memo(CounterpartyTable);

@@ -39,17 +39,32 @@ export const splitBySign = (value) => {
   return { debit: 0, credit: Math.abs(amount) };
 };
 
+/** Округление до копеек, чтобы 0.1 + 0.2 − 0.3 не превращалось в «−0,00» */
+const roundMoney = (v) => Math.round(v * 100) / 100 || 0;
+
 const pickFirstDefined = (...values) => {
   const found = values.find((v) => v !== null && v !== undefined && v !== "");
   return found ?? null;
 };
 
 /**
- * Нормализует аналитику контрагента для отображения в табличном отчете
+ * Строка оборотно-сальдовой ведомости по контрагенту (как в 1С).
+ *
+ * Сальдо — это остаток, поэтому у контрагента оно стоит только с одной стороны:
+ *   нетто > 0 → Дебет (контрагент должен нам), нетто < 0 → Кредит (мы должны ему / аванс).
+ * Бэк сейчас может отдавать в opening_debit/opening_credit валовые суммы
+ * (все отгрузки и все оплаты до начала периода) — разница от этого не меняется,
+ * поэтому сальдо считаем как разность, а не берём поля как есть.
+ *
+ *   Сальдо на начало = opening_debit − opening_credit
+ *   Оборот Дт        = turnover_debit  (отгрузки за период)
+ *   Оборот Кт        = turnover_credit (оплаты и возвраты за период)
+ *   Сальдо на конец  = сальдо на начало + Оборот Дт − Оборот Кт
+ *
  * @param {Object} counterparty
  * @returns {{
- *   openingDebit: number|null,
- *   openingCredit: number|null,
+ *   openingDebit: number,
+ *   openingCredit: number,
  *   turnoverDebit: number,
  *   turnoverCredit: number,
  *   closingDebit: number,
@@ -57,58 +72,73 @@ const pickFirstDefined = (...values) => {
  * }}
  */
 export const getCounterpartyAnalyticsView = (counterparty) => {
-  const analytics = counterparty?.analytics || {};
-  const debts = analytics?.debts || {};
-  const cash = analytics?.cash || {};
+  const debts = counterparty?.analytics?.debts || {};
 
-  const openingDebitRaw = pickFirstDefined(
-    debts?.opening_debit,
-    debts?.start_debit,
-    debts?.period_start_debit
-  );
-  const openingCreditRaw = pickFirstDefined(
-    debts?.opening_credit,
-    debts?.start_credit,
-    debts?.period_start_credit
-  );
+  const openingNet =
+    toNumber(
+      pickFirstDefined(
+        debts?.opening_debit,
+        debts?.start_debit,
+        debts?.period_start_debit
+      )
+    ) -
+    toNumber(
+      pickFirstDefined(
+        debts?.opening_credit,
+        debts?.start_credit,
+        debts?.period_start_credit
+      )
+    );
 
-  // Оборот за период: приоритет явных полей оборота, иначе движение по кассе
+  // Оборот — строго за период (debts.turnover_*). Без date_from/date_to бэк эти поля
+  // не отдаёт: тогда оборот пустой, а не пожизненные движения по кассе.
   const turnoverDebit = toNumber(
-    pickFirstDefined(debts?.turnover_debit, debts?.period_debit, cash?.received)
+    pickFirstDefined(debts?.turnover_debit, debts?.period_debit)
   );
   const turnoverCredit = toNumber(
-    pickFirstDefined(debts?.turnover_credit, debts?.period_credit, cash?.paid)
+    pickFirstDefined(debts?.turnover_credit, debts?.period_credit)
   );
 
-  // Сальдо на конец: явные closing-поля → owes-поля → разбор баланса по знаку
-  let closingDebit = toNumber(
-    pickFirstDefined(debts?.closing_debit, debts?.counterparty_owes_company)
-  );
-  let closingCredit = toNumber(
-    pickFirstDefined(debts?.closing_credit, debts?.company_owes_counterparty)
-  );
-
-  if (!closingDebit && !closingCredit) {
-    const byBalance = splitBySign(debts?.balance);
-    closingDebit = byBalance.debit;
-    closingCredit = byBalance.credit;
-  }
+  const closingNet = openingNet + turnoverDebit - turnoverCredit;
+  const opening = splitBySign(roundMoney(openingNet));
+  const closing = splitBySign(roundMoney(closingNet));
 
   return {
-    openingDebit:
-      openingDebitRaw === null || openingDebitRaw === undefined
-        ? null
-        : toNumber(openingDebitRaw),
-    openingCredit:
-      openingCreditRaw === null || openingCreditRaw === undefined
-        ? null
-        : toNumber(openingCreditRaw),
+    openingDebit: opening.debit,
+    openingCredit: opening.credit,
     turnoverDebit,
     turnoverCredit,
-    closingDebit,
-    closingCredit,
+    closingDebit: closing.debit,
+    closingCredit: closing.credit,
   };
 };
+
+/**
+ * Итоги ведомости: сумма каждой колонки по строкам (развёрнутое сальдо, как в 1С —
+ * дебетовые и кредитовые остатки разных контрагентов между собой не сворачиваются).
+ * @param {Array} counterparties
+ */
+export const getCounterpartiesLedgerTotals = (counterparties) =>
+  (Array.isArray(counterparties) ? counterparties : []).reduce(
+    (acc, counterparty) => {
+      const m = getCounterpartyAnalyticsView(counterparty);
+      acc.openingDebit += m.openingDebit;
+      acc.openingCredit += m.openingCredit;
+      acc.turnoverDebit += m.turnoverDebit;
+      acc.turnoverCredit += m.turnoverCredit;
+      acc.closingDebit += m.closingDebit;
+      acc.closingCredit += m.closingCredit;
+      return acc;
+    },
+    {
+      openingDebit: 0,
+      openingCredit: 0,
+      turnoverDebit: 0,
+      turnoverCredit: 0,
+      closingDebit: 0,
+      closingCredit: 0,
+    }
+  );
 
 /**
  * Форматирует сообщение для модального окна удаления

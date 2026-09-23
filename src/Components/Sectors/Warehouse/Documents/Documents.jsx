@@ -59,6 +59,7 @@ import { numberToWords } from "../../../../utils/numberToWords";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { prepareItemsWithImages } from "./utils/prepareItemsWithImages";
 import { formatWholesaleModeLabel } from "../utils/wholesalePricing";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -147,9 +148,15 @@ const Documents = () => {
   const [activeTab, setActiveTab] = useState(() =>
     resolveTabFromParam(searchParams.get("tab"), docType),
   );
-  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [viewMode, setViewMode] = usePersistedState(
+    "warehouse:documents:viewMode",
+    "table",
+  ); // "table" | "cards"
+  const [searchTerm, setSearchTerm] = usePersistedState(
+    `warehouse:documents:${docType}:search`,
+    "",
+  );
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const [showReconciliationModal, setShowReconciliationModal] = useState(false);
   const [previewReceiptId, setPreviewReceiptId] = useState(null);
@@ -163,7 +170,10 @@ const Documents = () => {
   const showAgentFilter =
     docType === "SALE" &&
     (profile?.role === "owner" || profile?.role === "admin");
-  const [agentFilterId, setAgentFilterId] = useState("");
+  const [agentFilterId, setAgentFilterId] = usePersistedState(
+    `warehouse:documents:${docType}:agentFilter`,
+    "",
+  );
   const [agentsList, setAgentsList] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
 
@@ -175,7 +185,8 @@ const Documents = () => {
   const [createSaleModalCart, setCreateSaleModalCart] = useState(null);
 
   /** Фильтр списка приходов по payment_kind (только doc_type RECEIPT) */
-  const [receiptPaymentKindFilter, setReceiptPaymentKindFilter] = useState("");
+  const [receiptPaymentKindFilter, setReceiptPaymentKindFilter] =
+    usePersistedState("warehouse:documents:receiptPaymentKindFilter", "");
 
   // Debounce для поиска
   useEffect(() => {
@@ -519,11 +530,19 @@ const Documents = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, activeTab]);
 
-  // Сброс страницы и фильтра по агенту при смене таба или типа документа
+  // Сброс страницы и фильтра по агенту при реальной смене таба или типа документа —
+  // сравниваем с предыдущим значением (а не флагом «уже монтировались»), иначе под
+  // React.StrictMode двойной прогон эффекта при монтировании затирает восстановленное
+  // из sessionStorage значение
+  const prevDocTypeTabRef = useRef({ activeTab, docType });
   useEffect(() => {
-    setCurrentPage(1);
-    if (docType !== "SALE") setAgentFilterId("");
-  }, [activeTab, docType]);
+    const prev = prevDocTypeTabRef.current;
+    if (prev.activeTab !== activeTab || prev.docType !== docType) {
+      setCurrentPage(1);
+      if (docType !== "SALE") setAgentFilterId("");
+    }
+    prevDocTypeTabRef.current = { activeTab, docType };
+  }, [activeTab, docType, setAgentFilterId]);
 
   // SALE-only таб (Сводка/Продажи по заявкам) недоступен вне SALE — откатываем на дефолт
   useEffect(() => {
@@ -532,9 +551,13 @@ const Documents = () => {
     }
   }, [activeTab, docType]);
 
+  const prevReceiptDocTypeRef = useRef(docType);
   useEffect(() => {
-    if (docType !== "RECEIPT") setReceiptPaymentKindFilter("");
-  }, [docType]);
+    if (prevReceiptDocTypeRef.current !== docType && docType !== "RECEIPT") {
+      setReceiptPaymentKindFilter("");
+    }
+    prevReceiptDocTypeRef.current = docType;
+  }, [docType, setReceiptPaymentKindFilter]);
 
   // Загрузка данных через Redux при изменении таба, страницы, типа документа или поиска
   useEffect(() => {

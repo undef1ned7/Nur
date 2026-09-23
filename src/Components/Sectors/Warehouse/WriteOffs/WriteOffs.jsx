@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FaBalanceScale, FaPlus, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import warehouseAPI from "../../../../api/warehouse";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./WriteOffs.scss";
 
 const PAGE = 15;
@@ -20,10 +21,10 @@ const statusLabel = (s) =>
 
 const WarehouseWriteOffs = () => {
   const navigate = useNavigate();
-  const [q, setQ] = useState("");
+  const [q, setQ] = usePersistedState("warehouse:writeOffs:search", "");
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = usePersistedState("warehouse:writeOffs:page", 1);
 
   const load = useCallback(async () => {
     setLoading(true);

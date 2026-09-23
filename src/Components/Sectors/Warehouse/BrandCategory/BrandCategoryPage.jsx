@@ -104,7 +104,9 @@ const BrandCategoryPage = () => {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
   // Хуки для управления данными
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    `warehouse:brandCategory:${activeTab}:search`,
+  );
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
     [searchParams],

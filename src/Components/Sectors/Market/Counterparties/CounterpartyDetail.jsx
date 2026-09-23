@@ -19,6 +19,7 @@ import { getAgentDisplay } from "./utils";
 import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import EditCounterpartyModal from "./components/EditCounterpartyModal";
 import CounterpartyLegalInfo from "./components/CounterpartyLegalInfo";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./CounterpartyDetail.scss";
 import "../../Warehouse/Money/MoneyDocumentsPage.scss";
 
@@ -31,6 +32,8 @@ const fmtDate = (v) => {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("ru-RU");
 };
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const fmtDateTime = (v) => {
   if (!v) return "—";
@@ -131,7 +134,6 @@ const CounterpartyDetail = () => {
   const [warehouses, setWarehouses] = useState([]);
   const [paymentCategories, setPaymentCategories] = useState([]);
   const [cashRegisters, setCashRegisters] = useState([]);
-  const [payDebtLoading, setPayDebtLoading] = useState(false);
   const [payDebtError, setPayDebtError] = useState("");
   const [showPayDebtModal, setShowPayDebtModal] = useState(false);
   const [payDebtForm, setPayDebtForm] = useState({
@@ -139,18 +141,37 @@ const CounterpartyDetail = () => {
     payment_category: "",
     amount: "",
     comment: "",
+    date: "",
   });
   const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(true);
   const [payDebtSubmitting, setPayDebtSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const [docTypeFilter, setDocTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [warehouseFilter, setWarehouseFilter] = useState("");
-  const [paymentCategoryFilter, setPaymentCategoryFilter] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchDebounced, setSearchDebounced] = useState("");
-  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
+  const [docTypeFilter, setDocTypeFilter] = usePersistedState(
+    `warehouse:counterpartyDetail:${id}:docTypeFilter`,
+    "",
+  );
+  const [statusFilter, setStatusFilter] = usePersistedState(
+    `warehouse:counterpartyDetail:${id}:statusFilter`,
+    "",
+  );
+  const [warehouseFilter, setWarehouseFilter] = usePersistedState(
+    `warehouse:counterpartyDetail:${id}:warehouseFilter`,
+    "",
+  );
+  const [paymentCategoryFilter, setPaymentCategoryFilter] = usePersistedState(
+    `warehouse:counterpartyDetail:${id}:paymentCategoryFilter`,
+    "",
+  );
+  const [searchTerm, setSearchTerm] = usePersistedState(
+    `warehouse:counterpartyDetail:${id}:search`,
+    "",
+  );
+  const [searchDebounced, setSearchDebounced] = useState(searchTerm);
+  const [viewMode, setViewMode] = usePersistedState(
+    "warehouse:counterpartyDetail:viewMode",
+    "table",
+  ); // "table" | "cards"
 
   const name = current?.name ?? "—";
   const canEdit = profile?.role === "owner" || profile?.role === "admin";
@@ -406,65 +427,12 @@ const CounterpartyDetail = () => {
       payment_category: firstCategory,
       amount: amount > 0 ? String(amount) : "",
       comment: "Погашение долга",
+      date: todayStr(),
     });
     setPayDebtCreateAsPosted(true);
     setPayDebtError("");
     setShowPayDebtModal(true);
   }, [summary.debtBalance, cashRegisters, paymentCategories]);
-
-  /** Оплатить весь долг одной кнопкой: приход или расход на полную сумму с подтверждением. */
-  const payFullDebt = useCallback(async () => {
-    if (!id) return;
-    const debtBalance = summary.debtBalance;
-    if (debtBalance === 0) return;
-    const amount = Math.abs(debtBalance);
-    const firstCash = cashRegisters[0]?.id ?? cashRegisters[0]?.uuid;
-    const firstCategory =
-      paymentCategories[0]?.id ?? paymentCategories[0]?.uuid;
-    if (!firstCash || !firstCategory) {
-      setPayDebtError(
-        !firstCash
-          ? "Нет доступных касс. Добавьте кассу в настройках."
-          : "Нет категорий платежей. Добавьте категорию в настройках.",
-      );
-      return;
-    }
-    setPayDebtError("");
-    const isReceipt = debtBalance > 0;
-    const actionText = isReceipt
-      ? `Создать приход на ${amount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} с (контрагент погашает долг)?`
-      : `Создать расход на ${amount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} с (погашение долга контрагенту)?`;
-    if (!window.confirm(actionText)) return;
-    setPayDebtLoading(true);
-    try {
-      const created = await warehouseAPI.createMoneyDocument({
-        doc_type: isReceipt ? "MONEY_RECEIPT" : "MONEY_EXPENSE",
-        cash_register: firstCash,
-        counterparty: id,
-        payment_category: firstCategory,
-        amount,
-        comment: "Погашение долга",
-      });
-      if (created?.id) {
-        await warehouseAPI.postMoneyDocument(created.id);
-      }
-      await loadOperations();
-    } catch (e) {
-      const msg =
-        e?.message ||
-        e?.detail ||
-        (typeof e === "string" ? e : "Не удалось создать документ");
-      setPayDebtError(msg);
-    } finally {
-      setPayDebtLoading(false);
-    }
-  }, [
-    id,
-    summary.debtBalance,
-    cashRegisters,
-    paymentCategories,
-    loadOperations,
-  ]);
 
   const closePayDebtModal = useCallback(() => {
     setShowPayDebtModal(false);
@@ -473,6 +441,7 @@ const CounterpartyDetail = () => {
       payment_category: "",
       amount: "",
       comment: "",
+      date: "",
     });
     setPayDebtError("");
   }, []);
@@ -512,6 +481,7 @@ const CounterpartyDetail = () => {
           payment_category,
           amount: amountNum,
           comment: payDebtForm.comment?.trim() || "",
+          ...(payDebtForm.date && { date: payDebtForm.date }),
         });
         if (payDebtCreateAsPosted && created?.id) {
           await warehouseAPI.postMoneyDocument(created.id);
@@ -907,14 +877,6 @@ const CounterpartyDetail = () => {
                   >
                     Оплатить долг
                   </button>
-                  <button
-                    type="button"
-                    className="counterparty-detail-page__pay-debt-btn counterparty-detail-page__pay-debt-btn--full"
-                    onClick={payFullDebt}
-                    disabled={payDebtLoading}
-                  >
-                    {payDebtLoading ? "Создание…" : "Оплатить весь долг"}
-                  </button>
                   {payDebtError && !showPayDebtModal && (
                     <span className="counterparty-detail-page__pay-debt-error">
                       {payDebtError}
@@ -1136,7 +1098,9 @@ const CounterpartyDetail = () => {
                       </span>
                     </div>
                     <span className="money-documents-page__modal-status-date">
-                      {new Date().toLocaleDateString("ru-RU", {
+                      {new Date(
+                        `${payDebtForm.date || todayStr()}T00:00:00`,
+                      ).toLocaleDateString("ru-RU", {
                         day: "numeric",
                         month: "long",
                       })}
@@ -1205,6 +1169,17 @@ const CounterpartyDetail = () => {
                           </option>
                         ))}
                       </select>
+                    </div>
+                    <div className="money-documents-page__field">
+                      <label htmlFor="pay-debt-date">Дата</label>
+                      <input
+                        id="pay-debt-date"
+                        type="date"
+                        value={payDebtForm.date}
+                        onChange={(e) =>
+                          handlePayDebtFormChange("date", e.target.value)
+                        }
+                      />
                     </div>
                     <div className="money-documents-page__field">
                       <label htmlFor="pay-debt-amount">Сумма, сом *</label>

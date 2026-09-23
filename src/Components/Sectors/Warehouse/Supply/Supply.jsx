@@ -8,6 +8,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import warehouseAPI from "../../../../api/warehouse";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./Supply.scss";
 
 const PER_PAGE = 15;
@@ -42,8 +43,8 @@ const formatApiError = (error) => {
 
 const WarehouseSupply = () => {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("sup"); // sup | po | rt
-  const [q, setQ] = useState("");
+  const [tab, setTab] = usePersistedState("warehouse:supply:tab", "sup"); // sup | po | rt
+  const [q, setQ] = usePersistedState("warehouse:supply:search", "");
 
   const [suppliers, setSuppliers] = useState([]);
   const [purchaseDocs, setPurchaseDocs] = useState([]);
@@ -52,9 +53,9 @@ const WarehouseSupply = () => {
   const [loadingPo, setLoadingPo] = useState(true);
   const [loadingRt, setLoadingRt] = useState(true);
 
-  const [pageSup, setPageSup] = useState(1);
-  const [pagePO, setPagePO] = useState(1);
-  const [pageRT, setPageRT] = useState(1);
+  const [pageSup, setPageSup] = usePersistedState("warehouse:supply:pageSup", 1);
+  const [pagePO, setPagePO] = usePersistedState("warehouse:supply:pagePO", 1);
+  const [pageRT, setPageRT] = usePersistedState("warehouse:supply:pageRT", 1);
 
   const [openSup, setOpenSup] = useState(false);
   const [supName, setSupName] = useState("");

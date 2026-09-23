@@ -59,6 +59,7 @@ import {
   getApiErrorPayload,
   validateResErrors,
 } from "../../../../../tools/validateResErrors";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./Agents.scss";
 
@@ -3640,8 +3641,14 @@ const Agents = () => {
   const isAgent = !isOwnerOrAdmin;
 
   // Владелец/админ: все заявки, история, запросы, выдача. Остальные: свои заявки и остатки.
-  const [activeTab, setActiveTab] = useState("carts");
-  const [historySubTab, setHistorySubTab] = useState("approved");
+  const [activeTab, setActiveTab] = usePersistedState(
+    "warehouse:agents:activeTab",
+    "carts",
+  );
+  const [historySubTab, setHistorySubTab] = usePersistedState(
+    "warehouse:agents:historySubTab",
+    "approved",
+  );
   const [ownerCompanySubTab, setOwnerCompanySubTab] = useState("incoming"); // incoming | active
   const [agentCompanySubTab, setAgentCompanySubTab] = useState("search"); // search | myRequests
   const [viewMode, setViewMode] = useState(VIEW_MODES.TABLE);
@@ -3660,8 +3667,14 @@ const Agents = () => {
   const [cartsLoading, setCartsLoading] = useState(false);
   const [cartsError, setCartsError] = useState("");
   const [carts, setCarts] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = usePersistedState(
+    "warehouse:agents:cartsStatusFilter",
+    "",
+  );
+  const [search, setSearch] = usePersistedState(
+    "warehouse:agents:cartsSearch",
+    "",
+  );
   const [actionBusyId, setActionBusyId] = useState(null);
   const [alertModal, setAlertModal] = useState(INITIAL_ALERT_MODAL);
 
@@ -3710,9 +3723,18 @@ const Agents = () => {
   const [returnCartsLoading, setReturnCartsLoading] = useState(false);
   const [returnCartsError, setReturnCartsError] = useState("");
   const [returnCarts, setReturnCarts] = useState([]);
-  const [returnStatusFilter, setReturnStatusFilter] = useState("");
-  const [returnsSubTab, setReturnsSubTab] = useState("list");
-  const [returnHistorySubTab, setReturnHistorySubTab] = useState("approved");
+  const [returnStatusFilter, setReturnStatusFilter] = usePersistedState(
+    "warehouse:agents:returnStatusFilter",
+    "",
+  );
+  const [returnsSubTab, setReturnsSubTab] = usePersistedState(
+    "warehouse:agents:returnsSubTab",
+    "list",
+  );
+  const [returnHistorySubTab, setReturnHistorySubTab] = usePersistedState(
+    "warehouse:agents:returnHistorySubTab",
+    "approved",
+  );
   const [returnActionBusyId, setReturnActionBusyId] = useState(null);
   const [returnRequestModalOpen, setReturnRequestModalOpen] = useState(false);
   const [returnRequestCartId, setReturnRequestCartId] = useState(null);
@@ -3769,9 +3791,15 @@ const Agents = () => {
   const [companyRequestsLoading, setCompanyRequestsLoading] = useState(false);
   const [companyRequestsError, setCompanyRequestsError] = useState("");
   const [companyRequests, setCompanyRequests] = useState([]);
-  const [companyStatusFilter, setCompanyStatusFilter] = useState("");
+  const [companyStatusFilter, setCompanyStatusFilter] = usePersistedState(
+    "warehouse:agents:companyStatusFilter",
+    "",
+  );
   const [companyActionBusyId, setCompanyActionBusyId] = useState(null);
-  const [companySearch, setCompanySearch] = useState("");
+  const [companySearch, setCompanySearch] = usePersistedState(
+    "warehouse:agents:companySearch",
+    "",
+  );
   const [companySearchLoading, setCompanySearchLoading] = useState(false);
   const [companySearchError, setCompanySearchError] = useState("");
   const [companySearchResults, setCompanySearchResults] = useState([]);

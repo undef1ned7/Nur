@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { Plus, Tags, Check, X, Save, Printer, Pencil, Trash2, Ban } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useConfirm } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
+import { useDepartments } from "../../../../store/slices/departmentSlice";
+import { getEmployees } from "../../../../store/creators/departmentCreators";
 import { numberToWords } from "../../../../utils/numberToWords";
 import SearchSection from "../../Market/Warehouse/components/SearchSection";
 import Pagination from "../../Market/Warehouse/components/Pagination";
@@ -28,6 +31,15 @@ const DOC_TYPE_FROM_PARAM = {
 const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
   " с";
+
+const getApiErrorMessage = (err, fallback) =>
+  err?.message ||
+  err?.detail ||
+  (typeof err === "string" ? err : fallback);
+
+/** Бэкенд отдаёт 400 «Точно такой же документ уже проведён…» при повторном /post/ */
+const isDuplicateDocumentError = (err) =>
+  /уже проведён/i.test(getApiErrorMessage(err, "") || "");
 
 const parseAmount = (value) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -67,8 +79,16 @@ const statusLabel = (s) =>
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+const getCounterpartyAgentId = (cp) => {
+  const a = cp?.agent;
+  if (!a) return "";
+  if (typeof a === "object") return String(a.id ?? a.uuid ?? "");
+  return String(a);
+};
+
 const initialForm = {
   cash_register: "",
+  agent: "", // только фильтр контрагентов в форме, в payload не уходит
   counterparty: "",
   payment_category: "",
   amount: "",
@@ -79,7 +99,9 @@ const initialForm = {
 const MoneyDocumentsPage = () => {
   const { docType: docTypeParam } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { company, profile } = useUser();
+  const { employees } = useDepartments();
   const apiDocType = DOC_TYPE_FROM_PARAM[docTypeParam];
   const isValidType = Boolean(apiDocType);
 
@@ -99,6 +121,10 @@ const MoneyDocumentsPage = () => {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const [postingId, setPostingId] = useState(null); // id документа, для которого идёт проведение/отмена
+  // Синхронный guard от повторного /post/ при двойном клике — не полагаемся только
+  // на state (setState асинхронный, второй клик может проскочить до ре-рендера)
+  const postingRef = useRef(false);
+  const creatingRef = useRef(false);
   const [printingId, setPrintingId] = useState(null);
   const [createAsPosted, setCreateAsPosted] = useState(true); // при создании: провести сразу или черновик
   const [viewMode, setViewMode] = useState(() => {
@@ -115,7 +141,9 @@ const MoneyDocumentsPage = () => {
     }
   }, [viewMode]);
 
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    `warehouse:money:${docTypeParam}:search`,
+  );
   const rows = list.results || [];
   const filteredRows = useMemo(() => {
     if (!debouncedSearchTerm?.trim()) return rows;
@@ -217,7 +245,7 @@ const MoneyDocumentsPage = () => {
       try {
         const [cashData, cpData, catData] = await Promise.all([
           warehouseAPI.listCashRegisters({ page_size: 200 }),
-          warehouseAPI.listCounterparties(),
+          warehouseAPI.listCounterparties({ page_size: 1000 }),
           warehouseAPI.listMoneyCategories(),
         ]);
         setCashRegisters(
@@ -233,7 +261,45 @@ const MoneyDocumentsPage = () => {
         // справочники опциональны для отображения страницы
       }
     })();
-  }, []);
+    dispatch(getEmployees());
+  }, [dispatch]);
+
+  const agentOptions = useMemo(() => {
+    const list = Array.isArray(employees) ? employees : [];
+    return list
+      .filter((e) => {
+        const role = String(e?.role ?? e?.role_name ?? "").trim().toLowerCase();
+        return role !== "admin" && role !== "owner";
+      })
+      .map((e) => ({
+        value: String(e.id),
+        label: e.full_name || e.name || e.email || `#${e.id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  }, [employees]);
+
+  // При выбранном агенте показываем только его контрагентов
+  const counterpartyOptions = useMemo(() => {
+    if (!form.agent) return counterparties;
+    return counterparties.filter(
+      (cp) => getCounterpartyAgentId(cp) === form.agent,
+    );
+  }, [counterparties, form.agent]);
+
+  const handleAgentChange = (agent) => {
+    setForm((prev) => {
+      const selected = counterparties.find(
+        (cp) => String(cp.id) === String(prev.counterparty),
+      );
+      const keepCounterparty =
+        !agent || (selected && getCounterpartyAgentId(selected) === agent);
+      return {
+        ...prev,
+        agent,
+        counterparty: keepCounterparty ? prev.counterparty : "",
+      };
+    });
+  };
 
   const openCategoriesModal = () => {
     setCategoryError("");
@@ -291,9 +357,16 @@ const MoneyDocumentsPage = () => {
     if (!row?.id) return;
     try {
       const doc = (await warehouseAPI.getMoneyDocumentById(row.id)) || row;
+      const counterpartyId = String(
+        doc.counterparty?.id ?? doc.counterparty ?? "",
+      );
+      const counterpartyObj = counterparties.find(
+        (cp) => String(cp.id) === counterpartyId,
+      );
       setForm({
         cash_register: String(doc.cash_register?.id ?? doc.cash_register ?? ""),
-        counterparty: String(doc.counterparty?.id ?? doc.counterparty ?? ""),
+        agent: getCounterpartyAgentId(counterpartyObj),
+        counterparty: counterpartyId,
         payment_category: String(
           doc.payment_category?.id ?? doc.payment_category ?? "",
         ),
@@ -308,14 +381,69 @@ const MoneyDocumentsPage = () => {
     } catch {
       window.alert("Не удалось загрузить документ для редактирования");
     }
-  }, []);
+  }, [counterparties]);
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const docDisplayLabel = (row) =>
+    row?.number ? `№ ${row.number}` : "(черновик)";
+
+  // Финальная развязка (успех/отказ/обычная ошибка) — сбрасывает и state, и ref-guard.
+  // Пока идёт уточняющий confirm («точно такой же уже проведён — всё равно?»), guard
+  // намеренно НЕ сбрасывается — кнопка остаётся заблокированной до решения пользователя.
+  const finishPosting = useCallback(() => {
+    postingRef.current = false;
+    setPostingId(null);
+  }, []);
+
+  // Один POST /post/ (без рекурсии — чтобы избежать самоссылки на ещё не
+  // проинициализированный useCallback). При 400 «уже проведён», не разрешённом
+  // пользователем явно, возвращает исходный текст ошибки бэка как есть.
+  const attemptPostMoneyDocument = useCallback(
+    async (row, allowDuplicate) => {
+      try {
+        await warehouseAPI.postMoneyDocument(
+          row.id,
+          allowDuplicate ? { allow_duplicate: true } : undefined,
+        );
+        window.alert("Документ успешно проведён");
+        load();
+        finishPosting();
+        return null;
+      } catch (err) {
+        if (!allowDuplicate && isDuplicateDocumentError(err)) {
+          return getApiErrorMessage(err, "Такой документ уже проведён");
+        }
+        window.alert(
+          "Ошибка: " + getApiErrorMessage(err, "Ошибка при проведении документа"),
+        );
+        finishPosting();
+        return null;
+      }
+    },
+    [load, finishPosting],
+  );
+
+  const postMoneyDocumentWithRetry = useCallback(
+    async (row) => {
+      const duplicateMsg = await attemptPostMoneyDocument(row, false);
+      if (!duplicateMsg) return;
+      confirm(`${duplicateMsg} Всё равно провести?`, (allowed) => {
+        if (!allowed) {
+          finishPosting();
+          return;
+        }
+        attemptPostMoneyDocument(row, true);
+      });
+    },
+    [confirm, attemptPostMoneyDocument, finishPosting],
+  );
+
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    if (creatingRef.current) return; // guard от двойного клика/сабмита
     setCreateError("");
     const cash_register = form.cash_register?.trim();
     const counterparty = form.counterparty?.trim();
@@ -330,6 +458,7 @@ const MoneyDocumentsPage = () => {
       setCreateError("Укажите корректную сумму");
       return;
     }
+    creatingRef.current = true;
     setCreating(true);
     try {
       const payload = {
@@ -344,52 +473,43 @@ const MoneyDocumentsPage = () => {
       };
       if (editingId) {
         await warehouseAPI.patchMoneyDocument(editingId, payload);
+        closeCreateModal();
+        load();
       } else {
         const created = await warehouseAPI.createMoneyDocument(payload);
+        // Документ уже создан (как черновик) — дальше закрываем форму и
+        // обновляем список независимо от исхода проведения ниже.
+        closeCreateModal();
+        load();
         if (createAsPosted && created?.id) {
-          await warehouseAPI.postMoneyDocument(created.id);
+          postingRef.current = true;
+          setPostingId(created.id);
+          postMoneyDocumentWithRetry(created);
         }
       }
-      closeCreateModal();
-      load();
     } catch (err) {
-      const msg =
-        err?.message ||
-        err?.detail ||
-        (typeof err === "string" ? err : "Ошибка при создании документа");
-      setCreateError(msg);
+      setCreateError(
+        getApiErrorMessage(err, "Ошибка при создании документа"),
+      );
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };
 
   const goBack = () => navigate("/crm/warehouse/documents/all");
 
-  const docDisplayLabel = (row) =>
-    row?.number ? `№ ${row.number}` : "(черновик)";
-
   const handlePost = useCallback(
     (row) => {
-      if (!row?.id) return;
-      confirm(`Провести документ ${docDisplayLabel(row)}?`, async (result) => {
+      if (!row?.id || postingRef.current) return;
+      confirm(`Провести документ ${docDisplayLabel(row)}?`, (result) => {
         if (!result) return;
+        postingRef.current = true;
         setPostingId(row.id);
-        try {
-          await warehouseAPI.postMoneyDocument(row.id);
-          window.alert("Документ успешно проведён");
-          load();
-        } catch (err) {
-          const msg =
-            err?.message ||
-            err?.detail ||
-            (typeof err === "string" ? err : "Ошибка при проведении документа");
-          window.alert("Ошибка: " + msg);
-        } finally {
-          setPostingId(null);
-        }
+        postMoneyDocumentWithRetry(row);
       });
     },
-    [confirm, load],
+    [confirm, postMoneyDocumentWithRetry],
   );
 
   const handleUnpost = useCallback(
@@ -925,6 +1045,21 @@ const MoneyDocumentsPage = () => {
                 </select>
               </div>
               <div className="money-documents-page__field">
+                <label htmlFor="money-doc-agent">Агент</label>
+                <select
+                  id="money-doc-agent"
+                  value={form.agent}
+                  onChange={(e) => handleAgentChange(e.target.value)}
+                >
+                  <option value="">все агенты</option>
+                  {agentOptions.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="money-documents-page__field">
                 <label htmlFor="money-doc-counterparty">Контрагент</label>
                 <select
                   id="money-doc-counterparty"
@@ -933,8 +1068,12 @@ const MoneyDocumentsPage = () => {
                     handleFormChange("counterparty", e.target.value)
                   }
                 >
-                  <option value="">введите</option>
-                  {counterparties.map((c) => (
+                  <option value="">
+                    {form.agent && counterpartyOptions.length === 0
+                      ? "у агента нет контрагентов"
+                      : "введите"}
+                  </option>
+                  {counterpartyOptions.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name ?? c.full_name ?? c.title ?? c.id}
                     </option>

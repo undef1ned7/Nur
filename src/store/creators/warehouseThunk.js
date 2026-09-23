@@ -178,13 +178,13 @@ export const fetchWarehouseCounterparties = createAsyncThunk(
         if (!apiTypes.length) {
           return warehouseAPI.listCounterparties(queryParams);
         }
-        const { page: _page, ...rest } = queryParams;
+        const { page: _page, page_size, ...rest } = queryParams;
         const payloads = await Promise.all(
           apiTypes.map((type) =>
             warehouseAPI.listCounterparties({
               ...rest,
               type,
-              page_size: 500,
+              page_size: page_size || 500,
             })
           )
         );

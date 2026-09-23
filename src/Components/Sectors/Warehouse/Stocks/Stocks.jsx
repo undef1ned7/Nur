@@ -28,6 +28,7 @@ import { formatDeleteMessage } from "../../Market/Warehouse/utils";
 import "./StocksGroups.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import {
   compareByAlphabetEnRu,
   sortByAlphabetEnRu,
@@ -88,7 +89,7 @@ const Stocks = () => {
 
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = usePersistedState("warehouse:stocks:filters", {});
   /** Выбранная группа хранится в URL (`product_group`), чтобы после создания/редактирования товара возвращаться в ту же группу */
   const selectedGroupId = searchParams.get("product_group") || "all"; // all | uuid
 
@@ -132,7 +133,9 @@ const Stocks = () => {
   });
 
   // Хуки для управления данными
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    "warehouse:stocks:search",
+  );
 
   // Загрузка справочников
   const { brands, categories } = useWarehouseReferences();
@@ -283,13 +286,16 @@ const Stocks = () => {
     }
   }, [dispatch, selectedRows, requestParams]);
 
-  const handleApplyFilters = useCallback((newFilters) => {
-    setFilters(newFilters);
-  }, []);
+  const handleApplyFilters = useCallback(
+    (newFilters) => {
+      setFilters(newFilters);
+    },
+    [setFilters],
+  );
 
   const handleResetFilters = useCallback(() => {
     setFilters({});
-  }, []);
+  }, [setFilters]);
 
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);

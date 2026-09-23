@@ -32,7 +32,9 @@ const shortId = (id) => {
 const AgentStocks = () => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    "warehouse:agentStocks:search",
+  );
 
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;

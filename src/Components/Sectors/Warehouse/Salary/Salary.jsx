@@ -21,6 +21,7 @@ import {
   listSalaryRates,
   updateSalaryRate,
 } from "../../../../api/warehouseSalary";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./Salary.scss";
 
 const TABS = {
@@ -123,13 +124,31 @@ const Salary = () => {
   );
 
   // ---------- Фильтры ----------
-  const [dateFrom, setDateFrom] = useState(monthAgoISO);
-  const [dateTo, setDateTo] = useState(todayISO);
-  const [agentFilter, setAgentFilter] = useState("");
-  const [warehouseFilter, setWarehouseFilter] = useState("");
-  const [saleTypeFilter, setSaleTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = usePersistedState(
+    "warehouse:salary:dateFrom",
+    monthAgoISO,
+  );
+  const [dateTo, setDateTo] = usePersistedState(
+    "warehouse:salary:dateTo",
+    todayISO,
+  );
+  const [agentFilter, setAgentFilter] = usePersistedState(
+    "warehouse:salary:agentFilter",
+    "",
+  );
+  const [warehouseFilter, setWarehouseFilter] = usePersistedState(
+    "warehouse:salary:warehouseFilter",
+    "",
+  );
+  const [saleTypeFilter, setSaleTypeFilter] = usePersistedState(
+    "warehouse:salary:saleTypeFilter",
+    "",
+  );
+  const [statusFilter, setStatusFilter] = usePersistedState(
+    "warehouse:salary:statusFilter",
+    "",
+  );
+  const [search, setSearch] = usePersistedState("warehouse:salary:search", "");
   const [page, setPage] = useState(1);
 
   // ---------- Справочники ----------
@@ -248,7 +267,10 @@ const Salary = () => {
   const [ratesError, setRatesError] = useState("");
   const [rateDrafts, setRateDrafts] = useState({});
   const [rateSaving, setRateSaving] = useState({});
-  const [ratesSearch, setRatesSearch] = useState("");
+  const [ratesSearch, setRatesSearch] = usePersistedState(
+    "warehouse:salary:ratesSearch",
+    "",
+  );
 
   const loadRates = useCallback(async () => {
     setRatesLoading(true);
