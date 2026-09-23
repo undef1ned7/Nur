@@ -47,7 +47,9 @@ const Brands = () => {
   });
 
   // Хуки для управления данными
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    "warehouse:brands:search",
+  );
   const [searchParams] = useSearchParams();
 
   // Получаем текущую страницу из URL

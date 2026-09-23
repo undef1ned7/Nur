@@ -24,6 +24,7 @@ import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
 import { numberToWords } from "../../../../utils/numberToWords";
 import Ko1PdfDocument from "../Documents/components/Ko1PdfDocument.jsx";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "../../../Deposits/Kassa/kassa.scss";
 import "./WarehouseKassa.scss";
 
@@ -1130,20 +1131,44 @@ const CashRegisterDetail = () => {
   const [operations, setOperations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("all"); // all | receipt | expense
+  const [activeTab, setActiveTab] = usePersistedState(
+    "warehouse:kassa:activeTab",
+    "all",
+  ); // all | receipt | expense
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [counterparties, setCounterparties] = useState([]);
   const [categories, setCategories] = useState([]);
   const [agentsList, setAgentsList] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
-  const [agentFilterId, setAgentFilterId] = useState("");
-  const [counterpartyFilterId, setCounterpartyFilterId] = useState("");
-  const [dateFromFilter, setDateFromFilter] = useState("");
-  const [dateToFilter, setDateToFilter] = useState("");
-  const [categoryFilterId, setCategoryFilterId] = useState("");
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
-  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
+  const [agentFilterId, setAgentFilterId] = usePersistedState(
+    "warehouse:kassa:agentFilter",
+    "",
+  );
+  const [counterpartyFilterId, setCounterpartyFilterId] = usePersistedState(
+    "warehouse:kassa:counterpartyFilter",
+    "",
+  );
+  const [dateFromFilter, setDateFromFilter] = usePersistedState(
+    "warehouse:kassa:dateFromFilter",
+    "",
+  );
+  const [dateToFilter, setDateToFilter] = usePersistedState(
+    "warehouse:kassa:dateToFilter",
+    "",
+  );
+  const [categoryFilterId, setCategoryFilterId] = usePersistedState(
+    "warehouse:kassa:categoryFilter",
+    "",
+  );
+  const [paymentMethodFilter, setPaymentMethodFilter] = usePersistedState(
+    "warehouse:kassa:paymentMethodFilter",
+    "",
+  );
+  const [filtersPanelOpen, setFiltersPanelOpen] = usePersistedState(
+    "warehouse:kassa:filtersPanelOpen",
+    false,
+  );
   const [docs, setDocs] = useState([]);
   const [docsCount, setDocsCount] = useState(0);
   const [docsLoading, setDocsLoading] = useState(false);

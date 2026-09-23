@@ -647,6 +647,9 @@ $due-red: #dc2626;
 
   &__main {
     flex: 1;
+    min-width: 0; // без этого flex-элемент не сжимается ниже ширины содержимого
+                  // (таблицы/сайдбара итогов) и продавливает всю страницу вправо —
+                  // а overflow:hidden на корне просто обрезает вылезшее, без скролла
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1398,13 +1401,15 @@ $due-red: #dc2626;
   &__table-wrapper {
     background: #fff;
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto; // если строкам реально не хватает ширины — скроллим таблицу
+    overflow-y: hidden; // сохраняет скруглённые углы карточки
     margin-bottom: 20px;
     border: 1px solid #e2e8f0;
   }
 
   &__table {
     width: 100%;
+    min-width: 640px; // не даём колонкам схлопнуться в кашу — вместо этого скролл
     border-collapse: collapse;
 
     thead {

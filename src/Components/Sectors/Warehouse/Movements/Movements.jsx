@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import warehouseAPI from "../../../../api/warehouse";
+import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./Movements.scss";
 
 const PAGE_SIZE = 15;
@@ -25,13 +26,13 @@ const statusLabel = (s) =>
 
 const WarehouseMovements = () => {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("receipt");
-  const [q, setQ] = useState("");
+  const [tab, setTab] = usePersistedState("warehouse:movements:tab", "receipt");
+  const [q, setQ] = usePersistedState("warehouse:movements:search", "");
   const [receiptDocs, setReceiptDocs] = useState([]);
   const [saleDocs, setSaleDocs] = useState([]);
   const [loadingReceipt, setLoadingReceipt] = useState(true);
   const [loadingSale, setLoadingSale] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = usePersistedState("warehouse:movements:page", 1);
 
   const loadReceipt = useCallback(async () => {
     setLoadingReceipt(true);

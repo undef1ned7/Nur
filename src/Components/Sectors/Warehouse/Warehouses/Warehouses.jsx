@@ -57,7 +57,9 @@ const Warehouses = () => {
   const [editingWarehouse, setEditingWarehouse] = useState(null);
 
   // Хуки для управления данными
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    "warehouse:warehouses:search",
+  );
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(

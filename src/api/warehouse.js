@@ -2920,9 +2920,12 @@ export const deleteMoneyDocument = async (id) => {
   }
 };
 
-export const postMoneyDocument = async (id) => {
+export const postMoneyDocument = async (id, payload) => {
   try {
-    const response = await api.post(`warehouse/money/documents/${id}/post/`);
+    const response = await api.post(
+      `warehouse/money/documents/${id}/post/`,
+      payload,
+    );
     return response.data;
   } catch (error) {
     if (error.response) {

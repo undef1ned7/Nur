@@ -47,7 +47,9 @@ const Categories = () => {
   });
 
   // Хуки для управления данными
-  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
+  const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
+    "warehouse:categories:search",
+  );
   const [searchParams] = useSearchParams();
 
   // Получаем текущую страницу из URL
