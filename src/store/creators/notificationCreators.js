@@ -6,6 +6,7 @@ import {
   markNotificationRead,
 } from '../../api/notification';
 import { consultingNotificationLeadId } from '../../utils/consultingLeadSources';
+import { dedupeRequest } from '../../utils/dedupeRequest';
 
 const isUnread = (n) => !(n?.is_read ?? n?.read ?? false);
 const idOf = (n) => n?.id ?? n?.uuid ?? n?.pk;
@@ -14,7 +15,11 @@ export const fetchNotificationsAsync = createAsyncThunk(
   'notification/fetchAll',
   async (params, thunkAPI) => {
     try {
-      const data = await getNotifications(params);
+      const { append: _append, ...query } = params || {};
+      const data = await dedupeRequest(
+        `notifications:${JSON.stringify(query)}`,
+        () => getNotifications(params),
+      );
       // Признак догрузки страницы (lazy load) — не затирать список, а добавить.
       return { data, append: Boolean(params?.append), offset: params?.offset || 0 };
     } catch (err) {

@@ -54,8 +54,11 @@ export default defineConfig(({ mode }) => {
         injectManifest: {
           maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         },
+        // SW в dev выключен: он кэширует Vite-модули (/src/*, /@vite/client)
+        // через StaleWhileRevalidate — отдаёт устаревший код и ломает HMR.
+        // main.jsx в dev ещё и снимает ранее зарегистрированные SW.
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
       }),
     ],

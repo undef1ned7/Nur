@@ -180,7 +180,12 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Только при смене токена (вход под другим пользователем). Начальный токен
+  // обрабатывает checkTokenValidity выше — иначе на старте уходит лишний company/.
+  const prevAccessTokenRef = useRef(accessToken);
   useEffect(() => {
+    if (prevAccessTokenRef.current === accessToken) return;
+    prevAccessTokenRef.current = accessToken;
     if (accessToken) {
       dispatch(getCompany());
     }
