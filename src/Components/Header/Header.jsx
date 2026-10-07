@@ -253,11 +253,14 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   // «Долго не отвечали» приходит только с бэка через /ws/notifications/.
 
   // Первичная загрузка списка/счётчика (один раз при появлении пользователя).
+  // Зависим от id, а не от объекта: каждый рефетч профиля кладёт в стор новый
+  // объект, и список уведомлений перезапрашивался бы после каждого из них.
+  const userProfileId = userProfile?.id;
   useEffect(() => {
-    if (userProfile) {
+    if (userProfileId) {
       dispatch(fetchNotificationsAsync({ limit: 20, offset: 0 }));
     }
-  }, [userProfile, dispatch]);
+  }, [userProfileId, dispatch]);
   const {
     items: buildingProjects,
     selectedProjectId,

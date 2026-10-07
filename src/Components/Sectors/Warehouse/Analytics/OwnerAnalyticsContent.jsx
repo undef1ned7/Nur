@@ -1,7 +1,12 @@
 import {
+  ArrowLeftRight,
   Check,
+  Coins,
   Package,
   ShoppingCart,
+  TrendingUp,
+  Truck,
+  Users,
   Warehouse,
   Wallet,
 } from "lucide-react";
@@ -24,15 +29,34 @@ import {
   formatShortDate,
   moneyCategoryLabel,
 } from "./warehouseAnalyticsShared";
+import {
+  buildBusinessTotals,
+  buildOnHand,
+  buildRevenueByPaymentKind,
+  buildSalesSummary,
+  buildStockMovementRows,
+  buildTopAgentsBySales,
+  listOf,
+  numOrNull,
+  toNum,
+} from "./warehouseAnalyticsModel";
 import { AccordionItem, KpiCard, PaginatedTable } from "./warehouseAnalyticsUi";
+
+const money = (v) => `${formatNum(v)} сом`;
+const moneyOrDash = (v) => (v == null ? "—" : money(v));
+const qtyOrDash = (v) => (v == null ? "—" : formatNum(v));
+const percentOrDash = (v) =>
+  v == null ? "—" : `${formatNum(Math.round(Number(v) * 10) / 10)}%`;
 
 const OwnerAnalyticsContent = ({
   data,
   showAgentSalesAnalytics = true,
   showMoneyAnalytics = true,
   showDetailsAccordions = true,
-  salesCountLabel = "Количество продаж агентов",
-  salesAmountLabel = "Сумма продаж агентов",
+  // Переопределение подписей (например, «Моя аналитика» агента).
+  // Без них подписи выбираются по ответу бэкенда.
+  salesCountLabel,
+  salesAmountLabel,
   idPrefix = "wa",
 }) => {
   const summary = data?.summary || {};
@@ -40,43 +64,40 @@ const OwnerAnalyticsContent = ({
   const topAgents = data?.top_agents || {};
   const details = data?.details || {};
 
-  const salesByDate = Array.isArray(charts?.sales_by_date)
-    ? charts.sales_by_date
-    : [];
-  const bySales = Array.isArray(topAgents?.by_sales) ? topAgents.by_sales : [];
-  const byReceived = Array.isArray(topAgents?.by_received)
-    ? topAgents.by_received
-    : [];
-  const warehouses = Array.isArray(details?.warehouses)
-    ? details.warehouses
-    : [];
-  const salesByProduct = Array.isArray(details?.sales_by_product)
-    ? details.sales_by_product
-    : [];
-  const salesByGroup = Array.isArray(details?.sales_by_group)
-    ? details.sales_by_group
-    : [];
-  const moneyByDate = Array.isArray(charts?.money_by_date)
-    ? charts.money_by_date
-    : [];
-  const cashByRegister = Array.isArray(details?.cash_by_register)
-    ? details.cash_by_register
-    : [];
-  const moneyReceiptsByCategory = Array.isArray(
-    details?.money_receipts_by_category,
-  )
-    ? details.money_receipts_by_category
-    : [];
-  const moneyExpensesByCategory = Array.isArray(
-    details?.money_expenses_by_category,
-  )
-    ? details.money_expenses_by_category
-    : [];
+  const sales = buildSalesSummary(summary);
+  const onHand = buildOnHand(summary);
+  const topAgentsBySales = buildTopAgentsBySales(topAgents, summary);
+  const revenueByPaymentKind = buildRevenueByPaymentKind(summary);
+  // Закупки, прибыль и зарплата — только владельцу/админу
+  const totals = showMoneyAnalytics ? buildBusinessTotals(summary) : null;
+  const stockMovementRows = showDetailsAccordions
+    ? buildStockMovementRows(summary)
+    : null;
 
-  const totalSalesAmount = bySales.reduce(
-    (acc, a) => acc + Number(a.sales_amount ?? a.amount ?? 0),
-    0,
-  );
+  const salesByDate = listOf(charts.sales_by_date);
+  const moneyByDate = listOf(charts.money_by_date);
+  const purchasesByDate = listOf(charts.purchases_by_date);
+  const profitByDate = listOf(charts.profit_by_date);
+  const byReceived = listOf(topAgents.by_received);
+  const warehouses = listOf(details.warehouses);
+  const salesByProduct = listOf(details.sales_by_product);
+  const salesByGroup = listOf(details.sales_by_group);
+  const cashByRegister = listOf(details.cash_by_register);
+  const moneyReceiptsByCategory = listOf(details.money_receipts_by_category);
+  const moneyExpensesByCategory = listOf(details.money_expenses_by_category);
+  const purchasesBySupplier = listOf(details.purchases_by_supplier);
+  const salaryByAgent = listOf(details.salary_by_agent);
+  const profitByProduct = listOf(details.profit_by_product);
+  const profitByAgent = listOf(details.profit_by_agent);
+
+  const customSalesLabels = salesCountLabel != null || salesAmountLabel != null;
+  const showSplitHints = sales.hasSplit && !customSalesLabels;
+  const salesCountTitle =
+    salesCountLabel ??
+    (sales.hasSplit ? "Количество продаж" : "Количество продаж агентов");
+  const salesAmountTitle =
+    salesAmountLabel ?? (sales.hasSplit ? "Сумма продаж" : "Сумма продаж агентов");
+
   const totalReceivedItems = byReceived.reduce(
     (acc, a) =>
       acc +
@@ -84,20 +105,12 @@ const OwnerAnalyticsContent = ({
     0,
   );
 
-  const bySalesRows = bySales.map((a) => {
-    const amount = Number(a.sales_amount ?? a.amount ?? 0);
-    const count = formatNum(a.sales_count ?? a.count);
-    const share =
-      totalSalesAmount > 0
-        ? `${Math.round((amount / totalSalesAmount) * 100)}%`
-        : "—";
-    return [
-      a.agent_name || a.name || a.agent_display || a.id || "—",
-      `${formatNum(amount)} сом`,
-      `${count} шт`,
-      share,
-    ];
-  });
+  const bySalesRows = topAgentsBySales.map((a) => [
+    a.name,
+    money(a.amount),
+    formatNum(a.docsCount),
+    percentOrDash(a.sharePercent),
+  ]);
 
   const byReceivedRows = byReceived.map((a) => {
     const items = Number(
@@ -139,12 +152,20 @@ const OwnerAnalyticsContent = ({
     counterpartyNet: Number(d.money_counterparty_net_amount ?? 0),
   }));
 
+  const purchasesChartData = purchasesByDate.map((d) => ({
+    date: d.date ? formatShortDate(d.date) : d.label || "—",
+    amount: toNum(d.amount),
+  }));
+
+  const profitChartData = profitByDate.map((d) => ({
+    date: d.date ? formatShortDate(d.date) : d.label || "—",
+    revenue: toNum(d.revenue),
+    cogs: toNum(d.cogs),
+    grossProfit: toNum(d.gross_profit),
+  }));
+
   const requestsApproved = Number(summary.requests_approved ?? 0);
   const itemsApproved = Number(summary.items_approved ?? 0);
-  const salesCount = Number(summary.sales_count ?? 0);
-  const salesAmount = Number(summary.sales_amount ?? 0);
-  const onHandQty = Number(summary.on_hand_qty ?? 0);
-  const onHandAmount = Number(summary.on_hand_amount ?? 0);
   const moneyDocsCount = Number(summary.money_docs_count ?? 0);
   const moneyReceiptAmount = Number(summary.money_receipt_amount ?? 0);
   const moneyExpenseAmount = Number(summary.money_expense_amount ?? 0);
@@ -172,13 +193,95 @@ const OwnerAnalyticsContent = ({
       ? Number(moneyCounterpartyNetRaw)
       : moneyCounterpartyReceiptAmount - moneyCounterpartyExpenseAmount;
 
-  // Итого по всем графам (обычная касса + долги + контрагенты)
+  // Итого по всем графам (обычная касса + долги + взаиморасчёты)
   const moneyTotalReceiptAmount =
     moneyReceiptAmount + moneyDebtReceiptAmount + moneyCounterpartyReceiptAmount;
   const moneyTotalExpenseAmount =
     moneyExpenseAmount + moneyDebtExpenseAmount + moneyCounterpartyExpenseAmount;
 
   const areaFillId = `${idPrefix}AreaFill`;
+  const purchasesFillId = `${idPrefix}PurchasesFill`;
+
+  const showPurchasesBlock =
+    showMoneyAnalytics &&
+    (purchasesBySupplier.length > 0 ||
+      purchasesChartData.length > 0 ||
+      Boolean(totals?.purchasesByPaymentKind));
+  const showSalaryBlock =
+    showMoneyAnalytics &&
+    (salaryByAgent.length > 0 || totals?.salaryAccrued != null);
+  const showProfitBlock =
+    showMoneyAnalytics &&
+    (profitByProduct.length > 0 || profitChartData.length > 0);
+  const showProfitByAgentBlock =
+    showMoneyAnalytics && showAgentSalesAnalytics && profitByAgent.length > 0;
+
+  const totalsKpis = totals
+    ? [
+        totals.revenue != null && {
+          key: "revenue",
+          label: "Выручка",
+          value: money(totals.revenue),
+          description: "Продажи за вычетом возвратов",
+          icon: ShoppingCart,
+        },
+        totals.cogs != null && {
+          key: "cogs",
+          label: "Себестоимость",
+          value: money(totals.cogs),
+          description: totals.costIsEstimated
+            ? "Оценочная: часть по текущей закупочной цене"
+            : "По закупочной цене на момент продажи",
+          icon: Package,
+        },
+        totals.grossProfit != null && {
+          key: "gross",
+          label: "Валовая прибыль",
+          value: money(totals.grossProfit),
+          description:
+            totals.grossMarginPercent != null
+              ? `Маржа ${percentOrDash(totals.grossMarginPercent)}`
+              : "Выручка − себестоимость",
+          icon: TrendingUp,
+        },
+        totals.netPurchasesAmount != null && {
+          key: "purchases",
+          label: "Закупки",
+          value: money(totals.netPurchasesAmount),
+          description:
+            totals.purchaseReturnsAmount
+              ? `За вычетом возвратов поставщику: ${money(totals.purchaseReturnsAmount)}`
+              : totals.purchasesCount != null
+                ? `Документов: ${formatNum(totals.purchasesCount)}`
+                : "Закупки и приходы товара",
+          icon: Truck,
+        },
+        totals.writeoffLoss != null && {
+          key: "writeoff",
+          label: "Списания и недостачи",
+          value: money(totals.writeoffLoss),
+          description: "По закупочной цене",
+          icon: Package,
+        },
+        totals.salaryExpense != null && {
+          key: "salary",
+          label: "Зарплата агентам",
+          value: money(totals.salaryExpense),
+          description:
+            totals.salaryPayable != null
+              ? `Начислено за период; к выплате всего: ${money(totals.salaryPayable)}`
+              : "Начислено за период",
+          icon: Users,
+        },
+        totals.operatingProfit != null && {
+          key: "operating",
+          label: "Операционная прибыль",
+          value: money(totals.operatingProfit),
+          description: "Валовая прибыль − списания − зарплата агентам",
+          icon: Coins,
+        },
+      ].filter(Boolean)
+    : [];
 
   return (
     <>
@@ -190,24 +293,64 @@ const OwnerAnalyticsContent = ({
           icon={Check}
         />
         <KpiCard
-          label="Одобрено позиций"
+          label="Выдано агентам, шт"
           value={formatNum(itemsApproved)}
-          description="Товаров выдано"
+          description="По одобренным заявкам"
           icon={Package}
         />
         {showAgentSalesAnalytics && (
           <>
             <KpiCard
-              label={salesCountLabel}
-              value={formatNum(salesCount)}
-              description="За период"
+              label={salesCountTitle}
+              value={formatNum(sales.count)}
+              description={
+                showSplitHints
+                  ? `Из них агентами: ${formatNum(sales.agentCount)}`
+                  : "За период"
+              }
               icon={ShoppingCart}
             />
             <KpiCard
-              label={salesAmountLabel}
-              value={`${formatNum(salesAmount)} сом`}
+              label={salesAmountTitle}
+              value={money(sales.amount)}
+              description={
+                showSplitHints
+                  ? `Из них агенты: ${money(sales.agentAmount)}`
+                  : sales.returnsAmount > 0
+                    ? "За вычетом возвратов"
+                    : undefined
+              }
               icon={ShoppingCart}
             />
+            {sales.returnsCount > 0 && (
+              <KpiCard
+                label="Возвраты"
+                value={money(sales.returnsAmount)}
+                description={
+                  sales.grossAmount != null
+                    ? `Документов: ${formatNum(sales.returnsCount)}; продажи до возвратов: ${money(sales.grossAmount)}`
+                    : `Документов: ${formatNum(sales.returnsCount)}`
+                }
+                icon={ShoppingCart}
+              />
+            )}
+            {sales.pendingCashCount > 0 && (
+              <KpiCard
+                label="Ожидают подтверждения кассы"
+                value={moneyOrDash(sales.pendingCashAmount)}
+                description={`Продаж: ${formatNum(sales.pendingCashCount)}. Товар отгружен, в выручке учтён`}
+                icon={Wallet}
+              />
+            )}
+            {revenueByPaymentKind?.map((row) => (
+              <KpiCard
+                key={`revenue-${row.key}`}
+                label={`Выручка: ${row.label.toLowerCase()}`}
+                value={money(row.amount)}
+                description="По документам продаж"
+                icon={Coins}
+              />
+            ))}
           </>
         )}
         {showMoneyAnalytics && (
@@ -220,83 +363,129 @@ const OwnerAnalyticsContent = ({
             />
             <KpiCard
               label="Приход по кассе"
-              value={`${formatNum(moneyReceiptAmount)} сом`}
-              description="Без долгов и контрагентов"
+              value={money(moneyReceiptAmount)}
+              description="Без долгов и взаиморасчётов с контрагентами"
               icon={Wallet}
             />
             <KpiCard
               label="Расход по кассе"
-              value={`${formatNum(moneyExpenseAmount)} сом`}
-              description="Без долгов и контрагентов"
+              value={money(moneyExpenseAmount)}
+              description="Без долгов и взаиморасчётов с контрагентами"
               icon={Wallet}
             />
             <KpiCard
               label="Сальдо"
-              value={`${formatNum(moneyNetAmount)} сом`}
-              description="Приход − расход (без долгов и контрагентов)"
+              value={money(moneyNetAmount)}
+              description="Приход − расход (без долгов и взаиморасчётов)"
               icon={Wallet}
             />
             <KpiCard
               label="Погашение долга"
-              value={`${formatNum(moneyDebtReceiptAmount)} сом`}
+              value={money(moneyDebtReceiptAmount)}
               description="Поступления в счёт долга"
               icon={Wallet}
             />
             <KpiCard
               label="Выплаты по долгу"
-              value={`${formatNum(moneyDebtExpenseAmount)} сом`}
+              value={money(moneyDebtExpenseAmount)}
               description="Отдельная графа долга"
               icon={Wallet}
             />
             <KpiCard
               label="Нетто по долгам"
-              value={`${formatNum(moneyDebtNetAmount)} сом`}
+              value={money(moneyDebtNetAmount)}
               description="Погашение − выплаты"
               icon={Wallet}
             />
             <KpiCard
-              label="Приход от контрагентов"
-              value={`${formatNum(moneyCounterpartyReceiptAmount)} сом`}
-              description="Операции с контрагентами"
+              label="Взаиморасчёты: приход"
+              value={money(moneyCounterpartyReceiptAmount)}
+              description="Ручные операции с контрагентами"
               icon={Wallet}
             />
             <KpiCard
-              label="Расход контрагентам"
-              value={`${formatNum(moneyCounterpartyExpenseAmount)} сом`}
-              description="Операции с контрагентами"
+              label="Взаиморасчёты: расход"
+              value={money(moneyCounterpartyExpenseAmount)}
+              description="Ручные операции с контрагентами"
               icon={Wallet}
             />
             <KpiCard
-              label="Нетто по контрагентам"
-              value={`${formatNum(moneyCounterpartyNetAmount)} сом`}
+              label="Нетто по взаиморасчётам"
+              value={money(moneyCounterpartyNetAmount)}
               description="Приход − расход по контрагентам"
               icon={Wallet}
             />
             <KpiCard
               label="Всего пришло в кассу"
-              value={`${formatNum(moneyTotalReceiptAmount)} сом`}
-              description="Касса + долги + контрагенты"
+              value={money(moneyTotalReceiptAmount)}
+              description="Касса + долги + взаиморасчёты"
               icon={Wallet}
             />
             <KpiCard
               label="Всего вышло из кассы"
-              value={`${formatNum(moneyTotalExpenseAmount)} сом`}
-              description="Касса + долги + контрагенты"
+              value={money(moneyTotalExpenseAmount)}
+              description="Касса + долги + взаиморасчёты"
               icon={Wallet}
             />
           </>
         )}
+        {onHand.hasWarehouse && (
+          <>
+            <KpiCard
+              label="На складах, шт"
+              value={formatNum(onHand.warehouseQty)}
+              description="Текущий остаток"
+              icon={Warehouse}
+            />
+            {onHand.warehouseAmount != null && (
+              <KpiCard
+                label="На складах, сом"
+                value={money(onHand.warehouseAmount)}
+                description="По продажной цене"
+                icon={Warehouse}
+              />
+            )}
+            {showMoneyAnalytics && onHand.warehousePurchaseAmount != null && (
+              <KpiCard
+                label="На складах по закупке, сом"
+                value={money(onHand.warehousePurchaseAmount)}
+                description="По закупочной цене"
+                icon={Warehouse}
+              />
+            )}
+          </>
+        )}
         <KpiCard
-          label="Остаток на руках, шт"
-          value={formatNum(onHandQty)}
+          label="У агентов на руках, шт"
+          value={formatNum(onHand.agentQty)}
+          description="Личный остаток агентов"
           icon={Package}
         />
         <KpiCard
-          label="Остаток на руках, сом"
-          value={`${formatNum(onHandAmount)} сом`}
+          label="У агентов на руках, сом"
+          value={money(onHand.agentAmount)}
+          description="По продажной цене"
           icon={Package}
         />
       </div>
+
+      {totalsKpis.length > 0 && (
+        <section className="warehouse-analytics__section">
+          <h3 className="warehouse-analytics__sectionTitle">Итоги за период</h3>
+          <div className="warehouse-analytics__kpis">
+            {totalsKpis.map(({ key, ...kpi }) => (
+              <KpiCard key={key} {...kpi} />
+            ))}
+          </div>
+          {totals.costIsEstimated && (
+            <p className="warehouse-analytics__note">
+              Себестоимость части продаж оценочная: для документов, проведённых
+              до фиксации закупочной цены в строке, взята текущая закупочная
+              цена товара.
+            </p>
+          )}
+        </section>
+      )}
 
       {(showAgentSalesAnalytics || showMoneyAnalytics) && (
       <div className="warehouse-analytics__chartsRow">
@@ -376,8 +565,13 @@ const OwnerAnalyticsContent = ({
         {showMoneyAnalytics && (
         <div className="warehouse-analytics__card warehouse-analytics__card--chart">
           <div className="warehouse-analytics__cardTitle">
-            Движение денег по датам (касса)
+            Движение денег по кассе
           </div>
+          <p className="warehouse-analytics__note">
+            {revenueByPaymentKind
+              ? "Наличные продажи агентов в кассу компании не проводятся — их выручка показана в карточках «Выручка» выше."
+              : "Наличные продажи агентов в кассу компании не проводятся и на этом графике не видны."}
+          </p>
           <div className="warehouse-analytics__chartWrap">
             {moneyChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
@@ -447,7 +641,7 @@ const OwnerAnalyticsContent = ({
                   <Line
                     type="monotone"
                     dataKey="counterpartyNet"
-                    name="Нетто по контрагентам"
+                    name="Нетто по взаиморасчётам"
                     stroke="#f59e0b"
                     strokeWidth={2}
                     dot={false}
@@ -479,9 +673,9 @@ const OwnerAnalyticsContent = ({
               <div className="warehouse-analytics__card warehouse-analytics__accCard">
                 {bySalesRows.length > 0 ? (
                   <PaginatedTable
-                    head={["Агент", "Продажи", "Кол-во", "Доля"]}
+                    head={["Агент", "Продажи", "Документов", "Доля"]}
                     rows={bySalesRows}
-                    colTemplate="1fr 120px 90px 70px"
+                    colTemplate="1fr 120px 110px 80px"
                     numeric={[1, 2, 3]}
                   />
                 ) : (
@@ -502,9 +696,9 @@ const OwnerAnalyticsContent = ({
               <div className="warehouse-analytics__card warehouse-analytics__accCard">
                 {byReceivedRows.length > 0 ? (
                   <PaginatedTable
-                    head={["Агент", "Позиций", "Доля"]}
+                    head={["Агент", "Выдано, шт", "Доля"]}
                     rows={byReceivedRows}
-                    colTemplate="1fr 100px 70px"
+                    colTemplate="1fr 110px 70px"
                     numeric={[1, 2]}
                   />
                 ) : (
@@ -530,23 +724,30 @@ const OwnerAnalyticsContent = ({
                 head={[
                   "Склад",
                   "Заявок одобрено",
-                  "Позиций одобрено",
+                  "Выдано агентам, шт",
                   "Продаж",
                   "Сумма продаж",
-                  "Остаток, шт",
-                  "Остаток, сом",
+                  "На складе, шт",
+                  "Продажная цена, сом",
+                  "Закупочная цена, сом",
+                  "У агентов, шт",
                 ]}
-                rows={warehouses.map((w) => [
-                  w.warehouse_name ?? w.name ?? "—",
-                  formatNum(w.carts_approved ?? w.requests_approved ?? 0),
-                  formatNum(w.items_approved ?? 0),
-                  formatNum(w.sales_count ?? 0),
-                  `${formatNum(w.sales_amount ?? 0)} сом`,
-                  formatNum(w.on_hand_qty ?? 0),
-                  `${formatNum(w.on_hand_amount ?? 0)} сом`,
-                ])}
-                colTemplate="1.2fr 130px 150px 90px 130px 110px 130px"
-                numeric={[1, 2, 3, 4, 5, 6]}
+                rows={warehouses.map((w) => {
+                  const stock = buildOnHand(w);
+                  return [
+                    w.warehouse_name ?? w.name ?? "—",
+                    formatNum(w.carts_approved ?? w.requests_approved ?? 0),
+                    formatNum(w.items_approved ?? 0),
+                    formatNum(w.sales_count ?? 0),
+                    money(w.sales_amount ?? 0),
+                    qtyOrDash(stock.warehouseQty),
+                    moneyOrDash(stock.warehouseAmount),
+                    moneyOrDash(stock.warehousePurchaseAmount),
+                    formatNum(stock.agentQty),
+                  ];
+                })}
+                colTemplate="1.2fr 120px 140px 80px 130px 110px 140px 150px 110px"
+                numeric={[1, 2, 3, 4, 5, 6, 7, 8]}
               />
             ) : (
               <div className="warehouse-analytics-table__empty">
@@ -574,9 +775,9 @@ const OwnerAnalyticsContent = ({
                   "Долг +, сом",
                   "Долг −, сом",
                   "Нетто долг, сом",
-                  "Контр. +, сом",
-                  "Контр. −, сом",
-                  "Нетто контр., сом",
+                  "Взаим. +, сом",
+                  "Взаим. −, сом",
+                  "Нетто взаим., сом",
                   "Документов",
                 ]}
                 rows={cashByRegister.map((r) => {
@@ -722,6 +923,233 @@ const OwnerAnalyticsContent = ({
             )}
           </div>
         </AccordionItem>
+
+        {showPurchasesBlock && (
+          <AccordionItem
+            id={`${idPrefix}-purchases`}
+            title="Закупки"
+            icon={Truck}
+            badge={
+              purchasesBySupplier.length ? `${purchasesBySupplier.length}` : "0"
+            }
+            defaultOpen={false}
+          >
+            <div className="warehouse-analytics__card warehouse-analytics__accCard">
+              {totals?.purchasesByPaymentKind && (
+                <PaginatedTable
+                  head={["Способ оплаты", "Сумма, сом"]}
+                  rows={totals.purchasesByPaymentKind.map((r) => [
+                    r.label,
+                    formatNum(r.amount),
+                  ])}
+                  colTemplate="1fr 140px"
+                  numeric={[1]}
+                />
+              )}
+              {purchasesChartData.length > 0 && (
+                <div className="warehouse-analytics__chartWrap">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <AreaChart
+                      data={purchasesChartData}
+                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id={purchasesFillId}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--wa-border)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNum(v)} />
+                      <Tooltip
+                        formatter={(value) => [money(value), "Закупки"]}
+                        labelFormatter={(l) => `Дата: ${l}`}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="amount"
+                        stroke="#6366f1"
+                        strokeWidth={2}
+                        fill={`url(#${purchasesFillId})`}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {purchasesBySupplier.length > 0 ? (
+                <PaginatedTable
+                  head={["Поставщик", "Документов", "Сумма, сом"]}
+                  rows={purchasesBySupplier.map((s) => [
+                    s.name || "Без поставщика",
+                    formatNum(s.docs_count ?? 0),
+                    formatNum(s.amount ?? 0),
+                  ])}
+                  colTemplate="1fr 110px 140px"
+                  numeric={[1, 2]}
+                />
+              ) : (
+                <div className="warehouse-analytics-table__empty">
+                  Нет закупок по поставщикам за период.
+                </div>
+              )}
+            </div>
+          </AccordionItem>
+        )}
+
+        {stockMovementRows && (
+          <AccordionItem
+            id={`${idPrefix}-stock-movement`}
+            title="Движение товара"
+            icon={ArrowLeftRight}
+            badge={`${stockMovementRows.length}`}
+            defaultOpen={false}
+          >
+            <div className="warehouse-analytics__card warehouse-analytics__accCard">
+              <PaginatedTable
+                head={["Операция", "Кол-во", "По закупочной цене, сом"]}
+                rows={stockMovementRows.map((r) => [
+                  r.label,
+                  formatNum(r.qty),
+                  r.cost == null ? "—" : formatNum(r.cost),
+                ])}
+                colTemplate="1fr 120px 180px"
+                numeric={[1, 2]}
+              />
+            </div>
+          </AccordionItem>
+        )}
+
+        {showSalaryBlock && (
+          <AccordionItem
+            id={`${idPrefix}-salary`}
+            title="Зарплата агентов"
+            icon={Users}
+            badge={salaryByAgent.length ? `${salaryByAgent.length}` : "0"}
+            defaultOpen={false}
+          >
+            <div className="warehouse-analytics__card warehouse-analytics__accCard">
+              {totals && (
+                <PaginatedTable
+                  head={["Показатель", "Сумма, сом"]}
+                  rows={[
+                    ["Начислено за период", moneyOrDash(totals.salaryAccrued)],
+                    ["Выплачено за период", moneyOrDash(totals.salaryPaid)],
+                    ["К выплате (всего)", moneyOrDash(totals.salaryPayable)],
+                  ]}
+                  colTemplate="1fr 160px"
+                  numeric={[1]}
+                />
+              )}
+              {salaryByAgent.length > 0 ? (
+                <PaginatedTable
+                  head={["Агент", "Начислено", "Выплачено", "К выплате"]}
+                  rows={salaryByAgent.map((a) => [
+                    a.agent_name || a.agent_id || "—",
+                    formatNum(a.accrued ?? 0),
+                    formatNum(a.paid ?? 0),
+                    formatNum(a.payable ?? 0),
+                  ])}
+                  colTemplate="1fr 120px 120px 120px"
+                  numeric={[1, 2, 3]}
+                />
+              ) : (
+                <div className="warehouse-analytics-table__empty">
+                  Нет начислений за период.
+                </div>
+              )}
+            </div>
+          </AccordionItem>
+        )}
+
+        {showProfitBlock && (
+          <AccordionItem
+            id={`${idPrefix}-profit-by-product`}
+            title="Прибыль по товарам"
+            icon={TrendingUp}
+            badge={profitByProduct.length ? `${profitByProduct.length}` : "0"}
+            defaultOpen={false}
+          >
+            <div className="warehouse-analytics__card warehouse-analytics__accCard">
+              {totals?.costIsEstimated && (
+                <p className="warehouse-analytics__note">
+                  Себестоимость частично оценочная (по текущей закупочной цене).
+                </p>
+              )}
+              {profitChartData.length > 0 && (
+                <div className="warehouse-analytics__chartWrap">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart
+                      data={profitChartData}
+                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--wa-border)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNum(v)} />
+                      <Tooltip
+                        formatter={(value, name) => [money(value), name]}
+                        labelFormatter={(l) => `Дата: ${l}`}
+                      />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                      <Line type="monotone" dataKey="revenue" name="Выручка" stroke="#22c55e" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="cogs" name="Себестоимость" stroke="#ef4444" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="grossProfit" name="Валовая прибыль" stroke="var(--wa-primary)" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {profitByProduct.length > 0 ? (
+                <PaginatedTable
+                  head={["Товар", "Кол-во", "Выручка", "Себестоимость", "Прибыль", "Маржа"]}
+                  rows={profitByProduct.map((p) => [
+                    p.product_name ?? p.name ?? "—",
+                    formatNum(p.qty ?? 0),
+                    formatNum(p.revenue ?? 0),
+                    formatNum(p.cogs ?? 0),
+                    formatNum(p.profit ?? 0),
+                    percentOrDash(numOrNull(p, "margin_percent")),
+                  ])}
+                  colTemplate="1fr 90px 120px 130px 120px 80px"
+                  numeric={[1, 2, 3, 4, 5]}
+                />
+              ) : (
+                <div className="warehouse-analytics-table__empty">
+                  Нет данных о прибыли по товарам за период.
+                </div>
+              )}
+            </div>
+          </AccordionItem>
+        )}
+
+        {showProfitByAgentBlock && (
+          <AccordionItem
+            id={`${idPrefix}-profit-by-agent`}
+            title="Прибыль по агентам"
+            icon={TrendingUp}
+            badge={`${profitByAgent.length}`}
+            defaultOpen={false}
+          >
+            <div className="warehouse-analytics__card warehouse-analytics__accCard">
+              <PaginatedTable
+                head={["Агент", "Выручка", "Себестоимость", "Прибыль"]}
+                rows={profitByAgent.map((a) => [
+                  a.agent_name || a.agent_id || "—",
+                  formatNum(a.revenue ?? 0),
+                  formatNum(a.cogs ?? 0),
+                  formatNum(a.profit ?? 0),
+                ])}
+                colTemplate="1fr 130px 130px 130px"
+                numeric={[1, 2, 3]}
+              />
+            </div>
+          </AccordionItem>
+        )}
       </div>
       )}
     </>

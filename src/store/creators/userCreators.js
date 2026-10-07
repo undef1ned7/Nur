@@ -11,6 +11,7 @@ import api from "../../api";
 import { setSector } from "../slices/sectorSlice";
 import { mapSectorNameToSlug } from "../../utils/sectorMapping";
 import { handleThunkError } from "./utils/handleThunkError";
+import { dedupeRequest } from "../../utils/dedupeRequest";
 
 export const registerUserAsync = createAsyncThunk(
   "user/register",
@@ -99,11 +100,13 @@ export const getCompany = createAsyncThunk(
   "user/fetchCompany",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/users/company/", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
+      const { data } = await dedupeRequest("users/company", () =>
+        api.get("/users/company/", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }),
+      );
       return data;
     } catch (error) {
       return handleThunkError(error, rejectWithValue);

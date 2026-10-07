@@ -1,15 +1,11 @@
-import {
-  Percent,
-  RefreshCw,
-  Save,
-  Search,
-  Wallet,
-  X,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Percent, RefreshCw, Save, Search, Wallet, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
 import { useUser } from "../../../../store/slices/userSlice";
+import { fetchBranchesAsync } from "../../../../store/creators/branchCreators";
 import {
+  listCashRegisters,
   listCompanyAgentRequests,
   listWarehouses,
 } from "../../../../api/warehouse";
@@ -22,6 +18,8 @@ import {
   updateSalaryRate,
 } from "../../../../api/warehouseSalary";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
+import { monthAgoLocalISODate, toLocalISODate } from "../utils/localDate";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Salary.scss";
 
 const TABS = {
@@ -76,13 +74,10 @@ const fmtDateTime = (value) => {
   });
 };
 
-const monthAgoISO = () => {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  return d.toISOString().slice(0, 10);
-};
+// Локальная дата: toISOString() давал UTC, и с 00:00 до 06:00 по Бишкеку «сегодня» было вчера
+const monthAgoISO = () => monthAgoLocalISODate();
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => toLocalISODate();
 
 const errorText = (e) => {
   const detail = e?.detail || e?.message;
@@ -95,8 +90,12 @@ const errorText = (e) => {
 const isNotReady = (e) => e?.status === 404;
 
 const Salary = () => {
+  const dispatch = useDispatch();
   const { profile } = useUser();
   const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+  const { list: branches = [] } = useSelector(
+    (state) => state.branches || { list: [] },
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -140,6 +139,11 @@ const Salary = () => {
     "warehouse:salary:warehouseFilter",
     "",
   );
+  const [branchFilter, setBranchFilter] = usePersistedState(
+    "warehouse:salary:branchFilter",
+    "",
+  );
+  const effectiveBranchFilter = isOwnerOrAdmin ? branchFilter : "";
   const [saleTypeFilter, setSaleTypeFilter] = usePersistedState(
     "warehouse:salary:saleTypeFilter",
     "",
@@ -150,6 +154,7 @@ const Salary = () => {
   );
   const [search, setSearch] = usePersistedState("warehouse:salary:search", "");
   const [page, setPage] = useState(1);
+  const didInitBranchFilter = useRef(false);
 
   // ---------- Справочники ----------
   const [agents, setAgents] = useState([]);
@@ -159,7 +164,9 @@ const Salary = () => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await listWarehouses({ page_size: 1000 });
+        const params = { page_size: 1000 };
+        if (effectiveBranchFilter) params.branch = effectiveBranchFilter;
+        const data = await listWarehouses(params);
         if (!cancelled) setWarehouses(normalizeList(data));
       } catch {
         if (!cancelled) setWarehouses([]);
@@ -178,7 +185,13 @@ const Salary = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwnerOrAdmin]);
+  }, [effectiveBranchFilter, isOwnerOrAdmin]);
+
+  useEffect(() => {
+    if (isOwnerOrAdmin && branches.length === 0) {
+      dispatch(fetchBranchesAsync({ page_size: 1000 }));
+    }
+  }, [branches.length, dispatch, isOwnerOrAdmin]);
 
   const agentOptions = useMemo(
     () =>
@@ -210,8 +223,9 @@ const Salary = () => {
     const params = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (effectiveBranchFilter) params.branch = effectiveBranchFilter;
     return params;
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, effectiveBranchFilter]);
 
   const loadAccruals = useCallback(async () => {
     setLoading(true);
@@ -232,7 +246,9 @@ const Salary = () => {
         }),
       ]);
       setAccruals(normalizeList(accrualsData));
-      setAccrualsCount(accrualsData?.count ?? normalizeList(accrualsData).length);
+      setAccrualsCount(
+        accrualsData?.count ?? normalizeList(accrualsData).length,
+      );
       setAccrualsHasNext(Boolean(accrualsData?.next));
       setSummary(summaryData || null);
       setNotReady(false);
@@ -276,7 +292,9 @@ const Salary = () => {
     setRatesLoading(true);
     setRatesError("");
     try {
-      const data = await listSalaryRates();
+      const data = await listSalaryRates(
+        effectiveBranchFilter ? { branch: effectiveBranchFilter } : {},
+      );
       setRates(normalizeList(data));
       setRateDrafts({});
       setNotReady(false);
@@ -288,7 +306,7 @@ const Salary = () => {
     } finally {
       setRatesLoading(false);
     }
-  }, []);
+  }, [effectiveBranchFilter]);
 
   useEffect(() => {
     if (tab === TABS.RATES && isOwnerOrAdmin) loadRates();
@@ -298,7 +316,9 @@ const Salary = () => {
     const q = ratesSearch.trim().toLowerCase();
     if (!q) return rates;
     return rates.filter((r) =>
-      String(r.warehouse_name || "").toLowerCase().includes(q),
+      String(r.warehouse_name || "")
+        .toLowerCase()
+        .includes(q),
     );
   }, [rates, ratesSearch]);
 
@@ -335,7 +355,10 @@ const Salary = () => {
 
   const handleSaveRate = async (rate) => {
     const draft = getDraft(rate);
-    if (!validPercent(draft.retail_percent) || !validPercent(draft.wholesale_percent)) {
+    if (
+      !validPercent(draft.retail_percent) ||
+      !validPercent(draft.wholesale_percent)
+    ) {
       setRatesError("Процент должен быть числом от 0 до 100");
       return;
     }
@@ -373,7 +396,11 @@ const Salary = () => {
     agent: "",
     amount: "",
     comment: "",
+    cash_register: "",
   });
+  // Кассы для выплаты: при выборе кассы бэкенд проводит расход «Зарплата агентам»
+  const [cashRegisters, setCashRegisters] = useState([]);
+  const [cashRegistersLoading, setCashRegistersLoading] = useState(false);
   const [payoutSubmitting, setPayoutSubmitting] = useState(false);
   const [payoutFormError, setPayoutFormError] = useState("");
 
@@ -398,6 +425,17 @@ const Salary = () => {
     if (tab === TABS.PAYOUTS) loadPayouts();
   }, [tab, loadPayouts]);
 
+  useEffect(() => {
+    if (!didInitBranchFilter.current) {
+      didInitBranchFilter.current = true;
+      return;
+    }
+    setWarehouseFilter("");
+    setCashRegisters([]);
+    setPayoutForm((prev) => ({ ...prev, cash_register: "" }));
+    setPage(1);
+  }, [effectiveBranchFilter, setWarehouseFilter]);
+
   const agentBalances = useMemo(() => {
     const byAgent = Array.isArray(summary?.by_agent) ? summary.by_agent : [];
     const map = new Map();
@@ -407,10 +445,26 @@ const Salary = () => {
     return map;
   }, [summary]);
 
+  const loadCashRegisters = useCallback(async () => {
+    setCashRegistersLoading(true);
+    try {
+      const params = { page_size: 200 };
+      if (effectiveBranchFilter) params.branch = effectiveBranchFilter;
+      const data = await listCashRegisters(params);
+      setCashRegisters(normalizeList(data));
+    } catch (e) {
+      console.error(e);
+      setCashRegisters([]);
+    } finally {
+      setCashRegistersLoading(false);
+    }
+  }, [effectiveBranchFilter]);
+
   const openPayoutModal = () => {
-    setPayoutForm({ agent: "", amount: "", comment: "" });
+    setPayoutForm({ agent: "", amount: "", comment: "", cash_register: "" });
     setPayoutFormError("");
     setPayoutModalOpen(true);
+    if (!cashRegisters.length) loadCashRegisters();
   };
 
   const handlePayoutAgentChange = (agentId) => {
@@ -443,12 +497,16 @@ const Salary = () => {
         agent: payoutForm.agent,
         amount: String(amountNum),
         comment: payoutForm.comment.trim() || undefined,
+        cash_register: payoutForm.cash_register || undefined,
+        branch: effectiveBranchFilter || undefined,
       });
       setPayoutModalOpen(false);
       await loadPayouts();
     } catch (err) {
       console.error(err);
-      setPayoutFormError(errorText(err));
+      setPayoutFormError(
+        validateResErrors(err, "Не удалось выполнить выплату"),
+      );
     } finally {
       setPayoutSubmitting(false);
     }
@@ -568,6 +626,23 @@ const Salary = () => {
             {agentOptions.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {isOwnerOrAdmin && (
+          <select
+            value={branchFilter}
+            onChange={(e) => {
+              setBranchFilter(e.target.value);
+              setPage(1);
+            }}
+            className="warehouse-salary__select"
+          >
+            <option value="">Все филиалы</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name || branch.code || branch.id}
               </option>
             ))}
           </select>
@@ -731,14 +806,30 @@ const Salary = () => {
         <h3 className="warehouse-salary__block-title">
           Процентные ставки складов
         </h3>
-        <div className="warehouse-salary__search">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Поиск склада…"
-            value={ratesSearch}
-            onChange={(e) => setRatesSearch(e.target.value)}
-          />
+        <div className="warehouse-salary__block-head-actions">
+          {isOwnerOrAdmin && (
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="warehouse-salary__select"
+            >
+              <option value="">Все филиалы</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name || branch.code || branch.id}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="warehouse-salary__search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Поиск склада…"
+              value={ratesSearch}
+              onChange={(e) => setRatesSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
       <p className="warehouse-salary__hint">
@@ -746,7 +837,9 @@ const Salary = () => {
         опт считаются отдельно. Изменение ставки действует только на новые
         продажи — уже созданные начисления не пересчитываются.
       </p>
-      {ratesError && <div className="warehouse-salary__error">{ratesError}</div>}
+      {ratesError && (
+        <div className="warehouse-salary__error">{ratesError}</div>
+      )}
       <div className="warehouse-salary__table-wrap">
         <table className="warehouse-salary__table">
           <thead>
@@ -858,6 +951,20 @@ const Salary = () => {
             />
           </label>
           {isOwnerOrAdmin && (
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="warehouse-salary__select"
+            >
+              <option value="">Все филиалы</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name || branch.code || branch.id}
+                </option>
+              ))}
+            </select>
+          )}
+          {isOwnerOrAdmin && (
             <button
               type="button"
               className="warehouse-salary__primary-btn"
@@ -879,6 +986,7 @@ const Salary = () => {
               <th>Дата</th>
               {isOwnerOrAdmin && <th>Агент</th>}
               <th>Сумма</th>
+              <th>Касса</th>
               <th>Комментарий</th>
               {isOwnerOrAdmin && <th>Кто выплатил</th>}
             </tr>
@@ -887,7 +995,7 @@ const Salary = () => {
             {payoutsLoading ? (
               <tr>
                 <td
-                  colSpan={isOwnerOrAdmin ? 5 : 3}
+                  colSpan={isOwnerOrAdmin ? 6 : 4}
                   className="warehouse-salary__empty"
                 >
                   Загрузка…
@@ -896,7 +1004,7 @@ const Salary = () => {
             ) : payouts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isOwnerOrAdmin ? 5 : 3}
+                  colSpan={isOwnerOrAdmin ? 6 : 4}
                   className="warehouse-salary__empty"
                 >
                   Выплат за выбранный период нет.
@@ -915,6 +1023,12 @@ const Salary = () => {
                   )}
                   <td className="warehouse-salary__cell-accent">
                     {fmtMoney(p.amount)}
+                  </td>
+                  <td>
+                    {p.cash_register_name ||
+                      (p.money_document || p.cash_register
+                        ? "Касса"
+                        : "Вне кассы")}
                   </td>
                   <td>{p.comment || "—"}</td>
                   {isOwnerOrAdmin && <td>{p.created_by_name || "—"}</td>}
@@ -985,6 +1099,31 @@ const Salary = () => {
                 }
               />
             </label>
+            <label className="warehouse-salary__field">
+              Касса
+              <select
+                value={payoutForm.cash_register}
+                disabled={cashRegistersLoading}
+                onChange={(e) =>
+                  setPayoutForm((prev) => ({
+                    ...prev,
+                    cash_register: e.target.value,
+                  }))
+                }
+              >
+                <option value="">Без кассы (выплата вне кассы)</option>
+                {cashRegisters.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name || r.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="warehouse-salary__hint">
+              {payoutForm.cash_register
+                ? "Из кассы будет проведён расход «Зарплата агентам» — он попадёт в кассу и аналитику."
+                : "Выплата не попадёт в кассу и в «Расход по кассе»."}
+            </p>
             <label className="warehouse-salary__field">
               Комментарий
               <input
@@ -1075,8 +1214,8 @@ const Salary = () => {
 
       {notReady && (
         <div className="warehouse-salary__notice">
-          Раздел «Зарплата» ещё не активирован на сервере. Данные появятся
-          после обновления бэкенда (см. docs/warehouse/salary.md).
+          Раздел «Зарплата» ещё не активирован на сервере. Данные появятся после
+          обновления бэкенда (см. docs/warehouse/salary.md).
         </div>
       )}
 

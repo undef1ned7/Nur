@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -18,17 +18,21 @@ import { usePagination } from "./hooks/usePagination";
 import { useSearch } from "./hooks/useSearch";
 import { PAGE_SIZE } from "./constants";
 import {
+  PULL_MODE_HINT,
   extractPartnershipError,
   filterProducts,
   getProductQty,
   mapOwnProductRow,
   normalizeList,
+  partnerPullMode,
+  pluralRu,
   warehouseLabel,
 } from "./partnership/partnershipHelpers";
+import { listWarehouseProducts } from "../../../../api/warehouse";
 import {
-  getStockPartnerCatalog,
-  listWarehouseProducts,
-} from "../../../../api/warehouse";
+  getPartnerWarehouses,
+  listPartnerWarehouseProducts,
+} from "../../../../api/warehousePartnership";
 import { fetchWarehousesAsync } from "../../../../store/creators/warehouseCreators";
 import "./PartnerCatalogPage.scss";
 import "./Warehouses.scss";
@@ -38,11 +42,23 @@ const DIRECTION = {
   SEND: "send",
 };
 
+const PRODUCT_FORMS = ["товар", "товара", "товаров"];
+
+const EMPTY_REMOTE = { list: [], count: 0, next: null, previous: null };
+
 const parsePaginationMeta = (data, listLength) => ({
   count: typeof data?.count === "number" ? data.count : listLength,
   next: data?.next ?? null,
   previous: data?.previous ?? null,
 });
+
+const CLOSED_TRANSFER = {
+  open: false,
+  mode: DIRECTION.RECEIVE,
+  product: null,
+  products: null,
+  warehouseFromId: null,
+};
 
 const PartnerCatalogPage = () => {
   const { partnerId } = useParams();
@@ -54,126 +70,157 @@ const PartnerCatalogPage = () => {
     searchParams.get("direction") === DIRECTION.SEND
       ? DIRECTION.SEND
       : DIRECTION.RECEIVE;
+  const isReceive = direction === DIRECTION.RECEIVE;
 
   const ownWarehouses = useSelector((state) => state.warehouse.list || []);
-  const { searchTerm: productSearch, debouncedSearchTerm, setSearchTerm: setProductSearch } =
-    useSearch(`warehouse:partnerCatalog:${partnerId}:search`);
+  const {
+    searchTerm: productSearch,
+    debouncedSearchTerm,
+    setSearchTerm: setProductSearch,
+  } = useSearch(`warehouse:partnerCatalog:${partnerId}:search`);
 
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState("");
-  const [catalogData, setCatalogData] = useState(null);
+  const [partnerLoading, setPartnerLoading] = useState(true);
+  const [partnerError, setPartnerError] = useState("");
+  // { source: "light" | "catalog", partner_company, partnership, warehouses, cash_registers }
+  const [partnerData, setPartnerData] = useState(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
-  const [ownProducts, setOwnProducts] = useState({
-    list: [],
-    count: 0,
-    next: null,
-    previous: null,
-  });
-  const [ownProductsLoading, setOwnProductsLoading] = useState(false);
+  // Серверная выдача: свои товары (send) или товары партнёра на новом бэке (receive)
+  const [remoteProducts, setRemoteProducts] = useState(EMPTY_REMOTE);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState("");
   const prevDebouncedSearchRef = useRef(debouncedSearchTerm);
 
   const [selectedProducts, setSelectedProducts] = useState(() => new Map());
-  const [transferState, setTransferState] = useState({
-    open: false,
-    mode: DIRECTION.RECEIVE,
-    product: null,
-    products: null,
-    warehouseFromId: null,
-  });
+  const [transferState, setTransferState] = useState(CLOSED_TRANSFER);
 
-  const partnerName =
-    catalogData?.partner_company?.name || "Партнёр";
+  const partnerName = partnerData?.partner_company?.name || "Партнёр";
+  const partnerWarehouses = useMemo(
+    () => partnerData?.warehouses || [],
+    [partnerData],
+  );
+  const pullMode = partnerPullMode(partnerData?.partnership);
 
-  const isReceive = direction === DIRECTION.RECEIVE;
+  // На старом бэке товары партнёра приходят вместе со складами — фильтруем и
+  // листаем на клиенте. На новом — запрашиваем страницу с бэка.
+  const isClientMode = isReceive && partnerData?.source !== "light";
 
-  const partnerWarehouses = catalogData?.warehouses || [];
+  const activeWarehouses = isReceive ? partnerWarehouses : ownWarehouses;
 
-  const activeWarehouses = useMemo(() => {
-    if (isReceive) return partnerWarehouses;
-    return ownWarehouses;
-  }, [isReceive, partnerWarehouses, ownWarehouses]);
+  const loadPartner = useCallback(async () => {
+    if (!partnerId) return;
+    setPartnerLoading(true);
+    setPartnerError("");
+    try {
+      setPartnerData(await getPartnerWarehouses(partnerId));
+    } catch (e) {
+      console.error(e);
+      setPartnerError(extractPartnershipError(e));
+      setPartnerData(null);
+    } finally {
+      setPartnerLoading(false);
+    }
+  }, [partnerId]);
+
+  const loadRemoteProducts = useCallback(
+    async ({ receive, warehouseId, page, search }) => {
+      if (!warehouseId) return;
+      setRemoteLoading(true);
+      setRemoteError("");
+      try {
+        const params = { page, page_size: PAGE_SIZE };
+        const trimmed = search.trim();
+        if (trimmed) params.search = trimmed;
+        const data = receive
+          ? await listPartnerWarehouseProducts(partnerId, warehouseId, params)
+          : await listWarehouseProducts(warehouseId, params);
+        const list = receive
+          ? normalizeList(data)
+          : normalizeList(data).map(mapOwnProductRow);
+        setRemoteProducts({ list, ...parsePaginationMeta(data, list.length) });
+      } catch (e) {
+        console.error(e);
+        setRemoteError(extractPartnershipError(e));
+        setRemoteProducts(EMPTY_REMOTE);
+      } finally {
+        setRemoteLoading(false);
+      }
+    },
+    [partnerId],
+  );
+
+  useEffect(() => {
+    dispatch(fetchWarehousesAsync({ page_size: 1000 }));
+    loadPartner();
+  }, [dispatch, loadPartner]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedProducts(new Map());
+  }, []);
+
+  const productsForSelectedWarehouse = useMemo(() => {
+    if (!selectedWarehouseId) return [];
+    if (isClientMode) {
+      const wh = partnerWarehouses.find(
+        (w) => String(w.id) === String(selectedWarehouseId),
+      );
+      return wh?.products || [];
+    }
+    return remoteProducts.list;
+  }, [isClientMode, selectedWarehouseId, partnerWarehouses, remoteProducts.list]);
+
+  const filteredClientProducts = useMemo(
+    () =>
+      isClientMode
+        ? filterProducts(productsForSelectedWarehouse, debouncedSearchTerm)
+        : [],
+    [isClientMode, productsForSelectedWarehouse, debouncedSearchTerm],
+  );
+
+  const productsCount = isClientMode
+    ? filteredClientProducts.length
+    : remoteProducts.count;
 
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
     [searchParams],
   );
 
-  const loadCatalog = useCallback(async () => {
-    if (!partnerId) return;
-    setCatalogLoading(true);
-    setCatalogError("");
-    try {
-      const data = await getStockPartnerCatalog(partnerId);
-      setCatalogData(data);
-    } catch (e) {
-      console.error(e);
-      setCatalogError(extractPartnershipError(e));
-      setCatalogData(null);
-    } finally {
-      setCatalogLoading(false);
-    }
-  }, [partnerId]);
+  const clientTotalPages = Math.max(1, Math.ceil((productsCount || 0) / PAGE_SIZE));
 
-  const loadOwnWarehouseProducts = useCallback(
-    async (warehouseId, page = 1, search = "") => {
-      if (!warehouseId) return;
-      setOwnProductsLoading(true);
-      try {
-        const params = {
-          page,
-          page_size: PAGE_SIZE,
-        };
-        const trimmedSearch = search.trim();
-        if (trimmedSearch) {
-          params.search = trimmedSearch;
-        }
-        const data = await listWarehouseProducts(warehouseId, params);
-        const list = normalizeList(data).map(mapOwnProductRow);
-        const meta = parsePaginationMeta(data, list.length);
-        setOwnProducts({ list, ...meta });
-      } catch (e) {
-        console.error(e);
-        setOwnProducts({
-          list: [],
-          count: 0,
-          next: null,
-          previous: null,
-        });
-      } finally {
-        setOwnProductsLoading(false);
-      }
-    },
-    [],
-  );
+  const paginationNext = isClientMode
+    ? currentPageFromUrl < clientTotalPages
+      ? "1"
+      : null
+    : remoteProducts.next;
+  const paginationPrevious = isClientMode
+    ? currentPageFromUrl > 1
+      ? "1"
+      : null
+    : remoteProducts.previous;
 
+  const {
+    currentPage,
+    totalPages,
+    hasNextPage,
+    hasPrevPage,
+    handlePageChange,
+    resetToFirstPage,
+  } = usePagination(productsCount, paginationNext, paginationPrevious);
+
+  // Смена направления или партнёра — начинаем с чистого листа. На первом
+  // рендере ничего не сбрасываем: страница и поиск из URL/сессии должны
+  // сохраниться при перезагрузке и переходе по ссылке.
+  const scopeKey = `${partnerId}|${direction}`;
+  const prevScopeKeyRef = useRef(scopeKey);
   useEffect(() => {
-    dispatch(fetchWarehousesAsync({ page_size: 1000 }));
-    loadCatalog();
-  }, [dispatch, loadCatalog]);
-
-  const clearSelection = useCallback(() => {
-    setSelectedProducts(new Map());
-  }, []);
-
-  useEffect(() => {
+    if (prevScopeKeyRef.current === scopeKey) return;
+    prevScopeKeyRef.current = scopeKey;
     setProductSearch("");
     setSelectedWarehouseId("");
     clearSelection();
-    setOwnProducts({
-      list: [],
-      count: 0,
-      next: null,
-      previous: null,
-    });
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete("page");
-        return params;
-      },
-      { replace: true },
-    );
-  }, [direction, partnerId, setProductSearch, setSearchParams, clearSelection]);
+    setRemoteProducts(EMPTY_REMOTE);
+    resetToFirstPage();
+  }, [scopeKey, setProductSearch, clearSelection, resetToFirstPage]);
 
   useEffect(() => {
     clearSelection();
@@ -185,73 +232,24 @@ const PartnerCatalogPage = () => {
     }
   }, [activeWarehouses, selectedWarehouseId]);
 
-  const productsForSelectedWarehouse = useMemo(() => {
-    if (!selectedWarehouseId) return [];
-    if (isReceive) {
-      const wh = partnerWarehouses.find(
-        (w) => String(w.id) === String(selectedWarehouseId),
-      );
-      return wh?.products || [];
-    }
-    return ownProducts.list;
-  }, [
-    isReceive,
-    selectedWarehouseId,
-    partnerWarehouses,
-    ownProducts.list,
-  ]);
-
-  const filteredPartnerProducts = useMemo(
-    () => filterProducts(productsForSelectedWarehouse, debouncedSearchTerm),
-    [productsForSelectedWarehouse, debouncedSearchTerm],
-  );
-
-  const productsCount = isReceive
-    ? filteredPartnerProducts.length
-    : ownProducts.count;
-
-  const totalPagesEstimate = useMemo(
-    () => Math.max(1, Math.ceil((productsCount || 0) / PAGE_SIZE)),
-    [productsCount],
-  );
-
-  const paginationNext = useMemo(() => {
-    if (isReceive) {
-      return currentPageFromUrl < totalPagesEstimate ? "1" : null;
-    }
-    return ownProducts.next;
-  }, [isReceive, currentPageFromUrl, totalPagesEstimate, ownProducts.next]);
-
-  const paginationPrevious = useMemo(() => {
-    if (isReceive) {
-      return currentPageFromUrl > 1 ? "1" : null;
-    }
-    return ownProducts.previous;
-  }, [isReceive, currentPageFromUrl, ownProducts.previous]);
-
-  const {
-    currentPage,
-    totalPages,
-    hasNextPage,
-    hasPrevPage,
-    handlePageChange,
-    resetToFirstPage,
-  } = usePagination(productsCount, paginationNext, paginationPrevious);
-
   useEffect(() => {
-    if (!isReceive && selectedWarehouseId) {
-      loadOwnWarehouseProducts(
-        selectedWarehouseId,
-        currentPage,
-        debouncedSearchTerm,
-      );
-    }
+    if (isClientMode || !selectedWarehouseId) return;
+    // receive на новом бэке ждёт, пока станет известен источник данных
+    if (isReceive && !partnerData) return;
+    loadRemoteProducts({
+      receive: isReceive,
+      warehouseId: selectedWarehouseId,
+      page: currentPage,
+      search: debouncedSearchTerm,
+    });
   }, [
+    isClientMode,
     isReceive,
+    partnerData,
     selectedWarehouseId,
     currentPage,
     debouncedSearchTerm,
-    loadOwnWarehouseProducts,
+    loadRemoteProducts,
   ]);
 
   useEffect(() => {
@@ -262,31 +260,22 @@ const PartnerCatalogPage = () => {
   }, [debouncedSearchTerm, resetToFirstPage]);
 
   useEffect(() => {
-    if (isReceive && currentPage > totalPages) {
+    if (isClientMode && currentPage > totalPages) {
       resetToFirstPage();
     }
-  }, [isReceive, currentPage, totalPages, resetToFirstPage]);
+  }, [isClientMode, currentPage, totalPages, resetToFirstPage]);
 
   const displayProducts = useMemo(() => {
-    if (!isReceive) {
-      return productsForSelectedWarehouse;
-    }
+    if (!isClientMode) return productsForSelectedWarehouse;
     const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredPartnerProducts.slice(start, start + PAGE_SIZE);
-  }, [
-    isReceive,
-    productsForSelectedWarehouse,
-    filteredPartnerProducts,
-    currentPage,
-  ]);
+    return filteredClientProducts.slice(start, start + PAGE_SIZE);
+  }, [isClientMode, productsForSelectedWarehouse, filteredClientProducts, currentPage]);
 
-  const productsLoading = !isReceive && ownProductsLoading;
-
-  const hasNoProducts = isReceive
-    ? filteredPartnerProducts.length === 0
-    : ownProducts.count === 0 && !productsLoading;
+  const productsLoading = !isClientMode && remoteLoading;
+  const hasNoProducts = !productsLoading && productsCount === 0;
 
   const setDirection = (next) => {
+    if (next === direction) return;
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -324,26 +313,24 @@ const PartnerCatalogPage = () => {
     });
   };
 
-  const closeTransfer = () => {
-    setTransferState({
-      open: false,
-      mode: DIRECTION.RECEIVE,
-      product: null,
-      products: null,
-      warehouseFromId: null,
-    });
+  const closeTransfer = () => setTransferState(CLOSED_TRANSFER);
+
+  const reloadProducts = () => {
+    if (isClientMode) return loadPartner();
+    return Promise.all([
+      loadPartner(),
+      loadRemoteProducts({
+        receive: isReceive,
+        warehouseId: selectedWarehouseId,
+        page: currentPage,
+        search: debouncedSearchTerm,
+      }),
+    ]);
   };
 
-  const handleTransferred = async (mode, warehouseFromId) => {
+  const handleTransferred = async () => {
     clearSelection();
-    await loadCatalog();
-    if (mode === DIRECTION.SEND && warehouseFromId) {
-      await loadOwnWarehouseProducts(
-        warehouseFromId,
-        currentPage,
-        debouncedSearchTerm,
-      );
-    }
+    await reloadProducts();
   };
 
   const toggleProductSelection = (product) => {
@@ -368,9 +355,7 @@ const PartnerCatalogPage = () => {
 
   const allPageSelected = useMemo(() => {
     if (transferableOnPage.length === 0) return false;
-    return transferableOnPage.every((p) =>
-      selectedProducts.has(String(p.id)),
-    );
+    return transferableOnPage.every((p) => selectedProducts.has(String(p.id)));
   }, [transferableOnPage, selectedProducts]);
 
   const somePageSelected = useMemo(
@@ -381,17 +366,13 @@ const PartnerCatalogPage = () => {
   );
 
   const handleSelectAllOnPage = () => {
-    if (allPageSelected) {
-      setSelectedProducts((prev) => {
-        const next = new Map(prev);
-        transferableOnPage.forEach((p) => next.delete(String(p.id)));
-        return next;
-      });
-      return;
-    }
     setSelectedProducts((prev) => {
       const next = new Map(prev);
-      transferableOnPage.forEach((p) => next.set(String(p.id), p));
+      if (allPageSelected) {
+        transferableOnPage.forEach((p) => next.delete(String(p.id)));
+      } else {
+        transferableOnPage.forEach((p) => next.set(String(p.id), p));
+      }
       return next;
     });
   };
@@ -402,52 +383,25 @@ const PartnerCatalogPage = () => {
 
   const handleWarehouseSelect = (warehouseId) => {
     setSelectedWarehouseId(String(warehouseId));
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete("page");
-        return params;
-      },
-      { replace: true },
-    );
     resetToFirstPage();
-  };
-
-  const handleRefresh = () => {
-    loadCatalog();
-    if (!isReceive && selectedWarehouseId) {
-      loadOwnWarehouseProducts(
-        selectedWarehouseId,
-        currentPage,
-        debouncedSearchTerm,
-      );
-    }
   };
 
   const productCountLabel = useMemo(() => {
     if (productsCount === 0) return null;
+    const searchSuffix = debouncedSearchTerm.trim() ? " по запросу" : "";
     if (totalPages <= 1) {
-      return `${productsCount} ${productsCount === 1 ? "товар" : "товаров"}${
-        debouncedSearchTerm.trim() ? " по запросу" : " на выбранном складе"
+      return `${productsCount} ${pluralRu(productsCount, PRODUCT_FORMS)}${
+        searchSuffix || " на выбранном складе"
       }`;
     }
     const from = (currentPage - 1) * PAGE_SIZE + 1;
     const to = Math.min(currentPage * PAGE_SIZE, productsCount);
-    return `Показано ${from}–${to} из ${productsCount} ${
-      productsCount === 1 ? "товара" : "товаров"
-    }${debouncedSearchTerm.trim() ? " по запросу" : ""}`;
-  }, [
-    productsCount,
-    totalPages,
-    currentPage,
-    debouncedSearchTerm,
-  ]);
+    return `Показано ${from}–${to} из ${productsCount}${searchSuffix}`;
+  }, [productsCount, totalPages, currentPage, debouncedSearchTerm]);
 
   const renderProductsTable = () => {
-    if (catalogLoading || productsLoading) {
-      return (
-        <div className="partner-catalog-empty">Загрузка товаров…</div>
-      );
+    if (partnerLoading || productsLoading) {
+      return <div className="partner-catalog-empty">Загрузка товаров…</div>;
     }
 
     if (activeWarehouses.length === 0) {
@@ -466,6 +420,10 @@ const PartnerCatalogPage = () => {
           У партнёра нет складов для приёма товара
         </div>
       );
+    }
+
+    if (remoteError && !isClientMode) {
+      return <div className="warehouse-partnership-error">{remoteError}</div>;
     }
 
     if (hasNoProducts) {
@@ -488,8 +446,7 @@ const PartnerCatalogPage = () => {
 
         {selectedCount > 0 && (
           <p className="partner-catalog-selection-note">
-            В корзине обмена: {selectedCount}{" "}
-            {selectedCount === 1 ? "товар" : selectedCount < 5 ? "товара" : "товаров"}
+            В корзине обмена: {selectedCount} {pluralRu(selectedCount, PRODUCT_FORMS)}
             {totalPages > 1 ? " (выбор сохраняется при перелистывании)" : ""}
           </p>
         )}
@@ -556,14 +513,10 @@ const PartnerCatalogPage = () => {
                             className="warehouse-table__action-btn warehouse-table__action-btn--receive"
                             disabled={!canTransfer}
                             onClick={() =>
-                              openTransfer(
-                                DIRECTION.RECEIVE,
-                                p,
-                                selectedWarehouseId,
-                              )
+                              openTransfer(DIRECTION.RECEIVE, p, selectedWarehouseId)
                             }
                           >
-                            Забрать
+                            {pullMode === "confirm" ? "Запросить" : "Забрать"}
                           </button>
                         ) : (
                           <button
@@ -571,11 +524,7 @@ const PartnerCatalogPage = () => {
                             className="warehouse-table__action-btn warehouse-table__action-btn--send"
                             disabled={!canTransfer}
                             onClick={() =>
-                              openTransfer(
-                                DIRECTION.SEND,
-                                p,
-                                selectedWarehouseId,
-                              )
+                              openTransfer(DIRECTION.SEND, p, selectedWarehouseId)
                             }
                           >
                             Отправить
@@ -610,11 +559,11 @@ const PartnerCatalogPage = () => {
       <WarehouseHeader
         onBack={handleBack}
         title={`Обмен с «${partnerName}»`}
-        subtitle="Межкомпанейное перемещение товаров между вашими складами"
+        subtitle="Межкомпанейское перемещение товаров между вашими складами"
       />
 
-      {catalogError && (
-        <div className="warehouse-partnership-error">{catalogError}</div>
+      {partnerError && (
+        <div className="warehouse-partnership-error">{partnerError}</div>
       )}
 
       <div className="partner-catalog-direction">
@@ -630,7 +579,9 @@ const PartnerCatalogPage = () => {
             Забрать у партнёра
           </span>
           <span className="partner-catalog-direction-card__desc">
-            Отметьте один или несколько товаров со склада партнёра — они поступят на ваш склад
+            {pullMode === "confirm"
+              ? "Отметьте товары со склада партнёра — после его подтверждения они поступят на ваш склад"
+              : "Отметьте один или несколько товаров со склада партнёра — они поступят на ваш склад"}
           </span>
           <span className="partner-catalog-direction-card__flow">
             <span className="partner-catalog-direction-card__flow-badge">
@@ -669,6 +620,14 @@ const PartnerCatalogPage = () => {
         </button>
       </div>
 
+      {isReceive && partnerData && (
+        <div
+          className={`warehouse-partnership-hint ${pullMode === "legacy" ? "warehouse-partnership-hint--warning" : ""}`}
+        >
+          {PULL_MODE_HINT[pullMode]}
+        </div>
+      )}
+
       <div className="partner-catalog-steps">
         {isReceive ? (
           <>
@@ -676,7 +635,8 @@ const PartnerCatalogPage = () => {
               <strong>1.</strong> Выберите склад партнёра
             </span>
             <span>
-              <strong>2.</strong> Отметьте товары галочками или нажмите «Забрать» в строке
+              <strong>2.</strong> Отметьте товары галочками или нажмите «
+              {pullMode === "confirm" ? "Запросить" : "Забрать"}» в строке
             </span>
             <span>
               <strong>3.</strong> Укажите свой склад-получатель и количество
@@ -720,8 +680,8 @@ const PartnerCatalogPage = () => {
         <button
           type="button"
           className="partner-catalog-toolbar__refresh"
-          onClick={handleRefresh}
-          disabled={catalogLoading}
+          onClick={reloadProducts}
+          disabled={partnerLoading || remoteLoading}
           aria-label="Обновить"
         >
           <RefreshCw size={18} />
@@ -756,7 +716,7 @@ const PartnerCatalogPage = () => {
         </div>
       )}
 
-      {!catalogLoading && activeWarehouses.length > 0 && productCountLabel && (
+      {!partnerLoading && activeWarehouses.length > 0 && productCountLabel && (
         <p
           style={{
             display: "flex",
@@ -781,25 +741,26 @@ const PartnerCatalogPage = () => {
       <PartnerCatalogSelectionBar
         selectedCount={selectedCount}
         isReceive={isReceive}
+        requiresConfirmation={pullMode === "confirm"}
         onContinue={openBulkTransfer}
         onClear={clearSelection}
       />
 
-      <StockPartnershipTransferModal
-        mode={transferState.mode}
-        open={transferState.open}
-        onClose={closeTransfer}
-        product={transferState.product}
-        products={transferState.products}
-        warehouseFromId={transferState.warehouseFromId}
-        partnerCompanyName={partnerName}
-        targetWarehouses={
-          transferState.mode === DIRECTION.SEND
-            ? partnerWarehouses
-            : ownWarehouses
-        }
-        onTransferred={handleTransferred}
-      />
+      {transferState.open && (
+        <StockPartnershipTransferModal
+          mode={transferState.mode}
+          onClose={closeTransfer}
+          product={transferState.product}
+          products={transferState.products}
+          warehouseFromId={transferState.warehouseFromId}
+          partnerCompanyName={partnerName}
+          pullMode={pullMode}
+          targetWarehouses={
+            transferState.mode === DIRECTION.SEND ? partnerWarehouses : ownWarehouses
+          }
+          onTransferred={handleTransferred}
+        />
+      )}
     </div>
   );
 };

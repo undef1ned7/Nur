@@ -24,17 +24,14 @@ import {
   TYPE_TABS,
   TYPE_TAB_LABELS,
   PAGE_SIZE,
-  getCounterpartyTypesForTab,
   filterCounterpartiesByTypeTab,
 } from "./constants";
 import {
   getAgentDisplay,
-  mergeCounterpartyLists,
   getCounterpartiesLedgerTotals,
 } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import CounterpartyBalanceBar from "./components/CounterpartyBalanceBar";
-import warehouseAPI from "../../../../api/warehouse";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
 
 /** Показывать колонку «Агент» для владельца и админа */
@@ -98,6 +95,11 @@ const Counterparties = () => {
     "warehouse:counterparties:customRange",
     monthRange(currentYM()),
   );
+  // «Только с долгом» (only_unpaid) — по умолчанию включён
+  const [onlyUnpaid, setOnlyUnpaid] = usePersistedState(
+    "warehouse:counterparties:onlyUnpaid",
+    true,
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -114,20 +116,16 @@ const Counterparties = () => {
     return customRange;
   }, [periodMode, monthValue, yearValue, customRange]);
 
-  // Выбран ровно один день (начало периода = конец) — только в этом случае бэкенд
-  // умеет фильтровать «только не оплативших» (сальдо на конец дня, дебет > кредит)
-  const isSingleDayPeriod = Boolean(
-    period.from && period.to && period.from === period.to,
-  );
-
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch(
     "warehouse:counterparties:search",
   );
+  // Один запрос на всех контрагентов: без type и agent — вкладка (клиент/поставщик)
+  // и агент фильтруются на фронте, поэтому их смена не дёргает API, а опции
+  // «Агент» строятся из этого же списка вместо отдельного запроса.
   const requestParams = useMemo(() => {
     const params = {
       ...filters,
-      _counterpartyTypes: getCounterpartyTypesForTab(typeTab),
       page_size: 1000,
     };
     if (debouncedSearchTerm?.trim()) {
@@ -140,21 +138,16 @@ const Counterparties = () => {
       params.date_from = period.from;
       params.date_to = period.to;
     }
-    if (isSingleDayPeriod) {
+    if (onlyUnpaid) {
       params.only_unpaid = 1;
-    }
-    if (agentFilter && agentFilter !== "__no_agent__") {
-      params.agent = agentFilter;
     }
     return params;
   }, [
-    typeTab,
     filters,
     debouncedSearchTerm,
     period.from,
     period.to,
-    isSingleDayPeriod,
-    agentFilter,
+    onlyUnpaid,
   ]);
 
   // Загрузка контрагентов
@@ -166,57 +159,16 @@ const Counterparties = () => {
     [rawCounterparties, typeTab],
   );
 
-  // Отдельный, не зависящий от agentFilter/search источник опций для <select>
-  // «Агент» — запрошен напрямую через API (не через useCounterpartyData/Redux:
-  // тот пишет результат в общий state.counterparty.list, и два параллельных вызова
-  // с разными параметрами затирали бы друг друга и ломали таблицу). Если строить
-  // опции из уже отфильтрованного по агенту requestParams, после выбора агента в
-  // данных остаётся только он один, и все остальные агенты пропадают из списка.
-  const [counterpartiesForAgentOptions, setCounterpartiesForAgentOptions] =
-    useState([]);
-
-  useEffect(() => {
-    if (!showAgent) {
-      setCounterpartiesForAgentOptions([]);
-      return undefined;
-    }
-    let cancelled = false;
-    const baseParams = { page_size: 1000 };
-    if (period.from && period.to) {
-      baseParams.date_from = period.from;
-      baseParams.date_to = period.to;
-    }
-    if (isSingleDayPeriod) {
-      baseParams.only_unpaid = 1;
-    }
-    const types = getCounterpartyTypesForTab(typeTab);
-    Promise.all(
-      types.map((type) =>
-        warehouseAPI.listCounterparties({ ...baseParams, type }),
-      ),
-    )
-      .then((payloads) => {
-        if (cancelled) return;
-        const merged = mergeCounterpartyLists(...payloads);
-        setCounterpartiesForAgentOptions(merged.results || []);
-      })
-      .catch(() => {
-        if (!cancelled) setCounterpartiesForAgentOptions([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showAgent, typeTab, period.from, period.to, isSingleDayPeriod]);
-
-  // Список уникальных агентов (не зависит от текущего выбора агента/поиска)
+  // Список уникальных агентов вкладки (агент фильтруется на фронте, поэтому выбор
+  // агента не сужает список опций)
   const agentOptions = useMemo(() => {
-    if (!showAgent || !Array.isArray(counterpartiesForAgentOptions)) return [];
+    if (!showAgent) return [];
     const seen = new Set();
     const options = [
       { value: "", label: "Все агенты" },
       { value: "__no_agent__", label: "Без агента" },
     ];
-    counterpartiesForAgentOptions.forEach((c) => {
+    counterparties.forEach((c) => {
       const key = c?.agent ?? "__no_agent__";
       if (key !== "__no_agent__" && !seen.has(key)) {
         seen.add(key);
@@ -235,7 +187,7 @@ const Counterparties = () => {
       options.push({ value: agentFilter, label: agentFilterLabel || "…" });
     }
     return options;
-  }, [showAgent, counterpartiesForAgentOptions, agentFilter, agentFilterLabel]);
+  }, [showAgent, counterparties, agentFilter, agentFilterLabel]);
 
   // Фильтрация по выбранному агенту (плоский список)
   const filteredCounterparties = useMemo(() => {
@@ -309,7 +261,7 @@ const Counterparties = () => {
 
   useEffect(() => {
     resetToFirstPage();
-  }, [period.from, period.to, resetToFirstPage]);
+  }, [period.from, period.to, onlyUnpaid, resetToFirstPage]);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -436,6 +388,8 @@ const Counterparties = () => {
         onViewModeChange={handleViewModeChange}
         count={filteredCounterparties.length}
         foundCount={filteredCounterparties.length}
+        onlyUnpaid={onlyUnpaid}
+        onOnlyUnpaidChange={setOnlyUnpaid}
       />
 
       <div className="counterparties-content">
@@ -459,7 +413,9 @@ const Counterparties = () => {
             <p className="counterparties-empty__hint">
               {agentFilter
                 ? "По выбранному агенту никого нет. Выберите «Все агенты» или другого агента."
-                : searchTerm.trim()
+                : onlyUnpaid
+                  ? "Должников за период нет. Отключите «Только с долгом», чтобы увидеть всех."
+                  : searchTerm.trim()
                   ? "Попробуйте изменить запрос или вкладку (Клиент / Поставщик)"
                   : "Добавьте контрагента кнопкой «Создать контрагента»"}
             </p>

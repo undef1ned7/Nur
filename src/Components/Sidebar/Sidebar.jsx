@@ -106,9 +106,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     setOpenDropdown(openDropdown === itemLabel ? null : itemLabel);
   };
 
+  // Обычно AuthGuard уже загрузил компанию и профиль до рендера Sidebar —
+  // запрашиваем только недостающее (ветки skip-redirect / офлайн)
   useEffect(() => {
-    dispatch(getCompany());
-    dispatch(getProfile())
+    if (!company) dispatch(getCompany());
+    if (!profile) dispatch(getProfile());
   }, [])
 
   const isLoading = !company || !profile;

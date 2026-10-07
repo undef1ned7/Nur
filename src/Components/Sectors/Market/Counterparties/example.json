@@ -1,7 +1,22 @@
 {
-  "client": "2669388f-5d1c-4c69-9442-aa51c504caa5",
-  "name": "Доработать аналитику",
-  "status": "new",
-  "description": "213",
-  "assigned_to": "997661b3-3334-4e89-9ccd-0a8362cb4311"
+  "print_receipt": false,
+  "idempotency_key": "b395a820-d517-4fe5-9f66-bb8c7a4b83bb",
+  "client_id": "a620f114-4219-4177-bd11-03b54fd7cd26",
+  "payment_method": "debt",
+  "cash_received": "500.00",
+  "prepayment_method": "mbank",
+  "cashbox_role": "pos_main",
+  "shift_id": "9918ba9c-9526-4609-9a23-847eaaf11e8a",
+  "schedule_version": "v2",
+  "debt_schedule": {
+    "unit": "month",
+    "count": 3,
+    "interval_months": 1,
+    "first_due_date": "2026-11-01",
+    "installments": [
+      { "number": 1, "amount": "983.33", "due_date": "2026-11-01" },
+      { "number": 2, "amount": "983.33", "due_date": "2026-12-01" },
+      { "number": 3, "amount": "983.34", "due_date": "2027-01-01" }
+    ]
+  }
 }

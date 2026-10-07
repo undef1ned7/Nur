@@ -1,5 +1,6 @@
 // src/store/slices/userSlice.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { dedupeRequest } from "../../utils/dedupeRequest";
 import {
   registerUserAsync,
   loginUserAsync,
@@ -38,7 +39,9 @@ export const getProfile = createAsyncThunk(
   "get/profile",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await api.get("/users/profile/");
+      const { data } = await dedupeRequest("users/profile", () =>
+        api.get("/users/profile/"),
+      );
       return data;
     } catch (e) {
       return rejectWithValue(e);

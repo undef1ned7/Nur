@@ -184,6 +184,17 @@ const Login = () => {
     if (isLocked) return;
     setLocalError("");
 
+    if (!formData.email.trim() || !formData.password) {
+      setLocalError(
+        !formData.email.trim() && !formData.password
+          ? "Введите email и пароль"
+          : !formData.email.trim()
+            ? "Введите email"
+            : "Введите пароль",
+      );
+      return;
+    }
+
     try {
       await dispatch(loginUserAsync(formData)).unwrap();
     } catch {

@@ -10,6 +10,7 @@ import {
 } from "../../../../api/warehouse";
 import OwnerAnalyticsContent from "./OwnerAnalyticsContent";
 import { PERIODS } from "./warehouseAnalyticsShared";
+import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
 import "./Analytics.scss";
 
 const WarehouseAnalytics = () => {
@@ -23,16 +24,15 @@ const WarehouseAnalytics = () => {
   const agentId = searchParams.get("agent_id") || null;
   const agentName = location.state?.agentName || null;
 
-  const [period, setPeriod] = useState("month");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [dateTo, setDateTo] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const {
+    period,
+    setPeriod,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    periodParams,
+  } = useAnalyticsPeriod("month");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
@@ -40,13 +40,7 @@ const WarehouseAnalytics = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const params = { period };
-    if (period === "custom") {
-      params.date_from = dateFrom;
-      params.date_to = dateTo;
-    } else {
-      params.date = date;
-    }
+    const params = periodParams();
     try {
       let result;
       if (agentId && isOwnerOrAdmin) {
@@ -64,7 +58,7 @@ const WarehouseAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  }, [isOwnerOrAdmin, period, date, dateFrom, dateTo, agentId]);
+  }, [isOwnerOrAdmin, periodParams, agentId]);
 
   useEffect(() => {
     load();
@@ -152,14 +146,8 @@ const WarehouseAnalytics = () => {
             showAgentSalesAnalytics={showAgentSalesAnalytics}
             showMoneyAnalytics={isOwnerOrAdmin}
             showDetailsAccordions={isOwnerOrAdmin}
-            salesCountLabel={
-              isAgentView
-                ? "Количество моих продаж"
-                : "Количество продаж агентов"
-            }
-            salesAmountLabel={
-              isAgentView ? "Сумма моих продаж" : "Сумма продаж агентов"
-            }
+            salesCountLabel={isAgentView ? "Количество моих продаж" : undefined}
+            salesAmountLabel={isAgentView ? "Сумма моих продаж" : undefined}
             idPrefix="wa"
           />
 

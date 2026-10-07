@@ -298,26 +298,31 @@
 }
 
 /* Stock partnerships */
+/* Вложенная навигация — второй уровень после «Склады / Партнёры»: подчёркнутые
+   табы на общей линии, действия справа на той же линии. Жёлтая заливка остаётся
+   только у табов страницы и у главной кнопки, чтобы табы не путались с кнопками. */
 .warehouse-partnership {
   &__toolbar {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-end;
+    gap: 12px 16px;
     flex-wrap: wrap;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
   }
 
   &__actions {
     display: flex;
     gap: 8px;
     align-items: center;
+    padding-bottom: 10px;
   }
 }
 
 .warehouse-partnership-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
@@ -325,29 +330,178 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #fff;
+  margin-bottom: -1px;
+  padding: 10px 14px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-dark);
+    outline-offset: -2px;
+    border-radius: 6px;
+  }
 
   &.active {
-    background: var(--primary);
-    border-color: var(--primary-dark);
+    color: var(--text);
+    border-bottom-color: var(--primary-dark);
   }
 
   &__count {
-    min-width: 22px;
-    height: 22px;
+    min-width: 20px;
+    height: 20px;
     padding: 0 6px;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.12);
+    background: #f1f5f9;
+    color: #475569;
     font-size: 12px;
+    font-weight: 700;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
+    &--attention {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
   }
+}
+
+.warehouse-partnership-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-dark);
+    outline-offset: 2px;
+  }
+
+  &--primary {
+    background: var(--primary);
+    color: var(--text);
+
+    &:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+  }
+
+  &--secondary {
+    background: #fff;
+    border-color: var(--border);
+    color: var(--text);
+
+    &:hover:not(:disabled) {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+  }
+
+  &--danger {
+    background: transparent;
+    color: #b91c1c;
+
+    &:hover:not(:disabled) {
+      background: #fef2f2;
+    }
+  }
+}
+
+.warehouse-partnership-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text);
+
+  input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+
+  &__track {
+    position: relative;
+    flex-shrink: 0;
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    transition: background 0.15s ease;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+      transition: transform 0.15s ease;
+    }
+  }
+
+  input:checked + &__track {
+    background: #16a34a;
+
+    &::after {
+      transform: translateX(14px);
+    }
+  }
+
+  input:focus-visible + &__track {
+    outline: 2px solid var(--primary-dark);
+    outline-offset: 2px;
+  }
+
+  input:disabled + &__track {
+    opacity: 0.5;
+  }
+
+  input:disabled ~ &__label {
+    color: var(--muted);
+  }
+}
+
+.warehouse-partnership-nowrap {
+  white-space: nowrap;
+}
+
+.warehouse-partnership-row-actions--nowrap {
+  flex-wrap: nowrap;
 }
 
 .warehouse-partnership-refresh {
@@ -450,6 +604,62 @@
     border-color: #fecaca;
     color: #991b1b;
   }
+}
+
+.warehouse-partnership-btn--neutral {
+  background: #fff;
+  border-color: var(--border);
+  color: #374151;
+}
+
+.warehouse-partnership-hint {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 14px;
+  line-height: 1.45;
+
+  &--warning {
+    border-color: #fde68a;
+    background: #fffbeb;
+    color: #92400e;
+  }
+}
+
+.warehouse-partnership-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+
+  input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  input:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.warehouse-partnership-subtitle {
+  margin: 20px 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+}
+
+.warehouse-partnership-muted {
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .warehouse-partnership-search-list {
@@ -579,14 +789,16 @@
     }
   }
 
+  // Действия над табами, табы — по нижней линии тулбара
   .warehouse-partnership {
     &__toolbar {
-      flex-direction: column;
+      flex-direction: column-reverse;
       align-items: stretch;
     }
 
     &__actions {
       width: 100%;
+      padding-bottom: 0;
 
       .warehouse-header__create-btn {
         flex: 1;
@@ -601,12 +813,16 @@
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 4px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   .warehouse-partnership-tab {
     flex-shrink: 0;
-    padding: 8px 12px;
+    padding: 10px 10px 12px;
     font-size: 13px;
   }
 
@@ -619,7 +835,8 @@
     width: 100%;
     min-width: 120px;
 
-    .warehouse-partnership-btn {
+    .warehouse-partnership-btn,
+    .warehouse-partnership-action {
       width: 100%;
       justify-content: center;
     }

@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Check, Plus, RefreshCw, Send, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { BarChart3, Plus, RefreshCw } from "lucide-react";
 import { useUser } from "../../../../../store/slices/userSlice";
+import { useAlert, useConfirm } from "../../../../../hooks/useDialog";
 import {
   acceptStockPartnershipRequest,
   cancelStockPartnershipRequest,
@@ -9,190 +10,96 @@ import {
   listActiveStockPartners,
   listStockPartnershipRequests,
   rejectStockPartnershipRequest,
-  searchAgentCompanies,
 } from "../../../../../api/warehouse";
-import { extractPartnershipError } from "../partnership/partnershipHelpers";
+import {
+  approvePartnerOperation,
+  cancelPartnerOperation,
+  listPartnerOperations,
+  rejectPartnerOperation,
+  terminateStockPartnership,
+  updateStockPartnershipSettings,
+} from "../../../../../api/warehousePartnership";
+import {
+  extractPartnershipError,
+  isOwnerOrAdmin as checkOwnerOrAdmin,
+} from "../partnership/partnershipHelpers";
+import PartnershipRequestsTable from "../partnership/PartnershipRequestsTable";
+import PartnerOperationsTable from "../partnership/PartnerOperationsTable";
+import PartnersTable from "../partnership/PartnersTable";
+import PartnershipInviteModal from "../partnership/PartnershipInviteModal";
 import "../Warehouses.scss";
 
-const fmtDateTime = (iso) => {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("ru-RU");
-  } catch {
-    return String(iso);
-  }
+const SUB_TABS = {
+  PARTNERS: "partners",
+  INCOMING: "incoming",
+  OUTGOING: "outgoing",
+  OPERATIONS: "operations",
 };
 
-const statusLabel = (status) => {
-  switch (status) {
-    case "PENDING":
-      return "Ожидает";
-    case "ACCEPTED":
-      return "Принята";
-    case "REJECTED":
-      return "Отклонена";
-    case "CANCELLED":
-      return "Отозвана";
-    default:
-      return status || "—";
-  }
-};
+const SUB_TAB_VALUES = new Set(Object.values(SUB_TABS));
 
-const statusClass = (status) => {
-  switch (status) {
-    case "PENDING":
-      return "badge--pending";
-    case "ACCEPTED":
-      return "badge--approved";
-    case "REJECTED":
-      return "badge--rejected";
-    case "CANCELLED":
-      return "badge--removed";
-    default:
-      return "badge--draft";
-  }
-};
-
-const normalizeCompanies = (data) => {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.results)) return data.results;
-  return [];
-};
-
-const RequestTable = ({
-  rows,
-  loading,
-  colSpan,
-  showActions,
-  isOwnerOrAdmin,
-  actionBusyId,
-  onAccept,
-  onReject,
-  onCancel,
-  mode,
-}) => (
-  <div className="warehouse-table-container w-full">
-    <div className="warehouse-table-scroll warehouse-table-scroll--requests">
-      <table className="warehouse-table warehouse-partnership-table">
-      <thead>
-        <tr>
-          <th>№</th>
-          <th>От кого</th>
-          <th>Кому</th>
-          <th>Статус</th>
-          <th>Примечание</th>
-          <th>Создана</th>
-          <th>Решение</th>
-          {showActions && <th>Действия</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {loading ? (
-          <tr>
-            <td colSpan={colSpan} className="warehouse-table__loading">
-              Загрузка…
-            </td>
-          </tr>
-        ) : rows.length === 0 ? (
-          <tr>
-            <td colSpan={colSpan} className="warehouse-table__empty">
-              {mode === "incoming" ? "Нет входящих заявок" : "Нет исходящих заявок"}
-            </td>
-          </tr>
-        ) : (
-          rows.map((r, idx) => (
-            <tr key={r.id}>
-              <td>{idx + 1}</td>
-              <td>{r.from_company_name || "—"}</td>
-              <td>{r.to_company_name || "—"}</td>
-              <td>
-                <span className={`warehouse-partnership-badge ${statusClass(r.status)}`}>
-                  {statusLabel(r.status)}
-                </span>
-              </td>
-              <td className="warehouse-partnership-note">{r.note || "—"}</td>
-              <td>{fmtDateTime(r.created_at)}</td>
-              <td>{fmtDateTime(r.decided_at)}</td>
-              {showActions && (
-                <td>
-                  {mode === "incoming" && isOwnerOrAdmin && (
-                    <div className="warehouse-partnership-row-actions">
-                      <button
-                        type="button"
-                        className="warehouse-partnership-btn warehouse-partnership-btn--approve"
-                        onClick={() => onAccept(r.id)}
-                        disabled={actionBusyId === r.id}
-                      >
-                        <Check size={16} />
-                        Принять
-                      </button>
-                      <button
-                        type="button"
-                        className="warehouse-partnership-btn warehouse-partnership-btn--reject"
-                        onClick={() => onReject(r.id)}
-                        disabled={actionBusyId === r.id}
-                      >
-                        <X size={16} />
-                        Отклонить
-                      </button>
-                    </div>
-                  )}
-                  {mode === "outgoing" && r.status === "PENDING" && (
-                    <button
-                      type="button"
-                      className="warehouse-partnership-btn warehouse-partnership-btn--reject"
-                      onClick={() => onCancel(r.id)}
-                      disabled={actionBusyId === r.id}
-                    >
-                      Отозвать
-                    </button>
-                  )}
-                  {mode === "outgoing" && r.status !== "PENDING" && "—"}
-                  {mode === "incoming" && !isOwnerOrAdmin && "—"}
-                </td>
-              )}
-            </tr>
-          ))
-        )}
-      </tbody>
-      </table>
-    </div>
-  </div>
-);
+const isPending = (row) => row?.status === "PENDING";
 
 const StockPartnershipPanel = () => {
   const navigate = useNavigate();
-  const { profile } = useUser();
-  const isOwnerOrAdmin =
-    profile?.role === "owner" || profile?.role === "admin";
+  const alert = useAlert();
+  const confirm = useConfirm();
+  const { profile, company } = useUser();
+  const isOwnerOrAdmin = checkOwnerOrAdmin(profile);
 
-  const [subTab, setSubTab] = useState("incoming");
+  // Вложенный таб — в URL (?sub=), чтобы «Назад» со страниц партнёра возвращал туда же
+  const [searchParams, setSearchParams] = useSearchParams();
+  const subFromUrl = searchParams.get("sub");
+  const subTab = SUB_TAB_VALUES.has(subFromUrl) ? subFromUrl : SUB_TABS.PARTNERS;
+  const setSubTab = useCallback(
+    (key) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (key === SUB_TABS.PARTNERS) next.delete("sub");
+          else next.set("sub", key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [partners, setPartners] = useState([]);
-  const [actionBusyId, setActionBusyId] = useState(null);
-
+  // null — бэк ещё не поддерживает операции с подтверждением (вкладку не показываем)
+  const [operations, setOperations] = useState(null);
+  const [busyId, setBusyId] = useState(null);
   const [showInvite, setShowInvite] = useState(false);
-  const [companySearch, setCompanySearch] = useState("");
-  const [companySearchLoading, setCompanySearchLoading] = useState(false);
-  const [companySearchResults, setCompanySearchResults] = useState([]);
-  const [inviteNote, setInviteNote] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
-  const companySearchTimerRef = useRef(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [requestsData, partnersData] = await Promise.all([
+      const [requestsData, partnersData, operationsData] = await Promise.all([
         listStockPartnershipRequests(),
         listActiveStockPartners(),
+        // Ошибка операций не должна ломать заявки и партнёров
+        listPartnerOperations().catch((e) => {
+          console.error(e);
+          return null;
+        }),
       ]);
       setIncoming(requestsData?.incoming || []);
       setOutgoing(requestsData?.outgoing || []);
       setPartners(partnersData?.partners || []);
+      setOperations(
+        operationsData
+          ? {
+              incoming: operationsData.incoming || [],
+              outgoing: operationsData.outgoing || [],
+            }
+          : null,
+      );
     } catch (e) {
       console.error(e);
       setError(extractPartnershipError(e));
@@ -208,196 +115,293 @@ const StockPartnershipPanel = () => {
     loadAll();
   }, [loadAll]);
 
-  useEffect(() => {
-    if (!showInvite) return undefined;
-    if (companySearchTimerRef.current) {
-      clearTimeout(companySearchTimerRef.current);
-    }
-    if (!companySearch.trim()) {
-      setCompanySearchResults([]);
-      return undefined;
-    }
-    companySearchTimerRef.current = setTimeout(async () => {
-      setCompanySearchLoading(true);
-      try {
-        const data = await searchAgentCompanies({ search: companySearch.trim() });
-        setCompanySearchResults(normalizeCompanies(data));
-      } catch (e) {
-        console.error(e);
-        setCompanySearchResults([]);
-      } finally {
-        setCompanySearchLoading(false);
-      }
-    }, 300);
-    return () => {
-      if (companySearchTimerRef.current) {
-        clearTimeout(companySearchTimerRef.current);
-      }
-    };
-  }, [showInvite, companySearch]);
+  // Если бэк перестал отдавать операции (или ещё не умеет) — вкладки нет
+  const activeTab =
+    subTab === SUB_TABS.OPERATIONS && operations === null
+      ? SUB_TABS.INCOMING
+      : subTab;
 
-  const handleAccept = async (id) => {
-    if (!id || actionBusyId) return;
-    setActionBusyId(id);
+  const incomingPending = useMemo(() => incoming.filter(isPending), [incoming]);
+  const operationsIncomingPending = useMemo(
+    () => (operations?.incoming || []).filter(isPending).length,
+    [operations],
+  );
+
+  const partnerIds = useMemo(
+    () => new Set(partners.map((p) => String(p.id))),
+    [partners],
+  );
+  const outgoingPendingIds = useMemo(
+    () => new Set(outgoing.filter(isPending).map((r) => String(r.to_company))),
+    [outgoing],
+  );
+  const incomingPendingIds = useMemo(
+    () => new Set(incomingPending.map((r) => String(r.from_company))),
+    [incomingPending],
+  );
+
+  const runAction = async (id, action, successMessage) => {
+    if (!id || busyId) return;
+    setBusyId(id);
     try {
-      await acceptStockPartnershipRequest(id);
+      await action();
+      if (successMessage) alert(successMessage);
       await loadAll();
     } catch (e) {
-      alert(extractPartnershipError(e));
+      alert(extractPartnershipError(e), true);
     } finally {
-      setActionBusyId(null);
+      setBusyId(null);
     }
   };
 
-  const handleReject = async (id) => {
-    if (!id || actionBusyId) return;
-    setActionBusyId(id);
-    try {
-      await rejectStockPartnershipRequest(id);
-      await loadAll();
-    } catch (e) {
-      alert(extractPartnershipError(e));
-    } finally {
-      setActionBusyId(null);
-    }
+  const ask = (message) =>
+    new Promise((resolve) => confirm(message, (ok) => resolve(Boolean(ok))));
+
+  const handleAccept = async (r) => {
+    const ok = await ask(
+      `Принять заявку от «${r.from_company_name || "компании"}»? Партнёр получит доступ к вашим складам, остаткам, кассам, аналитике и истории продаж.`,
+    );
+    if (ok) runAction(r.id, () => acceptStockPartnershipRequest(r.id));
   };
 
-  const handleCancel = async (id) => {
-    if (!id || actionBusyId) return;
-    setActionBusyId(id);
-    try {
-      await cancelStockPartnershipRequest(id);
-      await loadAll();
-    } catch (e) {
-      alert(extractPartnershipError(e));
-    } finally {
-      setActionBusyId(null);
-    }
+  const handleReject = async (r) => {
+    const ok = await ask(`Отклонить заявку от «${r.from_company_name || "компании"}»?`);
+    if (ok) runAction(r.id, () => rejectStockPartnershipRequest(r.id));
   };
 
-  const handleInvite = async (company) => {
-    if (!company?.id || inviteBusy) return;
+  const handleCancel = (r) =>
+    runAction(r.id, () => cancelStockPartnershipRequest(r.id));
+
+  const handleInvite = async (target, note) => {
+    if (!target?.id || inviteBusy) return;
     setInviteBusy(true);
     try {
       await createStockPartnershipRequest({
-        to_company: company.id,
-        note: inviteNote.trim() || undefined,
+        to_company: target.id,
+        note: note || undefined,
       });
       setShowInvite(false);
-      setCompanySearch("");
-      setInviteNote("");
-      setCompanySearchResults([]);
       await loadAll();
-      setSubTab("outgoing");
+      setSubTab(SUB_TABS.OUTGOING);
     } catch (e) {
-      alert(extractPartnershipError(e));
+      alert(extractPartnershipError(e), true);
     } finally {
       setInviteBusy(false);
     }
   };
 
-  const openPartnerCatalog = (partner) => {
-    if (!partner?.id) return;
-    navigate(`/crm/warehouse/partners/${partner.id}`);
+  const handleTerminate = async (p) => {
+    const ok = await ask(
+      `Разорвать партнёрство с «${p.name || "компанией"}»? Обмен товаром, инкассация и аналитика станут недоступны обеим компаниям, ожидающие запросы будут отменены. Проведённые документы и история сохранятся.`,
+    );
+    if (ok) {
+      runAction(
+        p.id,
+        () => terminateStockPartnership(p.id),
+        "Партнёрство разорвано",
+      );
+    }
+  };
+
+  // Подтверждаем только расширение доступа партнёра; сужение — сразу
+  const SETTINGS_CONFIRM = {
+    allow_direct_pull: (name) =>
+      `Разрешить «${name}» забирать товар с ваших складов и деньги из ваших касс без вашего подтверждения?`,
+    share_sales_history: (name) =>
+      `Показать «${name}» историю ваших продаж и возвратов (документы, покупатели, суммы)?`,
+  };
+
+  const handleUpdateSettings = async (p, patch) => {
+    const [field, enabled] = Object.entries(patch)[0] || [];
+    if (enabled && SETTINGS_CONFIRM[field]) {
+      const ok = await ask(SETTINGS_CONFIRM[field](p.name || "партнёру"));
+      if (!ok) return;
+    }
+    runAction(p.id, () => updateStockPartnershipSettings(p.id, patch));
+  };
+
+  const handleApproveOperation = async (op) => {
+    const what =
+      op.kind === "INCASSATION"
+        ? "Деньги спишутся из вашей кассы"
+        : "Товар спишется с вашего склада";
+    const ok = await ask(
+      `Подтвердить запрос «${op.initiator_company_name || "партнёра"}»? ${what} и поступят партнёру.`,
+    );
+    if (ok) runAction(op.id, () => approvePartnerOperation(op.id), "Операция проведена");
+  };
+
+  const handleRejectOperation = async (op) => {
+    const ok = await ask(`Отклонить запрос «${op.initiator_company_name || "партнёра"}»?`);
+    if (ok) runAction(op.id, () => rejectPartnerOperation(op.id));
+  };
+
+  const handleCancelOperation = (op) =>
+    runAction(op.id, () => cancelPartnerOperation(op.id));
+
+  const openSales = (p) => {
+    if (p?.id) {
+      navigate(`/crm/warehouse/partners/${p.id}/sales`, {
+        state: { partnerName: p.name },
+      });
+    }
+  };
+
+  const openCatalog = (p) => {
+    if (p?.id) navigate(`/crm/warehouse/partners/${p.id}`);
+  };
+
+  const openAnalytics = (p) => {
+    if (p?.id) {
+      navigate(`/crm/warehouse/partners/${p.id}/analytics`, {
+        state: { partnerName: p.name },
+      });
+    }
+  };
+
+  // count — сколько всего; attention — сколько ждут вашего решения (выделяется цветом)
+  const tabButton = (key, label, { count = 0, attention = 0 } = {}) => {
+    const badge = attention || count;
+    return (
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === key}
+        className={`warehouse-partnership-tab ${activeTab === key ? "active" : ""}`}
+        onClick={() => setSubTab(key)}
+      >
+        {label}
+        {badge > 0 && (
+          <span
+            className={`warehouse-partnership-tab__count ${attention ? "warehouse-partnership-tab__count--attention" : ""}`}
+            aria-label={attention ? `ждут решения: ${attention}` : undefined}
+          >
+            {badge}
+          </span>
+        )}
+      </button>
+    );
   };
 
   return (
     <section className="warehouse-partnership">
       <div className="warehouse-partnership__toolbar">
-        <div className="warehouse-partnership-tabs">
-          <button type="button" className={`warehouse-partnership-tab ${subTab === "incoming" ? "active" : ""}`} onClick={() => setSubTab("incoming")}>
-            Входящие
-            {incoming.length > 0 && <span className="warehouse-partnership-tab__count">{incoming.length}</span>}
-          </button>
-          <button type="button" className={`warehouse-partnership-tab ${subTab === "outgoing" ? "active" : ""}`} onClick={() => setSubTab("outgoing")}>Исходящие</button>
-          <button type="button" className={`warehouse-partnership-tab ${subTab === "partners" ? "active" : ""}`} onClick={() => setSubTab("partners")}>Партнёры</button>
+        <div className="warehouse-partnership-tabs" role="tablist" aria-label="Партнёрство">
+          {tabButton(SUB_TABS.PARTNERS, "Активные", { count: partners.length })}
+          {tabButton(SUB_TABS.INCOMING, "Входящие заявки", {
+            attention: incomingPending.length,
+          })}
+          {tabButton(SUB_TABS.OUTGOING, "Исходящие заявки")}
+          {operations !== null &&
+            tabButton(SUB_TABS.OPERATIONS, "Запросы на товар и деньги", {
+              attention: operationsIncomingPending,
+            })}
         </div>
         <div className="warehouse-partnership__actions">
-          {isOwnerOrAdmin && subTab === "partners" && (
+          {isOwnerOrAdmin && activeTab === SUB_TABS.PARTNERS && (
             <button
               type="button"
-              className="warehouse-table__action-btn"
+              className="warehouse-partnership-action warehouse-partnership-action--secondary"
               onClick={() => navigate("/crm/warehouse/partners/analytics")}
             >
+              <BarChart3 size={16} aria-hidden="true" />
               Аналитика партнёров
             </button>
           )}
-          <button type="button" className="warehouse-header__create-btn" onClick={() => setShowInvite(true)}><Plus size={16} /> Пригласить</button>
-          <button type="button" className="warehouse-partnership-refresh" onClick={loadAll} disabled={loading}><RefreshCw size={18} /></button>
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              className="warehouse-header__create-btn"
+              onClick={() => setShowInvite(true)}
+            >
+              <Plus size={16} /> Пригласить
+            </button>
+          )}
+          <button
+            type="button"
+            className="warehouse-partnership-refresh"
+            onClick={loadAll}
+            disabled={loading}
+            aria-label="Обновить"
+          >
+            <RefreshCw size={18} />
+          </button>
         </div>
       </div>
+
       {error && <div className="warehouse-partnership-error">{error}</div>}
-      {subTab === "incoming" && <RequestTable rows={incoming} loading={loading} colSpan={isOwnerOrAdmin ? 8 : 7} showActions={isOwnerOrAdmin} isOwnerOrAdmin={isOwnerOrAdmin} actionBusyId={actionBusyId} onAccept={handleAccept} onReject={handleReject} onCancel={handleCancel} mode="incoming" />}
-      {subTab === "outgoing" && <RequestTable rows={outgoing} loading={loading} colSpan={8} showActions isOwnerOrAdmin={isOwnerOrAdmin} actionBusyId={actionBusyId} onAccept={handleAccept} onReject={handleReject} onCancel={handleCancel} mode="outgoing" />}
-      {subTab === "partners" && (
-        <div className="warehouse-table-container w-full warehouse-partnership-partners-table">
-          <table className="warehouse-table">
-            <thead><tr><th>№</th><th>Компания</th><th>Действия</th></tr></thead>
-            <tbody>
-              {loading ? <tr><td colSpan={3} className="warehouse-table__loading">Загрузка…</td></tr> : partners.length === 0 ? (
-                <tr><td colSpan={3} className="warehouse-table__empty">Нет активных партнёров</td></tr>
-              ) : partners.map((p, idx) => (
-                <tr key={p.id}>
-                  <td>{idx + 1}</td>
-                  <td className="warehouse-table__name">{p.name || "—"}</td>
-                  <td>
-                    <div className="warehouse-partnership-row-actions">
-                      <button
-                        type="button"
-                        className="warehouse-table__action-btn"
-                        onClick={() => openPartnerCatalog(p)}
-                      >
-                        Обмен товарами
-                      </button>
-                      {isOwnerOrAdmin && (
-                        <button
-                          type="button"
-                          className="warehouse-table__action-btn"
-                          onClick={() =>
-                            navigate(
-                              `/crm/warehouse/partners/${p.id}/analytics`,
-                              { state: { partnerName: p.name } },
-                            )
-                          }
-                        >
-                          Аналитика
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      {activeTab === SUB_TABS.INCOMING && (
+        <PartnershipRequestsTable
+          mode="incoming"
+          rows={incoming}
+          loading={loading}
+          canDecide={isOwnerOrAdmin}
+          busyId={busyId}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          onCancel={handleCancel}
+        />
       )}
+      {activeTab === SUB_TABS.OUTGOING && (
+        <PartnershipRequestsTable
+          mode="outgoing"
+          rows={outgoing}
+          loading={loading}
+          canDecide={isOwnerOrAdmin}
+          busyId={busyId}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          onCancel={handleCancel}
+        />
+      )}
+      {activeTab === SUB_TABS.OPERATIONS && (
+        <>
+          <h4 className="warehouse-partnership-subtitle">Партнёры запрашивают у вас</h4>
+          <PartnerOperationsTable
+            mode="incoming"
+            rows={operations.incoming}
+            loading={loading}
+            busyId={busyId}
+            onApprove={handleApproveOperation}
+            onReject={handleRejectOperation}
+            onCancel={handleCancelOperation}
+          />
+          <h4 className="warehouse-partnership-subtitle">Вы запросили у партнёров</h4>
+          <PartnerOperationsTable
+            mode="outgoing"
+            rows={operations.outgoing}
+            loading={loading}
+            busyId={busyId}
+            onApprove={handleApproveOperation}
+            onReject={handleRejectOperation}
+            onCancel={handleCancelOperation}
+          />
+        </>
+      )}
+      {activeTab === SUB_TABS.PARTNERS && (
+        <PartnersTable
+          rows={partners}
+          loading={loading}
+          busyId={busyId}
+          onOpenCatalog={openCatalog}
+          onOpenAnalytics={openAnalytics}
+          onOpenSales={openSales}
+          onTerminate={handleTerminate}
+          onUpdateSettings={handleUpdateSettings}
+        />
+      )}
+
       {showInvite && (
-        <div className="warehouse-filter-overlay" onClick={() => !inviteBusy && setShowInvite(false)}>
-          <div className="warehouse-filter-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="warehouse-filter-modal__header">
-              <h3 className="warehouse-filter-modal__title">Заявка на партнёрство</h3>
-              <button type="button" className="warehouse-filter-modal__close" onClick={() => setShowInvite(false)} disabled={inviteBusy}><X size={20} /></button>
-            </div>
-            <div className="warehouse-filter-modal__content">
-              <div className="warehouse-filter-modal__section">
-                <label className="warehouse-filter-modal__label">Поиск компании</label>
-                <input className="warehouse-filter-modal__select" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} disabled={inviteBusy} placeholder="Начните вводить название…" />
-                {companySearchLoading && (
-                  <p className="warehouse-filter-modal__subtitle">Поиск…</p>
-                )}
-                <ul className="warehouse-partnership-search-list">
-                  {companySearchResults.map((c) => (
-                    <li key={c.id}><span>{c.name}</span><button type="button" className="warehouse-partnership-btn warehouse-partnership-btn--approve" onClick={() => handleInvite(c)} disabled={inviteBusy}><Send size={14} /> Отправить</button></li>
-                  ))}
-                </ul>
-              </div>
-              <div className="warehouse-filter-modal__section">
-                <label className="warehouse-filter-modal__label">Примечание</label>
-                <input className="warehouse-filter-modal__select" value={inviteNote} onChange={(e) => setInviteNote(e.target.value)} maxLength={512} disabled={inviteBusy} />
-              </div>
-            </div>
-          </div>
-        </div>
+        <PartnershipInviteModal
+          ownCompanyId={company?.id}
+          partnerIds={partnerIds}
+          outgoingPendingIds={outgoingPendingIds}
+          incomingPendingIds={incomingPendingIds}
+          busy={inviteBusy}
+          onInvite={handleInvite}
+          onClose={() => setShowInvite(false)}
+        />
       )}
     </section>
   );

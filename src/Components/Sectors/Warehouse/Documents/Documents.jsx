@@ -16,6 +16,7 @@ import {
   Check,
   X,
   Undo2,
+  Trash2,
   LayoutGrid,
   List,
   Download,
@@ -30,6 +31,7 @@ import {
 import {
   fetchWarehouseDocuments,
   postWarehouseDocument,
+  deleteWarehouseDocument,
   unpostWarehouseDocument,
   cashApproveWarehouseDocument,
   cashRejectWarehouseDocument,
@@ -54,7 +56,8 @@ import SummarySection from "./components/Summary/SummarySection";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
-import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
+import warehouseAPI from "../../../../api/warehouse";
+import { useCompanyAgents } from "../utils/useCompanyAgents";
 import { numberToWords } from "../../../../utils/numberToWords";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { prepareItemsWithImages } from "./utils/prepareItemsWithImages";
@@ -156,6 +159,14 @@ const Documents = () => {
     `warehouse:documents:${docType}:search`,
     "",
   );
+  const [dateFrom, setDateFrom] = usePersistedState(
+    `warehouse:documents:${docType}:dateFrom`,
+    "",
+  );
+  const [dateTo, setDateTo] = usePersistedState(
+    `warehouse:documents:${docType}:dateTo`,
+    "",
+  );
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const [showReconciliationModal, setShowReconciliationModal] = useState(false);
@@ -174,8 +185,9 @@ const Documents = () => {
     `warehouse:documents:${docType}:agentFilter`,
     "",
   );
-  const [agentsList, setAgentsList] = useState([]);
-  const [agentsLoading, setAgentsLoading] = useState(false);
+  // Все агенты компании (а не топ-10 аналитики за месяц)
+  const { agents: agentsList, loading: agentsLoading } =
+    useCompanyAgents(showAgentFilter);
 
   // Продажи по заявкам (одобренные заявки агентов, только для SALE)
   const [agentSalesCarts, setAgentSalesCarts] = useState([]);
@@ -205,42 +217,6 @@ const Documents = () => {
       }
     };
   }, [searchTerm]);
-
-  // Загрузка списка агентов для фильтра (продажи, владелец/админ)
-  useEffect(() => {
-    if (!showAgentFilter) {
-      setAgentsList([]);
-      return;
-    }
-    let cancelled = false;
-    setAgentsLoading(true);
-    getOwnerAnalytics({ period: "month" })
-      .then((data) => {
-        if (cancelled) return;
-        const top = data?.top_agents || {};
-        const bySales = top.by_sales || [];
-        const byReceived = top.by_received || [];
-        const map = new Map();
-        [...bySales, ...byReceived].forEach((a) => {
-          const id = a.agent_id;
-          if (id && !map.has(id)) {
-            map.set(id, a.agent_name || id);
-          }
-        });
-        setAgentsList(
-          Array.from(map.entries()).map(([id, name]) => ({ id, name })),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setAgentsList([]);
-      })
-      .finally(() => {
-        if (!cancelled) setAgentsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showAgentFilter]);
 
   // Загрузка продаж по заявкам (все одобренные заявки агентов)
   const loadAgentSalesCarts = useCallback(async () => {
@@ -366,6 +342,8 @@ const Documents = () => {
   /** Черновик и заявка на продажу — одни и те же действия (редактирование, проведение). */
   const isSaleDraftLikeStatus = (status) =>
     status === "DRAFT" || status === "SALE_REQUEST";
+  /** Удалять можно только обычный черновик. Заявка агента (SALE_REQUEST) связана с корзиной агента — не удаляем. */
+  const isDeletableDraftStatus = (status) => status === "DRAFT";
   const isSaleRequestStatus = (status) => status === "SALE_REQUEST";
 
   /** Документ-заявка от агента: флаг is_sale_request живёт у документа всегда,
@@ -576,6 +554,8 @@ const Documents = () => {
         page_size: PAGE_SIZE,
         ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(dateFrom && { date_from: dateFrom }),
+        ...(dateTo && { date_to: dateTo }),
         ...(docType === "RECEIPT" &&
           receiptPaymentKindFilter && {
             payment_kind: receiptPaymentKindFilter,
@@ -590,6 +570,8 @@ const Documents = () => {
     activeTab,
     currentPage,
     debouncedSearchTerm,
+    dateFrom,
+    dateTo,
     docType,
     receiptPaymentKindFilter,
   ]);
@@ -651,6 +633,41 @@ const Documents = () => {
     navigate(`/crm/warehouse/documents/edit/${item.id}`);
   };
 
+  // Удаление черновика (только DRAFT, без влияния на склад — документ не проводился)
+  const handleDeleteDraft = (item) => {
+    if (!item?.id || !isDeletableDraftStatus(item.rawStatus)) return;
+    confirm(`Удалить черновик ${item.number}? Действие необратимо.`, async (ok) => {
+      if (!ok) return;
+      try {
+        const result = await dispatch(deleteWarehouseDocument(item.id));
+        if (deleteWarehouseDocument.fulfilled.match(result)) {
+          alert("Черновик удалён");
+          // Удалили последний документ на странице — переходим на предыдущую
+          if (currentPage > 1 && (filteredDocuments?.length || 0) <= 1) {
+            setCurrentPage(currentPage - 1);
+          } else {
+            handleSaved();
+          }
+        } else {
+          const error = result.payload || result.error;
+          alert(
+            "Ошибка: " +
+              (error?.detail ||
+                error?.message ||
+                "Не удалось удалить черновик"),
+            true,
+          );
+        }
+      } catch (error) {
+        console.error("Ошибка при удалении черновика:", error);
+        alert(
+          "Ошибка: " + (error?.message || "Не удалось удалить черновик"),
+          true,
+        );
+      }
+    });
+  };
+
   const handleEditFromPreview = (receiptData) => {
     setPreviewReceiptId(null);
     setPreviewInvoiceId(null);
@@ -680,6 +697,8 @@ const Documents = () => {
         page_size: PAGE_SIZE,
         ...(requestDocType && { doc_type: requestDocType }),
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(dateFrom && { date_from: dateFrom }),
+        ...(dateTo && { date_to: dateTo }),
       };
       dispatch(fetchWarehouseDocuments(params));
     }
@@ -1309,6 +1328,7 @@ const Documents = () => {
     <div className="documents">
       {/* Header with search and filters */}
       <div className="documents__header">
+        <div className="documents__toolbar">
         <div className="documents__search">
           <Search size={20} className="documents__search-icon" />
           <input
@@ -1318,6 +1338,74 @@ const Documents = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+        <div className="documents__header-actions">
+          <button
+            className="documents__create-btn"
+            onClick={() =>
+              navigate("/crm/warehouse/documents/create", {
+                state: { docType: docType || "SALE" },
+              })
+            }
+          >
+            <Plus size={18} />
+            Создать
+          </button>
+          <button
+            className="documents__filter-btn"
+            onClick={() => setShowReconciliationModal(true)}
+          >
+            Создать акт сверки
+          </button>
+          {/* <button className="documents__filter-btn">
+            <Filter size={18} />
+            Фильтры
+          </button> */}
+          {/* <button className="documents__period-btn">
+            <Calendar size={18} />
+            Период
+          </button> */}
+        </div>
+        </div>
+        <div className="documents__filters">
+        <div className="documents__agent-filter documents__date-filter">
+          <label className="documents__agent-filter-label">Дата:</label>
+          <input
+            type="date"
+            className="documents__agent-filter-select documents__date-input"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setCurrentPage(1);
+            }}
+            title="Дата от"
+          />
+          <span className="documents__date-sep">—</span>
+          <input
+            type="date"
+            className="documents__agent-filter-select documents__date-input"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setCurrentPage(1);
+            }}
+            title="Дата до"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              className="documents__date-reset"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+                setCurrentPage(1);
+              }}
+            >
+              Сбросить
+            </button>
+          )}
         </div>
         {docType === "RECEIPT" && (
           <div className="documents__agent-filter">
@@ -1360,33 +1448,6 @@ const Documents = () => {
             </select>
           </div>
         )}
-        <div className="documents__header-actions">
-          <button
-            className="documents__create-btn"
-            onClick={() =>
-              navigate("/crm/warehouse/documents/create", {
-                state: { docType: docType || "SALE" },
-              })
-            }
-          >
-            <Plus size={18} />
-            Создать
-          </button>
-          <button
-            className="documents__filter-btn"
-            onClick={() => setShowReconciliationModal(true)}
-            style={{ marginRight: 10 }}
-          >
-            Создать акт сверки
-          </button>
-          {/* <button className="documents__filter-btn">
-            <Filter size={18} />
-            Фильтры
-          </button> */}
-          {/* <button className="documents__period-btn">
-            <Calendar size={18} />
-            Период
-          </button> */}
         </div>
       </div>
 
@@ -1486,45 +1547,45 @@ const Documents = () => {
                 <tr>
                   {activeTab === "receipts" && (
                     <>
-                      <th>Номер</th>
+                      <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата и время</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
                       {docType === "RECEIPT" && <th>Оплата</th>}
-                      <th>Товаров</th>
-                      <th>Сумма</th>
-                      <th>Скидка</th>
+                      <th className="documents__cell--num">Товаров</th>
+                      <th className="documents__cell--num">Сумма</th>
+                      <th className="documents__cell--num">Скидка</th>
                       <th>Статус</th>
-                      <th>Действия</th>
+                      <th className="documents__cell--actions">Действия</th>
                     </>
                   )}
                   {(activeTab === "invoices" || activeTab === "esf_xml") && (
                     <>
-                      <th>Номер</th>
+                      <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
-                      <th>Позиций</th>
-                      <th>Сумма</th>
-                      <th>Скидка</th>
+                      <th className="documents__cell--num">Позиций</th>
+                      <th className="documents__cell--num">Сумма</th>
+                      <th className="documents__cell--num">Скидка</th>
                       <th>Статус</th>
-                      <th>Действия</th>
+                      <th className="documents__cell--actions">Действия</th>
                     </>
                   )}
                   {activeTab === "ko1" && (
                     <>
-                      <th>Номер</th>
+                      <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата</th>
                       <th>Контрагент</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
-                      <th>Позиций</th>
-                      <th>Сумма</th>
-                      <th>Скидка</th>
+                      <th className="documents__cell--num">Позиций</th>
+                      <th className="documents__cell--num">Сумма</th>
+                      <th className="documents__cell--num">Скидка</th>
                       <th>Статус</th>
-                      <th>Действия</th>
+                      <th className="documents__cell--actions">Действия</th>
                     </>
                   )}
                 </tr>
@@ -1553,9 +1614,9 @@ const Documents = () => {
                     <tr key={item.id}>
                       {activeTab === "receipts" && (
                         <>
-                          <td>{item.number}</td>
-                          <td>{item.date}</td>
-                          <td>{item.client}</td>
+                          <td className="documents__cell--sticky-left">{item.number}</td>
+                          <td className="documents__cell--nowrap">{item.date}</td>
+                          <td className="documents__cell--truncate" title={item.client}>{item.client}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
@@ -1565,9 +1626,9 @@ const Documents = () => {
                           {docType === "RECEIPT" && (
                             <td>{item.paymentKindLabel}</td>
                           )}
-                          <td>{item.products}</td>
-                          <td>{formatAmount(item.amount)} сом</td>
-                          <td>{formatDocumentDiscountCell(item)}</td>
+                          <td className="documents__cell--num">{item.products}</td>
+                          <td className="documents__cell--num documents__cell--amount">{formatAmount(item.amount)} сом</td>
+                          <td className="documents__cell--num">{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1575,7 +1636,7 @@ const Documents = () => {
                               {item.status}
                             </span>
                           </td>
-                          <td>
+                          <td className="documents__cell--actions">
                             <div className="documents__actions">
                               <button
                                 className="documents__action-btn"
@@ -1591,6 +1652,15 @@ const Documents = () => {
                                   title="Редактировать черновик"
                                 >
                                   <Pencil size={18} />
+                                </button>
+                              )}
+                              {isDeletableDraftStatus(item.rawStatus) && (
+                                <button
+                                  className="documents__action-btn documents__action-btn--reject"
+                                  onClick={() => handleDeleteDraft(item)}
+                                  title="Удалить черновик"
+                                >
+                                  <Trash2 size={18} />
                                 </button>
                               )}
                               <button
@@ -1660,18 +1730,18 @@ const Documents = () => {
                       )}
                       {(activeTab === "invoices" || activeTab === "esf_xml") && (
                         <>
-                          <td>{item.number}</td>
-                          <td>{item.date}</td>
-                          <td>{item.counterparty}</td>
+                          <td className="documents__cell--sticky-left">{item.number}</td>
+                          <td className="documents__cell--nowrap">{item.date}</td>
+                          <td className="documents__cell--truncate" title={item.counterparty}>{item.counterparty}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
                           {docType === "SALE" && (
                             <td>{item.wholesaleModeLabel ?? "—"}</td>
                           )}
-                          <td>{item.positions}</td>
-                          <td>{formatAmount(item.amount)} сом</td>
-                          <td>{formatDocumentDiscountCell(item)}</td>
+                          <td className="documents__cell--num">{item.positions}</td>
+                          <td className="documents__cell--num documents__cell--amount">{formatAmount(item.amount)} сом</td>
+                          <td className="documents__cell--num">{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1679,7 +1749,7 @@ const Documents = () => {
                               {item.status}
                             </span>
                           </td>
-                          <td>
+                          <td className="documents__cell--actions">
                             <div className="documents__actions">
                               <button
                                 className="documents__action-btn"
@@ -1695,6 +1765,15 @@ const Documents = () => {
                                   title="Редактировать черновик"
                                 >
                                   <Pencil size={18} />
+                                </button>
+                              )}
+                              {isDeletableDraftStatus(item.rawStatus) && (
+                                <button
+                                  className="documents__action-btn documents__action-btn--reject"
+                                  onClick={() => handleDeleteDraft(item)}
+                                  title="Удалить черновик"
+                                >
+                                  <Trash2 size={18} />
                                 </button>
                               )}
                               <button
@@ -1779,18 +1858,18 @@ const Documents = () => {
                       )}
                       {activeTab === "ko1" && (
                         <>
-                          <td>{item.number}</td>
-                          <td>{item.date}</td>
-                          <td>{item.counterparty}</td>
+                          <td className="documents__cell--sticky-left">{item.number}</td>
+                          <td className="documents__cell--nowrap">{item.date}</td>
+                          <td className="documents__cell--truncate" title={item.counterparty}>{item.counterparty}</td>
                           {docType === "SALE" && (
                             <td>{item.agentDisplay ?? "—"}</td>
                           )}
                           {docType === "SALE" && (
                             <td>{item.wholesaleModeLabel ?? "—"}</td>
                           )}
-                          <td>{item.positions}</td>
-                          <td>{formatAmount(item.amount)} сом</td>
-                          <td>{formatDocumentDiscountCell(item)}</td>
+                          <td className="documents__cell--num">{item.positions}</td>
+                          <td className="documents__cell--num documents__cell--amount">{formatAmount(item.amount)} сом</td>
+                          <td className="documents__cell--num">{formatDocumentDiscountCell(item)}</td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -1798,7 +1877,7 @@ const Documents = () => {
                               {item.status}
                             </span>
                           </td>
-                          <td>
+                          <td className="documents__cell--actions">
                             <div className="documents__actions">
                               <button
                                 className="documents__action-btn"
@@ -1814,6 +1893,15 @@ const Documents = () => {
                                   title="Редактировать"
                                 >
                                   <Pencil size={18} />
+                                </button>
+                              )}
+                              {isDeletableDraftStatus(item.rawStatus) && (
+                                <button
+                                  className="documents__action-btn documents__action-btn--reject"
+                                  onClick={() => handleDeleteDraft(item)}
+                                  title="Удалить черновик"
+                                >
+                                  <Trash2 size={18} />
                                 </button>
                               )}
                               <button
@@ -2048,6 +2136,15 @@ const Documents = () => {
                         title="Редактировать черновик"
                       >
                         <Pencil size={18} />
+                      </button>
+                    )}
+                    {isDeletableDraftStatus(item.rawStatus) && (
+                      <button
+                        className="documents__action-btn documents__action-btn--reject"
+                        onClick={() => handleDeleteDraft(item)}
+                        title="Удалить черновик"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     )}
                     {activeTab === "receipts" && (

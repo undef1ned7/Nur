@@ -1,16 +1,12 @@
 import React from "react";
 import { ArrowRight, X } from "lucide-react";
+import { pluralRu } from "../partnership/partnershipHelpers";
 import "./PartnerCatalogSelectionBar.scss";
-
-const pluralItems = (n) => {
-  if (n === 1) return "товар";
-  if (n >= 2 && n <= 4) return "товара";
-  return "товаров";
-};
 
 const PartnerCatalogSelectionBar = ({
   selectedCount,
   isReceive,
+  requiresConfirmation = false,
   onContinue,
   onClear,
 }) => {
@@ -22,7 +18,7 @@ const PartnerCatalogSelectionBar = ({
         <div className="partner-catalog-selection-bar__info">
           <span className="partner-catalog-selection-bar__count">{selectedCount}</span>
           <span>
-            {pluralItems(selectedCount)} в корзине обмена
+            {pluralRu(selectedCount, ["товар", "товара", "товаров"])} в корзине обмена
           </span>
         </div>
         <div className="partner-catalog-selection-bar__actions">
@@ -39,7 +35,11 @@ const PartnerCatalogSelectionBar = ({
             className={`partner-catalog-selection-bar__continue ${isReceive ? "partner-catalog-selection-bar__continue--receive" : "partner-catalog-selection-bar__continue--send"}`}
             onClick={onContinue}
           >
-            {isReceive ? "Забрать выбранное" : "Отправить выбранное"}
+            {isReceive
+              ? requiresConfirmation
+                ? "Запросить выбранное"
+                : "Забрать выбранное"
+              : "Отправить выбранное"}
             <ArrowRight size={18} />
           </button>
         </div>

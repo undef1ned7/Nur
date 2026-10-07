@@ -1105,6 +1105,29 @@ export const updateProductByUuid = async (uuid, payload) => {
 };
 
 /**
+ * Корректировка остатка товара: создаёт и проводит документ INVENTORY.
+ * Количество в карточке товара через PATCH больше не меняется.
+ * POST /api/warehouse/products/{product_uuid}/stock-adjustment/
+ * @param {Object} payload - { fact_qty: "50", comment?: string }
+ * @returns {{ document_id, document_number, qty_before, qty_after, delta }}
+ */
+export const adjustProductStock = async (uuid, payload) => {
+  try {
+    const response = await api.post(
+      `warehouse/products/${uuid}/stock-adjustment/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Adjust Product Stock Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
  * 3.1 Удалить товар
  * DELETE /api/warehouse/products/{product_uuid}/
  */
@@ -3233,6 +3256,7 @@ export default {
   createProductInWarehouse,
   getProductByUuid,
   updateProductByUuid,
+  adjustProductStock,
   deleteProductByUuid,
   // Фото товара (3.2)
   listProductImages,

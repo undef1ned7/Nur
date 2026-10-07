@@ -1,3 +1,5 @@
+export { toLocalISODate, monthAgoLocalISODate } from "../utils/localDate";
+
 export const PERIODS = [
   { value: "day", label: "День" },
   { value: "week", label: "Неделя" },
