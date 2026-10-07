@@ -44,6 +44,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import { getAgentMeAnalytics, getOwnerAgentAnalytics } from "../../../../api/warehouse";
 import { useUser } from "../../../../store/slices/userSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
+import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
 import "./Analytics.scss";
 
 const PERIODS = [
@@ -254,18 +255,15 @@ const AgentAnalytics = () => {
   const agentId = searchParams.get("agent_id") || null;
   const agentName = location.state?.agentName || null;
 
-  const [period, setPeriod] = useState("month");
-  const [date, setDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [dateTo, setDateTo] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const {
+    period,
+    setPeriod,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    periodParams,
+  } = useAnalyticsPeriod("month");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
@@ -273,13 +271,7 @@ const AgentAnalytics = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const params = { period };
-    if (period === "custom") {
-      params.date_from = dateFrom;
-      params.date_to = dateTo;
-    } else {
-      params.date = date;
-    }
+    const params = periodParams();
     try {
       const result = agentId
         ? await getOwnerAgentAnalytics(agentId, params)
@@ -292,7 +284,7 @@ const AgentAnalytics = () => {
     } finally {
       setLoading(false);
     }
-  }, [agentId, period, date, dateFrom, dateTo]);
+  }, [agentId, periodParams]);
 
   useEffect(() => {
     load();

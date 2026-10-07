@@ -65,7 +65,7 @@ import React, { useMemo } from "react";
 import "./Tabs.scss";
 import { canAccessOnlineShowcase } from "../../../../utils/subscriptionPlan";
 
-const allTabs = ["Моя компания", "Безопасность", "Касса", "Токен для весов", "Интерфейс", "Печать", "Онлайн"];
+const allTabs = ["Моя компания", "Безопасность", "Касса", "Токен для весов", "Интерфейс", "Печать", "Онлайн", "Тариф и оплата"];
 
 const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
@@ -130,6 +130,7 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
       if (tab === "Токен для весов") return isMarketSector;
       if (tab === "Печать") return isCafeSector;
       if (tab === "Онлайн") return canViewOnline;
+      if (tab === "Тариф и оплата") return isOwner;
       // "Безопасность" и "Интерфейс" всегда видны
       return true;
     });

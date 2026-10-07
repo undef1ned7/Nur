@@ -21,7 +21,7 @@ const reject = (label) => (error) => {
 /**
  * Ставки всех складов компании (розница/опт), owner/admin.
  * GET /api/warehouse/salary/rates/
- * @param {Object} params - search, page
+ * @param {Object} params - search, page, branch
  * @returns {{results: Array<{warehouse, warehouse_name, retail_percent, wholesale_percent, updated_at}>}}
  */
 export const listSalaryRates = async (params = {}) => {
@@ -58,7 +58,7 @@ export const updateSalaryRate = async (warehouseId, payload) => {
  * GET /api/warehouse/salary/accruals/
  * @param {Object} params - date_from, date_to (YYYY-MM-DD), agent (uuid),
  *   warehouse (uuid), sale_type (retail|wholesale),
- *   status (pending|accrued|paid|canceled), search, page
+ *   status (pending|accrued|paid|canceled), search, page, branch
  */
 export const listSalaryAccruals = async (params = {}) => {
   try {
@@ -72,7 +72,7 @@ export const listSalaryAccruals = async (params = {}) => {
 /**
  * Сводка по начислениям за период (итоги + разбивка по агентам).
  * GET /api/warehouse/salary/summary/
- * @param {Object} params - date_from, date_to, agent, warehouse
+ * @param {Object} params - date_from, date_to, agent, warehouse, branch
  */
 export const getSalarySummary = async (params = {}) => {
   try {
@@ -88,7 +88,7 @@ export const getSalarySummary = async (params = {}) => {
 /**
  * История выплат. Owner/admin — все, агент — только свои.
  * GET /api/warehouse/salary/payouts/
- * @param {Object} params - date_from, date_to, agent, page
+ * @param {Object} params - date_from, date_to, agent, page, branch
  */
 export const listSalaryPayouts = async (params = {}) => {
   try {
@@ -102,7 +102,9 @@ export const listSalaryPayouts = async (params = {}) => {
 /**
  * Выплатить агенту (закрывает его начисления в статусе accrued).
  * POST /api/warehouse/salary/payouts/
- * @param {Object} payload - { agent: uuid, amount?: "1500.00", comment?: string }
+ * @param {Object} payload - { agent: uuid, amount?: "1500.00", comment?: string, cash_register?: uuid, branch?: uuid }
+ *   cash_register — касса, из которой выдаются деньги: бэкенд создаёт и проводит
+ *   MONEY_EXPENSE (категория «Зарплата агентам»). Без неё выплата «вне кассы».
  */
 export const createSalaryPayout = async (payload) => {
   try {

@@ -1,43 +1,59 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { transferStockPartnership } from "../../../../../api/warehouse";
+import { useAlert } from "../../../../../hooks/useDialog";
 import {
+  PULL_MODE_HINT,
   extractPartnershipError,
+  formatQty,
   getProductQty,
+  isPendingOperationResponse,
+  pluralRu,
+  transferItemPrice,
   warehouseLabel,
 } from "../partnership/partnershipHelpers";
 import "../../../Market/Warehouse/Warehouse.scss";
 import "./StockPartnershipTransferModal.scss";
 
-const formatQty = (v) => {
-  const n = Number(String(v ?? "").replace(",", "."));
-  return Number.isFinite(n) ? n.toFixed(3) : "0.000";
-};
+const DEFAULT_COMMENT = "Межкомпанейское перемещение";
 
-const formatPrice = (v) => {
-  const n = Number(String(v ?? "").replace(",", "."));
-  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
-};
-
-const buildItemPayload = (productId, qtyNum) => ({
-  product: String(productId),
+const buildItemPayload = (product, qtyNum) => ({
+  product: String(product.id),
   qty: formatQty(qtyNum),
-  price: formatPrice(0),
-  discount_percent: formatPrice(0),
-  discount_amount: formatPrice(0),
+  price: transferItemPrice(product),
+  discount_percent: "0.00",
+  discount_amount: "0.00",
 });
 
+const initialQty = (product) => {
+  const available = getProductQty(product);
+  return available > 0 ? formatQty(available) : "1.000";
+};
+
+const parseQty = (value) => Number(String(value ?? "").replace(",", "."));
+
+const POSITIONS = ["позицию", "позиции", "позиций"];
+
+/**
+ * Перемещение товара между складами компаний-партнёров.
+ * Монтируется только в открытом состоянии: начальные значения формы
+ * считаются один раз из переданных товаров.
+ *
+ * mode "send"    — со своего склада на склад партнёра (проводится сразу);
+ * mode "receive" — со склада партнёра на свой (см. pullMode).
+ */
 const StockPartnershipTransferModal = ({
   mode = "receive",
-  open,
   onClose,
   product,
   products,
   warehouseFromId,
   partnerCompanyName,
   targetWarehouses,
+  pullMode = "legacy",
   onTransferred,
 }) => {
+  const alert = useAlert();
   const isSend = mode === "send";
 
   const productsList = useMemo(() => {
@@ -47,164 +63,148 @@ const StockPartnershipTransferModal = ({
   }, [products, product]);
 
   const isMulti = productsList.length > 1;
+  const count = productsList.length;
 
   const [toWarehouseId, setToWarehouseId] = useState("");
-  const [qty, setQty] = useState("");
-  const [qtyByProductId, setQtyByProductId] = useState({});
-  const [comment, setComment] = useState("межкомпанейское перемещение");
+  const [qtyByProductId, setQtyByProductId] = useState(() => {
+    const initial = {};
+    productsList.forEach((p) => {
+      initial[String(p.id)] = initialQty(p);
+    });
+    return initial;
+  });
+  const [comment, setComment] = useState(DEFAULT_COMMENT);
   const [submitting, setSubmitting] = useState(false);
 
-  const singleProduct = productsList[0];
-  const maxQty = useMemo(
-    () => (singleProduct ? getProductQty(singleProduct) : 0),
-    [singleProduct],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-
-    setToWarehouseId("");
-    setComment("межкомпанейское перемещение");
-    setSubmitting(false);
-
-    if (isMulti) {
-      const initial = {};
-      productsList.forEach((p) => {
-        const available = getProductQty(p);
-        initial[String(p.id)] = available > 0 ? formatQty(available) : "1.000";
-      });
-      setQtyByProductId(initial);
-      setQty("");
-    } else {
-      setQty(maxQty > 0 ? formatQty(maxQty) : "1.000");
-      setQtyByProductId({});
-    }
-  }, [open, productsList, isMulti, maxQty]);
+  const close = () => {
+    if (!submitting) onClose();
+  };
 
   const validateAndBuildItems = () => {
+    if (count === 0) return { error: "Товар не выбран" };
     const items = [];
-
-    if (isMulti) {
-      for (const p of productsList) {
-        const id = String(p.id);
-        const available = getProductQty(p);
-        const qtyNum = Number(String(qtyByProductId[id] ?? "").replace(",", "."));
-
-        if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-          return { error: `Укажите корректное количество для «${p.name || "товара"}»` };
-        }
-        if (available > 0 && qtyNum > available) {
-          return {
-            error: `«${p.name}»: количество не может превышать остаток (${formatQty(available)})`,
-          };
-        }
-        items.push(buildItemPayload(id, qtyNum));
+    for (const p of productsList) {
+      const id = String(p.id);
+      const available = getProductQty(p);
+      const qtyNum = parseQty(qtyByProductId[id]);
+      const label = p.name || "товара";
+      if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+        return { error: `Укажите корректное количество для «${label}»` };
       }
-      return { items };
+      if (available > 0 && qtyNum > available) {
+        return {
+          error: `«${label}»: количество не может превышать остаток (${formatQty(available)})`,
+        };
+      }
+      items.push(buildItemPayload(p, qtyNum));
     }
-
-    const qtyNum = Number(String(qty).replace(",", "."));
-    if (!singleProduct?.id) {
-      return { error: "Товар не выбран" };
-    }
-    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-      return { error: "Укажите корректное количество" };
-    }
-    if (maxQty > 0 && qtyNum > maxQty) {
-      return { error: `Количество не может превышать остаток (${formatQty(maxQty)})` };
-    }
-    return { items: [buildItemPayload(singleProduct.id, qtyNum)] };
+    return { items };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!warehouseFromId || !toWarehouseId) return;
+    if (submitting) return;
+    if (!warehouseFromId) {
+      alert("Не выбран склад-источник", true);
+      return;
+    }
+    if (!toWarehouseId) {
+      alert("Выберите склад-получатель", true);
+      return;
+    }
 
     const { items, error } = validateAndBuildItems();
     if (error) {
-      alert(error);
+      alert(error, true);
       return;
     }
-    if (!items?.length) return;
 
     setSubmitting(true);
     try {
-      await transferStockPartnership({
+      const result = await transferStockPartnership({
         warehouse_from: String(warehouseFromId),
         warehouse_to: String(toWarehouseId),
         comment: comment.trim() || undefined,
         items,
       });
-      if (typeof onTransferred === "function") {
-        onTransferred(mode, warehouseFromId);
-      }
+      const pending = isPendingOperationResponse(result);
+      alert(
+        pending
+          ? `Запрос отправлен «${partnerCompanyName || "партнёру"}». Товар поступит на ваш склад после подтверждения партнёром.`
+          : "Перемещение проведено",
+      );
+      onTransferred?.(mode, warehouseFromId, { pending });
       onClose();
     } catch (err) {
       console.error("Stock partnership transfer error:", err);
-      alert(`Не удалось переместить: ${extractPartnershipError(err)}`);
+      alert(`Не удалось переместить: ${extractPartnershipError(err)}`, true);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const setMultiQty = (productId, value) => {
-    setQtyByProductId((prev) => ({
-      ...prev,
-      [String(productId)]: value,
-    }));
+  const setQty = (productId, value) => {
+    setQtyByProductId((prev) => ({ ...prev, [String(productId)]: value }));
   };
 
   const fillAllMaxQty = () => {
     const next = {};
     productsList.forEach((p) => {
-      const available = getProductQty(p);
-      next[String(p.id)] = available > 0 ? formatQty(available) : "1.000";
+      next[String(p.id)] = initialQty(p);
     });
     setQtyByProductId(next);
   };
 
-  if (!open) return null;
-
+  const actionVerb = isSend ? "Отправить" : pullMode === "confirm" ? "Запросить" : "Забрать";
   const submitLabel = submitting
-    ? "Перемещаем..."
+    ? "Отправляем..."
     : isMulti
-      ? isSend
-        ? `Отправить ${productsList.length} позиций`
-        : `Забрать ${productsList.length} позиций`
-      : isSend
-        ? "Передать"
-        : "Забрать";
+      ? `${actionVerb} ${count} ${pluralRu(count, POSITIONS)}`
+      : actionVerb;
+
+  const title = isSend
+    ? isMulti
+      ? "Массовая отправка партнёру"
+      : "Отправка партнёру"
+    : isMulti
+      ? "Массовое получение от партнёра"
+      : "Получение от партнёра";
+
+  const singleProduct = productsList[0];
+  const singleAvailable = singleProduct ? getProductQty(singleProduct) : 0;
 
   return (
-    <div className="warehouse-filter-overlay" onClick={onClose} role="presentation">
+    <div className="warehouse-filter-overlay" onClick={close} role="presentation">
       <div
         className={`warehouse-filter-modal stock-partnership-transfer-modal ${isMulti ? "stock-partnership-transfer-modal--multi" : ""}`}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={title}
       >
         <div className="warehouse-filter-modal__header">
-          <h3 className="warehouse-filter-modal__title">
-            {isMulti
-              ? isSend
-                ? "Массовая отправка партнёру"
-                : "Массовое получение от партнёра"
-              : isSend
-                ? "Отправка партнёру"
-                : "Получение от партнёра"}
-          </h3>
-          <button className="warehouse-filter-modal__close" onClick={onClose} type="button">
+          <h3 className="warehouse-filter-modal__title">{title}</h3>
+          <button
+            className="warehouse-filter-modal__close"
+            onClick={close}
+            type="button"
+            disabled={submitting}
+            aria-label="Закрыть"
+          >
             <X size={20} />
           </button>
         </div>
         <p className="warehouse-filter-modal__subtitle">
           {isSend
             ? `С вашего склада партнёру «${partnerCompanyName || "—"}»`
-            : `Из склада партнёра «${partnerCompanyName || "—"}» на ваш склад`}
+            : `Со склада партнёра «${partnerCompanyName || "—"}» на ваш склад`}
         </p>
 
-        {isMulti && (
-          <p className="stock-partnership-transfer-modal__hint">
-            Один документ перемещения на все выбранные позиции. Проверьте количество по каждой строке.
-          </p>
+        {!isSend && (
+          <div
+            className={`stock-partnership-transfer-modal__hint ${pullMode === "legacy" ? "stock-partnership-transfer-modal__hint--warning" : ""}`}
+          >
+            {PULL_MODE_HINT[pullMode] || PULL_MODE_HINT.legacy}
+          </div>
         )}
 
         <form className="warehouse-filter-modal__content" onSubmit={handleSubmit}>
@@ -220,18 +220,22 @@ const StockPartnershipTransferModal = ({
                 )}
               </div>
               <div className="warehouse-filter-modal__section">
-                <label className="warehouse-filter-modal__label">Количество</label>
+                <label className="warehouse-filter-modal__label" htmlFor="partner-transfer-qty">
+                  Количество
+                </label>
                 <input
+                  id="partner-transfer-qty"
                   className="warehouse-filter-modal__select"
                   type="text"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
+                  inputMode="decimal"
+                  value={qtyByProductId[String(singleProduct?.id)] ?? ""}
+                  onChange={(e) => setQty(singleProduct?.id, e.target.value)}
                   disabled={submitting}
                   required
                 />
-                {maxQty > 0 && (
+                {singleAvailable > 0 && (
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                    Доступно: {formatQty(maxQty)} {singleProduct?.unit || ""}
+                    Доступно: {formatQty(singleAvailable)} {singleProduct?.unit || ""}
                   </div>
                 )}
               </div>
@@ -240,7 +244,7 @@ const StockPartnershipTransferModal = ({
             <div className="warehouse-filter-modal__section">
               <div className="stock-partnership-transfer-modal__items-header">
                 <label className="warehouse-filter-modal__label">
-                  Позиции ({productsList.length})
+                  Позиции ({count})
                 </label>
                 <button
                   type="button"
@@ -275,8 +279,9 @@ const StockPartnershipTransferModal = ({
                       <input
                         className="warehouse-filter-modal__select stock-partnership-transfer-modal__qty-input"
                         type="text"
+                        inputMode="decimal"
                         value={qtyByProductId[id] ?? ""}
-                        onChange={(e) => setMultiQty(id, e.target.value)}
+                        onChange={(e) => setQty(id, e.target.value)}
                         disabled={submitting}
                         aria-label={`Количество: ${p.name}`}
                         required
@@ -289,10 +294,11 @@ const StockPartnershipTransferModal = ({
           )}
 
           <div className="warehouse-filter-modal__section">
-            <label className="warehouse-filter-modal__label">
+            <label className="warehouse-filter-modal__label" htmlFor="partner-transfer-to">
               {isSend ? "Склад партнёра-получатель" : "Ваш склад-получатель"}
             </label>
             <select
+              id="partner-transfer-to"
               className="warehouse-filter-modal__select"
               value={toWarehouseId}
               onChange={(e) => setToWarehouseId(e.target.value)}
@@ -309,8 +315,11 @@ const StockPartnershipTransferModal = ({
           </div>
 
           <div className="warehouse-filter-modal__section">
-            <label className="warehouse-filter-modal__label">Комментарий</label>
+            <label className="warehouse-filter-modal__label" htmlFor="partner-transfer-comment">
+              Комментарий
+            </label>
             <input
+              id="partner-transfer-comment"
               className="warehouse-filter-modal__select"
               type="text"
               value={comment}
@@ -321,14 +330,8 @@ const StockPartnershipTransferModal = ({
 
           {isMulti && (
             <div className="stock-partnership-transfer-modal__summary">
-              Будет создан <strong>один документ</strong> перемещения с{" "}
-              <strong>{productsList.length}</strong>{" "}
-              {productsList.length === 1
-                ? "позицией"
-                : productsList.length < 5
-                  ? "позициями"
-                  : "позициями"}
-              .
+              Будет создан <strong>один документ</strong> перемещения на{" "}
+              <strong>{count}</strong> {pluralRu(count, POSITIONS)}.
             </div>
           )}
 
@@ -343,7 +346,7 @@ const StockPartnershipTransferModal = ({
             <button
               className="warehouse-filter-modal__cancel-btn"
               type="button"
-              onClick={onClose}
+              onClick={close}
               disabled={submitting}
             >
               Отмена

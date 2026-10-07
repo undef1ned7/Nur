@@ -1,4 +1,4 @@
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, ReceiptText, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { getOwnerPartnerAnalytics } from "../../../../api/warehouse";
@@ -15,7 +15,7 @@ import "./Analytics.scss";
 
 const PartnerAnalyticsDetail = () => {
   const { partnerId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const { tariff, company } = useUser();
   const showAgentSalesAnalytics = !isStartPlan(
@@ -73,11 +73,31 @@ const PartnerAnalyticsDetail = () => {
 
   const partnerName =
     data?.partner_company?.name || partnerNameFromState || "Партнёр";
+  // Список филиалов партнёра отдаёт новый бэк (partner_branches); на старом
+  // выбора нет, а вместо UUID показываем название, если оно пришло.
+  const partnerBranches = Array.isArray(data?.partner_branches)
+    ? data.partner_branches
+    : [];
+  const selectedBranchName =
+    data?.branch_name ||
+    partnerBranches.find((b) => String(b.id) === String(data?.branch_id))?.name;
   const branchHint = data?.all_branches
     ? "Все филиалы партнёра"
     : data?.branch_id
-      ? `Филиал: ${data.branch_id}`
+      ? `Филиал: ${selectedBranchName || "выбранный филиал"}`
       : null;
+
+  const handleBranchChange = (branchId) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (branchId) next.set("partner_branch", branchId);
+        else next.delete("partner_branch");
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const periodLabel =
     data?.date_from && data?.date_to
       ? `${formatShortDate(data.date_from)} — ${formatShortDate(data.date_to)}`
@@ -105,6 +125,16 @@ const PartnerAnalyticsDetail = () => {
           )}
         </div>
         <div className="warehouse-analytics__header-actions">
+          <Link
+            to={`/crm/warehouse/partners/${partnerId}/sales${
+              partnerBranch ? `?partner_branch=${partnerBranch}` : ""
+            }`}
+            state={{ partnerName }}
+            className="warehouse-analytics__refresh"
+          >
+            <ReceiptText size={18} />
+            История продаж
+          </Link>
           <button
             type="button"
             className="warehouse-analytics__refresh"
@@ -115,6 +145,22 @@ const PartnerAnalyticsDetail = () => {
             <RefreshCw size={18} />
             Обновить
           </button>
+          {partnerBranches.length > 1 && (
+            <select
+              className="warehouse-analytics__input"
+              value={partnerBranch || ""}
+              onChange={(e) => handleBranchChange(e.target.value)}
+              disabled={loading}
+              aria-label="Филиал партнёра"
+            >
+              <option value="">Все филиалы</option>
+              {partnerBranches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name || "Филиал"}
+                </option>
+              ))}
+            </select>
+          )}
           <AnalyticsPeriodControls
             period={period}
             onPeriodChange={setPeriod}

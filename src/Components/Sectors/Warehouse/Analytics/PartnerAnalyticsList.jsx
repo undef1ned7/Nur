@@ -12,6 +12,7 @@ import {
   formatNum,
   formatShortDate,
 } from "./warehouseAnalyticsShared";
+import { buildOnHand, buildSalesSummary } from "./warehouseAnalyticsModel";
 import { AnalyticsPeriodControls } from "./warehouseAnalyticsUi";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
 import "./Analytics.scss";
@@ -175,25 +176,28 @@ const PartnerAnalyticsList = () => {
                   <tr>
                     <th scope="col">Партнёр</th>
                     <th scope="col">Заявок</th>
-                    <th scope="col">Позиций</th>
+                    <th scope="col">Выдано агентам, шт</th>
                     {showAgentSalesAnalytics && (
                       <>
                         <th scope="col">Продаж</th>
                         <th scope="col">Сумма продаж</th>
                       </>
                     )}
-                    <th scope="col">Остаток, шт</th>
-                    <th scope="col">Остаток, сом</th>
+                    <th scope="col">На складах, шт</th>
+                    <th scope="col">На складах, сом</th>
+                    <th scope="col">У агентов, шт</th>
                     <th scope="col">Приход</th>
                     <th scope="col">Расход</th>
                     <th scope="col">Сальдо</th>
-                    <th scope="col">Контрагенты</th>
+                    <th scope="col">Взаиморасчёты</th>
                     <th scope="col" aria-hidden="true" />
                   </tr>
                 </thead>
                 <tbody>
                   {summaryRows.map((row) => {
                     const s = row.summary;
+                    const stock = buildOnHand(s);
+                    const sales = buildSalesSummary(s);
                     return (
                       <tr
                         key={row.id}
@@ -216,17 +220,24 @@ const PartnerAnalyticsList = () => {
                         {showAgentSalesAnalytics && (
                           <>
                             <td className="is-num">
-                              {formatNum(s.sales_count)}
+                              {formatNum(sales.count)}
                             </td>
                             <td className="is-num">
-                              {formatNum(s.sales_amount)} сом
+                              {formatNum(sales.amount)} сом
                             </td>
                           </>
                         )}
-                        <td className="is-num">{formatNum(s.on_hand_qty)}</td>
                         <td className="is-num">
-                          {formatNum(s.on_hand_amount)} сом
+                          {stock.warehouseQty == null
+                            ? "—"
+                            : formatNum(stock.warehouseQty)}
                         </td>
+                        <td className="is-num">
+                          {stock.warehouseAmount == null
+                            ? "—"
+                            : `${formatNum(stock.warehouseAmount)} сом`}
+                        </td>
+                        <td className="is-num">{formatNum(stock.agentQty)}</td>
                         <td className="is-num">
                           {formatNum(s.money_receipt_amount)} сом
                         </td>

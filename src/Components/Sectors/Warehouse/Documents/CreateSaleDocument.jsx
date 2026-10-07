@@ -35,7 +35,6 @@ import Ko1PdfDocument from "./components/Ko1PdfDocument.jsx";
 import CommercialOfferPdfDocument from "./components/CommercialOfferPdfDocument.jsx";
 import { numberToWords } from "../../../../utils/numberToWords.js";
 import {
-  fetchWarehouseCounterparties,
   fetchWarehouses,
   postWarehouseDocument,
   getWarehouseDocumentById,
@@ -44,7 +43,6 @@ import {
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import warehouseAPI from "../../../../api/warehouse";
 import { useCash } from "../../../../store/slices/cashSlice";
-import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
@@ -58,6 +56,8 @@ import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { exportInvoiceToExcel } from "./components/invoiceExcelExport";
 import { sortByAlphabetEnRu } from "../../../../utils/sortByAlphabetEnRu";
 import { listCompanyAgentRequests } from "../../../../api/warehouse";
+
+const CP_PAGE_SIZE = 50;
 
 const VALID_DOC_TYPES = [
   "SALE",
@@ -382,11 +382,16 @@ const SearchSelect = ({
   placeholder = "Выберите...",
   disabled = false,
   emptyText = "Ничего не найдено",
+  onSearch,
+  onLoadMore,
+  hasMore = false,
+  loading = false,
 }) => {
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const serverMode = typeof onSearch === "function";
 
   const selected = useMemo(() => {
     const v = value == null ? "" : String(value);
@@ -398,12 +403,27 @@ const SearchSelect = ({
   const filtered = useMemo(() => {
     const list = Array.isArray(options) ? options : [];
     const q = query.trim().toLowerCase();
-    if (!q) return list;
+    // В серверном режиме поиск уже выполнен на бэкенде
+    if (!q || serverMode) return list;
     return list.filter((o) => {
       const text = String(o.searchText || o.label || "").toLowerCase();
       return text.includes(q);
     });
-  }, [options, query]);
+  }, [options, query, serverMode]);
+
+  // Серверный поиск с debounce (только при открытом списке)
+  useEffect(() => {
+    if (!serverMode || !open) return undefined;
+    const t = setTimeout(() => onSearch(query.trim()), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, open, serverMode]);
+
+  // Если после фильтрации список короткий и есть ещё страницы — подгружаем
+  useEffect(() => {
+    if (open && hasMore && !loading && filtered.length < 10) onLoadMore?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hasMore, loading, filtered.length]);
 
   useEffect(() => {
     const onDocDown = (e) => {
@@ -435,10 +455,22 @@ const SearchSelect = ({
       />
 
       {open && !disabled && (
-        <div className="create-sale-document__searchselect-menu">
+        <div
+          className="create-sale-document__searchselect-menu"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (
+              hasMore &&
+              !loading &&
+              el.scrollTop + el.clientHeight >= el.scrollHeight - 40
+            ) {
+              onLoadMore?.();
+            }
+          }}
+        >
           {filtered.length === 0 ? (
             <div className="create-sale-document__searchselect-empty">
-              {emptyText}
+              {loading ? "Загрузка..." : emptyText}
             </div>
           ) : (
             filtered.map((o) => (
@@ -460,6 +492,11 @@ const SearchSelect = ({
                 {o.label}
               </button>
             ))
+          )}
+          {filtered.length > 0 && loading && (
+            <div className="create-sale-document__searchselect-empty">
+              Загрузка...
+            </div>
           )}
         </div>
       )}
@@ -492,7 +529,14 @@ const CreateSaleDocument = () => {
   /** Агент продаёт со своих остатков, а не из каталога склада */
   const useAgentStockCatalog = !isOwnerOrAdmin;
   const { list: cashBoxes } = useCash();
-  const { list: counterparties } = useCounterparty();
+  // Контрагенты: серверный поиск + постраничная подгрузка
+  const [counterparties, setCounterparties] = useState([]);
+  const [cpHasMore, setCpHasMore] = useState(false);
+  const [cpLoading, setCpLoading] = useState(false);
+  const cpPageRef = useRef(1);
+  const cpSearchRef = useRef("");
+  const cpReqRef = useRef(0);
+  const cpLoadingRef = useRef(false);
   const { employees } = useDepartments();
   const alert = useAlert();
   const urlDocType = searchParams.get("doc_type");
@@ -1728,11 +1772,81 @@ const CreateSaleDocument = () => {
     });
   };
 
-  // Загрузка контрагентов через warehouse API
+  // Загрузка контрагентов через warehouse API (постранично, с серверным поиском)
+  const loadCounterparties = useCallback(async ({ search, append = false }) => {
+    if (append && cpLoadingRef.current) return;
+    const reqId = ++cpReqRef.current;
+    const page = append ? cpPageRef.current + 1 : 1;
+    if (!append) cpSearchRef.current = search ?? cpSearchRef.current;
+    cpLoadingRef.current = true;
+    setCpLoading(true);
+    try {
+      const params = { page, page_size: CP_PAGE_SIZE };
+      if (cpSearchRef.current) params.search = cpSearchRef.current;
+      const data = await warehouseAPI.listCounterparties(params);
+      if (reqId !== cpReqRef.current) return;
+      const results = Array.isArray(data) ? data : data?.results || [];
+      cpPageRef.current = page;
+      setCounterparties((prev) => {
+        if (!append) return results;
+        const seen = new Set(prev.map((c) => String(c.id)));
+        return [...prev, ...results.filter((c) => !seen.has(String(c.id)))];
+      });
+      setCpHasMore(Boolean(!Array.isArray(data) && data?.next));
+    } catch (e) {
+      if (reqId === cpReqRef.current) setCpHasMore(false);
+    } finally {
+      if (reqId === cpReqRef.current) {
+        cpLoadingRef.current = false;
+        setCpLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    // Загружаем всех контрагентов (CLIENT, SUPPLIER, BOTH)
-    dispatch(fetchWarehouseCounterparties());
-  }, [dispatch]);
+    loadCounterparties({ search: "" });
+  }, [loadCounterparties]);
+
+  const handleCounterpartySearch = useCallback(
+    (q) => {
+      if (q === cpSearchRef.current) return;
+      loadCounterparties({ search: q });
+    },
+    [loadCounterparties],
+  );
+  const handleCounterpartyLoadMore = useCallback(
+    () => loadCounterparties({ append: true }),
+    [loadCounterparties],
+  );
+
+  // Выбранный контрагент может не попасть в загруженные страницы (редактирование
+  // документа, поиск, старый контрагент) — запоминаем/догружаем его по ID
+  const [selectedCp, setSelectedCp] = useState(null);
+  useEffect(() => {
+    if (!clientId) {
+      setSelectedCp(null);
+      return undefined;
+    }
+    const found = counterparties.find((c) => String(c.id) === String(clientId));
+    if (found) {
+      setSelectedCp(found);
+      return undefined;
+    }
+    if (selectedCp && String(selectedCp.id) === String(clientId)) {
+      return undefined;
+    }
+    let cancelled = false;
+    warehouseAPI
+      .getCounterpartyById(clientId)
+      .then((cp) => {
+        if (!cancelled && cp?.id) setSelectedCp(cp);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, counterparties]);
 
   // Загрузка складов через новый warehouse API
   useEffect(() => {
@@ -2149,7 +2263,13 @@ const CreateSaleDocument = () => {
 
   // Фильтрация контрагентов в зависимости от типа документа
   const filteredCounterparties = useMemo(() => {
-    const all = counterparties || [];
+    const base = counterparties || [];
+    const all =
+      selectedCp &&
+      String(selectedCp.id) === String(clientId) &&
+      !base.some((c) => String(c.id) === String(selectedCp.id))
+        ? [selectedCp, ...base]
+        : base;
     // Для SALE, SALE_RETURN, PURCHASE, PURCHASE_RETURN нужны контрагенты
     if (
       ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType)
@@ -2166,7 +2286,7 @@ const CreateSaleDocument = () => {
     }
     // Для других типов документов показываем всех
     return all;
-  }, [counterparties, docType]);
+  }, [counterparties, docType, selectedCp, clientId]);
 
   const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
   const applyAgentFilter = isAgentFilterRelevant && !startPlan;
@@ -3977,195 +4097,6 @@ const CreateSaleDocument = () => {
                       : "Создание документа продажи"}
                 </p>
               </div>
-              <div className="create-sale-document__header-meta">
-                <div
-                  className="create-sale-document__date"
-                  onClick={() => {
-                    if (!isDocumentDateEditable) return;
-                    const input = dateInputRef.current;
-                    if (input) input.showPicker?.() || input.click();
-                  }}
-                  style={
-                    isDocumentDateEditable ? undefined : { cursor: "default" }
-                  }
-                  title={
-                    isDocumentDateEditable
-                      ? "Изменить дату и время документа"
-                      : "Дату можно менять только у черновика"
-                  }
-                >
-                  <Calendar size={18} />
-                  {displayDate}
-                </div>
-                {docType !== "COMMERCIAL_OFFER" && (
-                  <label className="create-sale-document__toggle">
-                    <input
-                      type="checkbox"
-                      className="create-sale-document__toggle-input"
-                      checked={isDocumentPosted}
-                      onChange={(e) => setIsDocumentPosted(e.target.checked)}
-                    />
-                    <span className="create-sale-document__toggle-track">
-                      <span className="create-sale-document__toggle-thumb">
-                        <Check size={14} strokeWidth={2.5} />
-                      </span>
-                    </span>
-                    <span className="create-sale-document__toggle-label">
-                      Документ проведён
-                    </span>
-                  </label>
-                )}
-                {isPaymentKindRelevant && (
-                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_kind"
-                        value="cash"
-                        checked={paymentKind === "cash"}
-                        onChange={() => {
-                          setPaymentKind("cash");
-                          setPrepaymentAmount("");
-                        }}
-                      />
-                      <span>Сразу</span>
-                    </label>
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_kind"
-                        value="credit"
-                        checked={paymentKind === "credit"}
-                        onChange={() => setShowPrepaymentModal(true)}
-                      />
-                      <span>В долг</span>
-                    </label>
-                    {paymentKind === "credit" && (
-                      <div className="create-sale-document__prepayment-badge">
-                        <span className="create-sale-document__prepayment-badge-label">
-                          Предоплата:{" "}
-                          {prepaymentAmount
-                            ? `${formatPrice(Number(prepaymentAmount) || 0)} сом`
-                            : "0 сом"}
-                        </span>
-                        <button
-                          type="button"
-                          className="create-sale-document__prepayment-badge-btn"
-                          onClick={() => setShowPrepaymentModal(true)}
-                        >
-                          Изменить
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {showWholesaleToggle && (
-                  <div className="create-sale-document__wholesale-mode">
-                    <span className="create-sale-document__wholesale-mode-label">
-                      Режим цен
-                    </span>
-                    <div
-                      className="create-sale-document__wholesale-seg"
-                      role="radiogroup"
-                      aria-label="Режим цен"
-                    >
-                      <label
-                        className={`create-sale-document__wholesale-seg-btn ${
-                          !isWholesale ? "is-active" : ""
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="sale_price_mode"
-                          checked={!isWholesale}
-                          onChange={() => handleWholesaleModeChange(false)}
-                        />
-                        <span>Оптовая цена</span>
-                      </label>
-                      <label
-                        className={`create-sale-document__wholesale-seg-btn ${
-                          isWholesale ? "is-active" : ""
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="sale_price_mode"
-                          checked={isWholesale}
-                          onChange={() => handleWholesaleModeChange(true)}
-                        />
-                        <span>Цена агента</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-                {isPaymentKindRelevant && (
-                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value="cash"
-                        checked={paymentMethod === "cash"}
-                        onChange={() => setPaymentMethod("cash")}
-                      />
-                      <span>Наличными</span>
-                    </label>
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_method"
-                        value="cashless"
-                        checked={paymentMethod === "cashless"}
-                        onChange={() => setPaymentMethod("cashless")}
-                      />
-                      <span>Безналичными</span>
-                    </label>
-                  </div>
-                )}
-                {docType === "RECEIPT" && (
-                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_kind"
-                        value="cash"
-                        checked={paymentKind === "cash"}
-                        onChange={() => {
-                          setPaymentKind("cash");
-                          setPrepaymentAmount("");
-                        }}
-                      />
-                      <span>Через кассу</span>
-                    </label>
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_kind"
-                        value="credit"
-                        checked={paymentKind === "credit"}
-                        onChange={() => {
-                          setPaymentKind("credit");
-                          setPrepaymentAmount("");
-                        }}
-                      />
-                      <span>В долг</span>
-                    </label>
-                    <label className="create-sale-document__payment-option">
-                      <input
-                        type="radio"
-                        name="payment_kind"
-                        value="external"
-                        checked={paymentKind === "external"}
-                        onChange={() => {
-                          setPaymentKind("external");
-                          setPrepaymentAmount("");
-                        }}
-                      />
-                      <span>Вне кассы</span>
-                    </label>
-                  </div>
-                )}
-              </div>
               <input
                 ref={dateInputRef}
                 type="datetime-local"
@@ -4223,6 +4154,195 @@ const CreateSaleDocument = () => {
                   </div>
                 )}
               </div>
+            </div>
+            <div className="create-sale-document__header-meta">
+              <div
+                className="create-sale-document__date"
+                onClick={() => {
+                  if (!isDocumentDateEditable) return;
+                  const input = dateInputRef.current;
+                  if (input) input.showPicker?.() || input.click();
+                }}
+                style={
+                  isDocumentDateEditable ? undefined : { cursor: "default" }
+                }
+                title={
+                  isDocumentDateEditable
+                    ? "Изменить дату и время документа"
+                    : "Дату можно менять только у черновика"
+                }
+              >
+                <Calendar size={18} />
+                {displayDate}
+              </div>
+              {docType !== "COMMERCIAL_OFFER" && (
+                <label className="create-sale-document__toggle">
+                  <input
+                    type="checkbox"
+                    className="create-sale-document__toggle-input"
+                    checked={isDocumentPosted}
+                    onChange={(e) => setIsDocumentPosted(e.target.checked)}
+                  />
+                  <span className="create-sale-document__toggle-track">
+                    <span className="create-sale-document__toggle-thumb">
+                      <Check size={14} strokeWidth={2.5} />
+                    </span>
+                  </span>
+                  <span className="create-sale-document__toggle-label">
+                    Документ проведён
+                  </span>
+                </label>
+              )}
+              {isPaymentKindRelevant && (
+                <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_kind"
+                      value="cash"
+                      checked={paymentKind === "cash"}
+                      onChange={() => {
+                        setPaymentKind("cash");
+                        setPrepaymentAmount("");
+                      }}
+                    />
+                    <span>Сразу</span>
+                  </label>
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_kind"
+                      value="credit"
+                      checked={paymentKind === "credit"}
+                      onChange={() => setShowPrepaymentModal(true)}
+                    />
+                    <span>В долг</span>
+                  </label>
+                  {paymentKind === "credit" && (
+                    <div className="create-sale-document__prepayment-badge">
+                      <span className="create-sale-document__prepayment-badge-label">
+                        Предоплата:{" "}
+                        {prepaymentAmount
+                          ? `${formatPrice(Number(prepaymentAmount) || 0)} сом`
+                          : "0 сом"}
+                      </span>
+                      <button
+                        type="button"
+                        className="create-sale-document__prepayment-badge-btn"
+                        onClick={() => setShowPrepaymentModal(true)}
+                      >
+                        Изменить
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {showWholesaleToggle && (
+                <div className="create-sale-document__wholesale-mode">
+                  <span className="create-sale-document__wholesale-mode-label">
+                    Режим цен
+                  </span>
+                  <div
+                    className="create-sale-document__wholesale-seg"
+                    role="radiogroup"
+                    aria-label="Режим цен"
+                  >
+                    <label
+                      className={`create-sale-document__wholesale-seg-btn ${
+                        !isWholesale ? "is-active" : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sale_price_mode"
+                        checked={!isWholesale}
+                        onChange={() => handleWholesaleModeChange(false)}
+                      />
+                      <span>Оптовая цена</span>
+                    </label>
+                    <label
+                      className={`create-sale-document__wholesale-seg-btn ${
+                        isWholesale ? "is-active" : ""
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sale_price_mode"
+                        checked={isWholesale}
+                        onChange={() => handleWholesaleModeChange(true)}
+                      />
+                      <span>Цена агента</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+              {isPaymentKindRelevant && (
+                <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="cash"
+                      checked={paymentMethod === "cash"}
+                      onChange={() => setPaymentMethod("cash")}
+                    />
+                    <span>Наличными</span>
+                  </label>
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="cashless"
+                      checked={paymentMethod === "cashless"}
+                      onChange={() => setPaymentMethod("cashless")}
+                    />
+                    <span>Безналичными</span>
+                  </label>
+                </div>
+              )}
+              {docType === "RECEIPT" && (
+                <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_kind"
+                      value="cash"
+                      checked={paymentKind === "cash"}
+                      onChange={() => {
+                        setPaymentKind("cash");
+                        setPrepaymentAmount("");
+                      }}
+                    />
+                    <span>Через кассу</span>
+                  </label>
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_kind"
+                      value="credit"
+                      checked={paymentKind === "credit"}
+                      onChange={() => {
+                        setPaymentKind("credit");
+                        setPrepaymentAmount("");
+                      }}
+                    />
+                    <span>В долг</span>
+                  </label>
+                  <label className="create-sale-document__payment-option">
+                    <input
+                      type="radio"
+                      name="payment_kind"
+                      value="external"
+                      checked={paymentKind === "external"}
+                      onChange={() => {
+                        setPaymentKind("external");
+                        setPrepaymentAmount("");
+                      }}
+                    />
+                    <span>Вне кассы</span>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
 
@@ -4320,6 +4440,10 @@ const CreateSaleDocument = () => {
                         value={clientId}
                         onChange={(v) => setClientId(String(v || ""))}
                         options={counterpartyOptions}
+                        onSearch={handleCounterpartySearch}
+                        onLoadMore={handleCounterpartyLoadMore}
+                        hasMore={cpHasMore}
+                        loading={cpLoading}
                         placeholder={
                           docType === "SALE" || docType === "SALE_RETURN"
                             ? isCounterpartyRequired
@@ -4811,7 +4935,7 @@ const CreateSaleDocument = () => {
             }}
             onClose={() => {
               setShowCreateCounterpartyModal(false);
-              dispatch(fetchWarehouseCounterparties());
+              loadCounterparties({ search: cpSearchRef.current });
             }}
           />
         </ReactPortal>

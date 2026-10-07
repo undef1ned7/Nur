@@ -16,6 +16,10 @@ const PartnerAnalyticsDetail = lazy(
   () =>
     import("../../Components/Sectors/Warehouse/Analytics/PartnerAnalyticsDetail"),
 );
+const PartnerSalesHistory = lazy(
+  () =>
+    import("../../Components/Sectors/Warehouse/Analytics/PartnerSalesHistory"),
+);
 const PartnerAnalyticsOwnerGate = lazy(
   () =>
     import("../../Components/Sectors/Warehouse/Analytics/PartnerAnalyticsOwnerGate"),
@@ -122,7 +126,16 @@ export const warehouseRoutes = (profile) => [
       <PartnerAnalyticsDetail />
     </PartnerAnalyticsOwnerGate>
   )),
-  createProtectedRoute("warehouse/partners/:partnerId", PartnerCatalogPage),
+  createProtectedRoute("warehouse/partners/:partnerId/sales", () => (
+    <PartnerAnalyticsOwnerGate>
+      <PartnerSalesHistory />
+    </PartnerAnalyticsOwnerGate>
+  )),
+  createProtectedRoute("warehouse/partners/:partnerId", () => (
+    <PartnerAnalyticsOwnerGate>
+      <PartnerCatalogPage />
+    </PartnerAnalyticsOwnerGate>
+  )),
   createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),
   <Route

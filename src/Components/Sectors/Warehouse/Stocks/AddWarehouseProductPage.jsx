@@ -41,6 +41,7 @@ import {
 import { countries } from "../../../../data/countries";
 import api from "../../../../api";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import StockAdjustmentModal from "./StockAdjustmentModal";
 import "../../../Deposits/Sklad/AddProductPage.scss";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
@@ -157,6 +158,9 @@ const AddWarehouseProductPage = () => {
     obs.observe(root, { childList: true, subtree: true });
     return () => obs.disconnect();
   }, []);
+
+  // Корректировка остатка (только в режиме редактирования)
+  const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
 
   // Состояние для AlertModal
   const [alertModal, setAlertModal] = useState({
@@ -897,6 +901,13 @@ const AddWarehouseProductPage = () => {
       };
     }
 
+    // Остаток меняется только документами (инвентаризация/приход/списание).
+    // При редактировании quantity не отправляем: иначе карточка расходится с
+    // регистром остатков и товар «сам растёт» (docs/warehouse/stock-single-source-of-truth.md).
+    if (isEditMode) {
+      delete payload.quantity;
+    }
+
     try {
       let product;
       if (isEditMode && productId) {
@@ -1107,6 +1118,16 @@ const AddWarehouseProductPage = () => {
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
+      const quantityError =
+        err?.response?.data?.quantity ?? err?.data?.quantity ?? err?.quantity;
+      if (quantityError) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          quantity: Array.isArray(quantityError)
+            ? quantityError.join(" ")
+            : String(quantityError),
+        }));
+      }
       const errorMessage = validateResErrors(
         err,
         "Ошибка при добавлении товара",
@@ -1387,6 +1408,28 @@ const AddWarehouseProductPage = () => {
 
   return (
     <>
+      {isEditMode && stockAdjustmentOpen && (
+        <StockAdjustmentModal
+          onClose={() => setStockAdjustmentOpen(false)}
+          productId={productId}
+          productName={newItemData.name}
+          currentQty={newItemData.quantity || "0"}
+          unit={marketData.unit}
+          onAdjusted={(result, fact) => {
+            const qtyAfter = result?.qty_after ?? fact;
+            setNewItemData((prev) => ({ ...prev, quantity: String(qtyAfter) }));
+            setFieldErrors((prev) => ({ ...prev, quantity: undefined }));
+            setStockAdjustmentOpen(false);
+            showAlert(
+              result?.document_number
+                ? `Остаток изменён. Проведён документ ${result.document_number}.`
+                : "Остаток изменён.",
+              "success",
+              "Готово",
+            );
+          }}
+        />
+      )}
       <AlertModal
         open={alertModal.open}
         type={alertModal.type}
@@ -1563,6 +1606,7 @@ const AddWarehouseProductPage = () => {
               onChangeDebt={onChangeDebt}
               pickSupplier={pickSupplier}
               company={company}
+              onOpenStockAdjustment={() => setStockAdjustmentOpen(true)}
             />
           ) : (
             <>
@@ -2150,28 +2194,15 @@ const AddWarehouseProductPage = () => {
                     </div>
                   </div>
 
-                  <div className="add-product-page__form-group">
-                    <label className="add-product-page__label">
-                      Количество *
-                    </label>
-                    <div className="add-product-page__price-input">
-                      <input
-                        type="text"
-                        name="quantity"
-                        placeholder="0"
-                        className="add-product-page__input"
-                        value={newItemData.quantity}
-                        onChange={handleChange}
-                        required
-                      />
-                      <span className="add-product-page__currency">шт</span>
-                    </div>
-                    {fieldErrors.quantity && (
-                      <p className="add-product-page__error">
-                        {fieldErrors.quantity}
-                      </p>
-                    )}
-                  </div>
+                  <ProductQuantityField
+                    prefix="add-product-page"
+                    isEditMode={isEditMode}
+                    value={newItemData.quantity}
+                    unit="шт"
+                    onChange={handleChange}
+                    error={fieldErrors.quantity}
+                    onOpenStockAdjustment={() => setStockAdjustmentOpen(true)}
+                  />
                 </div>
 
                 {/* Кнопки действий */}
@@ -2201,6 +2232,65 @@ const AddWarehouseProductPage = () => {
 };
 
 // Компонент формы для маркета
+/**
+ * Поле количества.
+ * Создание: «Начальный остаток» — бэкенд оформит его документом INVENTORY.
+ * Редактирование: только чтение + «Корректировка остатка» (документ INVENTORY).
+ */
+const ProductQuantityField = ({
+  prefix,
+  className = "",
+  isEditMode,
+  value,
+  unit,
+  onChange,
+  error,
+  onOpenStockAdjustment,
+  allowAdjustment = true,
+}) => (
+  <div className={`${prefix}__form-group ${className}`.trim()}>
+    <label className={`${prefix}__label`}>
+      {isEditMode ? "Остаток на складе" : "Начальный остаток *"}
+    </label>
+    <div className={`${prefix}__price-input`}>
+      <input
+        type="text"
+        name="quantity"
+        placeholder="0"
+        className={`${prefix}__input`}
+        value={isEditMode ? value || "0" : value}
+        onChange={isEditMode ? undefined : onChange}
+        readOnly={isEditMode}
+        aria-readonly={isEditMode || undefined}
+        title={
+          isEditMode
+            ? "Остаток меняется только документами: инвентаризация, приход, списание"
+            : undefined
+        }
+        style={isEditMode ? { background: "#f3f4f6", cursor: "not-allowed" } : undefined}
+        required={!isEditMode}
+      />
+      <span className={`${prefix}__currency`}>{unit || "шт"}</span>
+    </div>
+    {isEditMode && allowAdjustment && (
+      <>
+        <button
+          type="button"
+          className="market-product-form__add-packaging-btn"
+          style={{ marginTop: 8 }}
+          onClick={onOpenStockAdjustment}
+        >
+          Корректировка остатка
+        </button>
+        <p style={{ margin: "6px 0 0", fontSize: 13, color: "#6b7280" }}>
+          Остаток меняется только документами: инвентаризация, приход, списание.
+        </p>
+      </>
+    )}
+    {error && <p className={`${prefix}__error`}>{error}</p>}
+  </div>
+);
+
 const MarketProductForm = ({
   itemType,
   setItemType,
@@ -2261,6 +2351,7 @@ const MarketProductForm = ({
   onChangeDebt,
   pickSupplier,
   groupOptions,
+  onOpenStockAdjustment,
   company,
   selectedWarehouse,
   setSelectedWarehouse,
@@ -2976,23 +3067,17 @@ const MarketProductForm = ({
             ))}
           </div>
         )}
-        <div className="market-product-form__form-group mt-4">
-          <label className="market-product-form__label">Количество *</label>
-          <div className="market-product-form__price-input">
-            <input
-              type="text"
-              name="quantity"
-              className="market-product-form__input"
-              value={newItemData.quantity}
-              onChange={handleChange}
-              placeholder="0"
-              required
-            />
-            <span className="market-product-form__currency">
-              {marketData.unit || "шт"}
-            </span>
-          </div>
-        </div>
+        <ProductQuantityField
+          prefix="market-product-form"
+          className="mt-4"
+          isEditMode={isEditMode}
+          value={newItemData.quantity}
+          unit={marketData.unit}
+          onChange={handleChange}
+          error={fieldErrors.quantity}
+          onOpenStockAdjustment={onOpenStockAdjustment}
+          allowAdjustment={itemType !== "service"}
+        />
 
         {/* Список упаковок */}
       </div>

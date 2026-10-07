@@ -20,6 +20,15 @@ import {
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
+import { getPartnerWarehouses } from "../../../../api/warehousePartnership";
+import {
+  PULL_MODE_HINT,
+  extractPartnershipError,
+  isOwnerOrAdmin,
+  isPendingOperationResponse,
+  partnerPullMode,
+} from "../Warehouses/partnership/partnershipHelpers";
+import { useCompanyAgents } from "../utils/useCompanyAgents";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { useUser } from "../../../../store/slices/userSlice";
 import { numberToWords } from "../../../../utils/numberToWords";
@@ -88,14 +97,6 @@ const triggerPdfDownload = (blob, filename) => {
   window.URL.revokeObjectURL(url);
 };
 
-const partnershipMoneyErr = (e) => {
-  if (!e) return "Ошибка";
-  if (typeof e === "string") return e;
-  if (e.detail) return String(e.detail);
-  if (e.cash_register) return String(e.cash_register);
-  const parts = Object.entries(e).map(([k, v]) => `${k}: ${v}`);
-  return parts.length ? parts.join("; ") : JSON.stringify(e);
-};
 
 function n2display(v) {
   const n = parseAmount(String(v ?? "0"));
@@ -137,7 +138,7 @@ const PartnerCashIncassationPanel = () => {
       setPartners(data?.partners || []);
     } catch (e) {
       console.error(e);
-      setPartnerErr(partnershipMoneyErr(e));
+      setPartnerErr(extractPartnershipError(e));
       setPartners([]);
     } finally {
       setPartnersLoading(false);
@@ -189,8 +190,7 @@ const PartnerCashIncassationPanel = () => {
       setCatalogLoading(true);
       setCatalogErr("");
       try {
-        const data =
-          await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
+        const data = await getPartnerWarehouses(partnerCompanyId);
         if (!cancelled) {
           setCatalog(data);
           setFromRegisterId("");
@@ -199,7 +199,7 @@ const PartnerCashIncassationPanel = () => {
       } catch (e) {
         if (!cancelled) {
           setCatalog(null);
-          setCatalogErr(partnershipMoneyErr(e));
+          setCatalogErr(extractPartnershipError(e));
         }
       } finally {
         if (!cancelled) setCatalogLoading(false);
@@ -210,7 +210,11 @@ const PartnerCashIncassationPanel = () => {
     };
   }, [partnerCompanyId]);
 
-  const partnerRegisters = catalog?.cash_registers || [];
+  const partnerRegisters = useMemo(
+    () => catalog?.cash_registers || [],
+    [catalog],
+  );
+  const pullMode = partnerPullMode(catalog?.partnership);
   const ownIds = useMemo(
     () => new Set(ownRegisters.map((r) => String(r.id))),
     [ownRegisters],
@@ -251,28 +255,30 @@ const PartnerCashIncassationPanel = () => {
     }
     setSubmitting(true);
     try {
-      await warehouseAPI.createCashIncassation({
+      const result = await warehouseAPI.createCashIncassation({
         cash_register_from: fromRegisterId,
         cash_register_to: toRegisterId,
         amount: amount.toFixed(2),
         comment: commentStr.trim() || undefined,
       });
-      alert("Инкассация проведена");
+      alert(
+        isPendingOperationResponse(result)
+          ? "Запрос отправлен партнёру. Деньги поступят после его подтверждения (Склады → Партнёры → Запросы на товар и деньги)."
+          : "Инкассация проведена",
+      );
       setAmountStr("");
       setCommentStr("");
       loadHistory();
       if (partnerCompanyId) {
         try {
-          const data =
-            await warehouseAPI.getStockPartnerCatalog(partnerCompanyId);
-          setCatalog(data);
+          setCatalog(await getPartnerWarehouses(partnerCompanyId));
         } catch (e) {
           console.error(e);
         }
       }
       loadOwnRegisters();
     } catch (e) {
-      alert(partnershipMoneyErr(e), true);
+      alert(extractPartnershipError(e), true);
     } finally {
       setSubmitting(false);
     }
@@ -289,6 +295,15 @@ const PartnerCashIncassationPanel = () => {
     isValidCrossCompanyPair() &&
     parseAmount(amountStr) > 0;
 
+  // Деньги забираются из кассы партнёра — партнёр должен это подтвердить
+  const pullsFromPartner =
+    Boolean(fromRegisterId) && partnerIds.has(String(fromRegisterId));
+  const submitLabel = submitting
+    ? "Отправка…"
+    : pullsFromPartner && pullMode === "confirm"
+      ? "Запросить у партнёра"
+      : "Провести инкассацию";
+
   return (
     <div className="warehouse-kassa__partner-incass">
       <h3 className="warehouse-kassa__inbox-title">
@@ -296,9 +311,10 @@ const PartnerCashIncassationPanel = () => {
         Инкассация между компаниями-партнёрами
       </h3>
       <p className="warehouse-kassa__partner-incass-hint">
-        Перевод наличных между вашей кассой и кассой партнёра (одно партнёрство
-        для склада и кассы). Создаются проведённые расход и приход по категории
-        «Инкассация».
+        Перевод наличных между вашей кассой и кассой партнёра. Создаются
+        проведённые расход и приход по категории «Инкассация». Отправка из
+        вашей кассы проводится сразу; списание из кассы партнёра — по правилам
+        партнёра (см. подсказку ниже).
       </p>
 
       {partnerErr && (
@@ -372,7 +388,9 @@ const PartnerCashIncassationPanel = () => {
                           <td>{r.location || "—"}</td>
                           <td>{r.branch_name || "—"}</td>
                           <td>
-                            {money(parseAmount(String(r.balance ?? "0")))}
+                            {r.balance != null
+                              ? money(parseAmount(String(r.balance)))
+                              : "—"}
                           </td>
                         </tr>
                       ))
@@ -404,7 +422,8 @@ const PartnerCashIncassationPanel = () => {
                     <optgroup label="Кассы партнёра">
                       {partnerRegisters.map((r) => (
                         <option key={`p-f-${r.id}`} value={r.id}>
-                          {r.name || r.id} · сальдо {n2display(r.balance)}
+                          {r.name || r.id}
+                          {r.balance != null ? ` · сальдо ${n2display(r.balance)}` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -429,7 +448,8 @@ const PartnerCashIncassationPanel = () => {
                     <optgroup label="Кассы партнёра">
                       {partnerRegisters.map((r) => (
                         <option key={`p-t-${r.id}`} value={r.id}>
-                          {r.name || r.id} · сальдо {n2display(r.balance)}
+                          {r.name || r.id}
+                          {r.balance != null ? ` · сальдо ${n2display(r.balance)}` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -455,6 +475,13 @@ const PartnerCashIncassationPanel = () => {
                     onChange={(e) => setCommentStr(e.target.value)}
                   />
                 </div>
+                {pullsFromPartner && (
+                  <div
+                    className={`kassa__alert ${pullMode === "legacy" ? "kassa__alert--error" : ""}`}
+                  >
+                    {PULL_MODE_HINT[pullMode]}
+                  </div>
+                )}
                 <div className="kassa-modal__footer" style={{ marginTop: 8 }}>
                   <button
                     type="button"
@@ -462,7 +489,7 @@ const PartnerCashIncassationPanel = () => {
                     disabled={!canSubmit}
                     onClick={handleSubmit}
                   >
-                    {submitting ? "Проведение…" : "Провести инкассацию"}
+                    {submitLabel}
                   </button>
                 </div>
               </div>
@@ -791,7 +818,13 @@ const CashRegisterList = () => {
   }, [tab]);
 
   const requestsTabVisible = confirmEnabled !== false || pendingCount > 0;
-  const effectiveTab = tab === "requests" && !requestsTabVisible ? "registers" : tab;
+  // Инкассация между компаниями — только владелец/админ (docs/warehouse/stock-partnership.md, П1)
+  const partnerIncassVisible = isOwnerOrAdmin(profile);
+  const effectiveTab =
+    (tab === "requests" && !requestsTabVisible) ||
+    (tab === "partner_incass" && !partnerIncassVisible)
+      ? "registers"
+      : tab;
 
   const load = useCallback(async () => {
     try {
@@ -862,8 +895,14 @@ const CashRegisterList = () => {
     );
   }, [rows, q]);
 
+  // Кассы партнёров (include_partners=1) не считаются — лимит «одна касса» только на свою компанию
+  const hasOwnRegister = useMemo(
+    () => rows.some((r) => !isPartnerCashRegister(r, company?.id)),
+    [rows, company?.id],
+  );
+
   const onCreate = async () => {
-    if (rows.length >= 1) {
+    if (hasOwnRegister) {
       alert("Разрешена только одна касса.", true);
       setCreateOpen(false);
       load();
@@ -924,16 +963,18 @@ const CashRegisterList = () => {
                 Запросы
               </button>
             )}
-            <button
-              type="button"
-              className={`kassa-header__nav-tab flex gap-2 items-center ${
-                effectiveTab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
-              }`}
-              onClick={() => setTab("partner_incass")}
-            >
-              <ArrowRightLeft size={16} />
-              Инкассация партнёров
-            </button>
+            {partnerIncassVisible && (
+              <button
+                type="button"
+                className={`kassa-header__nav-tab flex gap-2 items-center ${
+                  effectiveTab === "partner_incass" ? "kassa-header__nav-tab--active" : ""
+                }`}
+                onClick={() => setTab("partner_incass")}
+              >
+                <ArrowRightLeft size={16} />
+                Инкассация партнёров
+              </button>
+            )}
             {isOwner && (
               <button
                 type="button"
@@ -948,7 +989,7 @@ const CashRegisterList = () => {
             )}
           </nav>
           <div className="kassa-header__right">
-            {effectiveTab === "registers" && rows.length === 0 && (
+            {effectiveTab === "registers" && !hasOwnRegister && (
               <button
                 className="kassa-header__create-btn"
                 onClick={() => setCreateOpen(true)}
@@ -1139,8 +1180,10 @@ const CashRegisterDetail = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [counterparties, setCounterparties] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [agentsList, setAgentsList] = useState([]);
-  const [agentsLoading, setAgentsLoading] = useState(false);
+  // Все агенты компании (а не топ-10 аналитики за месяц); список видит владелец/админ
+  const { agents: agentsList, loading: agentsLoading } = useCompanyAgents(
+    profile?.role === "owner" || profile?.role === "admin",
+  );
   const [agentFilterId, setAgentFilterId] = usePersistedState(
     "warehouse:kassa:agentFilter",
     "",
@@ -1222,41 +1265,6 @@ const CashRegisterDetail = () => {
       } catch {}
     })();
   }, [agentFilterId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setAgentsLoading(true);
-    warehouseAPI
-      .getOwnerAnalytics({ period: "month" })
-      .then((data) => {
-        if (cancelled) return;
-        const top = data?.top_agents || {};
-        const bySales = top.by_sales || [];
-        const byReceived = top.by_received || [];
-        const map = new Map();
-        [...bySales, ...byReceived].forEach((a) => {
-          const agentId = a.agent_id;
-          if (agentId && !map.has(agentId)) {
-            map.set(agentId, a.agent_name || agentId);
-          }
-        });
-        setAgentsList(
-          Array.from(map.entries()).map(([agentId, name]) => ({
-            id: agentId,
-            name,
-          })),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setAgentsList([]);
-      })
-      .finally(() => {
-        if (!cancelled) setAgentsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const receipts = operations?.receipts ?? [];
   const expenses = operations?.expenses ?? [];

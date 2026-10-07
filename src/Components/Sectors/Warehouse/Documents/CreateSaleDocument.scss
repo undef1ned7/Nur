@@ -658,7 +658,7 @@ $due-red: #dc2626;
 
   &__header {
     background: #fff;
-    padding: 20px 24px;
+    padding: 18px 24px 16px;
     border-bottom: 1px solid #e5e7eb;
     display: flex;
     justify-content: space-between;
@@ -670,20 +670,23 @@ $due-red: #dc2626;
   &__header-left {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
   }
 
   &__back-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    font-size: 14px;
-    color: #475569;
+    padding: 5px 12px 5px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
     background: transparent;
-    border: 1px solid #e2e8f0;
+    border: 1px solid transparent;
     border-radius: 8px;
+    margin-left: -8px;
     cursor: pointer;
     align-self: flex-start;
     transition: background 0.15s, color 0.15s;
@@ -699,36 +702,50 @@ $due-red: #dc2626;
 
   &__doc-title {
     margin: 0 0 4px;
-    font-size: 22px;
-    font-weight: 600;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     color: #0f172a;
   }
 
   &__doc-subtitle {
     margin: 0;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
     color: #64748b;
   }
 
+  /* Панель параметров документа: дата, проведение, оплата, режим цен */
   &__header-meta {
+    flex: 1 0 100%;
     display: flex;
     align-items: center;
-    gap: 16px;
     flex-wrap: wrap;
+    gap: 10px 20px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #eef1f5;
+    border-radius: 12px;
   }
 
   &__date {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #64748b;
+    color: #334155;
     cursor: pointer;
     user-select: none;
+    transition: border-color 0.15s;
 
     &:hover {
+      border-color: #cbd5e1;
       color: #0f172a;
     }
 
@@ -753,13 +770,14 @@ $due-red: #dc2626;
   }
 
   &__save-btn {
-    padding: 10px 18px;
+    height: 40px;
+    padding: 0 20px;
     background: $primary;
     color: #000;
     border: 1px solid $primary-dark;
     border-radius: 10px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -777,7 +795,8 @@ $due-red: #dc2626;
   }
 
   &__save-print-btn {
-    padding: 10px 18px;
+    height: 40px;
+    padding: 0 16px;
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
@@ -1029,9 +1048,63 @@ $due-red: #dc2626;
     flex-wrap: wrap;
     margin-top: 8px;
 
+    // В шапке — сегментированный переключатель
     &--header {
       margin-top: 0;
       align-items: center;
+      gap: 2px;
+      padding: 3px;
+      background: #eef1f5;
+      border-radius: 10px;
+
+      .create-sale-document__payment-option {
+        position: relative;
+        justify-content: center;
+        height: 30px;
+        padding: 0 14px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 500;
+        color: #64748b;
+        white-space: nowrap;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          box-shadow 0.15s;
+
+        input {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          margin: -1px;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        &:hover {
+          color: #0f172a;
+        }
+
+        &:has(input:checked) {
+          background: #fff;
+          color: #0f172a;
+          font-weight: 600;
+          box-shadow:
+            0 1px 3px rgba(15, 23, 42, 0.12),
+            0 0 0 1px rgba(15, 23, 42, 0.04);
+        }
+
+        &:has(input:focus-visible) {
+          outline: 2px solid #3b82f6;
+          outline-offset: 1px;
+        }
+      }
+
+      .create-sale-document__prepayment-badge {
+        margin-left: 6px;
+        padding: 3px 10px;
+        border-radius: 8px;
+      }
     }
   }
 
@@ -1051,20 +1124,15 @@ $due-red: #dc2626;
   &__wholesale-mode {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border: 2px solid $primary-dark;
-    border-radius: 12px;
-    background: $summary-bg;
-    box-shadow: 0 2px 8px rgba(230, 197, 71, 0.25);
+    gap: 10px;
   }
 
   &__wholesale-mode-label {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #854d0e;
+    color: #64748b;
     white-space: nowrap;
   }
 
@@ -1072,9 +1140,7 @@ $due-red: #dc2626;
     display: inline-flex;
     padding: 3px;
     border-radius: 10px;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+    background: #eef1f5;
   }
 
   &__wholesale-seg-btn {
@@ -1082,14 +1148,15 @@ $due-red: #dc2626;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 96px;
-    padding: 8px 18px;
+    height: 30px;
+    padding: 0 16px;
     border: none;
     border-radius: 8px;
     background: transparent;
     color: #64748b;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
     transition:
       background-color 0.2s ease,
@@ -1110,15 +1177,14 @@ $due-red: #dc2626;
     }
 
     &:hover:not(.is-active) {
-      color: #334155;
-      background: #f8fafc;
+      color: #0f172a;
     }
 
     &.is-active {
       color: #0f172a;
-      background: linear-gradient(180deg, $primary 0%, $primary-dark 100%);
-      box-shadow: 0 2px 6px rgba(230, 197, 71, 0.45);
-      transform: translateY(-1px);
+      font-weight: 600;
+      background: $primary;
+      box-shadow: 0 1px 3px rgba(230, 197, 71, 0.6);
     }
   }
 

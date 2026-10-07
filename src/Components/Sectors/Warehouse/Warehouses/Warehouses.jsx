@@ -42,6 +42,7 @@ const Warehouses = () => {
             next.set("tab", PAGE_TABS.PARTNERSHIPS);
           } else {
             next.delete("tab");
+            next.delete("sub");
           }
           return next;
         },

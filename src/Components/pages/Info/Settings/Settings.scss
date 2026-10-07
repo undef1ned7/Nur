@@ -1504,3 +1504,93 @@
     }
   }
 }
+
+/* ===== Вкладка «Тариф и оплата» ===== */
+.settings__billing {
+  &-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 20px 0;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &-card {
+    padding: 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  &-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+
+  &-value {
+    margin-top: 8px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  &-badge {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #15803d;
+    background: #dcfce7;
+
+    &--expired {
+      color: #b91c1c;
+      background: #fee2e2;
+    }
+  }
+
+  &-table {
+    margin-bottom: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  &-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    font-size: 14px;
+    color: #6b7280;
+
+    & + & {
+      border-top: 1px solid #f0f1f3;
+    }
+
+    strong {
+      color: #111827;
+      text-align: right;
+    }
+  }
+
+  &-subtitle {
+    margin: 8px 0 12px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+}

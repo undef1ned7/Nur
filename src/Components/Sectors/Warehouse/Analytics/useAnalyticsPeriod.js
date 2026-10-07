@@ -1,17 +1,15 @@
 import { useCallback, useState } from "react";
-import { buildAnalyticsPeriodParams } from "./warehouseAnalyticsShared";
+import {
+  buildAnalyticsPeriodParams,
+  monthAgoLocalISODate,
+  toLocalISODate,
+} from "./warehouseAnalyticsShared";
 
 export const useAnalyticsPeriod = (initialPeriod = "month") => {
   const [period, setPeriod] = useState(initialPeriod);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [dateTo, setDateTo] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [date, setDate] = useState(() => toLocalISODate());
+  const [dateFrom, setDateFrom] = useState(() => monthAgoLocalISODate());
+  const [dateTo, setDateTo] = useState(() => toLocalISODate());
 
   const periodParams = useCallback(
     (extra = {}) =>
