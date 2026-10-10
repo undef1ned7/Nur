@@ -9,6 +9,10 @@ import {
 import { useNavigate } from "react-router-dom";
 import warehouseAPI from "../../../../api/warehouse";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
+import {
+  counterpartyTypeLabel,
+  documentStatusLabel,
+} from "../utils/warehouseLabels";
 import "./Supply.scss";
 
 const PER_PAGE = 15;
@@ -22,8 +26,8 @@ const fmtDate = (v) => {
   }
 };
 
-const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+// Статусы по-русски: CASH_PENDING → «Ожидает кассы» и т.д. (QA B40)
+const statusLabel = (s) => documentStatusLabel(s);
 
 const formatApiError = (error) => {
   if (!error) return "Неизвестная ошибка";
@@ -128,7 +132,7 @@ const WarehouseSupply = () => {
       (suppliers || []).filter(
         (s) =>
           safeIncludes(s?.name, q) ||
-          safeIncludes(s?.type, q)
+          safeIncludes(counterpartyTypeLabel(s?.type), q)
       ),
     [suppliers, q]
   );
@@ -341,7 +345,7 @@ const WarehouseSupply = () => {
               pageDataSup.map((s) => (
                 <tr key={s.id} className="sklad-supply__trow">
                   <td className="sklad-supply__td" data-label="Название">{s.name ?? "—"}</td>
-                  <td className="sklad-supply__td" data-label="Тип">{s.type ?? "—"}</td>
+                  <td className="sklad-supply__td" data-label="Тип">{counterpartyTypeLabel(s.type)}</td>
                   <td className="sklad-supply__td sklad-supply__td--actions">
                     <button
                       className="sklad-supply__btn sklad-supply__btn--secondary"

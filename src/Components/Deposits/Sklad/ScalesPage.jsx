@@ -5,6 +5,8 @@ import { sendProductsToScales } from "../../../store/creators/userCreators";
 import AlertModal from "../../common/AlertModal/AlertModal";
 import "./ScalesPage.scss";
 import { validateResErrors } from "../../../../tools/validateResErrors";
+import { useUser } from "../../../store/slices/userSlice";
+import { isWarehouseSectorName } from "../../../utils/warehouseSector";
 
 const isWeightProduct = (p) =>
   Boolean(p?.is_weight) || p?.scale_type === "weight";
@@ -14,13 +16,17 @@ const isWeightProduct = (p) =>
  * (см. docs/market/scales-weight-products.md), клиентский фильтр —
  * подстраховка на случай, если параметр проигнорирован.
  */
-const fetchAllWeightProducts = async () => {
+const fetchAllWeightProducts = async ({ warehouse = false } = {}) => {
   const collected = [];
   let page = 1;
   const MAX_PAGES = 100;
 
+  // Сектор «Склад»: товары склада (warehouse/products/), а не модуля магазина
+  // (main/products/) — QA B37. Весовой признак — is_weight из формы склада.
+  const url = warehouse ? "warehouse/products/" : "main/products/list/";
+
   while (page <= MAX_PAGES) {
-    const { data } = await api.get("main/products/list/", {
+    const { data } = await api.get(url, {
       params: { page, is_weight: true },
     });
     const results = Array.isArray(data?.results)
@@ -60,11 +66,18 @@ const TABS = [
 ];
 
 /** Таб «Штрих-М»: отправка весовых товаров на весы через бэкенд. */
+// Отправка/экспорт на бэке пока работают только с товарами магазина
+// (users/scales/send-products/, main/products/scale-export/) — для склада
+// нужна поддержка на сервере (docs/warehouse/qa-2026-10-06-backend-fixes.md, B37).
+const WAREHOUSE_SCALES_UNSUPPORTED_HINT =
+  "Выгрузка складских товаров на весы появится после поддержки на сервере.";
+
 const ShtrihMTab = ({
   weightProducts,
   loading,
   onSuccess,
   onError,
+  isWarehouse = false,
 }) => {
   const dispatch = useDispatch();
   const [isSending, setIsSending] = useState(false);
@@ -120,10 +133,16 @@ const ShtrihMTab = ({
           type="button"
           className="scales-page__send-btn"
           onClick={handleSendAllToScales}
-          disabled={loading || isSending || count === 0}
+          disabled={loading || isSending || count === 0 || isWarehouse}
         >
           {isSending ? "Отправка..." : "Отправить весовые товары на весы"}
         </button>
+
+        {isWarehouse && !loading && count > 0 && (
+          <div className="scales-page__hint">
+            {WAREHOUSE_SCALES_UNSUPPORTED_HINT}
+          </div>
+        )}
 
         {loading && (
           <div className="scales-page__hint">Загрузка товаров...</div>
@@ -172,7 +191,13 @@ const EXPORT_FORMATS = [
   },
 ];
 
-const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
+const RongtaTab = ({
+  weightProducts,
+  loading,
+  onSuccess,
+  onError,
+  isWarehouse = false,
+}) => {
   const [isExporting, setIsExporting] = useState(false);
   const [translit, setTranslit] = useState(true);
   const [format, setFormat] = useState("txp");
@@ -263,12 +288,18 @@ const RongtaTab = ({ weightProducts, loading, onSuccess, onError }) => {
           type="button"
           className="scales-page__send-btn"
           onClick={handleExport}
-          disabled={loading || isExporting || count === 0}
+          disabled={loading || isExporting || count === 0 || isWarehouse}
         >
           {isExporting
             ? "Выгрузка..."
             : `Экспорт для весов (.${format === "xls" ? "xls" : "TXP"})`}
         </button>
+
+        {isWarehouse && !loading && count > 0 && (
+          <div className="scales-page__hint">
+            {WAREHOUSE_SCALES_UNSUPPORTED_HINT}
+          </div>
+        )}
 
         {loading && (
           <div className="scales-page__hint">Загрузка товаров...</div>
@@ -532,6 +563,8 @@ const ScaleBarcodeSettingsTab = ({ onSuccess, onError }) => {
  * «Настройки» — чтение штрихкода весов кассой (на уровне компании).
  */
 const ScalesPage = () => {
+  const { sector, company } = useUser();
+  const isWarehouse = isWarehouseSectorName(sector || company?.sector?.name);
   const [activeTab, setActiveTab] = useState("shtrih-m");
   const [weightProducts, setWeightProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -545,7 +578,9 @@ const ScalesPage = () => {
 
     const load = async () => {
       try {
-        const products = await fetchAllWeightProducts();
+        const products = await fetchAllWeightProducts({
+          warehouse: isWarehouse,
+        });
         if (!cancelledRef.current) setWeightProducts(products);
       } catch (err) {
         if (!cancelledRef.current) {
@@ -564,7 +599,7 @@ const ScalesPage = () => {
     return () => {
       cancelledRef.current = true;
     };
-  }, []);
+  }, [isWarehouse]);
 
   const handleSuccess = useCallback((message) => {
     setAlertMessage(message);
@@ -607,6 +642,7 @@ const ScalesPage = () => {
             loading={loading}
             onSuccess={handleSuccess}
             onError={handleError}
+            isWarehouse={isWarehouse}
           />
         )}
         {activeTab === "rongta" && (
@@ -615,6 +651,7 @@ const ScalesPage = () => {
             loading={loading}
             onSuccess={handleSuccess}
             onError={handleError}
+            isWarehouse={isWarehouse}
           />
         )}
         {activeTab === "settings" && (

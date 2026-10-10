@@ -15,6 +15,7 @@ import {
 import { buildOnHand, buildSalesSummary } from "./warehouseAnalyticsModel";
 import { AnalyticsPeriodControls } from "./warehouseAnalyticsUi";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
+import { useLatestRequest } from "./useLatestRequest";
 import "./Analytics.scss";
 
 const PartnerAnalyticsList = () => {
@@ -42,6 +43,7 @@ const PartnerAnalyticsList = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const { begin, isLatest } = useLatestRequest();
 
   const loadPartners = useCallback(async () => {
     setPartnersLoading(true);
@@ -60,6 +62,7 @@ const PartnerAnalyticsList = () => {
   }, []);
 
   const loadAnalytics = useCallback(async () => {
+    const token = begin();
     if (!partners.length) {
       setData(null);
       return;
@@ -68,17 +71,19 @@ const PartnerAnalyticsList = () => {
     setError("");
     try {
       const result = await getOwnerPartnersAnalytics(periodParams());
+      if (!isLatest(token)) return;
       setData(result);
     } catch (e) {
+      if (!isLatest(token)) return;
       console.error(e);
       setError(
         extractWarehouseApiError(e, "Не удалось загрузить аналитику партнёров"),
       );
       setData(null);
     } finally {
-      setLoading(false);
+      if (isLatest(token)) setLoading(false);
     }
-  }, [partners.length, periodParams]);
+  }, [partners.length, periodParams, begin, isLatest]);
 
   useEffect(() => {
     loadPartners();

@@ -56,6 +56,14 @@ import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { exportInvoiceToExcel } from "./components/invoiceExcelExport";
 import { sortByAlphabetEnRu } from "../../../../utils/sortByAlphabetEnRu";
 import { listCompanyAgentRequests } from "../../../../api/warehouse";
+import {
+  SALE_PRICE_MODE_LABELS,
+  formatWholesaleModeLabel,
+} from "../utils/wholesalePricing";
+import {
+  formatDocumentNumber,
+  getDocumentSubtitle,
+} from "./utils/documentDisplay";
 
 const CP_PAGE_SIZE = 50;
 
@@ -103,8 +111,8 @@ const formatDocumentPrice = (price) =>
     maximumFractionDigits: 2,
   });
 
-const getSalePriceModeLabel = (isWholesale) =>
-  isWholesale ? "Опт" : "Розница";
+// B09: подпись режима совпадает с полем формы товара и отправляемым is_wholesale.
+const getSalePriceModeLabel = formatWholesaleModeLabel;
 
 const applyWholesaleModeToCartItem = (item, isWholesale) => {
   if (!item?.priceAuto) return item;
@@ -552,6 +560,24 @@ const CreateSaleDocument = () => {
   const debouncedProductSearch = useDebouncedValue(productSearch, 300);
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
   const [addingProduct, setAddingProduct] = useState(false);
+  // Защита от повторного сохранения (двойной/тройной клик, Enter, «Печать»
+  // во время сохранения). Ref блокирует синхронно — до перерисовки кнопки,
+  // state — для disabled и текста «Сохранение…».
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const withSaveLock =
+    (fn) =>
+    async (...args) => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      setSaving(true);
+      try {
+        return await fn(...args);
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    };
 
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
@@ -624,9 +650,6 @@ const CreateSaleDocument = () => {
   const [activeGroupKeyForKeyboard, setActiveGroupKeyForKeyboard] =
     useState("");
   const [groupKeyboardIndexMap, setGroupKeyboardIndexMap] = useState({});
-  const [documentId] = useState(
-    () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  );
   // id из URL (маршрут edit/:id) или из query/state для обратной совместимости
   const editDocumentId =
     params.id ||
@@ -634,6 +657,10 @@ const CreateSaleDocument = () => {
     location.state?.editDocumentId ||
     null;
   const [loadingDraft, setLoadingDraft] = useState(!!editDocumentId);
+  // B21: реальный номер документа (приходит с бэка после сохранения)
+  const [savedDocumentNumber, setSavedDocumentNumber] = useState("");
+  // B44: подсказки «Доступно N» у поля количества, когда ввели больше остатка
+  const [qtyLimitHints, setQtyLimitHints] = useState({});
 
   // Дату и время можно менять при создании документа и при редактировании черновика
   const isDocumentDateEditable =
@@ -1924,6 +1951,7 @@ const CreateSaleDocument = () => {
             : doc.agent != null && doc.agent !== ""
               ? String(doc.agent)
               : "";
+        setSavedDocumentNumber(doc.number ? String(doc.number) : "");
         setWarehouse(whFrom);
         setWarehouseTo(whTo);
         setClientId(cpId);
@@ -2860,8 +2888,22 @@ const CreateSaleDocument = () => {
       unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
     let finalQty = isPiece ? Math.floor(qty) : qty;
     const maxQty = Number(item.stock ?? 0);
+    // B44: не обрезаем молча — показываем подсказку «Доступно N» у поля
     if (isStockLimitRequired && maxQty > 0 && finalQty > maxQty) {
       finalQty = maxQty;
+      setQtyLimitHints((prev) => ({
+        ...prev,
+        [itemId]: `Доступно ${maxQty}${
+          item.warehouseName ? ` (${item.warehouseName})` : ""
+        }`,
+      }));
+    } else {
+      setQtyLimitHints((prev) => {
+        if (!prev[itemId]) return prev;
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
     }
     setCartItems((prev) =>
       prev.map((i) => (i.id === itemId ? { ...i, quantity: finalQty } : i)),
@@ -2911,8 +2953,23 @@ const CreateSaleDocument = () => {
   // Валидация данных документа перед отправкой
   const validateDocumentData = () => {
     // Проверка товаров
+    // B42: без строк документ не сохраняем и не проводим
     if (!cartItems || cartItems.length === 0) {
-      return { valid: false, error: "Добавьте товары в документ" };
+      return {
+        valid: false,
+        error: isDocumentPosted
+          ? "Нельзя провести документ без строк. Добавьте хотя бы один товар."
+          : "Нельзя сохранить пустой документ. Добавьте хотя бы один товар.",
+      };
+    }
+    const zeroQtyItem = cartItems.find((item) => !(Number(item.quantity) > 0));
+    if (zeroQtyItem && docType !== "INVENTORY") {
+      return {
+        valid: false,
+        error: `Укажите количество больше 0 для товара "${
+          zeroQtyItem.productName || zeroQtyItem.name
+        }" или удалите строку`,
+      };
     }
 
     // Валидация каждого товара
@@ -3064,7 +3121,12 @@ const CreateSaleDocument = () => {
       const unit = item.unit || "шт";
       const isPiece =
         unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
-      const qty = Number(item.quantity || 1);
+      // В инвентаризации факт 0 — валидное значение, не подменяем на 1.
+      const rawQty = Number(item.quantity);
+      const qty =
+        docType === "INVENTORY"
+          ? Number.isFinite(rawQty) ? rawQty : 0
+          : Number(item.quantity || 1);
       const finalQty = isPiece ? Math.floor(qty) : qty;
       const price = Number(item.price || item.unit_price || 0);
       const itemDiscPct = Math.max(
@@ -3119,7 +3181,7 @@ const CreateSaleDocument = () => {
   };
 
   // Сохранение документа (без печати)
-  const handleSave = async () => {
+  const handleSave = withSaveLock(async () => {
     // Валидация перед отправкой
     const validation = validateDocumentData();
     if (!validation.valid) {
@@ -3248,7 +3310,7 @@ const CreateSaleDocument = () => {
       console.error("Ошибка при сохранении документа:", error);
       alert("Ошибка: " + formatApiError(error?.response?.data || error));
     }
-  };
+  });
 
   // Вспомогательная функция для скачивания blob
   const downloadBlob = (blob, filename) => {
@@ -3298,7 +3360,7 @@ const CreateSaleDocument = () => {
   };
 
   // Сохранение и печать
-  const handleSaveAndPrint = async (printType) => {
+  const handleSaveAndPrint = withSaveLock(async (printType) => {
     // Используем ту же валидацию, что и для handleSave
     const validation = validateDocumentData();
     if (!validation.valid) {
@@ -3545,7 +3607,7 @@ const CreateSaleDocument = () => {
       const totalDiscount = itemsDiscountTotal + docDiscountCombined;
       const total = Number(doc.total) || subtotal - totalDiscount;
 
-      const docNumber = doc.number || documentId.substring(0, 8) || "00001";
+      const docNumber = formatDocumentNumber(doc);
       const currentDate = doc.date
         ? new Date(doc.date)
         : new Date(documentDateValue || undefined);
@@ -3831,7 +3893,7 @@ const CreateSaleDocument = () => {
             "Не удалось сохранить документ или сформировать файл";
       alert("Ошибка: " + errorMessage);
     }
-  };
+  });
 
   const formatPrice = (price) => {
     return Number(price || 0).toLocaleString("ru-RU", {
@@ -3864,7 +3926,9 @@ const CreateSaleDocument = () => {
           style={
             isDesktopLayout
               ? {
-                  flex: "0 0 auto",
+                  // B28: каталог может ужаться до minWidth, основная область
+                  // забирает остаток — сумма ширин никогда не превышает контейнер
+                  flex: "0 1 auto",
                   width: `calc(${desktopCatalogWidth}% - 4px)`,
                   minWidth: 260,
                 }
@@ -4051,9 +4115,9 @@ const CreateSaleDocument = () => {
           style={
             isDesktopLayout
               ? {
-                  flex: "0 0 auto",
-                  width: `calc(${100 - desktopCatalogWidth}% - 4px)`,
-                  minWidth: 360,
+                  flex: "1 1 0",
+                  width: 0,
+                  minWidth: 0,
                 }
               : undefined
           }
@@ -4087,14 +4151,20 @@ const CreateSaleDocument = () => {
                   {docType === "TRANSFER" && "Перемещение"}
                   {docType === "COMMERCIAL_OFFER" && "Коммерческое предложение"}
                   {!docType && "Документ"}{" "}
-                  {documentId ? `#${documentId.slice(4, 12)}` : ""}
+                  {/* B21: до сохранения временный номер не показываем — только реальный */}
+                  {editDocumentId
+                    ? formatDocumentNumber({
+                        number: savedDocumentNumber,
+                        id: editDocumentId,
+                      })
+                    : "· новый документ"}
                 </h1>
                 <p className="create-sale-document__doc-subtitle">
                   {docType === "COMMERCIAL_OFFER"
                     ? "Без проведения: склад, остатки и касса не затрагиваются"
                     : isMultiWarehouseOwnerDoc
                       ? "Можно добавить товары с разных складов в один документ"
-                      : "Создание документа продажи"}
+                      : getDocumentSubtitle(docType, !!editDocumentId)}
                 </p>
               </div>
               <input
@@ -4113,15 +4183,18 @@ const CreateSaleDocument = () => {
                 type="button"
                 className="create-sale-document__save-btn"
                 onClick={handleSave}
+                disabled={saving}
+                aria-busy={saving}
               >
                 <Save size={18} />
-                Сохранить
+                {saving ? "Сохранение…" : "Сохранить"}
               </button>
               <div className="create-sale-document__save-print-wrapper">
                 <button
                   type="button"
                   className="create-sale-document__save-print-btn"
                   onClick={() => setShowSavePrintMenu(!showSavePrintMenu)}
+                  disabled={saving}
                 >
                   <Printer size={18} />
                   Печать
@@ -4258,7 +4331,9 @@ const CreateSaleDocument = () => {
                         checked={!isWholesale}
                         onChange={() => handleWholesaleModeChange(false)}
                       />
-                      <span>Оптовая цена</span>
+                      <span title="Цена из поля «Оптовая цена» товара (is_wholesale: false)">
+                        {SALE_PRICE_MODE_LABELS.base}
+                      </span>
                     </label>
                     <label
                       className={`create-sale-document__wholesale-seg-btn ${
@@ -4271,7 +4346,9 @@ const CreateSaleDocument = () => {
                         checked={isWholesale}
                         onChange={() => handleWholesaleModeChange(true)}
                       />
-                      <span>Цена агента</span>
+                      <span title="Цена из поля «Цена агента» товара (is_wholesale: true)">
+                        {SALE_PRICE_MODE_LABELS.agent}
+                      </span>
                     </label>
                   </div>
                 </div>
@@ -4583,7 +4660,16 @@ const CreateSaleDocument = () => {
                                   ? `макс. ${item.stock}`
                                   : undefined
                               }
+                              aria-invalid={qtyLimitHints[item.id] ? true : undefined}
                             />
+                            {qtyLimitHints[item.id] && (
+                              <div
+                                className="create-sale-document__qty-hint"
+                                role="status"
+                              >
+                                {qtyLimitHints[item.id]}
+                              </div>
+                            )}
                           </td>
                           <td>
                             <input

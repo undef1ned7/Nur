@@ -37,4 +37,17 @@ describe("companyAgentOptions", () => {
       companyAgentOptions({ results: [{ user: "1", user_display: "А", status: "active" }] }),
     ).toEqual([{ id: "1", name: "А" }]);
   });
+
+  it("схлопывает несколько членств одного пользователя (B17)", () => {
+    const options = companyAgentOptions([
+      { id: "m1", user: "1", user_display: "Бакыт", status: "active" },
+      { id: "m2", user: "1", user_display: "Бакыт", status: "active" },
+      { id: "m3", user: { id: "1" }, user_display: "Бакыт", status: "active" },
+      { id: "m4", user: { id: "2" }, user_display: "Айбек", status: "active" },
+    ]);
+    expect(options).toEqual([
+      { id: "2", name: "Айбек" },
+      { id: "1", name: "Бакыт" },
+    ]);
+  });
 });

@@ -51,10 +51,10 @@ const employeeSlice = createSlice({
       })
       .addCase(fetchEmployeesAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.list = action.payload.results;
-        state.count = action.payload.count;
-        state.next = action.payload.next;
-        state.previous = action.payload.previous;
+        state.list = action.payload?.results ?? [];
+        state.count = action.payload?.count ?? 0;
+        state.next = action.payload?.next ?? null;
+        state.previous = action.payload?.previous ?? null;
       })
       .addCase(fetchEmployeesAsync.rejected, (state, action) => {
         state.loading = false;

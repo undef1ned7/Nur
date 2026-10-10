@@ -11,6 +11,7 @@ import { useSearch } from "../Warehouses/hooks/useSearch";
 import { formatNum, formatShortDate } from "./warehouseAnalyticsShared";
 import { AnalyticsPeriodControls, KpiCard } from "./warehouseAnalyticsUi";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
+import { useLatestRequest } from "./useLatestRequest";
 import {
   PARTNER_SALES_DOC_TYPES,
   PARTNER_SALES_PAGE_SIZE,
@@ -94,15 +95,21 @@ const PartnerSalesHistory = () => {
     [periodParams, docType, status, debouncedSearchTerm, partnerBranch, page],
   );
 
+  // Ответ на устаревший запрос (быстрая смена типа/статуса/периода) не должен затирать свежие данные.
+  const { begin, isLatest } = useLatestRequest();
+
   const load = useCallback(async () => {
     if (!partnerId) return;
+    const token = begin();
     setLoading(true);
     setError("");
     try {
       const result = await listPartnerSales(partnerId, requestParams);
+      if (!isLatest(token)) return;
       setData(normalizePartnerSalesResponse(result));
       setUnsupported(false);
     } catch (e) {
+      if (!isLatest(token)) return;
       if (isEndpointMissing(e)) {
         setUnsupported(true);
       } else {
@@ -111,9 +118,9 @@ const PartnerSalesHistory = () => {
       }
       setData(normalizePartnerSalesResponse(null));
     } finally {
-      setLoading(false);
+      if (isLatest(token)) setLoading(false);
     }
-  }, [partnerId, requestParams]);
+  }, [partnerId, requestParams, begin, isLatest]);
 
   useEffect(() => {
     load();

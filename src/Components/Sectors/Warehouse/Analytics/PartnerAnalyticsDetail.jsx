@@ -11,6 +11,7 @@ import {
 } from "./warehouseAnalyticsShared";
 import { AnalyticsPeriodControls } from "./warehouseAnalyticsUi";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
+import { useLatestRequest } from "./useLatestRequest";
 import "./Analytics.scss";
 
 const PartnerAnalyticsDetail = () => {
@@ -40,9 +41,11 @@ const PartnerAnalyticsDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const { begin, isLatest } = useLatestRequest();
 
   const load = useCallback(async () => {
     if (!partnerId) return;
+    const token = begin();
     setLoading(true);
     setError("");
     try {
@@ -52,8 +55,10 @@ const PartnerAnalyticsDetail = () => {
         partnerId,
         periodParams(extra),
       );
+      if (!isLatest(token)) return;
       setData(result);
     } catch (e) {
+      if (!isLatest(token)) return;
       console.error(e);
       setError(
         extractWarehouseApiError(
@@ -63,9 +68,9 @@ const PartnerAnalyticsDetail = () => {
       );
       setData(null);
     } finally {
-      setLoading(false);
+      if (isLatest(token)) setLoading(false);
     }
-  }, [partnerId, partnerBranch, periodParams]);
+  }, [partnerId, partnerBranch, periodParams, begin, isLatest]);
 
   useEffect(() => {
     load();
@@ -145,6 +150,11 @@ const PartnerAnalyticsDetail = () => {
             <RefreshCw size={18} />
             Обновить
           </button>
+          {loading && data && (
+            <span className="warehouse-analytics__refreshing" role="status">
+              Загрузка…
+            </span>
+          )}
           {partnerBranches.length > 1 && (
             <select
               className="warehouse-analytics__input"
@@ -176,14 +186,20 @@ const PartnerAnalyticsDetail = () => {
 
       {error && <div className="warehouse-analytics__error">{error}</div>}
 
-      {loading ? (
+      {/* Старые данные остаются на экране, пока грузятся новые (см. Analytics.jsx). */}
+      {loading && !data ? (
         <div className="warehouse-analytics__loading">Загрузка…</div>
       ) : data ? (
-        <OwnerAnalyticsContent
-          data={data}
-          showAgentSalesAnalytics={showAgentSalesAnalytics}
-          idPrefix="pa"
-        />
+        <div
+          className={`warehouse-analytics__content${loading ? " is-refreshing" : ""}`}
+          aria-busy={loading}
+        >
+          <OwnerAnalyticsContent
+            data={data}
+            showAgentSalesAnalytics={showAgentSalesAnalytics}
+            idPrefix="pa"
+          />
+        </div>
       ) : null}
     </div>
   );

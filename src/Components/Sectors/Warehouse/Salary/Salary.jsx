@@ -19,6 +19,7 @@ import {
 } from "../../../../api/warehouseSalary";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
 import { monthAgoLocalISODate, toLocalISODate } from "../utils/localDate";
+import { companyAgentOptions } from "../utils/useCompanyAgents";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Salary.scss";
 
@@ -176,7 +177,9 @@ const Salary = () => {
       (async () => {
         try {
           const data = await listCompanyAgentRequests({ status: "active" });
-          if (!cancelled) setAgents(normalizeList(data));
+          // QA B17: у одного агента бывает несколько членств (заявок) —
+          // companyAgentOptions схлопывает их по id пользователя
+          if (!cancelled) setAgents(companyAgentOptions(data));
         } catch {
           if (!cancelled) setAgents([]);
         }
@@ -194,11 +197,7 @@ const Salary = () => {
   }, [branches.length, dispatch, isOwnerOrAdmin]);
 
   const agentOptions = useMemo(
-    () =>
-      agents.map((m) => ({
-        id: m.user,
-        label: m.user_display || m.user_email || m.user,
-      })),
+    () => agents.map((a) => ({ id: a.id, label: a.name })),
     [agents],
   );
 

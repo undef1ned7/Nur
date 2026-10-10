@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Search,
@@ -34,6 +40,12 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { numberToWords } from "../../../../utils/numberToWords";
 import Ko1PdfDocument from "../Documents/components/Ko1PdfDocument.jsx";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
+import {
+  documentStatusLabel,
+  documentTypeLabel,
+  formatDateTime,
+  formatSom,
+} from "../utils/warehouseLabels";
 import "../../../Deposits/Kassa/kassa.scss";
 import "./WarehouseKassa.scss";
 
@@ -41,11 +53,26 @@ const BASE = "/crm/warehouse/kassa";
 
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
-const money = (v) =>
-  (Number(v) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 0 }) + " с";
-const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("ru-RU") : "—");
-const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
+// Единая валюта «сом», дата «18.09.2026 17:10», статусы по-русски (QA B40, B41)
+const money = (v) => formatSom(v);
+const fmtDate = (v) => formatDateTime(v);
+const statusLabel = (s) => documentStatusLabel(s);
+
+/**
+ * Остаток кассы (QA B06): поле balance из API (cash-registers / operations),
+ * иначе приход − расход. null — посчитать не из чего.
+ */
+const getRegisterBalance = (register, totals) => {
+  const raw = register?.balance ?? totals?.balance;
+  if (raw != null && raw !== "") return parseAmount(String(raw));
+  if (totals?.receipts_total == null || totals?.expenses_total == null) {
+    return null;
+  }
+  return (
+    parseAmount(String(totals.receipts_total)) -
+    parseAmount(String(totals.expenses_total))
+  );
+};
 
 const paymentMethodLabel = (value) => {
   const raw = String(value || "").toLowerCase();
@@ -644,7 +671,7 @@ const CashRequestsInbox = () => {
                 return (
                   <tr key={r.id}>
                     <td>{doc.number ?? "—"}</td>
-                    <td>{doc.doc_type ?? "—"}</td>
+                    <td>{documentTypeLabel(doc.doc_type)}</td>
                     <td>{fmtDate(doc.date)}</td>
                     <td>{doc.counterparty_display_name ?? "—"}</td>
                     <td>{money(r.amount)}</td>
@@ -847,6 +874,7 @@ const CashRegisterList = () => {
           [list[0].id]: {
             receipts_total: data.receipts_total,
             expenses_total: data.expenses_total,
+            balance: list[0].balance ?? data.balance ?? null,
           },
         });
         return;
@@ -859,11 +887,13 @@ const CashRegisterList = () => {
             next[r.id] = {
               receipts_total: ops?.receipts_total ?? "0.00",
               expenses_total: ops?.expenses_total ?? "0.00",
+              balance: r.balance ?? ops?.balance ?? null,
             };
           } catch {
             next[r.id] = {
               receipts_total: "0.00",
               expenses_total: "0.00",
+              balance: r.balance ?? null,
             };
           }
         }),
@@ -901,7 +931,11 @@ const CashRegisterList = () => {
     [rows, company?.id],
   );
 
+  // Синхронный замок: повторные клики «Сохранить» не должны создавать дубли касс
+  const creatingRegisterRef = useRef(false);
+
   const onCreate = async () => {
+    if (creatingRegisterRef.current) return;
     if (hasOwnRegister) {
       alert("Разрешена только одна касса.", true);
       setCreateOpen(false);
@@ -913,6 +947,7 @@ const CashRegisterList = () => {
       alert("Введите название кассы");
       return;
     }
+    creatingRegisterRef.current = true;
     try {
       await warehouseAPI.createCashRegister({
         name: title,
@@ -925,6 +960,8 @@ const CashRegisterList = () => {
     } catch (e) {
       console.error(e);
       alert(e?.detail || e?.message || "Не удалось создать кассу", true);
+    } finally {
+      creatingRegisterRef.current = false;
     }
   };
 
@@ -1040,13 +1077,14 @@ const CashRegisterList = () => {
                     <th>Расположение</th>
                     <th>Приход</th>
                     <th>Расход</th>
+                    <th>Остаток</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="kassa-table__loading">
+                      <td colSpan={7} className="kassa-table__loading">
                         Загрузка…
                       </td>
                     </tr>
@@ -1075,6 +1113,17 @@ const CashRegisterList = () => {
                           <td>{r.location || "—"}</td>
                           <td>{totals ? money(totals.receipts_total) : "—"}</td>
                           <td>{totals ? money(totals.expenses_total) : "—"}</td>
+                          <td
+                            className={
+                              getRegisterBalance(r, totals) < 0
+                                ? "warehouse-kassa__balance--negative"
+                                : undefined
+                            }
+                          >
+                            {getRegisterBalance(r, totals) == null
+                              ? "—"
+                              : money(getRegisterBalance(r, totals))}
+                          </td>
                           <td>
                             <button
                               className="kassa__btn kassa__btn--secondary"
@@ -1091,7 +1140,7 @@ const CashRegisterList = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="kassa-table__empty">
+                      <td colSpan={7} className="kassa-table__empty">
                         Нет касс
                       </td>
                     </tr>
@@ -1289,8 +1338,14 @@ const CashRegisterDetail = () => {
     ],
   );
 
+  // Счётчик для принудительного перезапроса журнала (после создания документа)
+  const [docsReloadKey, setDocsReloadKey] = useState(0);
+
   useEffect(() => {
-    if (!id) return;
+    if (!id) return undefined;
+    // Ответы на устаревшие запросы игнорируем: при смене вкладки/фильтра на странице > 1
+    // уходят два запроса, и медленный ответ старой страницы затирал таблицу.
+    let cancelled = false;
     const params = {
       cash_register: id,
       page_size: PAGE_SIZE,
@@ -1324,6 +1379,7 @@ const CashRegisterDetail = () => {
     warehouseAPI
       .listMoneyDocuments(params)
       .then((data) => {
+        if (cancelled) return;
         const items = asArray(data);
         setDocs(items);
         setDocsCount(
@@ -1331,14 +1387,19 @@ const CashRegisterDetail = () => {
         );
       })
       .catch(() => {
+        if (cancelled) return;
         setDocs([]);
         setDocsCount(0);
         setDocsError("Не удалось загрузить операции");
       })
       .finally(() => {
-        setDocsLoading(false);
+        if (!cancelled) setDocsLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [
+    docsReloadKey,
     id,
     activeTab,
     agentFilterId,
@@ -1368,6 +1429,7 @@ const CashRegisterDetail = () => {
   const toItem = Math.min(currentPage * PAGE_SIZE, docsCount);
 
   const openReceiptModal = () => {
+    moneyDraftRef.current = null;
     setForm({
       counterparty: "",
       payment_category: "",
@@ -1378,6 +1440,7 @@ const CashRegisterDetail = () => {
     setShowReceiptModal(true);
   };
   const openExpenseModal = () => {
+    moneyDraftRef.current = null;
     setForm({
       counterparty: "",
       payment_category: "",
@@ -1387,6 +1450,9 @@ const CashRegisterDetail = () => {
     setCreateError("");
     setShowExpenseModal(true);
   };
+
+  // Созданный, но ещё не проведённый документ: { key: данные формы, id }
+  const moneyDraftRef = useRef(null);
 
   const submitMoneyDoc = async (docType) => {
     const amountNum = Number(String(form.amount || "").replace(",", "."));
@@ -1409,13 +1475,25 @@ const CashRegisterDetail = () => {
         amount: amountNum,
         comment: (form.comment || "").trim(),
       };
-      const created = await warehouseAPI.createMoneyDocument(payload);
+      // Если черновик уже создан, а проведение упало, повтор с теми же данными только
+      // проводит его — иначе каждый повтор плодил бы новый документ.
+      const draftKey = JSON.stringify(payload);
+      let created =
+        moneyDraftRef.current?.key === draftKey
+          ? { id: moneyDraftRef.current.id }
+          : null;
+      if (!created) {
+        created = await warehouseAPI.createMoneyDocument(payload);
+        if (created?.id) moneyDraftRef.current = { key: draftKey, id: created.id };
+      }
       if (createAsPosted && created?.id) {
         await warehouseAPI.postMoneyDocument(created.id);
       }
+      moneyDraftRef.current = null;
       setShowReceiptModal(false);
       setShowExpenseModal(false);
       load();
+      setDocsReloadKey((k) => k + 1);
     } catch (err) {
       setCreateError(
         err?.detail ||

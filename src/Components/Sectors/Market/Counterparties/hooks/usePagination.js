@@ -68,12 +68,13 @@ export const usePagination = (count, next, previous) => {
     [totalPages]
   );
 
-  // Сброс на первую страницу
+  // Сброс на первую страницу. Функция должна быть стабильной (без зависимости от currentPage):
+  // её передают в зависимости эффектов «сбросить при смене фильтра», и при смене страницы
+  // эффект срабатывал бы снова и сразу откатывал любую страницу на первую.
+  // setCurrentPage(1) при уже первой странице — no-op.
   const resetToFirstPage = useCallback(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [currentPage]);
+    setCurrentPage(1);
+  }, []);
 
   return {
     currentPage,

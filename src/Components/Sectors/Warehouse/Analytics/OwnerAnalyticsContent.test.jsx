@@ -92,10 +92,13 @@ const kpiByLabel = (label) =>
 describe("OwnerAnalyticsContent", () => {
   afterEach(cleanup);
 
-  it("старый ответ: продажи подписаны как агентские, остаток — у агентов, склада нет", () => {
+  it("старый ответ: продажи без разбивки — нейтральная подпись, остаток — у агентов, склада нет", () => {
     render(<OwnerAnalyticsContent data={OLD_RESPONSE} />);
 
-    expect(screen.getByText("Сумма продаж агентов")).toBeInTheDocument();
+    expect(kpiByLabel("Количество продаж")).toBeInTheDocument();
+    expect(kpiByLabel("Сумма продаж")).toBeInTheDocument();
+    expect(screen.queryByText(/продаж агентов/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Из них агент/)).not.toBeInTheDocument();
     expect(within(kpiByLabel("У агентов на руках, шт")).getByText("8")).toBeInTheDocument();
     expect(screen.queryByText("На складах, шт")).not.toBeInTheDocument();
     expect(screen.queryByText("Итоги за период")).not.toBeInTheDocument();
@@ -134,6 +137,9 @@ describe("OwnerAnalyticsContent", () => {
     expect(screen.getByText("Итоги за период")).toBeInTheDocument();
     expect(screen.getByText("Валовая прибыль")).toBeInTheDocument();
     expect(screen.getByText("Маржа 41,7%")).toBeInTheDocument();
+    expect(within(kpiByLabel("Валовая маржа")).getByText("41,7%")).toBeInTheDocument();
+    expect(within(kpiByLabel("Себестоимость")).getByText("700 сом")).toBeInTheDocument();
+    expect(within(kpiByLabel("На складах, сом")).getByText("9 000 сом")).toBeInTheDocument();
     expect(screen.getAllByText(/Себестоимость части продаж оценочная/).length).toBeGreaterThan(0);
 
     expect(screen.getByText("55%")).toBeInTheDocument();
@@ -141,6 +147,51 @@ describe("OwnerAnalyticsContent", () => {
     for (const title of ["Закупки", "Движение товара", "Зарплата агентов", "Прибыль по товарам"]) {
       expect(screen.getByRole("button", { name: new RegExp(title) })).toBeInTheDocument();
     }
+  });
+
+  it("B10: две продажи без агента — «Количество продаж 2», из них агентами 0", () => {
+    render(
+      <OwnerAnalyticsContent
+        data={{
+          summary: {
+            sales_count: 2,
+            sales_amount: "750.00",
+            agent_sales_count: 0,
+            agent_sales_amount: "0.00",
+            own_sales_count: 2,
+            own_sales_amount: "750.00",
+          },
+          top_agents: { by_sales: [] },
+        }}
+      />,
+    );
+    const countKpi = kpiByLabel("Количество продаж");
+    expect(within(countKpi).getByText("2")).toBeInTheDocument();
+    expect(within(countKpi).getByText("Из них агентами: 0")).toBeInTheDocument();
+    expect(within(kpiByLabel("Сумма продаж")).getByText("Из них агенты: 0 сом")).toBeInTheDocument();
+    expect(screen.queryByText(/продаж агентов/)).not.toBeInTheDocument();
+  });
+
+  it("B17: один агент двумя строками — одна строка в «Топ агентов»", () => {
+    render(
+      <OwnerAnalyticsContent
+        data={{
+          summary: { sales_count: 4, sales_amount: "1000.00", agent_sales_count: 4, agent_sales_amount: "1000.00" },
+          top_agents: {
+            total_sales_amount: "1000.00",
+            by_sales: [
+              { agent_id: "k", agent_name: "Кубанычбек", sales_count: 2, sales_amount: "510.00", share_percent: "51.00" },
+              { agent_id: "k", agent_name: "Кубанычбек", sales_count: 1, sales_amount: "150.00", share_percent: "15.00" },
+              { agent_id: "b", agent_name: "Бакыт", sales_count: 1, sales_amount: "340.00", share_percent: "34.00" },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Кубанычбек")).toHaveLength(1);
+    expect(screen.getByText("66%")).toBeInTheDocument();
+    expect(screen.queryByText("51%")).not.toBeInTheDocument();
+    expect(screen.queryByText("15%")).not.toBeInTheDocument();
   });
 
   it("агент: закупки, прибыль и зарплата не показываются", () => {

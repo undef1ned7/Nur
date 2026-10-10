@@ -265,3 +265,89 @@ export const mergeCounterpartyPeriodAnalytics = (fullPayload, periodPayload) => 
   return mergedResults;
 };
 
+
+/**
+ * Есть ли у контрагента долг (в любую сторону) на конец периода (QA B18).
+ * Бэк игнорирует `only_unpaid` и отдаёт всех — поэтому «Только с долгом»
+ * фильтруем на клиенте по тем же цифрам, что видны в ведомости
+ * (сальдо на конец ≠ 0). Если analytics.debts нет — по debt_remaining / balance.
+ */
+export const counterpartyHasDebt = (counterparty) => {
+  const debts = counterparty?.analytics?.debts;
+  if (debts && typeof debts === "object") {
+    const view = getCounterpartyAnalyticsView(counterparty);
+    return view.closingDebit > 0 || view.closingCredit > 0;
+  }
+  const fallback = pickFirstDefined(
+    counterparty?.debt_remaining,
+    counterparty?.debt,
+    counterparty?.balance,
+  );
+  return roundMoney(toNumber(fallback)) !== 0;
+};
+
+const DEBT_CATEGORY_KEYS = new Set([
+  "debt",
+  "debts",
+  "debt_payment",
+  "debt_repayment",
+  "debt_return",
+]);
+
+const categoryTitle = (c) => String(c?.title ?? c?.name ?? "").trim();
+
+/**
+ * Категория «Погашение долга» / «Долги» для формы «Оплатить долг» (QA B14).
+ * Порядок: system_key / code / key → название «погашение долга» → любое
+ * название с «долг». Не нашли — null: категорию выбирает пользователь
+ * (раньше подставлялась первая по алфавиту — «Аренда»).
+ * @returns {Object|null}
+ */
+export const findDebtPaymentCategory = (categories) => {
+  const list = Array.isArray(categories) ? categories : [];
+  const byKey = list.find((c) =>
+    [c?.system_key, c?.code, c?.key, c?.slug].some((k) =>
+      DEBT_CATEGORY_KEYS.has(String(k ?? "").trim().toLowerCase()),
+    ),
+  );
+  if (byKey) return byKey;
+  const byExactTitle = list.find((c) =>
+    /погашени[ея]\s+долг/i.test(categoryTitle(c)),
+  );
+  if (byExactTitle) return byExactTitle;
+  return list.find((c) => /долг/i.test(categoryTitle(c))) || null;
+};
+
+/**
+ * Переплата долга (QA B15): сколько сумма оплаты больше текущего долга.
+ * 0 — переплаты нет или долга нет (тогда это обычный аванс/возврат).
+ */
+export const getDebtOverpayment = (amount, debtBalance) => {
+  const debt = Math.abs(toNumber(debtBalance));
+  if (debt <= 0) return 0;
+  const over = roundMoney(toNumber(amount) - debt);
+  return over > 0 ? over : 0;
+};
+
+/**
+ * Кредитные документы контрагента (QA B19): товарные документы из
+ * debt_operations, которые изменили долг (продажа/закуп в долг). Денежные
+ * документы (оплаты, предоплаты) и возвраты сюда не входят.
+ * «Ожидается» — текущий остаток долга, а не сумма документов: продажа 300
+ * с предоплатой 100 → 1 документ, ожидается 200.
+ * @param {Array} debtOperations — operations.debt_operations из API 5.3
+ * @param {number} debtBalance — сальдо: > 0 контрагент должен, < 0 должны мы
+ */
+export const getCreditDocumentsSummary = (debtOperations, debtBalance) => {
+  const list = Array.isArray(debtOperations) ? debtOperations : [];
+  const count = list.filter((row) => {
+    if (!row || row.source === "money") return false;
+    if (/^MONEY_/i.test(String(row.doc_type ?? ""))) return false;
+    const kind = String(
+      row.doc_type ?? row.document?.doc_type ?? row.number ?? "",
+    );
+    if (/RETURN/i.test(kind)) return false;
+    return roundMoney(toNumber(row.debt_delta)) !== 0;
+  }).length;
+  return { count, expected: Math.abs(roundMoney(toNumber(debtBalance))) };
+};

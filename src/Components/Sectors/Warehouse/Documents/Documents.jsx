@@ -37,6 +37,7 @@ import {
   cashRejectWarehouseDocument,
   getWarehouseDocumentById,
   createSaleFromAgentCartAsync,
+  fetchWarehouses,
 } from "../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
@@ -62,6 +63,11 @@ import { numberToWords } from "../../../../utils/numberToWords";
 import { buildArchiveInvoiceXml } from "../../../../utils/archiveInvoiceXml";
 import { prepareItemsWithImages } from "./utils/prepareItemsWithImages";
 import { formatWholesaleModeLabel } from "../utils/wholesalePricing";
+import {
+  formatDocumentDateTime,
+  formatDocumentNumber,
+  formatTransferRoute,
+} from "./utils/documentDisplay";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
@@ -90,18 +96,13 @@ const resolveTabFromParam = (tab, docType) => {
   return tab;
 };
 
+const EMPTY_DOCUMENT_POST_MESSAGE =
+  "Нельзя провести документ без строк. Откройте черновик и добавьте хотя бы один товар.";
+
 /** Проведение/отмена проведения на складе недоступны для КП (POST …/post/ вернёт 400). */
 const documentAllowsWarehousePosting = (doc) =>
   doc?.doc_type !== "COMMERCIAL_OFFER";
 
-/** Дата/время в списке документов: 02.04.2026:00:35:20 */
-const formatDocumentDateTime = (value) => {
-  if (value == null || value === "") return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
 
 /** Подпись payment_kind для таблицы складских документов */
 const formatWarehousePaymentKindLabel = (kind) => {
@@ -200,15 +201,21 @@ const Documents = () => {
   const [receiptPaymentKindFilter, setReceiptPaymentKindFilter] =
     usePersistedState("warehouse:documents:receiptPaymentKindFilter", "");
 
-  // Debounce для поиска
+  // Debounce для поиска. Страницу сбрасываем, только когда поиск реально
+  // изменился: при монтировании searchTerm уже равен debounced-значению, и
+  // безусловный setCurrentPage(1) откатывал ссылку «…?page=2» и «Вперед»,
+  // нажатый в первые 300 мс, на первую страницу.
+  const debouncedSearchRef = useRef(searchTerm);
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
+    if (debouncedSearchRef.current === searchTerm) return undefined;
 
     debounceTimerRef.current = setTimeout(() => {
+      debouncedSearchRef.current = searchTerm;
       setDebouncedSearchTerm(searchTerm);
-      setCurrentPage(1); // Сбрасываем на первую страницу при изменении поиска
+      setCurrentPage(1);
     }, 300);
 
     return () => {
@@ -277,10 +284,6 @@ const Documents = () => {
     };
   }, [activeTab, agentSalesCarts]);
 
-  const getDocumentNumber = (index, prefix = "ЧЕК") => {
-    const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
-    return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
-  };
 
   // Сумма документа: если total не пришёл (черновик), считаем по позициям
   const getDocumentAmount = (doc) => {
@@ -394,20 +397,42 @@ const Documents = () => {
     });
   }, [documents, agentFilterId]);
 
+  // B22: справочник складов — для «откуда → куда», если бэк не отдал *_name
+  const [warehouses, setWarehouses] = useState([]);
+  useEffect(() => {
+    if (docType && docType !== "TRANSFER") return;
+    let cancelled = false;
+    dispatch(fetchWarehouses()).then((result) => {
+      if (cancelled || !fetchWarehouses.fulfilled.match(result)) return;
+      const list =
+        result.payload?.results ||
+        (Array.isArray(result.payload) ? result.payload : []);
+      setWarehouses(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, docType]);
+
+  const counterpartyColumnTitle =
+    docType === "TRANSFER" ? "Откуда → куда" : "Контрагент";
+
   // Маппинг данных из Redux в формат для отображения
   const receiptsData = useMemo(() => {
     if (activeTab !== "receipts") return [];
-    return (filteredDocuments || []).map((doc, index) => {
+    return (filteredDocuments || []).map((doc) => {
       const resolvedStatus = resolveDocumentStatus(doc);
       return {
         id: doc.id,
-        number: doc.number || getDocumentNumber(index, "ЧЕК"),
+        number: formatDocumentNumber(doc),
         date: formatDocumentDateTime(doc.date || doc.created_at),
         client:
-          doc.counterparty?.name ||
-          doc.counterparty_display_name ||
-          doc.counterparty ||
-          "Без клиента",
+          doc.doc_type === "TRANSFER"
+            ? formatTransferRoute(doc, warehouses)
+            : doc.counterparty?.name ||
+              doc.counterparty_display_name ||
+              doc.counterparty ||
+              "Без клиента",
         products: doc.items?.length || 0,
         amount: getDocumentAmount(doc),
         discount_percent: doc.discount_percent ?? null,
@@ -424,21 +449,23 @@ const Documents = () => {
           (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
       };
     });
-  }, [filteredDocuments, activeTab, currentPage]);
+  }, [filteredDocuments, activeTab, warehouses]);
 
   const invoicesData = useMemo(() => {
     if (activeTab !== "invoices" && activeTab !== "esf_xml") return [];
-    return (filteredDocuments || []).map((doc, index) => {
+    return (filteredDocuments || []).map((doc) => {
       const resolvedStatus = resolveDocumentStatus(doc);
       return {
         id: doc.id,
-        number: doc.number || getDocumentNumber(index, "НАКЛ"),
+        number: formatDocumentNumber(doc),
         date: formatDocumentDateTime(doc.date || doc.created_at),
         counterparty:
-          doc.counterparty?.name ||
-          doc.counterparty_display_name ||
-          doc.counterparty ||
-          "Без контрагента",
+          doc.doc_type === "TRANSFER"
+            ? formatTransferRoute(doc, warehouses)
+            : doc.counterparty?.name ||
+              doc.counterparty_display_name ||
+              doc.counterparty ||
+              "Без контрагента",
         positions: doc.items?.length || 0,
         amount: getDocumentAmount(doc),
         discount_percent: doc.discount_percent ?? null,
@@ -454,21 +481,23 @@ const Documents = () => {
           (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
       };
     });
-  }, [filteredDocuments, activeTab, currentPage]);
+  }, [filteredDocuments, activeTab, warehouses]);
 
   const ko1Data = useMemo(() => {
     if (activeTab !== "ko1") return [];
-    return (filteredDocuments || []).map((doc, index) => {
+    return (filteredDocuments || []).map((doc) => {
       const resolvedStatus = resolveDocumentStatus(doc);
       return {
         id: doc.id,
-        number: doc.number || getDocumentNumber(index, "ПКО"),
+        number: formatDocumentNumber(doc),
         date: formatDocumentDateTime(doc.date || doc.created_at),
         counterparty:
-          doc.counterparty?.name ||
-          doc.counterparty_display_name ||
-          doc.counterparty ||
-          "Без контрагента",
+          doc.doc_type === "TRANSFER"
+            ? formatTransferRoute(doc, warehouses)
+            : doc.counterparty?.name ||
+              doc.counterparty_display_name ||
+              doc.counterparty ||
+              "Без контрагента",
         positions: doc.items?.length || 0,
         amount: getDocumentAmount(doc),
         discount_percent: doc.discount_percent ?? null,
@@ -484,7 +513,7 @@ const Documents = () => {
           (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
       };
     });
-  }, [filteredDocuments, activeTab, currentPage]);
+  }, [filteredDocuments, activeTab, warehouses]);
 
   // Обновление URL при изменении страницы и активного таба (без поиска)
   useEffect(() => {
@@ -753,6 +782,12 @@ const Documents = () => {
   // Проведение документа (options.onSuccess — для обновления UI продаж по заявкам)
   const handlePost = async (item, options) => {
     if (!item?.id) return;
+    // B42: документ без строк проводить нельзя (бэк тоже вернёт 400 document_empty)
+    const docItems = item.document?.items;
+    if (Array.isArray(docItems) && docItems.length === 0) {
+      alert(EMPTY_DOCUMENT_POST_MESSAGE, true);
+      return;
+    }
     confirm(`Провести документ ${item.number}?`, async (ok) => {
       if (!ok) return;
       try {
@@ -765,6 +800,13 @@ const Documents = () => {
           options?.onSuccess?.();
         } else {
           const error = result.payload || result.error;
+          if (
+            error?.code === "document_empty" ||
+            error?.error === "document_empty"
+          ) {
+            alert(EMPTY_DOCUMENT_POST_MESSAGE, true);
+            return;
+          }
           const errorMessage =
             error?.detail ||
             error?.message ||
@@ -1549,7 +1591,7 @@ const Documents = () => {
                     <>
                       <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата и время</th>
-                      <th>Контрагент</th>
+                      <th>{counterpartyColumnTitle}</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
                       {docType === "RECEIPT" && <th>Оплата</th>}
@@ -1564,7 +1606,7 @@ const Documents = () => {
                     <>
                       <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата</th>
-                      <th>Контрагент</th>
+                      <th>{counterpartyColumnTitle}</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
                       <th className="documents__cell--num">Позиций</th>
@@ -1578,7 +1620,7 @@ const Documents = () => {
                     <>
                       <th className="documents__cell--sticky-left">Номер</th>
                       <th>Дата</th>
-                      <th>Контрагент</th>
+                      <th>{counterpartyColumnTitle}</th>
                       {docType === "SALE" && <th>Агент</th>}
                       {docType === "SALE" && <th>Цены</th>}
                       <th className="documents__cell--num">Позиций</th>
@@ -1966,7 +2008,7 @@ const Documents = () => {
                     const docStatusType = getStatusType(resolvedDocStatus);
                     const agentItem = {
                       id: doc.id,
-                      number: doc.number || "",
+                      number: formatDocumentNumber(doc),
                       rawStatus: resolvedDocStatus,
                       document: doc,
                     };
@@ -1987,7 +2029,7 @@ const Documents = () => {
                         <td>
                           {Array.isArray(doc.items) ? doc.items.length : "—"}
                         </td>
-                        <td>{doc.number || "—"}</td>
+                        <td>{formatDocumentNumber(doc)}</td>
                         <td>Заявка на продажу</td>
                         <td>
                           <span
@@ -2064,7 +2106,11 @@ const Documents = () => {
                       <span className="documents__card-value">{item.date}</span>
                     </div>
                     <div className="documents__card-row">
-                      <span className="documents__card-label">Контрагент</span>
+                      <span className="documents__card-label">
+                        {item.document?.doc_type === "TRANSFER"
+                          ? "Откуда → куда"
+                          : "Контрагент"}
+                      </span>
                       <span className="documents__card-value">
                         {activeTab === "receipts"
                           ? item.client
@@ -2276,7 +2322,7 @@ const Documents = () => {
                 const docStatusType = getStatusType(resolvedDocStatus);
                 const agentItem = {
                   id: doc.id,
-                  number: doc.number || "",
+                  number: formatDocumentNumber(doc),
                   rawStatus: resolvedDocStatus,
                   document: doc,
                 };
@@ -2293,7 +2339,7 @@ const Documents = () => {
                             : "documents__status"
                         }
                       >
-                        {doc.number || "—"}
+                        {formatDocumentNumber(doc)}
                       </span>
                     </div>
                     <div className="documents__card-body">

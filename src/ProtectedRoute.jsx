@@ -29,7 +29,10 @@ const ProtectedRoute = ({ children }) => {
     alert,
   ]);
 
-  if (companyLoading) {
+  // Лоадер только при первичной загрузке. Повторный getCompany (например,
+  // после смены/обновления токена) не должен размонтировать страницу —
+  // иначе сбрасываются введённые в форму данные (QA B27).
+  if (companyLoading && !company) {
     return <div>Загрузка...</div>;
   }
 

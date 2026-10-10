@@ -45,6 +45,7 @@ import { getAgentMeAnalytics, getOwnerAgentAnalytics } from "../../../../api/war
 import { useUser } from "../../../../store/slices/userSlice";
 import { isStartPlan } from "../../../../utils/subscriptionPlan";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
+import { formatNum } from "./warehouseAnalyticsShared";
 import "./Analytics.scss";
 
 const PERIODS = [
@@ -53,15 +54,6 @@ const PERIODS = [
   { value: "month", label: "Месяц" },
   { value: "custom", label: "Период" },
 ];
-
-const formatNum = (v) => {
-  const n = Number(v);
-  if (v == null || Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  }).format(n);
-};
 
 const formatMoney = (v) => `${formatNum(v)} сом`;
 

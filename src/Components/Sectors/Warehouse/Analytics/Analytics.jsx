@@ -11,6 +11,7 @@ import {
 import OwnerAnalyticsContent from "./OwnerAnalyticsContent";
 import { PERIODS } from "./warehouseAnalyticsShared";
 import { useAnalyticsPeriod } from "./useAnalyticsPeriod";
+import { useLatestRequest } from "./useLatestRequest";
 import "./Analytics.scss";
 
 const WarehouseAnalytics = () => {
@@ -36,8 +37,10 @@ const WarehouseAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const { begin, isLatest } = useLatestRequest();
 
   const load = useCallback(async () => {
+    const token = begin();
     setLoading(true);
     setError("");
     const params = periodParams();
@@ -50,15 +53,17 @@ const WarehouseAnalytics = () => {
       } else {
         result = await getAgentMeAnalytics(params);
       }
+      if (!isLatest(token)) return;
       setData(result);
     } catch (e) {
+      if (!isLatest(token)) return;
       console.error(e);
       setError(e?.detail || e?.message || "Не удалось загрузить аналитику");
       setData(null);
     } finally {
-      setLoading(false);
+      if (isLatest(token)) setLoading(false);
     }
-  }, [isOwnerOrAdmin, periodParams, agentId]);
+  }, [isOwnerOrAdmin, periodParams, agentId, begin, isLatest]);
 
   useEffect(() => {
     load();
@@ -91,6 +96,11 @@ const WarehouseAnalytics = () => {
             <RefreshCw size={18} />
             Обновить
           </button>
+          {loading && data && (
+            <span className="warehouse-analytics__refreshing" role="status">
+              Загрузка…
+            </span>
+          )}
           <div
             className="warehouse-analytics__seg"
             role="tablist"
@@ -137,10 +147,15 @@ const WarehouseAnalytics = () => {
 
       {error && <div className="warehouse-analytics__error">{error}</div>}
 
-      {loading ? (
+      {/* При перезагрузке старые данные остаются на экране (приглушённо):
+          размонтирование и повторный монтаж всех графиков вешали слабые ПК. */}
+      {loading && !data ? (
         <div className="warehouse-analytics__loading">Загрузка…</div>
       ) : data ? (
-        <>
+        <div
+          className={`warehouse-analytics__content${loading ? " is-refreshing" : ""}`}
+          aria-busy={loading}
+        >
           <OwnerAnalyticsContent
             data={data}
             showAgentSalesAnalytics={showAgentSalesAnalytics}
@@ -161,7 +176,7 @@ const WarehouseAnalytics = () => {
                 </div>
               </div>
             )}
-        </>
+        </div>
       ) : null}
     </div>
   );

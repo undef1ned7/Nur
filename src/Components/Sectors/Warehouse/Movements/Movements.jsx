@@ -8,6 +8,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import warehouseAPI from "../../../../api/warehouse";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
+import {
+  documentStatusLabel,
+} from "../utils/warehouseLabels";
 import "./Movements.scss";
 
 const PAGE_SIZE = 15;
@@ -21,8 +24,8 @@ const fmtDate = (v) => {
   }
 };
 
-const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+// Статусы по-русски: CASH_PENDING → «Ожидает кассы» и т.д. (QA B40)
+const statusLabel = (s) => documentStatusLabel(s);
 
 const WarehouseMovements = () => {
   const navigate = useNavigate();

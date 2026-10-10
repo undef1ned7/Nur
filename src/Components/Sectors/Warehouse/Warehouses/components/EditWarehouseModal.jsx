@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X } from "lucide-react";
 import "../Warehouses.scss";
+import { parseDrfErrors } from "../../utils/drfErrors";
 import { updateWarehouseAsync } from "../../../../../store/creators/warehouseCreators";
 
 /**
@@ -15,23 +16,10 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
     location: warehouse?.address || warehouse?.location || "",
   });
   const [error, setError] = useState("");
+  // Ошибки по полям: клиентская валидация + ответ сервера DRF {field: [msg]}
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const updating = useSelector((state) => state.warehouse.updating || false);
-  const updateError = useSelector((state) => state.warehouse.updateError);
-
-  useEffect(() => {
-    if (updateError) {
-      setError(
-        updateError?.detail ||
-          updateError?.message ||
-          (typeof updateError === "string"
-            ? updateError
-            : "Не удалось обновить склад"),
-      );
-    } else {
-      setError("");
-    }
-  }, [updateError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -40,17 +28,50 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
       [name]: value,
     }));
     if (error) setError("");
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = "Название склада обязательно";
+    if (!formData.location.trim()) errors.location = "Адрес склада обязателен";
+    return errors;
+  };
+
+  const applyServerError = (err) => {
+    const { fieldErrors: serverFieldErrors, message } = parseDrfErrors(err, [
+      "name",
+      "location",
+      "address",
+    ]);
+    if (serverFieldErrors.address && !serverFieldErrors.location) {
+      serverFieldErrors.location = serverFieldErrors.address;
+    }
+    delete serverFieldErrors.address;
+    setFieldErrors(serverFieldErrors);
+    const hasFieldErrors = Object.keys(serverFieldErrors).length > 0;
+    setError(
+      message ||
+        (hasFieldErrors
+          ? "Проверьте выделенные поля"
+          : "Не удалось обновить склад"),
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
-      setError("Название склада обязательно");
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("");
       return;
     }
 
     setError("");
+    setFieldErrors({});
 
     try {
       await dispatch(
@@ -63,8 +84,8 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
         }),
       ).unwrap();
       onClose();
-    } catch {
-      // Ошибка уже обработана через Redux и отразится в updateError
+    } catch (err) {
+      applyServerError(err);
     }
   };
 
@@ -85,7 +106,7 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="warehouse-filter-modal__content">
             {error && (
               <div
@@ -114,11 +135,20 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
                 onChange={handleChange}
                 required
                 disabled={updating}
+                aria-invalid={!!fieldErrors.name}
+                style={
+                  fieldErrors.name ? { borderColor: "#ef4444" } : undefined
+                }
               />
+              {fieldErrors.name && (
+                <p style={{ color: "#c33", fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             <div className="warehouse-filter-modal__section">
-              <label className="warehouse-filter-modal__label">Адрес</label>
+              <label className="warehouse-filter-modal__label">Адрес *</label>
               <input
                 type="text"
                 name="location"
@@ -126,8 +156,18 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
                 placeholder="Введите адрес склада"
                 value={formData.location}
                 onChange={handleChange}
+                required
                 disabled={updating}
+                aria-invalid={!!fieldErrors.location}
+                style={
+                  fieldErrors.location ? { borderColor: "#ef4444" } : undefined
+                }
               />
+              {fieldErrors.location && (
+                <p style={{ color: "#c33", fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.location}
+                </p>
+              )}
             </div>
           </div>
 
@@ -155,4 +195,3 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
 };
 
 export default EditWarehouseModal;
-

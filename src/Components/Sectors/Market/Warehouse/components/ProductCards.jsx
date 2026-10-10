@@ -13,6 +13,21 @@ import "./ProductCards.scss";
 /**
  * Мемоизированный компонент карточки товара
  */
+// Поля, от которых зависит вид строки: перезапрос с теми же id, но новой ценой/остатком должен обновить DOM.
+const PRODUCT_VIEW_KEYS = [
+  "id",
+  "name",
+  "code",
+  "article",
+  "unit",
+  "price",
+  "discount_percent",
+  "quantity",
+  "kind",
+];
+const sameProduct = (a, b) =>
+  a === b || Boolean(a && b && PRODUCT_VIEW_KEYS.every((k) => a[k] === b[k]));
+
 const ProductCard = React.memo(
   ({
     product,
@@ -124,7 +139,7 @@ const ProductCard = React.memo(
   },
   (prevProps, nextProps) => {
     return (
-      prevProps.product.id === nextProps.product.id &&
+      sameProduct(prevProps.product, nextProps.product) &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.rowNumber === nextProps.rowNumber &&
       prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url &&
@@ -243,13 +258,7 @@ const areEqual = (prevProps, nextProps) => {
     return true;
   }
 
-  if (prevProps.products.length > 0 && nextProps.products.length > 0) {
-    if (prevProps.products[0]?.id !== nextProps.products[0]?.id) {
-      return false;
-    }
-  }
-
-  return true;
+  return prevProps.products.every((p, i) => sameProduct(p, nextProps.products[i]));
 };
 
 export default React.memo(ProductCards, areEqual);

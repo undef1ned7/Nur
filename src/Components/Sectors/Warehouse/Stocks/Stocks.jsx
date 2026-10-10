@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { Check, Folder, FolderOpen, Plus, Trash2, X, Grip } from "lucide-react";
@@ -229,6 +235,21 @@ const Stocks = () => {
     setSelectedRows,
   } = useProductSelection(sortedProducts);
 
+  // Выбранные товары относятся к текущей выдаче: при смене поиска, фильтров или группы выбор сбрасываем,
+  // иначе «Удалить выбранные» и «Переместить» действуют на строки, которых пользователь уже не видит.
+  const selectionScopeKey = JSON.stringify({
+    f: filters,
+    g: selectedGroupId,
+    s: debouncedSearchTerm?.trim() || "",
+  });
+  const prevSelectionScopeRef = useRef(selectionScopeKey);
+  useEffect(() => {
+    if (prevSelectionScopeRef.current !== selectionScopeKey) {
+      prevSelectionScopeRef.current = selectionScopeKey;
+      clearSelection();
+    }
+  }, [selectionScopeKey, clearSelection]);
+
   // Сохранение режима просмотра
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -423,7 +444,27 @@ const Stocks = () => {
           setGroupsError(null);
           try {
             await api.delete(`/warehouse/${warehouseId}/groups/${groupId}/`);
-            setGroups(groups.filter((g) => g.id !== groupId));
+            // Вместе с группой исчезают её подгруппы (иначе они остаются «сиротами» в состоянии).
+            const removed = new Set([String(groupId)]);
+            let grew = true;
+            while (grew) {
+              grew = false;
+              for (const g of groups) {
+                if (
+                  g?.parent != null &&
+                  removed.has(String(g.parent)) &&
+                  !removed.has(String(g.id))
+                ) {
+                  removed.add(String(g.id));
+                  grew = true;
+                }
+              }
+            }
+            setGroups(groups.filter((g) => !removed.has(String(g?.id))));
+            // Если открыта удалённая группа — возвращаемся к «Все товары», иначе фильтр остаётся в URL.
+            if (selectedGroupId !== "all" && removed.has(String(selectedGroupId))) {
+              setProductGroupFilter("all");
+            }
           } catch (e) {
             console.error("Ошибка при удалении группы:", e);
             const errorMessage = validateResErrors(
@@ -436,7 +477,14 @@ const Stocks = () => {
         true,
       );
     },
-    [warehouseId, selectedGroupId, resetToFirstPage, loadGroups, groups],
+    [
+      warehouseId,
+      selectedGroupId,
+      setProductGroupFilter,
+      resetToFirstPage,
+      loadGroups,
+      groups,
+    ],
   );
 
   const refreshProducts = useCallback(() => {
@@ -455,11 +503,12 @@ const Stocks = () => {
           ),
         );
         clearSelection();
+        setMoveTargetGroupId("");
         await loadGroups(); // обновим products_count
         refreshProducts();
       } catch (e) {
         console.error("Ошибка при переносе товара в группу:", e);
-        alert("Не удалось переместить товар в группу.");
+        alert("Не удалось переместить товар в группу.", true);
       }
     },
     [clearSelection, loadGroups, refreshProducts],
@@ -871,6 +920,7 @@ const Stocks = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             count={count}
+            countLabel="товаров"
             loading={loading}
             hasNextPage={hasNextPage}
             hasPrevPage={hasPrevPage}

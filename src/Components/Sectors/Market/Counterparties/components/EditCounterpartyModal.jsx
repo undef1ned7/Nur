@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X } from "lucide-react";
 import { useUser } from "../../../../../store/slices/userSlice";
@@ -9,8 +9,13 @@ import CounterpartyBankAccountsFields from "./CounterpartyBankAccountsFields";
 import {
   bankAccountsFromCounterparty,
   buildBankAccountsPayload,
-  validateBankAccounts,
 } from "../counterpartyBankAccounts";
+import {
+  INLINE_ERROR_FIELDS,
+  parseCounterpartyApiError,
+  scrollToFormError,
+  validateCounterpartyForm,
+} from "../counterpartyFormValidation";
 import "../Counterparties.scss";
 
 const isAgentRole = (profile) =>
@@ -45,6 +50,9 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
 
   const [error, setError] = useState("");
   const [localError, setLocalError] = useState("");
+  // Ошибки у конкретных полей (B25): показываем под полем и прокручиваем к нему
+  const [fieldErrors, setFieldErrors] = useState({});
+  const formRef = useRef(null);
 
   const updating =
     useSelector((state) => state.counterparty.updating) || false;
@@ -58,15 +66,19 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
 
   useEffect(() => {
     if (updateError) {
-      setError(
-        updateError?.detail ||
-          updateError?.message ||
-          (typeof updateError === "string"
-            ? updateError
-            : "Не удалось обновить контрагента"),
+      const parsed = parseCounterpartyApiError(
+        updateError,
+        "Не удалось обновить контрагента",
+      );
+      setError(parsed.message);
+      setFieldErrors(parsed.fieldErrors);
+      scrollToFormError(
+        formRef.current,
+        parsed.message ? null : Object.keys(parsed.fieldErrors)[0],
       );
     } else {
       setError("");
+      setFieldErrors({});
     }
   }, [updateError]);
 
@@ -91,42 +103,23 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
       setError("");
       setLocalError("");
     }
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      setLocalError("Название контрагента обязательно");
-      return false;
-    }
-
-    if (formData.name.trim().length < 1) {
-      setLocalError("Название должно содержать хотя бы 1 символ");
-      return false;
-    }
-
-    if (formData.name.trim().length > 255) {
-      setLocalError("Название не должно превышать 255 символов");
-      return false;
-    }
-
-    if (!formData.type) {
-      setLocalError("Тип контрагента обязателен");
-      return false;
-    }
-
-    const phoneTrim = (formData.phone || "").trim();
-    if (phoneTrim && !/^\+?\d[\d\s\-()]{5,}$/.test(phoneTrim)) {
-      setLocalError("Неверный формат телефона");
-      return false;
-    }
-
-    const bankErr = validateBankAccounts(bankAccounts);
-    if (bankErr) {
-      setLocalError(bankErr);
-      return false;
-    }
-
-    return true;
+    const invalid = validateCounterpartyForm(formData, bankAccounts);
+    if (!invalid) return true;
+    const isInputField = INLINE_ERROR_FIELDS.includes(invalid.field);
+    setLocalError(isInputField ? "" : invalid.message);
+    setFieldErrors(isInputField ? { [invalid.field]: invalid.message } : {});
+    scrollToFormError(formRef.current, isInputField ? invalid.field : null);
+    return false;
   };
 
   const handleSubmit = async (e) => {
@@ -139,6 +132,7 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
 
     setError("");
     setLocalError("");
+    setFieldErrors({});
 
     try {
       const phoneTrim = (formData.phone || "").trim();
@@ -196,10 +190,12 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} onSubmit={handleSubmit} noValidate>
           <div className="warehouse-filter-modal__content">
             {(error || localError) && (
               <div
+                data-form-error
+                role="alert"
                 style={{
                   padding: "12px",
                   background: "#fee",
@@ -219,6 +215,7 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
               <input
                 type="text"
                 name="name"
+                aria-invalid={Boolean(fieldErrors.name)}
                 className="warehouse-filter-modal__select"
                 placeholder="Введите название контрагента"
                 value={formData.name}
@@ -228,6 +225,11 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
                 maxLength={255}
                 disabled={updating}
               />
+              {fieldErrors.name && (
+                <div className="counterparty-form__field-error" role="alert">
+                  {fieldErrors.name}
+                </div>
+              )}
             </div>
 
             <div className="warehouse-filter-modal__section">
@@ -237,6 +239,7 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
               <input
                 type="tel"
                 name="phone"
+                aria-invalid={Boolean(fieldErrors.phone)}
                 className="warehouse-filter-modal__select"
                 placeholder="Введите номер телефона (необязательно)"
                 value={formData.phone}
@@ -244,6 +247,11 @@ const EditCounterpartyModal = ({ counterparty, onClose }) => {
                 disabled={updating}
                 autoComplete="tel"
               />
+              {fieldErrors.phone && (
+                <div className="counterparty-form__field-error" role="alert">
+                  {fieldErrors.phone}
+                </div>
+              )}
             </div>
 
             <div className="warehouse-filter-modal__section">

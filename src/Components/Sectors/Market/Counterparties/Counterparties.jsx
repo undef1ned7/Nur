@@ -27,12 +27,25 @@ import {
   filterCounterpartiesByTypeTab,
 } from "./constants";
 import {
+  counterpartyHasDebt,
   getAgentDisplay,
   getCounterpartiesLedgerTotals,
 } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import CounterpartyBalanceBar from "./components/CounterpartyBalanceBar";
 import { usePersistedState } from "../../../../hooks/usePersistedState";
+
+/**
+ * Ключ агента контрагента: API отдаёт agent то uuid-строкой, то объектом
+ * ({ id, name }). Объекты раньше попадали в Set по ссылке — один агент
+ * повторялся в фильтре столько раз, сколько у него контрагентов (QA B17).
+ */
+const getAgentKey = (counterparty) => {
+  const agent = counterparty?.agent;
+  if (!agent) return "";
+  if (typeof agent === "object") return String(agent.id ?? agent.uuid ?? "");
+  return String(agent);
+};
 
 /** Показывать колонку «Агент» для владельца и админа */
 const showAgentColumn = (profile) =>
@@ -154,10 +167,12 @@ const Counterparties = () => {
   const { counterparties: rawCounterparties, loading } =
     useCounterpartyData(requestParams);
 
-  const counterparties = useMemo(
-    () => filterCounterpartiesByTypeTab(rawCounterparties, typeTab),
-    [rawCounterparties, typeTab],
-  );
+  // «Только с долгом» (QA B18): бэк не поддерживает only_unpaid и отдаёт всех,
+  // поэтому дофильтровываем на клиенте — сальдо на конец периода ≠ 0.
+  const counterparties = useMemo(() => {
+    const byTab = filterCounterpartiesByTypeTab(rawCounterparties, typeTab);
+    return onlyUnpaid ? byTab.filter(counterpartyHasDebt) : byTab;
+  }, [rawCounterparties, typeTab, onlyUnpaid]);
 
   // Список уникальных агентов вкладки (агент фильтруется на фронте, поэтому выбор
   // агента не сужает список опций)
@@ -169,8 +184,8 @@ const Counterparties = () => {
       { value: "__no_agent__", label: "Без агента" },
     ];
     counterparties.forEach((c) => {
-      const key = c?.agent ?? "__no_agent__";
-      if (key !== "__no_agent__" && !seen.has(key)) {
+      const key = getAgentKey(c);
+      if (key && !seen.has(key)) {
         seen.add(key);
         options.push({ value: key, label: getAgentDisplay(c) });
       }
@@ -193,9 +208,9 @@ const Counterparties = () => {
   const filteredCounterparties = useMemo(() => {
     if (!agentFilter) return counterparties;
     if (agentFilter === "__no_agent__") {
-      return counterparties.filter((c) => !c?.agent);
+      return counterparties.filter((c) => !getAgentKey(c));
     }
-    return counterparties.filter((c) => c?.agent === agentFilter);
+    return counterparties.filter((c) => getAgentKey(c) === agentFilter);
   }, [counterparties, agentFilter]);
 
   // Итоги ведомости по всем контрагентам вкладки/агента (не только по странице).
@@ -238,14 +253,40 @@ const Counterparties = () => {
     return filteredCounterparties.slice(start, start + PAGE_SIZE);
   }, [filteredCounterparties, currentPage]);
 
-  // Сброс на первую страницу при изменении поиска или вкладки типа
+  // Сброс на первую страницу — только при РЕАЛЬНОЙ смене поиска, вкладки типа, периода или
+  // «Только с долгом»: сравниваем с предыдущими значениями, иначе эффект при монтировании
+  // стирает страницу из ссылки (?page=2).
+  const prevFiltersRef = useRef({
+    debouncedSearchTerm,
+    typeTab,
+    from: period.from,
+    to: period.to,
+    onlyUnpaid,
+  });
   useEffect(() => {
-    resetToFirstPage();
-  }, [debouncedSearchTerm, resetToFirstPage]);
-
-  useEffect(() => {
-    resetToFirstPage();
-  }, [typeTab]);
+    const prev = prevFiltersRef.current;
+    const changed =
+      prev.debouncedSearchTerm !== debouncedSearchTerm ||
+      prev.typeTab !== typeTab ||
+      prev.from !== period.from ||
+      prev.to !== period.to ||
+      prev.onlyUnpaid !== onlyUnpaid;
+    prevFiltersRef.current = {
+      debouncedSearchTerm,
+      typeTab,
+      from: period.from,
+      to: period.to,
+      onlyUnpaid,
+    };
+    if (changed) resetToFirstPage();
+  }, [
+    debouncedSearchTerm,
+    typeTab,
+    period.from,
+    period.to,
+    onlyUnpaid,
+    resetToFirstPage,
+  ]);
 
   // Сброс фильтра по агенту при реальной смене вкладки типа — сравниваем с предыдущим
   // значением (а не флагом «уже монтировались»), иначе под React.StrictMode двойной
@@ -258,10 +299,6 @@ const Counterparties = () => {
     }
     prevTypeTabRef.current = typeTab;
   }, [typeTab, setAgentFilter, setAgentFilterLabel]);
-
-  useEffect(() => {
-    resetToFirstPage();
-  }, [period.from, period.to, onlyUnpaid, resetToFirstPage]);
 
   // Сохранение режима просмотра
   useEffect(() => {
@@ -276,6 +313,21 @@ const Counterparties = () => {
       navigate(`/crm/warehouse/counterparties/${counterparty.id}`);
     },
     [navigate],
+  );
+
+  // Новый контрагент ещё без долга, и «Только с долгом» (включён по умолчанию) скрыл бы его —
+  // пользователю казалось бы, что сохранение не сработало. Снимаем фильтр и открываем
+  // вкладку его типа, чтобы запись сразу была видна.
+  const handleCounterpartyCreated = useCallback(
+    (created) => {
+      if (onlyUnpaid) setOnlyUnpaid(false);
+      if (created?.type === "SUPPLIER" && typeTab !== "supplier") {
+        setTypeTab("supplier");
+      } else if (created?.type === "CLIENT" && typeTab !== "client") {
+        setTypeTab("client");
+      }
+    },
+    [onlyUnpaid, setOnlyUnpaid, typeTab, setTypeTab],
   );
 
   const handlePageChange = useCallback(
@@ -458,7 +510,10 @@ const Counterparties = () => {
 
       {showCreateModal && (
         <ReactPortal wrapperId="create_counter_modal">
-          <CreateCounterpartyModal onClose={() => setShowCreateModal(false)} />
+          <CreateCounterpartyModal
+            onClose={() => setShowCreateModal(false)}
+            onCreated={handleCounterpartyCreated}
+          />
         </ReactPortal>
       )}
     </div>

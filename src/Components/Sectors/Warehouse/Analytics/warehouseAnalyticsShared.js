@@ -7,13 +7,17 @@ export const PERIODS = [
   { value: "custom", label: "Период" },
 ];
 
+// Один экземпляр на модуль: конструктор Intl.NumberFormat дорогой, а formatNum
+// вызывается на каждую ячейку (тысячи раз на большой аналитике).
+const NUM_FORMAT = new Intl.NumberFormat("ru-RU", {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+});
+
 export const formatNum = (v) => {
   const n = Number(v);
   if (v == null || Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  }).format(n);
+  return NUM_FORMAT.format(n);
 };
 
 export const formatShortDate = (s) => {

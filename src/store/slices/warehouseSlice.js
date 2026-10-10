@@ -167,18 +167,18 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseBrandsAsync.fulfilled, (state, action) => {
         state.brandsLoading = false;
-        const results = Array.isArray(action.payload.results)
-          ? action.payload.results
+        const results = Array.isArray(action.payload?.results)
+          ? action.payload?.results
           : Array.isArray(action.payload)
           ? action.payload
           : [];
         state.brands = results;
         state.brandsCount =
-          typeof action.payload.count === "number"
-            ? action.payload.count
+          typeof action.payload?.count === "number"
+            ? action.payload?.count
             : results.length;
-        state.brandsNext = action.payload.next ?? null;
-        state.brandsPrevious = action.payload.previous ?? null;
+        state.brandsNext = action.payload?.next ?? null;
+        state.brandsPrevious = action.payload?.previous ?? null;
       })
       .addCase(fetchWarehouseBrandsAsync.rejected, (state, action) => {
         state.brandsLoading = false;
@@ -250,18 +250,18 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseCategoriesAsync.fulfilled, (state, action) => {
         state.categoriesLoading = false;
-        const results = Array.isArray(action.payload.results)
-          ? action.payload.results
+        const results = Array.isArray(action.payload?.results)
+          ? action.payload?.results
           : Array.isArray(action.payload)
           ? action.payload
           : [];
         state.categories = results;
         state.categoriesCount =
-          typeof action.payload.count === "number"
-            ? action.payload.count
+          typeof action.payload?.count === "number"
+            ? action.payload?.count
             : results.length;
-        state.categoriesNext = action.payload.next ?? null;
-        state.categoriesPrevious = action.payload.previous ?? null;
+        state.categoriesNext = action.payload?.next ?? null;
+        state.categoriesPrevious = action.payload?.previous ?? null;
       })
       .addCase(fetchWarehouseCategoriesAsync.rejected, (state, action) => {
         state.categoriesLoading = false;
@@ -343,14 +343,14 @@ const warehouseSlice = createSlice({
       .addCase(fetchAgentProductsAsync.fulfilled, (state, action) => {
         state.agentProductsLoading = false;
         const results = Array.isArray(action.payload?.results)
-          ? action.payload.results
+          ? action.payload?.results
           : Array.isArray(action.payload)
             ? action.payload
             : [];
         state.agentProducts = results;
         state.agentProductsCount =
           typeof action.payload?.count === "number"
-            ? action.payload.count
+            ? action.payload?.count
             : results.length;
         state.agentProductsNext = action.payload?.next ?? null;
         state.agentProductsPrevious = action.payload?.previous ?? null;

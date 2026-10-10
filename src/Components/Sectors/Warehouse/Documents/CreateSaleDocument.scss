@@ -7,12 +7,19 @@ $due-red: #dc2626;
 
 .create-sale-document {
   height: 100vh;
+  // B28: корень не должен быть шире родителя; clip (а не hidden) — чтобы фокус по Tab
+  // не прокручивал «скрытое» содержимое вбок и кнопка «Сохранить» не уезжала
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
+  overflow: clip;
   background: #f5f6fa;
 
   &__container {
     display: flex;
     height: 100%;
+    min-width: 0;
 
     &--loading {
       align-items: center;
@@ -653,6 +660,7 @@ $due-red: #dc2626;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    overflow: clip;
     background: #fff;
   }
 
@@ -673,6 +681,7 @@ $due-red: #dc2626;
     align-items: flex-start;
     gap: 10px;
     min-width: 0;
+    flex: 1 1 240px;
   }
 
   &__back-btn {
@@ -784,9 +793,15 @@ $due-red: #dc2626;
     gap: 8px;
     transition: background 0.2s, border-color 0.2s;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: #f5d03d;
       border-color: #d4b83d;
+    }
+
+    // Идёт сохранение — повторный клик заблокирован
+    &:disabled {
+      opacity: 0.6;
+      cursor: progress;
     }
   }
 
@@ -920,7 +935,9 @@ $due-red: #dc2626;
 
   &__content {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
+    overflow-x: hidden; // горизонтальный скролл — только у таблицы строк
     padding: 24px;
   }
 
@@ -939,8 +956,8 @@ $due-red: #dc2626;
   }
 
   &__field {
-    flex: 1;
-    min-width: 200px;
+    flex: 1 1 200px;
+    min-width: 0;
 
     label {
       display: block;
@@ -1420,7 +1437,7 @@ $due-red: #dc2626;
 
   &__content-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
     gap: 24px;
     align-items: start;
   }
@@ -1525,6 +1542,14 @@ $due-red: #dc2626;
       outline: none;
       border-color: $primary-dark;
     }
+  }
+
+  &__qty-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: $due-red;
+    white-space: nowrap;
   }
 
   &__price-input {
