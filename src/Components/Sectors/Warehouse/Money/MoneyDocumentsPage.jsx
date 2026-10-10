@@ -21,6 +21,15 @@ import {
   STORAGE_KEY,
 } from "../../Market/Warehouse/constants";
 import "../../Market/Warehouse/Warehouse.scss";
+import {
+  documentStatusLabel,
+  formatDateTime,
+  formatSom,
+} from "../utils/warehouseLabels";
+import {
+  dateInputToLocalDateTime,
+  toLocalISODate,
+} from "../utils/localDate";
 import "./MoneyDocumentsPage.scss";
 
 const DOC_TYPE_FROM_PARAM = {
@@ -28,9 +37,8 @@ const DOC_TYPE_FROM_PARAM = {
   expense: "MONEY_EXPENSE",
 };
 
-const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
-  " с";
+// Единая валюта «сом» (QA B41)
+const fmtMoney = (v) => formatSom(v);
 
 const getApiErrorMessage = (err, fallback) =>
   err?.message ||
@@ -59,25 +67,13 @@ const formatKo1Date = (value) => {
   return date.toISOString().split("T")[0];
 };
 
-/** 02.04.2026:00:35:20 */
-const fmtDate = (v) => {
-  if (v == null || v === "") return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
+// Дата «18.09.2026 17:10» и статусы по-русски (QA B40, B41)
+const fmtDate = (v) => formatDateTime(v);
 
-const statusLabel = (s) =>
-  s === "POSTED"
-    ? "Проведён"
-    : s === "DRAFT"
-      ? "Черновик"
-      : s === "REJECTED"
-        ? "Отказан"
-        : (s ?? "—");
+const statusLabel = (s) => documentStatusLabel(s);
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+// Локальная дата: toISOString() в Бишкеке до 06:00 давал вчерашний день
+const todayStr = () => toLocalISODate();
 
 const getCounterpartyAgentId = (cp) => {
   const a = cp?.agent;
@@ -468,8 +464,12 @@ const MoneyDocumentsPage = () => {
         payment_category,
         amount: amountNum,
         comment: form.comment?.trim() || "",
-        // Дата операции (редактируемая). Бэкенд должен принимать `date`; см. доку.
-        ...(form.date && { date: form.date }),
+        // Дата операции (редактируемая). При создании — с текущим временем и
+        // часовым поясом, иначе бэк ставит 00:00 (QA B32). При редактировании
+        // шлём как есть, чтобы не перезаписать исходное время документа.
+        ...(form.date && {
+          date: editingId ? form.date : dateInputToLocalDateTime(form.date),
+        }),
       };
       if (editingId) {
         await warehouseAPI.patchMoneyDocument(editingId, payload);

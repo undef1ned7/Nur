@@ -12,6 +12,21 @@ import "./ProductTable.scss";
 /**
  * Мемоизированный компонент строки таблицы
  */
+// Поля, от которых зависит вид строки: перезапрос с теми же id, но новой ценой/остатком должен обновить DOM.
+const PRODUCT_VIEW_KEYS = [
+  "id",
+  "name",
+  "code",
+  "article",
+  "unit",
+  "price",
+  "discount_percent",
+  "quantity",
+  "kind",
+];
+const sameProduct = (a, b) =>
+  a === b || Boolean(a && b && PRODUCT_VIEW_KEYS.every((k) => a[k] === b[k]));
+
 const ProductRow = React.memo(
   ({
     product,
@@ -91,7 +106,7 @@ const ProductRow = React.memo(
   (prevProps, nextProps) => {
     // Кастомное сравнение для оптимизации ререндеров
     return (
-      prevProps.product.id === nextProps.product.id &&
+      sameProduct(prevProps.product, nextProps.product) &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.rowNumber === nextProps.rowNumber &&
       prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url &&
@@ -234,17 +249,9 @@ const areEqual = (prevProps, nextProps) => {
     return true;
   }
 
-  // При смене страницы данные всегда должны обновляться
-  // Проверяем только первые элементы - если они разные, значит это новая страница
-  if (prevProps.products.length > 0 && nextProps.products.length > 0) {
-    if (prevProps.products[0]?.id !== nextProps.products[0]?.id) {
-      return false; // Разные данные - нужно обновить
-    }
-  }
-
-  // Если первые элементы совпадают и длина совпадает, считаем что данные не изменились
-  // Это оптимизация для случая, когда меняется только selectedRows или другие пропсы
-  return true;
+  // Сравниваем каждый товар по полям, влияющим на вид: перезапрос с теми же id, но новыми ценой/остатком
+  // (и смена страницы с теми же первыми элементами) обязан обновить DOM.
+  return prevProps.products.every((p, i) => sameProduct(p, nextProps.products[i]));
 };
 
 export default React.memo(ProductTable, areEqual);

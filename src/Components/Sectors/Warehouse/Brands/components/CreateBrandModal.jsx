@@ -3,9 +3,12 @@ import { useDispatch } from "react-redux";
 import { X } from "lucide-react";
 import {
   createWarehouseBrandAsync,
+  deleteWarehouseBrandAsync,
   updateWarehouseBrandAsync,
 } from "../../../../../store/creators/warehouseCreators";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import { useConfirm } from "../../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 import "./CreateBrandModal.scss";
 
 const CreateBrandModal = ({ onClose, brand, onSaved }) => {
@@ -16,6 +19,8 @@ const CreateBrandModal = ({ onClose, brand, onSaved }) => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [alertType, setAlertType] = useState("success");
+  const [deleting, setDeleting] = useState(false);
+  const confirm = useConfirm();
 
   useEffect(() => {
     if (brand) {
@@ -69,6 +74,37 @@ const CreateBrandModal = ({ onClose, brand, onSaved }) => {
     }
   };
 
+  // Удаление бренда (только в режиме редактирования) — с подтверждением (QA B39)
+  const handleDelete = () => {
+    if (!brand?.id || deleting) return;
+    confirm(
+      `Удалить бренд «${brand.name || ""}»? Действие нельзя отменить.`,
+      async (ok) => {
+        if (!ok) return;
+        setDeleting(true);
+        setError("");
+        try {
+          await dispatch(deleteWarehouseBrandAsync(brand.id)).unwrap();
+          onSaved();
+          onClose();
+        } catch (err) {
+          const message = validateResErrors(
+            err,
+            "Не удалось удалить бренд. Возможно, он используется в товарах.",
+          );
+          setError(message);
+          setAlertMessage(message);
+          setAlertType("error");
+          setShowAlert(true);
+        } finally {
+          setDeleting(false);
+        }
+      },
+    );
+  };
+
+  const busy = loading || deleting;
+
   return (
     <>
       <div className="create-brand-modal-overlay" onClick={onClose} />
@@ -98,24 +134,35 @@ const CreateBrandModal = ({ onClose, brand, onSaved }) => {
               onChange={(e) => setName(e.target.value)}
               placeholder="Введите название бренда"
               required
-              disabled={loading}
+              disabled={busy}
             />
             {error && <p className="create-brand-modal__error">{error}</p>}
           </div>
 
           <div className="create-brand-modal__actions">
+            {brand?.id && (
+              <button
+                type="button"
+                className="create-brand-modal__cancel"
+                onClick={handleDelete}
+                disabled={busy}
+                style={{ color: "#b42318", marginRight: "auto" }}
+              >
+                {deleting ? "Удаление..." : "Удалить"}
+              </button>
+            )}
             <button
               type="button"
               className="create-brand-modal__cancel"
               onClick={onClose}
-              disabled={loading}
+              disabled={busy}
             >
               Отмена
             </button>
             <button
               type="submit"
               className="create-brand-modal__submit"
-              disabled={loading}
+              disabled={busy}
             >
               {loading ? "Сохранение..." : brand ? "Сохранить" : "Создать"}
             </button>

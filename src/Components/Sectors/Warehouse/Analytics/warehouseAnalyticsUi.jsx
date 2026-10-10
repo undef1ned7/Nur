@@ -1,6 +1,25 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
+/**
+ * Номера страниц с «окном» вокруг текущей: 1 … 4 5 6 … 500.
+ * Раньше рисовались все кнопки подряд, и при сотнях страниц левая часть
+ * списка уезжала за край блока — до первых страниц было не добраться.
+ */
+export const buildPageList = (cur, total, siblings = 1) => {
+  if (total <= 5 + siblings * 2) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const start = Math.max(2, cur - siblings);
+  const end = Math.min(total - 1, cur + siblings);
+  const list = [1];
+  if (start > 2) list.push("gap-start");
+  for (let p = start; p <= end; p += 1) list.push(p);
+  if (end < total - 1) list.push("gap-end");
+  list.push(total);
+  return list;
+};
+
 export const PaginatedTable = ({
   head,
   rows,
@@ -68,8 +87,14 @@ export const PaginatedTable = ({
       {rows.length > pageSize && (
         <div className="warehouse-analytics__pager" aria-label="Пагинация">
           <ul className="warehouse-analytics__pageList">
-            {Array.from({ length: total }).map((_, i) => {
-              const p = i + 1;
+            {buildPageList(cur, total).map((p) => {
+              if (typeof p !== "number") {
+                return (
+                  <li key={p} className="warehouse-analytics__pageGap" aria-hidden="true">
+                    …
+                  </li>
+                );
+              }
               return (
                 <li key={p}>
                   <button

@@ -28,12 +28,15 @@ const firstNum = (obj, keys) => {
   return null;
 };
 
+// 0 и "0" — это значение (hasValue отсекает только отсутствие поля, null и "").
 const anyValue = (obj, keys) => keys.some((key) => hasValue(obj, key));
 
 /**
  * Продажи.
- * Старый бэкенд: `sales_*` — только продажи агентов (нетто).
- * Новый: `sales_*` — все продажи (POSTED + CASH_PENDING), отдельно `agent_sales_*`, `own_sales_*`.
+ * Новый бэкенд: `sales_*` — все продажи (POSTED + CASH_PENDING), отдельно `agent_sales_*`, `own_sales_*`.
+ * Без `agent_sales_*` разбивки нет: неизвестно, сколько из продаж агентские
+ * (в т.ч. это могут быть продажи без агента — QA B10), поэтому `agentCount`/`agentAmount` = `null`,
+ * а общие продажи за агентские не выдаются.
  */
 export const buildSalesSummary = (summary = {}) => {
   const hasSplit = anyValue(summary, ["agent_sales_amount", "agent_sales_count"]);
@@ -46,8 +49,8 @@ export const buildSalesSummary = (summary = {}) => {
     grossAmount: numOrNull(summary, "gross_sales_amount"),
     returnsCount: toNum(summary.returns_count),
     returnsAmount: toNum(summary.returns_amount),
-    agentCount: hasSplit ? toNum(summary.agent_sales_count) : count,
-    agentAmount: hasSplit ? toNum(summary.agent_sales_amount) : amount,
+    agentCount: hasSplit ? toNum(summary.agent_sales_count) : null,
+    agentAmount: hasSplit ? toNum(summary.agent_sales_amount) : null,
     ownCount: numOrNull(summary, "own_sales_count"),
     ownAmount: numOrNull(summary, "own_sales_amount"),
     pendingCashCount: numOrNull(summary, "pending_cash_sales_count"),
@@ -62,10 +65,12 @@ export const buildSalesSummary = (summary = {}) => {
  */
 export const buildOnHand = (src = {}) => {
   const warehouseQty = numOrNull(src, "warehouse_on_hand_qty");
+  const warehouseAmount = numOrNull(src, "warehouse_on_hand_amount");
   return {
-    hasWarehouse: warehouseQty != null,
+    // Стоимость склада показываем, даже если бэкенд прислал только сумму (B12)
+    hasWarehouse: warehouseQty != null || warehouseAmount != null,
     warehouseQty,
-    warehouseAmount: numOrNull(src, "warehouse_on_hand_amount"),
+    warehouseAmount,
     warehousePurchaseAmount: firstNum(src, [
       "warehouse_on_hand_purchase_amount",
       "on_hand_purchase_amount",
@@ -75,35 +80,86 @@ export const buildOnHand = (src = {}) => {
   };
 };
 
+const normalizeName = (v) =>
+  String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
 /**
  * Топ агентов по продажам с долей от ВСЕХ продаж агентов.
  * Раньше доля считалась от суммы первых 10 строк — при 11+ агентах завышалась.
+ *
+ * Строки одного агента склеиваются (QA B17: бэкенд отдавал одного агента двумя строками):
+ * ключ — `agent_id`, без id — нормализованное имя. Сумма и число документов складываются,
+ * доля пересчитывается от общего знаменателя (`share_percent` бэкенда тогда складывается,
+ * если он есть у всех склеенных строк).
  */
 export const buildTopAgentsBySales = (topAgents = {}, summary = {}) => {
-  const rows = Array.isArray(topAgents?.by_sales) ? topAgents.by_sales : [];
-  const rowsTotal = rows.reduce(
-    (acc, a) => acc + toNum(a.sales_amount ?? a.amount),
-    0,
-  );
+  const rawRows = Array.isArray(topAgents?.by_sales) ? topAgents.by_sales : [];
+
+  const groups = new Map();
+  const nameToKey = new Map();
+  rawRows.forEach((a, index) => {
+    const id = a.agent_id ?? a.id ?? null;
+    const name = a.agent_name || a.name || a.agent_display || "";
+    const normName = normalizeName(name);
+    let key;
+    if (id != null && id !== "") {
+      key = `id:${id}`;
+    } else if (normName) {
+      // Строка без id — к агенту с тем же именем (если он уже есть с id)
+      key = nameToKey.get(normName) ?? `name:${normName}`;
+    } else {
+      key = `row:${index}`;
+    }
+    if (normName && !nameToKey.has(normName)) nameToKey.set(normName, key);
+
+    const amount = toNum(a.sales_amount ?? a.amount);
+    const docsCount = toNum(a.sales_count ?? a.count);
+    const share = numOrNull(a, "share_percent");
+    const prev = groups.get(key);
+    if (prev) {
+      prev.amount += amount;
+      prev.docsCount += docsCount;
+      prev.backendShare =
+        prev.backendShare != null && share != null ? prev.backendShare + share : null;
+      prev.merged += 1;
+    } else {
+      groups.set(key, {
+        id,
+        name: name || id || "—",
+        amount,
+        docsCount,
+        backendShare: share,
+        merged: 1,
+      });
+    }
+  });
+
+  const rows = Array.from(groups.values());
+  const rowsTotal = rows.reduce((acc, a) => acc + a.amount, 0);
   // Знаменатель: total из бэкенда → продажи агентов из summary →
   // (старый бэкенд) gross_sales_amount = все продажи агентов до возвратов → сумма строк.
   const denominator =
     firstNum(topAgents, ["total_sales_amount"]) ??
     firstNum(summary, ["agent_sales_amount", "gross_sales_amount", "sales_amount"]) ??
     rowsTotal;
+  const calcShare = (amount) => (denominator > 0 ? (amount / denominator) * 100 : null);
 
-  return rows.map((a) => {
-    const amount = toNum(a.sales_amount ?? a.amount);
-    const backendShare = numOrNull(a, "share_percent");
-    return {
-      id: a.agent_id ?? a.id ?? null,
-      name: a.agent_name || a.name || a.agent_display || a.agent_id || a.id || "—",
+  return rows
+    .map(({ id, name, amount, docsCount, backendShare, merged }) => ({
+      id,
+      name,
       amount,
-      docsCount: toNum(a.sales_count ?? a.count),
+      docsCount,
+      // После склейки доля бэкенда устарела, если её не было у какой-то из строк
       sharePercent:
-        backendShare ?? (denominator > 0 ? (amount / denominator) * 100 : null),
-    };
-  });
+        merged > 1
+          ? calcShare(amount) ?? backendShare
+          : backendShare ?? calcShare(amount),
+    }))
+    .sort((a, b) => b.amount - a.amount);
 };
 
 export const PAYMENT_KIND_LABELS = {
@@ -133,6 +189,7 @@ export const buildBusinessTotals = (summary = {}) => {
     "revenue_amount",
     "cogs_amount",
     "gross_profit_amount",
+    "gross_margin_percent",
     "operating_profit_amount",
     "writeoff_loss_amount",
   ];

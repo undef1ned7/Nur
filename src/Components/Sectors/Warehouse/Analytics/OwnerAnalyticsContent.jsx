@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   ArrowLeftRight,
   Check,
@@ -92,11 +93,10 @@ const OwnerAnalyticsContent = ({
 
   const customSalesLabels = salesCountLabel != null || salesAmountLabel != null;
   const showSplitHints = sales.hasSplit && !customSalesLabels;
-  const salesCountTitle =
-    salesCountLabel ??
-    (sales.hasSplit ? "Количество продаж" : "Количество продаж агентов");
-  const salesAmountTitle =
-    salesAmountLabel ?? (sales.hasSplit ? "Сумма продаж" : "Сумма продаж агентов");
+  // Без agent_sales_* бэкенд не говорит, чьи это продажи (там могут быть и продажи
+  // без агента — QA B10), поэтому подпись нейтральная, а не «продажи агентов».
+  const salesCountTitle = salesCountLabel ?? "Количество продаж";
+  const salesAmountTitle = salesAmountLabel ?? "Сумма продаж";
 
   const totalReceivedItems = byReceived.reduce(
     (acc, a) =>
@@ -242,6 +242,13 @@ const OwnerAnalyticsContent = ({
             totals.grossMarginPercent != null
               ? `Маржа ${percentOrDash(totals.grossMarginPercent)}`
               : "Выручка − себестоимость",
+          icon: TrendingUp,
+        },
+        totals.grossMarginPercent != null && {
+          key: "margin",
+          label: "Валовая маржа",
+          value: percentOrDash(totals.grossMarginPercent),
+          description: "Валовая прибыль / выручка",
           icon: TrendingUp,
         },
         totals.netPurchasesAmount != null && {
@@ -431,12 +438,14 @@ const OwnerAnalyticsContent = ({
         )}
         {onHand.hasWarehouse && (
           <>
-            <KpiCard
-              label="На складах, шт"
-              value={formatNum(onHand.warehouseQty)}
-              description="Текущий остаток"
-              icon={Warehouse}
-            />
+            {onHand.warehouseQty != null && (
+              <KpiCard
+                label="На складах, шт"
+                value={formatNum(onHand.warehouseQty)}
+                description="Текущий остаток"
+                icon={Warehouse}
+              />
+            )}
             {onHand.warehouseAmount != null && (
               <KpiCard
                 label="На складах, сом"
@@ -1156,4 +1165,6 @@ const OwnerAnalyticsContent = ({
   );
 };
 
-export default OwnerAnalyticsContent;
+// memo: смена периода/филиала перерисовывает страницу, но пока данные те же,
+// тяжёлые графики и таблицы пересчитывать не нужно (CPU ×6: фриз ~2 с).
+export default memo(OwnerAnalyticsContent);

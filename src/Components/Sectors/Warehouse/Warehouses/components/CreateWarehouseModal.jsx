@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSelector } from "react-redux";
 import { X } from "lucide-react";
 import "../Warehouses.scss";
+import { parseDrfErrors } from "../../utils/drfErrors";
 
 /**
  * Модальное окно для создания склада
@@ -12,25 +13,11 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
     location: "",
   });
   const [error, setError] = useState("");
+  // Ошибки по полям: клиентская валидация + ответ сервера DRF {field: [msg]}
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Получаем состояние создания из Redux
   const creating = useSelector((state) => state.warehouse.creating || false);
-  const createError = useSelector((state) => state.warehouse.createError);
-
-  // Отслеживаем ошибки из Redux
-  useEffect(() => {
-    if (createError) {
-      setError(
-        createError?.detail ||
-          createError?.message ||
-          typeof createError === "string"
-          ? createError
-          : "Не удалось создать склад"
-      );
-    } else {
-      setError("");
-    }
-  }, [createError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,27 +26,64 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
       [name]: value,
     }));
     if (error) setError("");
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validate = () => {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = "Название склада обязательно";
+    if (!formData.location.trim()) errors.location = "Адрес склада обязателен";
+    return errors;
+  };
+
+  const applyServerError = (err) => {
+    const { fieldErrors: serverFieldErrors, message } = parseDrfErrors(err, [
+      "name",
+      "location",
+      "address",
+    ]);
+    if (serverFieldErrors.address && !serverFieldErrors.location) {
+      serverFieldErrors.location = serverFieldErrors.address;
+    }
+    delete serverFieldErrors.address;
+    setFieldErrors(serverFieldErrors);
+    const hasFieldErrors = Object.keys(serverFieldErrors).length > 0;
+    setError(
+      message ||
+        (hasFieldErrors
+          ? "Проверьте выделенные поля"
+          : "Не удалось создать склад"),
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
-      setError("Название склада обязательно");
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError("");
       return;
     }
 
     setError("");
+    setFieldErrors({});
 
     try {
-      await onCreate(formData);
+      await onCreate({
+        name: formData.name.trim(),
+        location: formData.location.trim(),
+      });
       // При успешном создании (unwrap() не выбросил ошибку) закрываем модальное окно
       onClose();
       setFormData({ name: "", location: "" });
       setError("");
+      setFieldErrors({});
     } catch (err) {
-      // Ошибка уже обработана через Redux и отображена через useEffect
       // Модальное окно остается открытым для исправления ошибки
+      applyServerError(err);
     }
   };
 
@@ -80,7 +104,7 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="warehouse-filter-modal__content">
             {error && (
               <div
@@ -109,11 +133,20 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
                 onChange={handleChange}
                 required
                 disabled={creating}
+                aria-invalid={!!fieldErrors.name}
+                style={
+                  fieldErrors.name ? { borderColor: "#ef4444" } : undefined
+                }
               />
+              {fieldErrors.name && (
+                <p style={{ color: "#c33", fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
             <div className="warehouse-filter-modal__section">
-              <label className="warehouse-filter-modal__label">Адрес</label>
+              <label className="warehouse-filter-modal__label">Адрес *</label>
               <input
                 type="text"
                 name="location"
@@ -121,8 +154,18 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
                 placeholder="Введите адрес склада"
                 value={formData.location}
                 onChange={handleChange}
+                required
                 disabled={creating}
+                aria-invalid={!!fieldErrors.location}
+                style={
+                  fieldErrors.location ? { borderColor: "#ef4444" } : undefined
+                }
               />
+              {fieldErrors.location && (
+                <p style={{ color: "#c33", fontSize: 12, marginTop: 4 }}>
+                  {fieldErrors.location}
+                </p>
+              )}
             </div>
           </div>
 

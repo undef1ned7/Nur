@@ -33,7 +33,12 @@ export const loginUserAsync = createAsyncThunk(
   async (formData, { rejectWithValue, dispatch }) => {
     try {
       const response = await loginUser(formData);
-      localStorage.setItem("userData", JSON.stringify(response));
+      // Токены храним только в ключах accessToken/refreshToken — в userData
+      // их не дублируем (B34). userData читают только ради id/имени/роли.
+      // eslint-disable-next-line no-unused-vars
+      const { access: _access, refresh: _refresh, ...userDataSafe } =
+        response || {};
+      localStorage.setItem("userData", JSON.stringify(userDataSafe));
       if (response.access) {
         localStorage.setItem("accessToken", response.access);
       }

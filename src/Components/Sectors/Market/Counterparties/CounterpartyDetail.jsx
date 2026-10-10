@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -15,7 +15,23 @@ import { useDispatch, useSelector } from "react-redux";
 import { getWarehouseCounterpartyById } from "../../../../store/creators/warehouseThunk";
 import { clearCurrentCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
-import { getAgentDisplay } from "./utils";
+import {
+  findDebtPaymentCategory,
+  getAgentDisplay,
+  getCreditDocumentsSummary,
+  getDebtOverpayment,
+} from "./utils";
+import {
+  documentStatusLabel,
+  documentTypeLabel,
+  formatDate,
+  formatDateTime,
+  formatSom,
+} from "../../Warehouse/utils/warehouseLabels";
+import {
+  dateInputToLocalDateTime,
+  toLocalISODate,
+} from "../../Warehouse/utils/localDate";
 import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import EditCounterpartyModal from "./components/EditCounterpartyModal";
 import CounterpartyLegalInfo from "./components/CounterpartyLegalInfo";
@@ -23,39 +39,17 @@ import { usePersistedState } from "../../../../hooks/usePersistedState";
 import "./CounterpartyDetail.scss";
 import "../../Warehouse/Money/MoneyDocumentsPage.scss";
 
-const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
-  " с";
-
-const fmtDate = (v) => {
-  if (!v) return "—";
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("ru-RU");
-};
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
-const fmtDateTime = (v) => {
-  if (!v) return "—";
-  const d = new Date(v);
-  return Number.isNaN(d.getTime())
-    ? v
-    : d.toLocaleString("ru-RU", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-};
+// Единая валюта «сом» и формат даты «18.09.2026 17:10» (QA B41)
+const fmtMoney = (v) => formatSom(v);
+const fmtDate = formatDate;
+const fmtDateTime = formatDateTime;
+// Локальная дата: toISOString() в Бишкеке до 06:00 давал вчерашний день
+const todayStr = () => toLocalISODate();
 
 const emptyPage = { count: 0, next: null, previous: null, results: [] };
 const toNumber = (v) => Number(v) || 0;
-const fmtRu2 = (v) =>
-  toNumber(v).toLocaleString("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+/** Сумма с копейками и валютой: «1 050,00 сом» */
+const fmtSom2 = (v) => formatSom(v, 2);
 
 /**
  * Страница контрагента: только денежные операции по контрагенту (API 5.3).
@@ -126,10 +120,11 @@ const CounterpartyDetail = () => {
     useState(false);
   const [reconciliationStart, setReconciliationStart] = useState(() => {
     const d = new Date();
-    return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
+    // Локальная дата: toISOString() в UTC+6 превращал 1 января в 31 декабря прошлого года
+    return toLocalISODate(new Date(d.getFullYear(), 0, 1));
   });
   const [reconciliationEnd, setReconciliationEnd] = useState(() =>
-    new Date().toISOString().slice(0, 10),
+    toLocalISODate(),
   );
   const [warehouses, setWarehouses] = useState([]);
   const [paymentCategories, setPaymentCategories] = useState([]);
@@ -145,6 +140,8 @@ const CounterpartyDetail = () => {
   });
   const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(true);
   const [payDebtSubmitting, setPayDebtSubmitting] = useState(false);
+  // Переплата долга (QA B15): пока не null — показываем предупреждение и ждём решения
+  const [payDebtOverpayment, setPayDebtOverpayment] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const [docTypeFilter, setDocTypeFilter] = usePersistedState(
@@ -287,8 +284,8 @@ const CounterpartyDetail = () => {
   const downloadReconciliationPdf = useCallback(async () => {
     if (!id) return;
     const startStr =
-      reconciliationStart || new Date().toISOString().slice(0, 10);
-    const endStr = reconciliationEnd || new Date().toISOString().slice(0, 10);
+      reconciliationStart || toLocalISODate();
+    const endStr = reconciliationEnd || toLocalISODate();
     setReconciliationPdfLoading(true);
     const params = {
       start: startStr,
@@ -384,7 +381,6 @@ const CounterpartyDetail = () => {
       return {
         balance: cashNet,
         transfers: cashReceived + cashPaid,
-        debtOperationsCount: Number(analytics?.sales?.pending_cash?.count) || 0,
         debtBalance: debtNet,
       };
     }
@@ -406,35 +402,48 @@ const CounterpartyDetail = () => {
     return {
       balance: sumReceipt - sumExpense,
       transfers: sumReceipt + sumExpense,
-      debtOperationsCount: debtOperationsList.length,
       debtBalance: debtDeltaSum,
     };
-  }, [sortedAllRows, debtOperationsList, operations?.analytics]);
+  }, [sortedAllRows, operations?.analytics]);
+
+  // Кредитные документы (QA B19): продажи/закупы в долг из debt_operations.
+  // Раньше брали sales.pending_cash — это продажи «Ожидает кассы», а не долг,
+  // поэтому выходило «0 кредитных документов · ожидается 0,00» при 2 долговых операциях.
+  const creditDocs = useMemo(
+    () => getCreditDocumentsSummary(debtOperationsList, summary.debtBalance),
+    [debtOperationsList, summary.debtBalance],
+  );
 
   const counterpartyAnalytics =
     operations?.analytics && typeof operations.analytics === "object"
       ? operations.analytics
       : null;
 
+  // Созданный, но ещё не проведённый документ оплаты долга: { key: данные формы, id }
+  const payDebtDraftRef = useRef(null);
+
   const openPayDebtModal = useCallback(() => {
+    payDebtDraftRef.current = null;
     const debtBalance = summary.debtBalance;
     const amount = Math.abs(debtBalance);
     const firstCash = cashRegisters[0]?.id ?? cashRegisters[0]?.uuid ?? "";
-    const firstCategory =
-      paymentCategories[0]?.id ?? paymentCategories[0]?.uuid ?? "";
+    // Категория «Погашение долга» (QA B14); не нашли — пусто, пользователь выбирает сам
+    const debtCategory = findDebtPaymentCategory(paymentCategories);
     setPayDebtForm({
       cash_register: firstCash,
-      payment_category: firstCategory,
+      payment_category: String(debtCategory?.id ?? debtCategory?.uuid ?? ""),
       amount: amount > 0 ? String(amount) : "",
       comment: "Погашение долга",
       date: todayStr(),
     });
     setPayDebtCreateAsPosted(true);
     setPayDebtError("");
+    setPayDebtOverpayment(null);
     setShowPayDebtModal(true);
   }, [summary.debtBalance, cashRegisters, paymentCategories]);
 
   const closePayDebtModal = useCallback(() => {
+    payDebtDraftRef.current = null;
     setShowPayDebtModal(false);
     setPayDebtForm({
       cash_register: "",
@@ -444,15 +453,19 @@ const CounterpartyDetail = () => {
       date: "",
     });
     setPayDebtError("");
+    setPayDebtOverpayment(null);
   }, []);
 
   const handlePayDebtFormChange = useCallback((field, value) => {
     setPayDebtForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "amount") setPayDebtOverpayment(null);
   }, []);
 
-  const handlePayDebtSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
+  /**
+   * @param {boolean} allowAdvance — пользователь подтвердил, что переплата идёт в аванс (B15)
+   */
+  const submitPayDebt = useCallback(
+    async (allowAdvance) => {
       if (!id) return;
       setPayDebtError("");
       const cash_register = payDebtForm.cash_register?.trim();
@@ -466,26 +479,55 @@ const CounterpartyDetail = () => {
         return;
       }
       const amountNum = Number(amountStr);
-      if (Number.isNaN(amountNum) || amountNum <= 0) {
+      // isFinite: Number("1e999999") === Infinity проходил проверку и уходил на сервер как null
+      if (!Number.isFinite(amountNum) || amountNum <= 0) {
         setPayDebtError("Укажите корректную сумму");
         return;
       }
       const debtBalance = summary.debtBalance;
+      // B15: сумма больше долга — сначала спрашиваем, провести ли остаток как аванс
+      const overpayment = getDebtOverpayment(amountNum, debtBalance);
+      if (overpayment > 0 && !allowAdvance) {
+        setPayDebtOverpayment(overpayment);
+        return;
+      }
+      setPayDebtOverpayment(null);
       const isReceipt = debtBalance > 0;
       setPayDebtSubmitting(true);
       try {
-        const created = await warehouseAPI.createMoneyDocument({
+        const docPayload = {
           doc_type: isReceipt ? "MONEY_RECEIPT" : "MONEY_EXPENSE",
           cash_register,
           counterparty: id,
           payment_category,
           amount: amountNum,
           comment: payDebtForm.comment?.trim() || "",
-          ...(payDebtForm.date && { date: payDebtForm.date }),
-        });
-        if (payDebtCreateAsPosted && created?.id) {
-          await warehouseAPI.postMoneyDocument(created.id);
+          ...(overpayment > 0 && { allow_advance: true }),
+        };
+        // Если черновик уже создан, а проведение упало, повторная отправка с теми же данными
+        // только проводит его — иначе каждый повтор плодил бы новый черновик.
+        const draftKey = JSON.stringify(docPayload);
+        let created =
+          payDebtDraftRef.current?.key === draftKey
+            ? { id: payDebtDraftRef.current.id }
+            : null;
+        if (!created) {
+          created = await warehouseAPI.createMoneyDocument({
+            ...docPayload,
+            // B32: дата с текущим временем и часовым поясом, а не только дата (00:00)
+            date: dateInputToLocalDateTime(payDebtForm.date),
+          });
+          if (created?.id) {
+            payDebtDraftRef.current = { key: draftKey, id: created.id };
+          }
         }
+        if (payDebtCreateAsPosted && created?.id) {
+          await warehouseAPI.postMoneyDocument(
+            created.id,
+            overpayment > 0 ? { allow_advance: true } : undefined,
+          );
+        }
+        payDebtDraftRef.current = null;
         closePayDebtModal();
         await loadOperations();
       } catch (err) {
@@ -508,12 +550,15 @@ const CounterpartyDetail = () => {
     ],
   );
 
-  const docTypeLabel = (docType) =>
-    docType === "MONEY_RECEIPT"
-      ? "Приход"
-      : docType === "MONEY_EXPENSE"
-        ? "Расход"
-        : (docType ?? "—");
+  const handlePayDebtSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
+      submitPayDebt(false);
+    },
+    [submitPayDebt],
+  );
+
+  const docTypeLabel = (docType) => documentTypeLabel(docType);
   const sourceLabel = (row) => {
     if (row.source != null)
       return row.source === "money"
@@ -533,8 +578,7 @@ const CounterpartyDetail = () => {
     });
     return n > 0 ? `+${formatted}` : `−${formatted}`;
   };
-  const statusLabel = (s) =>
-    s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
+  const statusLabel = (s) => documentStatusLabel(s);
 
   const renderRowsContent = (rows, { showSource, showDebtDelta }) => {
     if (!rows || rows.length === 0) {
@@ -740,16 +784,16 @@ const CounterpartyDetail = () => {
                 </span>
                 <span className="counterparty-detail-page__summary-value">
                   {counterpartyAnalytics
-                    ? `${fmtRu2(counterpartyAnalytics.sales?.total)} COM`
+                    ? fmtSom2(counterpartyAnalytics.sales?.total)
                     : loadingOperations
                       ? "…"
                       : "—"}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
                   {counterpartyAnalytics
-                    ? `${counterpartyAnalytics.sales?.count ?? 0} док. · наличные ${fmtRu2(
+                    ? `${counterpartyAnalytics.sales?.count ?? 0} док. · наличные ${fmtSom2(
                         counterpartyAnalytics.sales?.cash_total,
-                      )} · в долг ${fmtRu2(
+                      )} · в долг ${fmtSom2(
                         counterpartyAnalytics.sales?.credit_total,
                       )}`
                     : ""}
@@ -759,12 +803,20 @@ const CounterpartyDetail = () => {
                 <span className="counterparty-detail-page__summary-label">
                   Сальдо
                 </span>
+                {/* B19: сальдо — остаток расчётов (долг), а не сумма поступлений в кассу */}
                 <span className="counterparty-detail-page__summary-value">
-                  {counterpartyAnalytics
-                    ? `${fmtRu2(counterpartyAnalytics.cash?.net)} COM`
-                    : loadingOperations
-                      ? "…"
-                      : "—"}
+                  {loadingOperations && !counterpartyAnalytics
+                    ? "…"
+                    : fmtSom2(summary.debtBalance)}
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  {loadingOperations && !counterpartyAnalytics
+                    ? ""
+                    : summary.debtBalance > 0
+                      ? "Дт · контрагент должен вам"
+                      : summary.debtBalance < 0
+                        ? "Кт · вы должны контрагенту (аванс)"
+                        : "Расчёты закрыты"}
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
@@ -775,11 +827,10 @@ const CounterpartyDetail = () => {
                   {counterpartyAnalytics ? (
                     <>
                       <span>
-                        Приход: {fmtRu2(counterpartyAnalytics.cash?.received)}{" "}
-                        COM
+                        Приход: {fmtSom2(counterpartyAnalytics.cash?.received)}
                       </span>
                       <span>
-                        Расход: {fmtRu2(counterpartyAnalytics.cash?.paid)} COM
+                        Расход: {fmtSom2(counterpartyAnalytics.cash?.paid)}
                       </span>
                     </>
                   ) : loadingOperations ? (
@@ -795,11 +846,11 @@ const CounterpartyDetail = () => {
                 </span>
                 <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
                   {counterpartyAnalytics
-                    ? `${fmtRu2(
+                    ? fmtSom2(
                         Math.abs(
                           toNumber(counterpartyAnalytics.debts?.balance),
                         ),
-                      )} с`
+                      )
                     : loadingOperations
                       ? "…"
                       : "—"}
@@ -822,10 +873,18 @@ const CounterpartyDetail = () => {
                     : ""}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
-                  {counterpartyAnalytics
-                    ? `${counterpartyAnalytics.sales?.pending_cash?.count ?? 0} кредитных документов · ожидается ${fmtRu2(
-                        counterpartyAnalytics.sales?.pending_cash?.total,
-                      )} с`
+                  {loadingOperations
+                    ? ""
+                    : `Кредитных документов: ${creditDocs.count} · ожидается ${fmtSom2(
+                        creditDocs.expected,
+                      )}`}
+                  {Number(counterpartyAnalytics?.sales?.pending_cash?.count) >
+                  0
+                    ? ` · ожидают кассы: ${
+                        counterpartyAnalytics.sales.pending_cash.count
+                      } на ${fmtSom2(
+                        counterpartyAnalytics.sales.pending_cash.total,
+                      )}`
                     : ""}
                 </span>
               </div>
@@ -1213,15 +1272,55 @@ const CounterpartyDetail = () => {
                         }
                       />
                     </div>
-                    <div className="money-documents-page__modal-actions money-documents-page__modal-actions--operation">
-                      <button
-                        type="submit"
-                        className="money-documents-page__btn-save"
-                        disabled={payDebtSubmitting}
+                    {payDebtOverpayment != null && (
+                      <div
+                        className="money-documents-page__form-error counterparty-detail-page__overpay-warning"
+                        role="alert"
                       >
-                        <Save size={20} />
-                        {payDebtSubmitting ? "Сохранение…" : "Сохранить"}
-                      </button>
+                        Сумма больше долга ({fmtSom2(
+                          Math.abs(summary.debtBalance),
+                        )}) на {fmtSom2(payDebtOverpayment)}. Провести
+                        переплату как аванс?
+                      </div>
+                    )}
+                    <div className="money-documents-page__modal-actions money-documents-page__modal-actions--operation">
+                      {payDebtOverpayment != null ? (
+                        <>
+                          <button
+                            type="button"
+                            className="money-documents-page__btn-save"
+                            disabled={payDebtSubmitting}
+                            onClick={() => submitPayDebt(true)}
+                          >
+                            <Save size={20} />
+                            {payDebtSubmitting
+                              ? "Сохранение…"
+                              : "Провести как аванс"}
+                          </button>
+                          <button
+                            type="button"
+                            className="money-documents-page__btn-cancel"
+                            disabled={payDebtSubmitting}
+                            onClick={() =>
+                              handlePayDebtFormChange(
+                                "amount",
+                                String(Math.abs(summary.debtBalance)),
+                              )
+                            }
+                          >
+                            Оплатить только долг
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="submit"
+                          className="money-documents-page__btn-save"
+                          disabled={payDebtSubmitting}
+                        >
+                          <Save size={20} />
+                          {payDebtSubmitting ? "Сохранение…" : "Сохранить"}
+                        </button>
+                      )}
                     </div>
                   </form>
                 </div>

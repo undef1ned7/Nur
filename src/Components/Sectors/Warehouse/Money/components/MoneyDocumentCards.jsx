@@ -1,28 +1,16 @@
 import React, { useMemo } from "react";
 import { Check, X, Printer, Pencil, Trash2, Ban } from "lucide-react";
+import {
+  documentStatusLabel,
+  formatDateTime,
+  formatSom,
+} from "../../utils/warehouseLabels";
 import "./MoneyDocumentCards.scss";
 
-const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
-  " с";
-
-/** 02.04.2026:00:35:20 */
-const fmtDate = (v) => {
-  if (v == null || v === "") return "—";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "—";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}:${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
-
-const statusLabel = (s) =>
-  s === "POSTED"
-    ? "Проведён"
-    : s === "DRAFT"
-      ? "Черновик"
-      : s === "REJECTED"
-        ? "Отказан"
-        : (s ?? "—");
+// Единая валюта «сом», дата «18.09.2026 17:10», статусы по-русски (QA B40, B41)
+const fmtMoney = (v) => formatSom(v);
+const fmtDate = (v) => formatDateTime(v);
+const statusLabel = (s) => documentStatusLabel(s);
 
 const MoneyDocumentCard = React.memo(
   ({

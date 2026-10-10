@@ -51,6 +51,35 @@ async function createDebt(payload) {
   return res.data;
 }
 
+// Подписи полей для сообщения об ошибке валидации (QA B26)
+const FIELD_LABELS = {
+  warehouse: "Склад",
+  name: "Наименование",
+  barcode: "Штрих-код",
+  purchase_price: "Цена закупки",
+  price: "Цена продажи",
+  kitProducts: "Состав комплекта",
+  minStock: "Минимальный остаток",
+  quantity: "Количество",
+  wholesale_price: "Цена агента",
+  category: "Категория",
+};
+
+// Поля ответа сервера (DRF {field: [msg]}) -> ключи fieldErrors формы
+const SERVER_FIELD_MAP = {
+  warehouse: "warehouse",
+  name: "name",
+  barcode: "barcode",
+  purchase_price: "purchase_price",
+  price: "price",
+  quantity: "quantity",
+  category: "category",
+  minimum_quantity: "minStock",
+};
+
+const errorBorderStyle = (hasError) =>
+  hasError ? { borderColor: "#ef4444" } : undefined;
+
 const AddWarehouseProductPage = () => {
   const { id: productId } = useParams();
   const location = useLocation();
@@ -394,8 +423,8 @@ const AddWarehouseProductPage = () => {
           const product = response.data;
 
           // Если API возвращает склад товара — фиксируем выбранный склад
-          if (product?.warehouse && !selectedWarehouse) {
-            setSelectedWarehouse(String(product.warehouse));
+          if (product?.warehouse) {
+            setSelectedWarehouse((prev) => prev || String(product.warehouse));
           }
 
           // Определяем тип товара на основе kind
@@ -447,7 +476,10 @@ const AddWarehouseProductPage = () => {
             markup: product.markup_percent || "0",
             discount: product.discount_percent || "0",
             supplier: product.client || "",
-            minStock: "0", // Нет в API
+            minStock:
+              product.minimum_quantity != null
+                ? String(product.minimum_quantity)
+                : "0",
             expiryDate: product.expiration_date || "",
             kitProducts: [], // Будет загружено из packages
             kitSearchTerm: "",
@@ -489,7 +521,9 @@ const AddWarehouseProductPage = () => {
       };
       loadProduct();
     }
-  }, [isEditMode, productId, selectedWarehouse]);
+    // selectedWarehouse намеренно не в зависимостях: иначе после установки
+    // склада (из ответа или URL) товар перезагружался и перетирал ввод (QA B27)
+  }, [isEditMode, productId]);
 
   // Обработка дублирования товара
   useEffect(() => {
@@ -548,7 +582,10 @@ const AddWarehouseProductPage = () => {
         markup: product.markup_percent || "0",
         discount: product.discount_percent || "0",
         supplier: product.client || "",
-        minStock: "0",
+        minStock:
+          product.minimum_quantity != null
+            ? String(product.minimum_quantity)
+            : "0",
         expiryDate: product.expiration_date || "",
         kitProducts: [], // Для комплекта можно будет доработать
         kitSearchTerm: "",
@@ -635,7 +672,27 @@ const AddWarehouseProductPage = () => {
     }
   }, [newItemData.client, pickSupplier, company?.subscription_plan?.name]);
 
+  // Защита от повторной отправки: ref блокирует синхронно (до перерисовки), state — для disabled/«Создание…».
+  // После успешного сохранения замок держим до ухода со страницы (1,5 с до редиректа), чтобы не создать дубль.
+  const submitLockRef = useRef(false);
+  const savedRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
+    setSubmitting(true);
+    try {
+      await handleSubmitInner();
+    } finally {
+      if (!savedRef.current) {
+        submitLockRef.current = false;
+        setSubmitting(false);
+      }
+    }
+  };
+
+  const handleSubmitInner = async () => {
     const {
       name,
       barcode,
@@ -698,9 +755,53 @@ const AddWarehouseProductPage = () => {
       }
     }
 
+    // Числа: «abc», бесконечность и отрицательные значения не должны уходить на сервер
+    // (раньше проверялось только «не пусто», а нечисловое количество превращалось в NaN → null).
+    const moneyError = (raw) => {
+      const t = String(raw ?? "")
+        .trim()
+        .replace(",", ".");
+      if (t === "") return null;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 ? null : "Введите число не меньше 0";
+    };
+    if (!errors.purchase_price && itemType === "product") {
+      const m = moneyError(purchasePriceValue);
+      if (m) errors.purchase_price = m;
+    }
+    if (!errors.price) {
+      const m = moneyError(priceValue);
+      if (m) errors.price = m;
+    }
+    {
+      const m = moneyError(wholesale_price);
+      if (m) errors.wholesale_price = m;
+    }
+    {
+      const m = moneyError(quantity);
+      if (m) errors.quantity = m;
+    }
+
+    // Минимальный остаток (minimum_quantity, decimal >= 0)
+    const minStockRaw = String(marketData.minStock ?? "")
+      .trim()
+      .replace(",", ".");
+    const minStockNumber = minStockRaw === "" ? 0 : Number(minStockRaw);
+    if (!Number.isFinite(minStockNumber) || minStockNumber < 0) {
+      errors.minStock = "Введите число не меньше 0";
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showAlert("Пожалуйста, заполните обязательные поля.");
+      const missing = Object.keys(errors)
+        .map((key) => FIELD_LABELS[key] || key)
+        .map((label) => `• ${label}`)
+        .join("\n");
+      showAlert(
+        `Проверьте поля:\n${missing}`,
+        "error",
+        "Заполните обязательные поля",
+      );
       return;
     }
 
@@ -843,6 +944,7 @@ const AddWarehouseProductPage = () => {
       description: marketData.description || "",
       characteristics: hasCharacteristics ? characteristics : null,
       kind: kindValue,
+      minimum_quantity: String(minStockNumber),
     };
 
     // Извлекаем количество из newItemData, убеждаемся что это число
@@ -1107,6 +1209,7 @@ const AddWarehouseProductPage = () => {
         dueDate: "",
       });
 
+      savedRef.current = true;
       showAlert(
         isEditMode ? "Товар успешно обновлен!" : "Товар успешно добавлен!",
         "success",
@@ -1118,15 +1221,20 @@ const AddWarehouseProductPage = () => {
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
-      const quantityError =
-        err?.response?.data?.quantity ?? err?.data?.quantity ?? err?.quantity;
-      if (quantityError) {
-        setFieldErrors((prev) => ({
-          ...prev,
-          quantity: Array.isArray(quantityError)
-            ? quantityError.join(" ")
-            : String(quantityError),
-        }));
+      // Разбираем ошибки сервера по полям, чтобы подсветить их в форме
+      const errData = err?.response?.data ?? err?.data ?? err;
+      if (errData && typeof errData === "object" && !Array.isArray(errData)) {
+        const serverFieldErrors = {};
+        Object.entries(SERVER_FIELD_MAP).forEach(([serverKey, formKey]) => {
+          const value = errData[serverKey];
+          if (value == null || value === "") return;
+          serverFieldErrors[formKey] = Array.isArray(value)
+            ? value.join(" ")
+            : String(value);
+        });
+        if (Object.keys(serverFieldErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...serverFieldErrors }));
+        }
       }
       const errorMessage = validateResErrors(
         err,
@@ -1555,7 +1663,7 @@ const AddWarehouseProductPage = () => {
               products={products || []}
               filterClient={list.filter((item) => item.type === "suppliers")}
               handleSubmit={handleSubmit}
-              creating={creating || updating}
+              creating={creating || updating || submitting}
               navigate={navigate}
               onCancel={handleBackNavigation}
               generateBarcode={generateBarcode}
@@ -2490,7 +2598,8 @@ const MarketProductForm = ({
   }, [marketData.kitProducts, itemType]);
 
   // Состояние для отслеживания, была ли цена продажи изменена вручную
-  const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
+  // В режиме редактирования сохранённая цена остаётся как есть, пока пользователь не изменит закупку/наценку.
+  const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(isEditMode);
 
   // Автоматический расчет цены продажи на основе цены закупки и наценки
   useEffect(() => {
@@ -2603,6 +2712,8 @@ const MarketProductForm = ({
             onChange={(e) => setSelectedWarehouse(e.target.value)}
             required
             disabled={isEditMode || warehousesLoading}
+            style={errorBorderStyle(fieldErrors.warehouse)}
+            aria-invalid={!!fieldErrors.warehouse}
           >
             <option value="">Выберите склад</option>
             {warehouses.map((warehouse) => (
@@ -2633,6 +2744,8 @@ const MarketProductForm = ({
             value={newItemData.name}
             onChange={handleChange}
             required
+            style={errorBorderStyle(fieldErrors.name)}
+            aria-invalid={!!fieldErrors.name}
           />
           {fieldErrors.name && (
             <p className="add-product-page__error">{fieldErrors.name}</p>
@@ -2671,6 +2784,8 @@ const MarketProductForm = ({
               className="market-product-form__input"
               value={newItemData.barcode}
               onChange={handleChange}
+              style={errorBorderStyle(fieldErrors.barcode)}
+              aria-invalid={!!fieldErrors.barcode}
             />
             {fieldErrors.barcode && (
               <p className="add-product-page__error">{fieldErrors.barcode}</p>
@@ -3280,6 +3395,8 @@ const MarketProductForm = ({
                     className="market-product-form__input"
                     value={newItemData.purchase_price}
                     onChange={handlePurchasePriceChange}
+                    style={errorBorderStyle(fieldErrors.purchase_price)}
+                    aria-invalid={!!fieldErrors.purchase_price}
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -3300,6 +3417,17 @@ const MarketProductForm = ({
                   />
                   <span className="market-product-form__currency">%</span>
                 </div>
+                {/* B45: наценка сохраняется и применится, когда появится цена закупки */}
+                {!(parseFloat(newItemData.purchase_price) > 0) &&
+                  parseFloat(marketData.markup) > 0 && (
+                    <p
+                      className="market-product-form__hint"
+                      style={{ marginTop: 4, fontSize: 12, color: "#b25e09" }}
+                    >
+                      Сначала укажите цену закупки — цена продажи пересчитается
+                      автоматически
+                    </p>
+                  )}
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">
@@ -3313,6 +3441,8 @@ const MarketProductForm = ({
                     value={newItemData.price}
                     onChange={handlePriceChange}
                     placeholder="Рассчитывается автоматически"
+                    style={errorBorderStyle(fieldErrors.price)}
+                    aria-invalid={!!fieldErrors.price}
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -3626,7 +3756,13 @@ const MarketProductForm = ({
                 onChange={(e) =>
                   handleMarketDataChange("minStock", e.target.value)
                 }
+                inputMode="decimal"
+                style={errorBorderStyle(fieldErrors.minStock)}
+                aria-invalid={!!fieldErrors.minStock}
               />
+              {fieldErrors.minStock && (
+                <p className="add-product-page__error">{fieldErrors.minStock}</p>
+              )}
             </div>
           </div>
 

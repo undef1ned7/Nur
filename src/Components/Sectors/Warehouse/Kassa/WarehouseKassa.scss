@@ -394,3 +394,9 @@
     }
   }
 }
+
+// Касса в минусе (QA B06)
+.warehouse-kassa__balance--negative {
+  color: #c33;
+  font-weight: 600;
+}

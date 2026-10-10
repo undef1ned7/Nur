@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import warehouseAPI, { listCompanyAgentRequests } from "../../../../../api/warehouse";
 import { createSaleFromAgentCartAsync } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
+import { SALE_PRICE_MODE_LABELS } from "../../utils/wholesalePricing";
 import "./ReconciliationModal.scss";
 import "./CreateSaleFromCartModal.scss";
 
@@ -388,7 +389,7 @@ export default function CreateSaleFromCartModal({
                     }
                     disabled={submitting}
                   >
-                    Розница
+                    {SALE_PRICE_MODE_LABELS.base}
                   </button>
                   <button
                     type="button"
@@ -402,7 +403,7 @@ export default function CreateSaleFromCartModal({
                     }
                     disabled={submitting}
                   >
-                    Опт
+                    {SALE_PRICE_MODE_LABELS.agent}
                   </button>
                 </div>
               </div>

@@ -1,5 +1,9 @@
 import axios from "axios";
-import { createAuthResponseInterceptor } from "./authInterceptors";
+import {
+  createAuthRequestInterceptor,
+  createAuthResponseInterceptor,
+  createTokenRefresher,
+} from "./authInterceptors";
 import {
   createCircuitRequestInterceptor,
   noteCircuitFailure,
@@ -16,12 +20,29 @@ const api = axios.create({
   },
 });
 
+// B34: у ранее залогиненных пользователей access/refresh лежат ещё и внутри
+// userData — вычищаем (источник истины — ключи accessToken/refreshToken).
+try {
+  const raw = localStorage.getItem("userData");
+  const parsed = raw ? JSON.parse(raw) : null;
+  if (parsed && typeof parsed === "object" && ("access" in parsed || "refresh" in parsed)) {
+    delete parsed.access;
+    delete parsed.refresh;
+    localStorage.setItem("userData", JSON.stringify(parsed));
+  }
+} catch {
+  /* битый userData — не трогаем */
+}
+
+// Один общий single-flight refresh для proactive- и 401-веток.
+const refreshAccessToken = createTokenRefresher(api);
+
+// Bearer-токен читается из localStorage на каждый запрос; если access уже
+// истёк по exp — сначала refresh (один на все параллельные запросы).
+api.interceptors.request.use(createAuthRequestInterceptor(refreshAccessToken));
+
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
     // Для multipart (FormData) дефолтный application/json ломает тело запроса
     // (сервер видит file: {} вместо бинарника). Даем браузеру/axios самой
     // выставить Content-Type с boundary.
@@ -52,7 +73,7 @@ api.interceptors.request.use(createCircuitRequestInterceptor());
 
 api.interceptors.response.use(
   (res) => res,
-  createAuthResponseInterceptor(api, axios),
+  createAuthResponseInterceptor(api, axios, refreshAccessToken),
 );
 
 api.interceptors.response.use(

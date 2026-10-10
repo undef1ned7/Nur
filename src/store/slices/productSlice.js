@@ -145,7 +145,7 @@ const productSlice = createSlice({
         applyPagination(state, action.payload, "list");
         
         // Подсчет товаров с is_weight: true используя цикл
-        const products = Array.isArray(action.payload.results)
+        const products = Array.isArray(action.payload?.results)
           ? action.payload.results
           : Array.isArray(action.payload)
           ? action.payload
@@ -153,7 +153,7 @@ const productSlice = createSlice({
         
         let weightCount = 0;
         for (let i = 0; i < products.length; i++) {
-          if (products[i].is_weight === true) {
+          if (products[i]?.is_weight === true) {
             weightCount++;
           }
         }

@@ -35,6 +35,68 @@ const CheckIcon = () => (
   </svg>
 );
 
+const CrossIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M18 6L6 18M6 6l12 12"
+      stroke="#fff"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ExclamationIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M12 6v8M12 18h.01"
+      stroke="#fff"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const InfoIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M12 11v7M12 6h.01"
+      stroke="#fff"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Иконка зависит от типа: раньше для ошибок тоже показывалась галочка (QA B26)
+const TYPE_ICONS = {
+  success: CheckIcon,
+  error: CrossIcon,
+  warning: ExclamationIcon,
+  info: InfoIcon,
+};
+
 const AlertModal = ({
   open,
   type = "success",
@@ -45,20 +107,26 @@ const AlertModal = ({
   onConfirm,
 }) => {
   const styles = TYPE_STYLES[type] || TYPE_STYLES.info;
+  const Icon = TYPE_ICONS[type] || InfoIcon;
   const handle = onConfirm || onClose;
   const ALERT_Z_INDEX = 100000;
 
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {
-      if (e.key === "Escape" || e.key === "Enter") {
+      // Escape — всегда закрытие (не подтверждение): иначе в окнах
+      // «Подтверждение удаления» Escape запускал удаление.
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose?.();
+      } else if (e.key === "Enter") {
         e.preventDefault();
         handle?.();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, handle]);
+  }, [open, handle, onClose]);
 
   if (!open) return null;
 
@@ -110,7 +178,7 @@ const AlertModal = ({
               margin: "0 auto 16px",
             }}
           >
-            <CheckIcon />
+            <Icon />
           </div>
           {title ? (
             <h3

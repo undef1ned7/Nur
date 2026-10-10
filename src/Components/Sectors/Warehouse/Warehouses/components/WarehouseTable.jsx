@@ -51,9 +51,18 @@ const WarehouseRow = React.memo(
     );
   },
   (prevProps, nextProps) => {
+    // Сравниваем и поля, которые видны в строке: после PATCH название/адрес должны обновиться.
+    const a = prevProps.warehouse;
+    const b = nextProps.warehouse;
     return (
-      prevProps.warehouse.id === nextProps.warehouse.id &&
-      prevProps.rowNumber === nextProps.rowNumber
+      a === b ||
+      (a.id === b.id &&
+        a.name === b.name &&
+        a.title === b.title &&
+        a.location === b.location &&
+        a.address === b.address &&
+        a.products_count === b.products_count &&
+        prevProps.rowNumber === nextProps.rowNumber)
     );
   }
 );
@@ -142,7 +151,7 @@ const WarehouseTable = ({
 const areEqual = (prevProps, nextProps) => {
   return (
     prevProps.loading === nextProps.loading &&
-    prevProps.warehouses.length === nextProps.warehouses.length &&
+    prevProps.warehouses === nextProps.warehouses &&
     prevProps.getRowNumber === nextProps.getRowNumber &&
     prevProps.onOpenWarehouse === nextProps.onOpenWarehouse &&
     prevProps.onEditWarehouse === nextProps.onEditWarehouse

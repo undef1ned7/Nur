@@ -297,3 +297,16 @@
     }
   }
 }
+
+// Ошибка у поля формы контрагента (QA B25)
+.counterparty-form__field-error {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #c33;
+}
+
+.warehouse-filter-modal [aria-invalid="true"] {
+  border-color: #e05555;
+  box-shadow: 0 0 0 1px #e05555;
+}

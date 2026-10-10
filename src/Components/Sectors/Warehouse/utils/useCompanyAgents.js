@@ -21,7 +21,13 @@ export const companyAgentOptions = (memberships) => {
   list.forEach((m) => {
     const status = String(m?.status || "").toLowerCase();
     if (status !== "active" && status !== "removed") return;
-    const id = m.user ?? m.user_id;
+    // user бывает uuid-строкой или объектом { id, ... } — ключ всегда id пользователя,
+    // иначе один сотрудник дублируется в фильтрах (QA B17)
+    const rawUser = m.user ?? m.user_id;
+    const id =
+      rawUser && typeof rawUser === "object"
+        ? rawUser.id ?? rawUser.uuid
+        : rawUser;
     if (!id) return;
     const key = String(id);
     const prev = byId.get(key);
