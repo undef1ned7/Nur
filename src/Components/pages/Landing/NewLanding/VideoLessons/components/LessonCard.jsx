@@ -54,3 +54,4 @@ const LessonCard = ({ lesson, compact = false, isCurrent = false }) => {
 };
 
 export default LessonCard;
+

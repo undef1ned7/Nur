@@ -353,3 +353,4 @@ export function consultingNotificationLeadId(n) {
   const rawUrl = n?.url ?? n?.link ?? data?.url ?? "";
   return extractLeadIdFromConsaltingUrl(rawUrl);
 }
+

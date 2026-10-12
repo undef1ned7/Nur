@@ -74,3 +74,4 @@ export const fetchWarehouseStockItems = (params) =>
 
 export const fetchWarehouseStockMoves = (params) =>
   api.get(`${BASE}/warehouse-stock/moves/`, { params });
+

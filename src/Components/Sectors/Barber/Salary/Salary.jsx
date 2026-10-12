@@ -1013,3 +1013,4 @@ const Salary = () => {
 };
 
 export default Salary;
+

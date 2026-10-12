@@ -66,3 +66,4 @@ export const linkClientTenant = (clientId, nurCompanyId) =>
     `${BASE}/clients/${clientId}/link-tenant/`,
     { nur_company_id: nurCompanyId },
   );
+

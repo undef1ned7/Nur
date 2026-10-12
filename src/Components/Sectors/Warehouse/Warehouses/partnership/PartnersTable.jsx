@@ -158,3 +158,4 @@ const PartnersTable = ({
 
 export default PartnersTable;
 
+

@@ -32,3 +32,4 @@ export function resolveEmployeeRoleLabel(employee, roleById) {
 
   return "Без роли";
 }
+

@@ -204,3 +204,4 @@ const TablesFiltersModal = ({
 };
 
 export default TablesFiltersModal;
+

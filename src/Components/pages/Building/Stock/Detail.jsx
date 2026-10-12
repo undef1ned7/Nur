@@ -1580,3 +1580,4 @@ export default function BuildingStockDetail() {
   );
 }
 
+

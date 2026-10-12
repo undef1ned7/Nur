@@ -369,3 +369,4 @@ export const {
 export const useFunnel = () => useSelector((state) => state.funnel);
 
 export default funnelSlice.reducer;
+

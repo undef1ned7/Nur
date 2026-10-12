@@ -61,3 +61,4 @@ export const useMasterAggregates = (appointments, year, month) => {
 
 export const useYearOptions = () =>
   useMemo(() => [2025, 2026, 2027], []);
+

@@ -360,3 +360,4 @@ const StockPartnershipTransferModal = ({
 
 export default StockPartnershipTransferModal;
 
+

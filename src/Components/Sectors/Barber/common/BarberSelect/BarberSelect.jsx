@@ -290,3 +290,4 @@ const BarberSelect = ({
 };
 
 export default BarberSelect;
+

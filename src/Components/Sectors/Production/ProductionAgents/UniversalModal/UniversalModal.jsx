@@ -31,3 +31,4 @@ const UniversalModal = ({ children, onClose, title, className = '' }) => {
 };
 
 export default UniversalModal;
+

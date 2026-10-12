@@ -393,3 +393,4 @@ const InventoryTab = () => {
 };
 
 export default InventoryTab;
+

@@ -108,3 +108,4 @@ const RecordaDeletedView = ({
 };
 
 export default RecordaDeletedView;
+

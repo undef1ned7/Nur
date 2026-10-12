@@ -422,3 +422,4 @@ export const calcFinalPrice = (base, discountPercent) => {
   const val = Math.round(base * (1 - discountPercent / 100));
   return val < 0 ? 0 : val;
 };
+

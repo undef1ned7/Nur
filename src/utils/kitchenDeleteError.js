@@ -41,3 +41,4 @@ export const getKitchenDeleteErrorMessage = (error, kitchenName = "кухня") 
     `Не удалось удалить кухню «${kitchenName}». Попробуйте ещё раз чуть позже.`
   );
 };
+

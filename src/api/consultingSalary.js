@@ -254,3 +254,4 @@ export const listSalaryPayouts = (params = {}, config) =>
 /** POST /consalting/salary/payouts/ ← { user, amount, comment? } (закрывает accrued FIFO). */
 export const createSalaryPayout = (payload) =>
   cPost("Create Consulting Salary Payout Error", `${URL}/payouts/`, payload);
+
