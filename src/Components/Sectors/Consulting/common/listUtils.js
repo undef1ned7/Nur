@@ -128,3 +128,4 @@ export const employeeName = (e) =>
   [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim() ||
   e?.email ||
   "—";
+

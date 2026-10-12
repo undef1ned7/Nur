@@ -26,3 +26,4 @@ export const WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS = Object.entries(
   value,
   label,
 }));
+

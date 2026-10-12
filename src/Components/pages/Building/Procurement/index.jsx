@@ -892,3 +892,4 @@ export default function BuildingProcurement() {
     </div>
   );
 }
+

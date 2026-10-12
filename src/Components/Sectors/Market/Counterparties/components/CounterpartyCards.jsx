@@ -197,3 +197,4 @@ const areEqual = (prevProps, nextProps) => {
 
 export default React.memo(CounterpartyCards, areEqual);
 
+

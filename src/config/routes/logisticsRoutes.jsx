@@ -7,3 +7,4 @@ export const logisticsRoutes = () => [
   createProtectedRoute("logistics", LogisticsPage),
   createProtectedRoute("logistics-analytics", LogisticsAnalytics),
 ];
+

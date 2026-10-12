@@ -131,3 +131,4 @@ export async function changeAccessPassword(currentPassword, newPassword) {
 export function lockRegistration() {
   setSessionUnlocked(false);
 }
+

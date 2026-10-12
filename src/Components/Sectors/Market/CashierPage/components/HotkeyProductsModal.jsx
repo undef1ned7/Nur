@@ -217,3 +217,4 @@ const HotkeyProductsModal = ({
 };
 
 export default HotkeyProductsModal;
+

@@ -19,3 +19,4 @@ export async function fetchBarberAnalyticsDashboard({
   });
   return data;
 }
+

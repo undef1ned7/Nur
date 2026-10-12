@@ -10,3 +10,4 @@ export const useAcceptances = () => {
   const acceptances = useSelector((state) => state.acceptance);
   return acceptances;
 };
+

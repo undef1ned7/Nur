@@ -160,3 +160,4 @@ const areEqual = (prevProps, nextProps) => {
 
 export default React.memo(WarehouseTable, areEqual);
 
+

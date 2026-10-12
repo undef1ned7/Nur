@@ -154,3 +154,4 @@ const acceptanceSlice = createSlice({
 
 export const { clearErrors, clearCurrent } = acceptanceSlice.actions;
 export default acceptanceSlice.reducer;
+

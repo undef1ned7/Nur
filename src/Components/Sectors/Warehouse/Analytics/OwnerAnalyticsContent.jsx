@@ -1169,3 +1169,4 @@ const OwnerAnalyticsContent = ({
 // тяжёлые графики и таблицы пересчитывать не нужно (CPU ×6: фриз ~2 с).
 export default memo(OwnerAnalyticsContent);
 
+

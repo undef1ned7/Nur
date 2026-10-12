@@ -16,3 +16,4 @@ const RecordaRatesSummary = ({ totals }) => {
 };
 
 export default RecordaRatesSummary;
+

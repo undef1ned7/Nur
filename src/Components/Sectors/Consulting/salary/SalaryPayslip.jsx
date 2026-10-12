@@ -187,3 +187,4 @@ export default function SalaryPayslip({ employees = [], isOwnerOrAdmin, myUserId
     </div>
   );
 }
+

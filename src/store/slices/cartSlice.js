@@ -120,3 +120,4 @@ export const selectCartLoading = (state) => state.cart.loading;
 export const selectCartError = (state) => state.cart.error;
 
 export default cartSlice.reducer;
+

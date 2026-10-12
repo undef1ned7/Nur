@@ -1182,3 +1182,4 @@ const KassaDet = () => {
 };
 
 export default KassaDet;
+

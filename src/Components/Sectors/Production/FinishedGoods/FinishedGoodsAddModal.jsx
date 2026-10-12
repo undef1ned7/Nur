@@ -1462,3 +1462,4 @@ const FinishedGoodsAddModal = ({
 
 export const AddModal = FinishedGoodsAddModal;
 export default FinishedGoodsAddModal;
+

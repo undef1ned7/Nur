@@ -747,3 +747,4 @@ function SellModal({
 }
 
 export default Bar;
+

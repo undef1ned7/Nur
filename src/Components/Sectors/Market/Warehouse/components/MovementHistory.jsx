@@ -200,3 +200,4 @@ const MovementHistory = ({ productId, productCode }) => {
 };
 
 export default MovementHistory;
+
