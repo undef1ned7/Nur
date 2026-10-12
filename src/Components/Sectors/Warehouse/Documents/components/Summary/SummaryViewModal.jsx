@@ -323,3 +323,4 @@ const SummaryViewModal = ({ id, onClose, onEdit, onDeleted, onChanged }) => {
 };
 
 export default SummaryViewModal;
+

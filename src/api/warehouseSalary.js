@@ -114,3 +114,4 @@ export const createSalaryPayout = async (payload) => {
     return reject("Create Salary Payout Error")(error);
   }
 };
+

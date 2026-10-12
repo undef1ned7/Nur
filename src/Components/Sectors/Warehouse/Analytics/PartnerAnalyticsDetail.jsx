@@ -206,3 +206,4 @@ const PartnerAnalyticsDetail = () => {
 };
 
 export default PartnerAnalyticsDetail;
+

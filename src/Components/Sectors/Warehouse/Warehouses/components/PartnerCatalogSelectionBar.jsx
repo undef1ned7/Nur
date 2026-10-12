@@ -49,3 +49,4 @@ const PartnerCatalogSelectionBar = ({
 };
 
 export default React.memo(PartnerCatalogSelectionBar);
+

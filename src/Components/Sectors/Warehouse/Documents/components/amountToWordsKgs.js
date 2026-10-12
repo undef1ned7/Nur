@@ -163,3 +163,4 @@ export function amountToWordsKgs(amount) {
 
   return `${somPart} ${tyiynPart} тыйын`.trim();
 }
+

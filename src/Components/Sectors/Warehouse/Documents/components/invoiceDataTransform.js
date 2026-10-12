@@ -266,3 +266,4 @@ export const transformSummaryDocumentToInvoiceData = (
 };
 
 export default transformWarehouseDocumentToInvoiceData;
+

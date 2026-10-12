@@ -186,3 +186,4 @@ export const invoicePdfStyles = StyleSheet.create({
     gap: 2,
   },
 });
+

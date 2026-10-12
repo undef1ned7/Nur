@@ -362,3 +362,4 @@ const WarehouseMoveProductModal = ({ open, ...props }) =>
   open ? <MoveProductForm {...props} /> : null;
 
 export default WarehouseMoveProductModal;
+

@@ -549,3 +549,4 @@ export default function SummaryPdfDocument({ summary, invoices = [] }) {
     </Document>
   );
 }
+

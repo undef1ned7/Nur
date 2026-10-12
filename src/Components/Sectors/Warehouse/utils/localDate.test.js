@@ -38,3 +38,4 @@ describe("dateInputToLocalDateTime (B32)", () => {
     expect(new Date(dateInputToLocalDateTime("", now)).getTime()).toBe(now.getTime());
   });
 });
+

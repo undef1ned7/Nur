@@ -210,3 +210,4 @@ describe("OwnerAnalyticsContent", () => {
     expect(screen.queryByText("На складах по закупке, сом")).not.toBeInTheDocument();
   });
 });
+

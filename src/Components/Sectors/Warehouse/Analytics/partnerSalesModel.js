@@ -100,3 +100,4 @@ export const saleLineAmount = (item) => {
   const discount = toNumber(item?.discount_amount) ?? 0;
   return Math.max(0, qty * price - discount);
 };
+

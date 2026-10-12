@@ -306,3 +306,4 @@ export default function ReceiptPdfDocument({ data }) {
     </Document>
   );
 }
+

@@ -199,3 +199,4 @@ export const normalizeSummary = (summary = {}, rawDocuments = null) => {
 };
 
 export { toNum };
+

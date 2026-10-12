@@ -195,3 +195,4 @@ const EditWarehouseModal = ({ warehouse, onClose }) => {
 };
 
 export default EditWarehouseModal;
+

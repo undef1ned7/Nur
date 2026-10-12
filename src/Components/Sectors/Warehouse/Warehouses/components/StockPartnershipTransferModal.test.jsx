@@ -153,3 +153,4 @@ describe("StockPartnershipTransferModal", () => {
     expect(screen.getByRole("button", { name: "Отправить 5 позиций" })).toBeTruthy();
   });
 });
+

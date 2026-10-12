@@ -414,3 +414,4 @@ const WarehouseProductDetail = () => {
 };
 
 export default WarehouseProductDetail;
+

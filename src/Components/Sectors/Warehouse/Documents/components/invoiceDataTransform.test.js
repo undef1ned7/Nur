@@ -79,3 +79,4 @@ describe("transformSummaryDocumentToInvoiceData", () => {
     expect(transformSummaryDocumentToInvoiceData(null, company)).toBeNull();
   });
 });
+

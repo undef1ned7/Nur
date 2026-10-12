@@ -173,3 +173,4 @@ describe("PartnerSalesHistory", () => {
     expect(await screen.findByText("Партнёр скрыл историю продаж.")).toBeTruthy();
   });
 });
+

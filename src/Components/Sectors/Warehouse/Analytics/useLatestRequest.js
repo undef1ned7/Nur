@@ -17,3 +17,4 @@ export const useLatestRequest = () => {
   const isLatest = useCallback((token) => token === seqRef.current, []);
   return { begin, isLatest };
 };
+

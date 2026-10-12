@@ -66,3 +66,4 @@ const WarehouseHeader = ({
 };
 
 export default React.memo(WarehouseHeader);
+

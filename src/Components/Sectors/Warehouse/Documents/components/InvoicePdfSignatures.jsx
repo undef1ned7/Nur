@@ -16,3 +16,4 @@ export default function InvoicePdfSignatures() {
     </View>
   );
 }
+

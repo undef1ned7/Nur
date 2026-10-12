@@ -112,3 +112,4 @@ describe("validateTransferQty", () => {
     expect(validateTransferQty("50", 0)).toBeNull();
   });
 });
+

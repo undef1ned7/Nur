@@ -193,3 +193,4 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
 };
 
 export default CreateWarehouseModal;
+

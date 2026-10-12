@@ -13,3 +13,4 @@ export default function WarehouseStartAgentGate({ children }) {
   }
   return children;
 }
+

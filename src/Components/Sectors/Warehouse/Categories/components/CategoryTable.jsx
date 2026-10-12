@@ -144,3 +144,4 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 export default React.memo(CategoryTable, areEqual);
+

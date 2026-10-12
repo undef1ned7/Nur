@@ -766,3 +766,4 @@ const PartnerCatalogPage = () => {
 };
 
 export default PartnerCatalogPage;
+

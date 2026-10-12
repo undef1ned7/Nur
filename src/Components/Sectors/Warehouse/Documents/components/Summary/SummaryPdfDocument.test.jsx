@@ -94,3 +94,4 @@ describe("SummaryPdfDocument — экземпляры накладных", () =>
     expect(longPages % 2).toBe(0);
   }, 60000);
 });
+

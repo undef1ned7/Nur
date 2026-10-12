@@ -118,3 +118,4 @@ const PartnershipRequestsTable = ({
 };
 
 export default PartnershipRequestsTable;
+

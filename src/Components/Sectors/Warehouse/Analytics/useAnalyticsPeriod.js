@@ -35,3 +35,4 @@ export const useAnalyticsPeriod = (initialPeriod = "month") => {
     periodParams,
   };
 };
+

@@ -129,3 +129,4 @@ const PartnerOperationsTable = ({
 };
 
 export default PartnerOperationsTable;
+

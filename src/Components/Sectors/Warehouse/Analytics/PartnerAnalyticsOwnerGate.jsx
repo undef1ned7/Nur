@@ -22,3 +22,4 @@ const PartnerAnalyticsOwnerGate = ({ children }) => {
 };
 
 export default PartnerAnalyticsOwnerGate;
+

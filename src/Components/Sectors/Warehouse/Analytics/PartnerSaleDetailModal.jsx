@@ -161,3 +161,4 @@ const PartnerSaleDetailModal = ({ partnerId, summaryRow, onClose }) => {
 };
 
 export default PartnerSaleDetailModal;
+

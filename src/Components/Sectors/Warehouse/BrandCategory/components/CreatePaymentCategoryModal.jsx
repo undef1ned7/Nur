@@ -121,3 +121,4 @@ const CreatePaymentCategoryModal = ({ onClose, category, onSaved }) => {
 };
 
 export default CreatePaymentCategoryModal;
+

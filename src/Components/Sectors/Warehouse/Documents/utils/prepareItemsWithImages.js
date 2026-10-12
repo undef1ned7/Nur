@@ -73,3 +73,4 @@ export const prepareItemsWithImages = async (items) => {
     }),
   );
 };
+

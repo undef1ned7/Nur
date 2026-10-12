@@ -77,3 +77,4 @@ export const getDocumentSubtitle = (docType, isEdit = false) => {
   const base = DOC_SUBTITLES[docType] || "Создание документа";
   return isEdit ? base.replace(/^Создание/, "Редактирование") : base;
 };
+

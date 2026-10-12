@@ -81,3 +81,4 @@ describe("StockAdjustmentModal", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Некорректное число.");
   });
 });
+

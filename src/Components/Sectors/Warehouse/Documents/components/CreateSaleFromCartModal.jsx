@@ -561,3 +561,4 @@ export default function CreateSaleFromCartModal({
     </div>
   );
 }
+

@@ -47,3 +47,4 @@ describe("documentDisplay", () => {
     expect(formatWholesaleModeLabel(true)).toBe("Цена агента");
   });
 });
+

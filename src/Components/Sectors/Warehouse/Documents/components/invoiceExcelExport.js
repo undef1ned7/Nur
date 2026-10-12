@@ -298,3 +298,4 @@ export function exportInvoiceToExcel(data) {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 }
+

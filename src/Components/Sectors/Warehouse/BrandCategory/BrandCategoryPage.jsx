@@ -529,3 +529,4 @@ const BrandCategoryPage = () => {
 };
 
 export default BrandCategoryPage;
+

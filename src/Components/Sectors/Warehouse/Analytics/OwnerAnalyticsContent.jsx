@@ -1168,3 +1168,4 @@ const OwnerAnalyticsContent = ({
 // memo: смена периода/филиала перерисовывает страницу, но пока данные те же,
 // тяжёлые графики и таблицы пересчитывать не нужно (CPU ×6: фриз ~2 с).
 export default memo(OwnerAnalyticsContent);
+

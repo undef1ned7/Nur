@@ -30,3 +30,4 @@ describe("форматы (B41)", () => {
     expect(formatSom(1050, 2).replace(/\s/g, " ")).toBe("1 050,00 сом");
   });
 });
+

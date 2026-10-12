@@ -408,3 +408,4 @@ const StockPartnershipPanel = () => {
 };
 
 export default StockPartnershipPanel;
+

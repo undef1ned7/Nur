@@ -237,3 +237,4 @@ export const buildStockMovementRows = (summary = {}) => {
 
 /** Массив из ответа или пустой массив. */
 export const listOf = (v) => (Array.isArray(v) ? v : []);
+

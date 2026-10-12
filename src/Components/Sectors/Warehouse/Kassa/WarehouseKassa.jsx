@@ -2150,3 +2150,4 @@ const WarehouseKassa = () => {
 };
 
 export default WarehouseKassa;
+

@@ -98,3 +98,4 @@ describe("подписи", () => {
     expect(paymentKindLabel(null)).toBe("—");
   });
 });
+

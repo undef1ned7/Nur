@@ -219,3 +219,4 @@ export const INVITE_STATUS_LABEL = {
 };
 
 export const INVITE_MIN_SEARCH_LENGTH = 3;
+

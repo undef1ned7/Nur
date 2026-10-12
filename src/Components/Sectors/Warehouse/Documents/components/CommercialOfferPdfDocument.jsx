@@ -298,3 +298,4 @@ export default function CommercialOfferPdfDocument({ data }) {
     </Document>
   );
 }
+

@@ -56,3 +56,4 @@ export const useSearch = (persistKey) => {
     setSearchTerm,
   };
 };
+

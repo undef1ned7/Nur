@@ -24,3 +24,4 @@ export const formatWholesaleModeLabel = (isWholesale) =>
   isWholesale
     ? SALE_PRICE_MODE_LABELS.agent
     : SALE_PRICE_MODE_LABELS.base;
+

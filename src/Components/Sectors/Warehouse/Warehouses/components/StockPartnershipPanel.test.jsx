@@ -274,3 +274,4 @@ describe("StockPartnershipPanel", () => {
     expect(partnershipApi.searchPartnershipCompanies).not.toHaveBeenCalled();
   });
 });
+

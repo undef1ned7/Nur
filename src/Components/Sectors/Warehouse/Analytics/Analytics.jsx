@@ -183,3 +183,4 @@ const WarehouseAnalytics = () => {
 };
 
 export default WarehouseAnalytics;
+

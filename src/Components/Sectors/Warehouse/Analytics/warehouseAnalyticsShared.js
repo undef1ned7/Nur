@@ -100,3 +100,4 @@ export const extractWarehouseApiError = (
   if (Array.isArray(d) && d.length) return String(d[0]);
   return fallback;
 };
+

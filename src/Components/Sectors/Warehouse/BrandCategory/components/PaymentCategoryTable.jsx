@@ -68,3 +68,4 @@ const PaymentCategoryTable = ({
 };
 
 export default React.memo(PaymentCategoryTable);
+

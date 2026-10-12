@@ -88,3 +88,4 @@ const SummaryList = ({ items = [], loading, onOpen, onEdit, onDelete, onPdf }) =
 };
 
 export default SummaryList;
+

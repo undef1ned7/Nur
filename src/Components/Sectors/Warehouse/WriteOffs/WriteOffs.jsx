@@ -175,3 +175,4 @@ const WarehouseWriteOffs = () => {
 };
 
 export default WarehouseWriteOffs;
+

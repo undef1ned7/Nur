@@ -316,3 +316,4 @@ const SummaryCreateModal = ({ date, summary, onClose, onSaved }) => {
 };
 
 export default SummaryCreateModal;
+

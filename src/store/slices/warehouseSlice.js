@@ -370,3 +370,4 @@ export const {
 } = warehouseSlice.actions;
 
 export default warehouseSlice.reducer;
+
